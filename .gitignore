@@ -1,0 +1,70 @@
+# ---------------------
+# OS
+# ---------------------
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# ---------------------
+# Go
+# ---------------------
+# Binaries
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+
+# Vendor folder (optional, if using Go modules you usually ignore it)
+vendor/
+
+# Go cache
+*.mod.cache
+*.sum
+*.lock
+
+# IDE/editor
+.idea/
+*.iml
+*.vscode/
+
+# ---------------------
+# Node / Vite / React
+# ---------------------
+# Node modules
+node_modules/
+
+# Build outputs
+dist/
+build/
+.out/
+*.local
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Vite cache
+.vite/
+
+# TypeScript
+*.tsbuildinfo
+
+# Misc
+.DS_Store
