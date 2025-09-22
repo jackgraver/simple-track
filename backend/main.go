@@ -3,6 +3,8 @@ package main
 import (
 	"be-simpletracker/db"
 	"be-simpletracker/handlers"
+	"be-simpletracker/mealplanner"
+	"be-simpletracker/workout"
 	"time"
 
 	"github.com/gin-contrib/cors"
@@ -11,7 +13,7 @@ import (
 
 func main() {
 	db := db.ConnectToDB()
-	
+
 	h := handlers.NewHandlers(db)
 
 	router := gin.Default()
@@ -26,6 +28,9 @@ func main() {
 
 	router.SetTrustedProxies(nil)
 
+	mealplanner.SetEndpoints(router, h)
+	workout.SetEndpoints(router, h)
+
 	router.GET("/api/foods", h.GetFoods)
 	router.POST("/api/foods", h.AddFood)
 
@@ -36,6 +41,6 @@ func main() {
 
 	router.GET("/api/today-meal-plan", h.GetTodayMealPlan)
 	router.GET("/api/meal-plan-days", h.GetMealPlanDays)
-	
+
 	router.Run("127.0.0.1:8080")
 }
