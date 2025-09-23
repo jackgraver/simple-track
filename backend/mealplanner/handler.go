@@ -1,27 +1,28 @@
 package mealplanner
 
 import (
-    "net/http"
+	"net/http"
+	"time"
 
-    "be-simpletracker/handlers"
-
-    "github.com/gin-gonic/gin"
+	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
-var MealPlanHandler *handlers.Handlers
+var mealplannerDB *gorm.DB
 
-func SetEndpoints(router *gin.Engine, h *handlers.Handlers) {
-    MealPlanHandler = h
+func SetEndpoints(router *gin.Engine, db *gorm.DB) {
+    mealplannerDB = db
 
     group := router.Group("/mealplan")
-    group.GET("/today", getToday)
-    group.GET("/week", getWeek)
-    group.GET("/foods/all", getAllFoods)
-    group.GET("/meals/all", getAllMeals)
+    group.GET("/today", getMealPlanToday)
+    group.GET("/week", getMealPlanWeek)
+    group.GET("/goals/today", getGoalsToday)
+    group.GET("/food/all", getAllFoods)
+    group.GET("/meal/all", getAllMeals)
 }
 
-func getToday(c *gin.Context) {
-    data, err := Today(MealPlanHandler.DB)
+func getMealPlanToday(c *gin.Context) {
+    data, err := MealPlanToday(mealplannerDB)
     if err != nil {
         c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
         return
@@ -29,8 +30,20 @@ func getToday(c *gin.Context) {
     c.JSON(http.StatusOK, data)
 }
 
-func getWeek(c *gin.Context) {
-    data, err := Week(MealPlanHandler.DB)
+func getMealPlanWeek(c *gin.Context) {
+    data, err := MealPlanWeek(mealplannerDB)
+    if err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+        return
+    }
+    c.JSON(http.StatusOK, gin.H{
+		"days": data,
+		"today": time.Now(),
+	})
+}
+
+func getGoalsToday(c *gin.Context) {
+    data, err := GoalsToday(mealplannerDB)
     if err != nil {
         c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
         return
@@ -39,7 +52,7 @@ func getWeek(c *gin.Context) {
 }
 
 func getAllFoods(c *gin.Context) {
-    data, err := AllFoods(MealPlanHandler.DB)
+    data, err := AllFoods(mealplannerDB)
     if err != nil {
         c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
         return
@@ -48,7 +61,7 @@ func getAllFoods(c *gin.Context) {
 }
 
 func getAllMeals(c *gin.Context) {
-    data, err := AllMeals(MealPlanHandler.DB)
+    data, err := AllMeals(mealplannerDB)
     if err != nil {
         c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
         return

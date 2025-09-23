@@ -1,17 +1,16 @@
 package workout
 
 import (
-    "net/http"
+	"net/http"
 
-    "be-simpletracker/handlers"
-
-    "github.com/gin-gonic/gin"
+	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
-var WorkoutHandler *handlers.Handlers
+var workoutDB *gorm.DB
 
-func SetEndpoints(router *gin.Engine, h *handlers.Handlers) {
-    WorkoutHandler = h
+func SetEndpoints(router *gin.Engine, db *gorm.DB) {
+    workoutDB = db
 
     group := router.Group("/workout")
     group.GET("/today", handleGetToday)
@@ -21,7 +20,7 @@ func SetEndpoints(router *gin.Engine, h *handlers.Handlers) {
 }
 
 func handleGetToday(c *gin.Context) {
-    day, err := GetToday(WorkoutHandler.DB)
+    day, err := GetToday(workoutDB)
     if err != nil {
         c.JSON(http.StatusNotImplemented, gin.H{"error": err.Error()})
         return
@@ -30,7 +29,7 @@ func handleGetToday(c *gin.Context) {
 }
 
 func handleGetWeek(c *gin.Context) {
-    days, err := GetWeek(WorkoutHandler.DB)
+    days, err := GetWeek(workoutDB)
     if err != nil {
         c.JSON(http.StatusNotImplemented, gin.H{"error": err.Error()})
         return
@@ -39,7 +38,7 @@ func handleGetWeek(c *gin.Context) {
 }
 
 func handleGetAllExercises(c *gin.Context) {
-    items, err := GetAllExercises(WorkoutHandler.DB)
+    items, err := GetAllExercises(workoutDB)
     if err != nil {
         c.JSON(http.StatusNotImplemented, gin.H{"error": err.Error()})
         return
@@ -56,7 +55,7 @@ func handleAddExercise(c *gin.Context) {
         return
     }
 
-    ex, err := AddExercise(WorkoutHandler.DB, req.Name)
+    ex, err := AddExercise(workoutDB, req.Name)
     if err != nil {
         c.JSON(http.StatusNotImplemented, gin.H{"error": err.Error()})
         return
