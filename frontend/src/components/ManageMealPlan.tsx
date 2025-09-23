@@ -1,20 +1,18 @@
 import { useFetchQuery } from "../hooks/useApi";
-import type { Meal, MealItem, MealPlanDay } from "../types/models";
+import type { MealPlanDay } from "../types/models";
 import { formatDateShort, isSameDay } from "../util/dateUtil";
 
 export default function ManageMealPlan() {
     const { data, isLoading, error } = useFetchQuery<{
         today: string;
         days: MealPlanDay[];
-    }>("meal-plan-days", "/meal-plan-days");
+    }>("meal-plan-week", "/mealplan/week");
 
     if (isLoading) return <p>Loading...</p>;
     if (error) return <p>Error loading meal plan days: {error.message}</p>;
 
     const days = data?.days;
     const today = data?.today;
-
-    console.log(today);
 
     return (
         <div className="flex flex-row gap-x-4 pt-12">
@@ -47,14 +45,28 @@ export default function ManageMealPlan() {
                         <div>
                             <h4>Expected</h4>
                             {expectedMeals?.map((dayMeal) => (
-                                <p key={dayMeal.meal.id}>{dayMeal.meal.name}</p>
+                                <p
+                                    key={
+                                        dayMeal.meal_plan_day_id +
+                                        dayMeal.meal_id
+                                    }
+                                >
+                                    {dayMeal.meal.name}
+                                </p>
                             ))}
                         </div>
 
                         <div>
                             <h4>Actual</h4>
                             {actualMeals?.map((dayMeal) => (
-                                <p key={dayMeal.meal.id}>{dayMeal.meal.name}</p>
+                                <p
+                                    key={
+                                        dayMeal.meal_plan_day_id +
+                                        dayMeal.meal_id
+                                    }
+                                >
+                                    {dayMeal.meal.name}
+                                </p>
                             ))}
                         </div>
                     </div>

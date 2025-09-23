@@ -28,7 +28,7 @@ export interface Meal extends BaseModel {
 
 export interface DayMeal extends BaseModel {
     id: number;
-    day_id: number;
+    meal_plan_day_id: number;
     meal_id: number;
     meal: Meal;
     status: string;

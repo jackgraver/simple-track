@@ -22,8 +22,8 @@ function TodayProgress() {
     //     "/daily-totals",
     // );
     const dailyGoalsQuery = useFetchQuery<DailyGoals>(
-        "daily-goals",
-        "/daily-goals",
+        "today-goals",
+        "mealplan/goals/today",
     );
 
     // if (dailyTotalsQuery.isLoading || dailyGoalsQuery.isLoading) {
@@ -37,7 +37,7 @@ function TodayProgress() {
 
     const totals = dailyTotalsQuery;
     const goals = dailyGoalsQuery.data;
-
+    console.log(goals);
     const percentage =
         totals && goals
             ? {

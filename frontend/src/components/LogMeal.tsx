@@ -21,7 +21,7 @@ function LogMeal() {
         data: foods,
         isLoading: foodsLoading,
         error: foodsError,
-    } = useFetchQuery<Food[]>("foods", "/foods");
+    } = useFetchQuery<Food[]>("food-all", "mealplan/food/all");
 
     const fillExpectedMeals = (meal: any) => {
         setCurrentMeal({
@@ -218,7 +218,7 @@ function SearchMeals({
         data: mealNames,
         isLoading,
         error,
-    } = useFetchQuery<Meal[]>("meal-names", "/meals");
+    } = useFetchQuery<Meal[]>("meal-names", "mealplan/meal/all");
 
     if (isLoading) return <p>Loading...</p>;
     if (error) return <p>Error loading meals: {error.message}</p>;

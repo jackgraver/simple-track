@@ -6,7 +6,7 @@ export default function AddExpected({ onMealSelect }: any) {
     const { data, isLoading, error } = useFetchQuery<{
         date: string;
         days: MealPlanDay[];
-    }>("today-meal-plan", "/today-meal-plan");
+    }>("meal-plan-today", "/mealplan/today");
 
     if (isLoading) return <p>Loading...</p>;
     if (error) return <p>Error loading meal plan: {error.message}</p>;
