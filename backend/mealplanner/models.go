@@ -14,85 +14,62 @@ func MigrateMealPlanDatabase(db *gorm.DB) {
 }
 
 func seed(db *gorm.DB) {
-	chicken := Food{Name: "Chicken Breast", Unit: "g", Calories: 1.65, Protein: 0.31, Fiber: 0}
-	rice    := Food{Name: "White Rice", Unit: "g", Calories: 1.30, Protein: 0.02, Fiber: 0.01}
-	yogurt  := Food{Name: "Greek Yogurt", Unit: "g", Calories: 0.59, Protein: 0.10, Fiber: 0}
-	berries := Food{Name: "Blueberries", Unit: "g", Calories: 0.57, Protein: 0.01, Fiber: 0.025}
+	egg := Food{Name: "Egg", Unit: "Serving", Calories: 140, Protein: 12, Fiber: 0}
+	sausage    := Food{Name: "Maple Breakfast Sausage", Unit: "Serving", Calories: 140, Protein: 12, Fiber: 0}
+	keto_bread  := Food{Name: "Keto Bread", Unit: "Serving", Calories: 140, Protein: 12, Fiber: 15}
+	blueberries := Food{Name: "Blueberries", Unit: "Serving", Calories: 20, Protein: 0.3, Fiber: 0.9}
+	kiwi := Food{Name: "Kiwi", Unit: "Piece", Calories: 40, Protein: 0.8, Fiber: 2}
 
-	db.Create(&chicken)
+	db.Create(&egg)
+	db.Create(&sausage)
+	db.Create(&keto_bread)
+	db.Create(&blueberries)
+	db.Create(&kiwi)
+
+	beef := Food{Name: "Beef", Unit: "Serving", Calories: 200, Protein: 24, Fiber: 0} 
+	rice    := Food{Name: "Rice", Unit: "Serving", Calories: 80, Protein: 0, Fiber: 0}
+	vegetables  := Food{Name: "Vegetables", Unit: "Serving", Calories: 50, Protein: 1, Fiber: 2}
+
+	db.Create(&beef)
 	db.Create(&rice)
-	db.Create(&yogurt)
-	db.Create(&berries)
+	db.Create(&vegetables)
 	
-	chickenRice := Meal{
-		Name: "Chicken & Rice Bowl",
+	breakfast := Meal{
+		Name: "Egg & Sausage Breakfast",
 		Items: []MealItem{
-			{FoodID: chicken.ID, Amount: 200},
-			{FoodID: rice.ID, Amount: 100},
+			{FoodID: egg.ID, Amount: 1},
+			{FoodID: sausage.ID, Amount: 2},
+			{FoodID: keto_bread.ID, Amount: 1},
+			{FoodID: blueberries.ID, Amount: 1},
+			{FoodID: kiwi.ID, Amount: 1},
 		},
 	}
-	proteinBreakfast := Meal{
-		Name: "Protein Breakfast",
-		Items: []MealItem{
-			{FoodID: chicken.ID, Amount: 200},
-			{FoodID: rice.ID, Amount: 100},
-		},
-	}
-	greekYogurt := Meal{
-		Name: "Greek Yogurt Bowl",
-		Items: []MealItem{
-			{FoodID: chicken.ID, Amount: 200},
-			{FoodID: rice.ID, Amount: 100},
-		},
-	}
-	
-	db.Create(&chickenRice)
-	db.Create(&proteinBreakfast)
-	db.Create(&greekYogurt)
 
-	// 2. Create day with meals and items
-	day1 := MealPlanDay{
-		Date: time.Date(2025, time.September, 20, 0, 0, 0, 0, time.UTC),
-		Meals: []DayMeal{
-			{MealID: chickenRice.ID, Status: "expected"},
-			{MealID: chickenRice.ID, Status: "actual"},
-		},
-		Goals: DayGoals{
-			Calories: 2000,
-			Protein:  150,
-			Fiber:    65,
+	dinner := Meal{
+		Name: "Ground Beef Bowl",
+		Items: []MealItem{
+			{FoodID: beef.ID, Amount: 1},
+			{FoodID: rice.ID, Amount: 1},
+			{FoodID: vegetables.ID, Amount: 1},
 		},
 	}
-	db.Create(&day1)
 	
-	day2 := MealPlanDay{
-		Date: time.Date(2025, time.September, 21, 0, 0, 0, 0, time.UTC),
-		Meals: []DayMeal{
-			{MealID: proteinBreakfast.ID, Status: "expected"},
-			{MealID: proteinBreakfast.ID, Status: "actual"},
-			{MealID: greekYogurt.ID, Status: "expected"},
-		},
-		Goals: DayGoals{
-			Calories: 1900,
-			Protein:  160,
-			Fiber:    45,
-		},
-	}
-	db.Create(&day2)
+	db.Create(&breakfast)
+	db.Create(&dinner)
 
 	year := 2025
 	month := time.September
 	daysInMonth := 30 // September has 30 days
 
 	for day := 1; day <= daysInMonth; day++ {
-		if day == 20 || day == 21 {
-			continue
-		}
-
 		date := time.Date(year, month, day, 0, 0, 0, 0, time.UTC)
 
 		mpd := MealPlanDay{
 			Date: date,
+			Meals: []DayMeal{
+				{MealID: breakfast.ID, Status: "expected"},
+				{MealID: dinner.ID, Status: "expected"},
+			},
 			Goals: DayGoals{
 				Calories: 2000,
 				Protein:  150,

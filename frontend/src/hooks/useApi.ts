@@ -16,6 +16,11 @@ async function fetcher<T>(url: string): Promise<T> {
     return res.data;
 }
 
+export async function poster<T>(url: string, data: any): Promise<T> {
+    const res = await api.post<T>(url, data);
+    return res.data;
+}
+
 export function useFetchQuery<T>(
     key: string | unknown[],
     url: string,

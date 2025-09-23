@@ -62,8 +62,29 @@ func AllFoods(db *gorm.DB) ([]Food, error) {
 
 func AllMeals(db *gorm.DB) ([]Meal, error) {
     var meals []Meal
-    if err := db.Find(&meals).Distinct("name").Error; err != nil {
+    if err := db.Preload("Items.Food").Find(&meals).Distinct("name").Error; err != nil {
         return nil, err
     }
     return meals, nil
+}
+
+func FindMealPlanDay(db *gorm.DB, date time.Time) (*MealPlanDay, error) {
+    var day MealPlanDay
+    err := db.Where("date = ?", date).First(&day).Error
+    if err != nil {
+        if err == gorm.ErrRecordNotFound {
+            // Explicitly return nil if no record exists
+            return nil, nil
+        }
+        return nil, err
+    }
+    return &day, nil
+}
+
+
+func CreateDayMeal(db *gorm.DB, dayMeal DayMeal) error {
+    if err := db.Create(&dayMeal).Error; err != nil {
+        return err
+    }
+    return nil
 }

@@ -37,7 +37,7 @@ function TodayProgress() {
 
     const totals = dailyTotalsQuery;
     const goals = dailyGoalsQuery.data;
-    console.log(goals);
+
     const percentage =
         totals && goals
             ? {

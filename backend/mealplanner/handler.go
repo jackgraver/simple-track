@@ -19,6 +19,7 @@ func SetEndpoints(router *gin.Engine, db *gorm.DB) {
     group.GET("/goals/today", getGoalsToday)
     group.GET("/food/all", getAllFoods)
     group.GET("/meal/all", getAllMeals)
+    group.POST("/meal/log", logMeal)
 }
 
 func getMealPlanToday(c *gin.Context) {
@@ -27,7 +28,10 @@ func getMealPlanToday(c *gin.Context) {
         c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
         return
     }
-    c.JSON(http.StatusOK, data)
+    c.JSON(http.StatusOK, gin.H{
+		"days": data,
+		"today": time.Now(),
+	})
 }
 
 func getMealPlanWeek(c *gin.Context) {
@@ -67,4 +71,42 @@ func getAllMeals(c *gin.Context) {
         return
     }
     c.JSON(http.StatusOK, data)
+}
+
+type CreateDayMealRequest struct {
+	MealID uint   `json:"meal_id"`
+	Status string `json:"status"`
+}
+
+func logMeal(c *gin.Context) {
+	var req CreateDayMealRequest
+	if err := c.BindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Parse date or use today
+	dayDate := time.Now().Truncate(24 * time.Hour)
+
+	// Find or create MealPlanDay
+    // var day MealPlanDay
+    day, derr := FindMealPlanDay(mealplannerDB, dayDate)
+    if derr != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{"error": derr.Error()})
+        return
+    }
+
+	// Create DayMeal
+	dayMeal := DayMeal{
+		MealPlanDayID: day.ID,
+		MealID:        req.MealID,
+		Status:        req.Status,
+	}
+
+	if err := CreateDayMeal(mealplannerDB, dayMeal); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, dayMeal)
 }

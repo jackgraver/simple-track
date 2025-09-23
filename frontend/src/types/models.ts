@@ -4,7 +4,7 @@ export interface BaseModel {
 }
 
 export interface Food extends BaseModel {
-    id: number;
+    ID: number;
     name: string;
     unit: string;
     calories: number;
@@ -13,7 +13,7 @@ export interface Food extends BaseModel {
 }
 
 export interface MealItem extends BaseModel {
-    id: number;
+    ID: number;
     meal_id: number;
     food_id: number;
     food?: Food;
@@ -21,13 +21,13 @@ export interface MealItem extends BaseModel {
 }
 
 export interface Meal extends BaseModel {
-    id: number;
+    ID: number;
     name: string;
     items: MealItem[];
 }
 
 export interface DayMeal extends BaseModel {
-    id: number;
+    ID: number;
     meal_plan_day_id: number;
     meal_id: number;
     meal: Meal;
@@ -35,7 +35,7 @@ export interface DayMeal extends BaseModel {
 }
 
 export interface DayGoals extends BaseModel {
-    id: number;
+    ID: number;
     day_id: number;
     calories: number;
     protein: number;
@@ -43,14 +43,14 @@ export interface DayGoals extends BaseModel {
 }
 
 export interface MealPlanDay extends BaseModel {
-    id: number;
+    ID: number;
     date: string;
     meals: DayMeal[];
     goals: DayGoals;
 }
 
 export interface MealLog {
-    id: number;
+    ID: number;
     date: string;
     meal_id: number;
     meal: Meal;

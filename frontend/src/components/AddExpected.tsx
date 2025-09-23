@@ -24,7 +24,7 @@ export default function AddExpected({ onMealSelect }: any) {
                 {expectedMeals?.map((dayMeal: DayMeal) => (
                     <button
                         onClick={() => onMealSelect(dayMeal.meal)}
-                        key={dayMeal.meal.id}
+                        key={dayMeal.meal.ID}
                         className="hover:bg-emerald-600"
                     >
                         <span className="flex flex-row gap-x-2">
