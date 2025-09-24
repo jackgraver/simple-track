@@ -1,8 +1,13 @@
 import { useFetchQuery } from "../hooks/useApi";
 import type { MealPlanDay } from "../types/models";
-import { formatDateShort, isSameDay } from "../util/dateUtil";
+import { dayOfWeek, formatDateShort, isSameDay } from "../util/dateUtil";
+import { usePopup } from "../hooks/usePopup";
+
+import { useGlobalPopup } from "../context/PopupContext";
 
 export default function ManageMealPlan() {
+    const popup = useGlobalPopup();
+
     const { data, isLoading, error } = useFetchQuery<{
         today: string;
         days: MealPlanDay[];
@@ -28,8 +33,12 @@ export default function ManageMealPlan() {
                     <div
                         key={i}
                         className={`mb-4 rounded-lg border border-gray-300 p-4 ${today && isSameDay(today, day.date) ? "bg-gray-600" : ""}`}
+                        onClick={() => popup.open(<h1>Hello</h1>)}
                     >
-                        <p className="font-bold">{formatDateShort(day.date)}</p>
+                        <p className="font-bold">
+                            {formatDateShort(day.date)}({dayOfWeek(2025, 9, 23)}
+                            )
+                        </p>
                         <span className="flex flex-row gap-x-2">
                             <p className="text-orange-400">
                                 C {day.goals.calories}

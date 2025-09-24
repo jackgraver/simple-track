@@ -22,3 +22,9 @@ export function isSameDay(a: string | Date, b: string | Date): boolean {
         dateA.getUTCDate() === dateB.getUTCDate()
     );
 }
+
+export function dayOfWeek(year: number, month: number, day: number): string {
+    // JS months are 0-based, so subtract 1
+    const date = new Date(year, month - 1, day);
+    return date.toLocaleDateString("en-US", { weekday: "long" });
+}
