@@ -1,6 +1,7 @@
 <script lang="ts" setup>
 import type { MealPlanDay } from "~/types/models";
 import { computed } from "vue";
+import { useApiFetch } from "~/composables/useApiFetch";
 
 const { data, pending, error } = useApiFetch<{
     date: string;
@@ -21,7 +22,7 @@ const expectedMeals = computed(() => {
     <div v-if="pending">Loading...</div>
     <div v-else-if="error">Error: {{ error.message }}</div>
     <div v-else>
-        <button v-for="meal in expectedMeals" :key="meal.ID">
+        <button v-for="meal in expectedMeals" :key="meal.ID" @click="$emit('set-meal', meal)">
             {{ meal.meal.name }}
         </button>
     </div>
