@@ -1,64 +1,31 @@
 <script lang="ts" setup>
 import { reactive } from "vue";
-import type { Meal, MealItem, Food } from "~/types/models";
+import type { Meal, MealItem, Food, MealPlanDay } from "~/types/models";
 
 // Props: optional meal to prefill
 const props = defineProps<{ meal?: Meal }>();
 
-// Sample food list
-const foodOptions: Food[] = [
-    {
-        ID: 1,
-        name: "Apple",
-        unit: "piece",
-        calories: 95,
-        protein: 0.5,
-        fiber: 4,
-        created_at: "",
-        updated_at: "",
-    },
-    {
-        ID: 2,
-        name: "Banana",
-        unit: "piece",
-        calories: 105,
-        protein: 1.3,
-        fiber: 3,
-        created_at: "",
-        updated_at: "",
-    },
-];
+const { data: foodRes, pending, error } = useFetch<Food[]>("http://localhost:8080/mealplan/food/all");
+
+const foodOptions = foodRes?.value || [];
 
 // Reactive form state
 const form = reactive({
-    name: props.meal?.name || "",
-    items:
-        props.meal?.items.map((i) => ({
-            ...i,
-            food: i.food ? { ...i.food } : undefined,
-        })) || ([] as MealItem[]),
-    selectedFoodId: 0,
-    amount: 1,
+    name: "",
+    items: [] as MealItem[],
 });
 
 // Add a new food item to the meal
 function addFoodItem() {
-    if (!form.selectedFoodId || form.amount <= 0) return;
-    const food = foodOptions.find((f) => f.ID === form.selectedFoodId);
-    if (!food) return;
-
     const newItem: MealItem = {
-        ID: Date.now(), // temp unique ID for client side
-        meal_id: 0, // will be assigned by DB
-        food_id: food.ID,
-        food: food,
-        amount: form.amount,
+        ID: Date.now(),
+        meal_id: 0,
+        food_id: -1,
+        amount: -1,
         created_at: "",
         updated_at: "",
     };
     form.items.push(newItem);
-    form.selectedFoodId = 0;
-    form.amount = 1;
 }
 
 // Remove food item
@@ -90,39 +57,23 @@ function onSubmit(e: Event) {
 </script>
 
 <template>
+    <h1>Log Food</h1>
+    <ExpectedMeals @set-meal="(meal: MealPlanDay) => console.log(meal)"/>
     <form @submit="onSubmit">
-        <label for="mealName">Meal Name</label>
-        <input
-            id="mealName"
-            type="text"
-            v-model="form.name"
-            placeholder="Enter meal name"
-        />
-
-        <div>
-            <select v-model="form.selectedFoodId">
-                <option value="0">Select food</option>
-                <option
-                    v-for="food in foodOptions"
-                    :key="food.ID"
-                    :value="food.ID"
-                >
-                    {{ food.name }}
-                </option>
-            </select>
-            <input type="number" v-model.number="form.amount" min="1" />
-            <button type="button" @click="addFoodItem">Add Food Item</button>
-        </div>
-
+        <SearchMeals />
         <div
             v-for="(item, index) in form.items"
             :key="item.ID"
             style="margin: 4px 0"
         >
-            <span>{{ item.food?.name }} ({{ item.amount }})</span>
-            <button type="button" @click="removeFoodItem(index)">X</button>
+            <span>{{ item.food ? item.food.name : "No food" }}</span>
+            <!-- <select value={{ item.food.name }} selected>
+                <option v-for="value in foodOptions">{{ value.name }}</option>
+            </select> -->
+             <input type="number" v-model.number="item.amount" min="1" />
+            <!--<button type="button" class="delete-button" @click="removeFoodItem(index)">X</button> -->
         </div>
-
+        <button type="button" @click="addFoodItem">Add Food Item</button>
         <button type="submit">Submit Meal</button>
     </form>
 </template>
@@ -134,13 +85,7 @@ form {
     flex-direction: column;
 }
 
-input,
-select,
-button {
-    background: rgb(71, 71, 71);
-    color: white;
-    border: none;
-    padding: 4px;
-    margin: 4px 0;
+.delete-button {
+    background: rgb(255, 20, 20)
 }
 </style>

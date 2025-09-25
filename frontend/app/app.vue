@@ -22,4 +22,13 @@ button {
 button:hover {
     background: #4baeff;
 }
+
+input,
+select {
+    background: rgb(71, 71, 71);
+    color: white;
+    border: none;
+    padding: 4px;
+    margin: 4px 0;
+}
 </style>
