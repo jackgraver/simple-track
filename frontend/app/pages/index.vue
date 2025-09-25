@@ -1,3 +1,7 @@
+<script setup lang="ts"></script>
+
 <template>
-    <h1>Hello world!</h1>
+    <h1>Log Food</h1>
+    <ExpectedMeals />
+    <LogMeal />
 </template>

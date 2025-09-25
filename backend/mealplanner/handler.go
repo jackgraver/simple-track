@@ -56,6 +56,7 @@ func getGoalsToday(c *gin.Context) {
 }
 
 func getAllFoods(c *gin.Context) {
+    time.Sleep(3 * time.Second)
     data, err := AllFoods(mealplannerDB)
     if err != nil {
         c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
