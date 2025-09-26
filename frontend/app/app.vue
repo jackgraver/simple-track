@@ -19,7 +19,15 @@ button {
     border: none;
 }
 
-button:hover {
+button:disabled {
+    background: #ccc;
+}
+
+button:disabled:hover {
+    cursor: not-allowed;
+}
+
+button:hover && button:not(:disabled) {
     background: #4baeff;
 }
 

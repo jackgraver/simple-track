@@ -6,14 +6,16 @@ const {
     data: foodRes,
     pending,
     error,
-} = useApiFetch<Food[]>("mealplan/food/all");
+} = useFetch<Food[]>("mealplan/food/all");
 
 const foodOptions = foodRes && foodRes.value ? foodRes.value : [];
+console.log("Food options:", foodOptions);
 
 const currentMeal = ref<Meal | null>(null);
 
 // Reactive form state
 const form = reactive({
+    ID: -1,
     name: "",
     items: [] as Partial<MealItem>[],
 });
@@ -21,6 +23,7 @@ const form = reactive({
 // When a preset meal is selected, fill the form
 watch(currentMeal, (meal) => {
     if (meal) {
+        form.ID = meal.ID;
         form.name = meal.name;
         form.items = meal.items.map((i) => ({
             ...i,
@@ -75,7 +78,7 @@ function onFoodSelect(item: MealItem) {
 function onSubmit(e: Event) {
     e.preventDefault();
     const newMeal: Meal = {
-        ID: Date.now(),
+        ID: currentMeal.value?.ID ?? -1,
         name: form.name,
         items: form.items.map((i) => ({
             ID: i.ID!,
@@ -132,7 +135,7 @@ function onSubmit(e: Event) {
             </button>
         </div>
         <button type="button" @click="addFoodItem">Add Food Item</button>
-        <button type="submit">Submit Meal</button>
+        <button type="submit" :disabled="!currentMeal?.name || currentMeal?.items.length === 0">Submit Meal</button>
     </form>
 </template>
 
