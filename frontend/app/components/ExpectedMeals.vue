@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import type { MealPlanDay } from "~/types/models";
+import type { Meal, MealItem, MealPlanDay } from "~/types/models";
 import { computed } from "vue";
 import { useApiFetch } from "~/composables/useApiFetch";
 
@@ -16,14 +16,24 @@ const expectedMeals = computed(() => {
         ) || []
     );
 });
+
+const emit = defineEmits<{ (e: "selectMeal", meal: Meal): void }>();
+
+function submitMeal(meal: Meal) {
+    emit("selectMeal", meal);
+}
 </script>
 
 <template>
     <div v-if="pending">Loading...</div>
     <div v-else-if="error">Error: {{ error.message }}</div>
     <div v-else>
-        <button v-for="meal in expectedMeals" :key="meal.ID" @click="$emit('set-meal', meal)">
-            {{ meal.meal.name }}
+        <button
+            v-for="dayMeal in expectedMeals"
+            :key="dayMeal.ID"
+            @click="submitMeal(dayMeal.meal)"
+        >
+            {{ dayMeal.meal.name }}
         </button>
     </div>
 </template>
