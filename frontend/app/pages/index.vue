@@ -2,4 +2,5 @@
 
 <template>
     <LogMeal />
+    <ManageMealPlan />
 </template>

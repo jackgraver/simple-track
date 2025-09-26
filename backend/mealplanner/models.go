@@ -68,6 +68,7 @@ func seed(db *gorm.DB) {
 			Date: date,
 			Meals: []DayMeal{
 				{MealID: breakfast.ID, Status: "expected"},
+				{MealID: breakfast.ID, Status: "actual"},
 				{MealID: dinner.ID, Status: "expected"},
 			},
 			Goals: DayGoals{
