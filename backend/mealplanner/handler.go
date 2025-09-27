@@ -1,6 +1,7 @@
 package mealplanner
 
 import (
+	"fmt"
 	"net/http"
 	"time"
 
@@ -75,39 +76,69 @@ func getAllMeals(c *gin.Context) {
 }
 
 type CreateDayMealRequest struct {
-	MealID uint   `json:"meal_id"`
-	Status string `json:"status"`
+    MealID uint       `json:"meal_id"`
+    Name   string     `json:"name"`
+    Items  []MealItem `json:"items"`
 }
 
 func logMeal(c *gin.Context) {
-	var req CreateDayMealRequest
-	if err := c.BindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
+    var req CreateDayMealRequest
+    if err := c.BindJSON(&req); err != nil {
+        fmt.Println("BindJSON error:", err) // log to console
+        c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+        return
+    }
 
-	// Parse date or use today
-	dayDate := time.Now().Truncate(24 * time.Hour)
-
-	// Find or create MealPlanDay
-    // var day MealPlanDay
+    // 1. Find or create MealPlanDay
+    dayDate := time.Now().Truncate(24 * time.Hour)
     day, derr := FindMealPlanDay(mealplannerDB, dayDate)
     if derr != nil {
         c.JSON(http.StatusInternalServerError, gin.H{"error": derr.Error()})
         return
     }
 
-	// Create DayMeal
-	dayMeal := DayMeal{
-		MealPlanDayID: day.ID,
-		MealID:        req.MealID,
-		Status:        req.Status,
-	}
+    var mealID uint
 
-	if err := CreateDayMeal(mealplannerDB, dayMeal); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
+    fmt.Println("req.MealID", req.MealID)
+    if req.MealID != 0 {
+        fmt.Println("Meal Exists")
+        // Meal exists: use it
+        mealID = req.MealID
+    } else {
+        fmt.Println("Meal Doesn't Exist")
+        // Meal doesn't exist: create it
+        if req.Name == "" {
+            c.JSON(http.StatusBadRequest, gin.H{"error": "Meal name is required for new meal"})
+            return
+        }
 
-	c.JSON(http.StatusOK, dayMeal)
+        newMeal := Meal{
+            Name:  req.Name,
+            Items: req.Items,
+        }
+
+        if err := mealplannerDB.Create(&newMeal).Error; err != nil {
+            c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+            return
+        }
+
+        mealID = newMeal.ID
+    }
+
+    // 2. Create DayMeal
+    dayMeal := DayMeal{
+        MealPlanDayID: day.ID,
+        MealID:        mealID,
+        Status:        "actual",
+    }
+
+    if err := CreateDayMeal(mealplannerDB, &dayMeal); err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+        return
+    }
+
+    // Optionally preload Meal and Items for response
+    mealplannerDB.Preload("Meal.Items").First(&dayMeal, dayMeal.ID)
+
+    c.JSON(http.StatusOK, dayMeal)
 }

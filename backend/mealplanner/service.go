@@ -82,7 +82,7 @@ func FindMealPlanDay(db *gorm.DB, date time.Time) (*MealPlanDay, error) {
 }
 
 
-func CreateDayMeal(db *gorm.DB, dayMeal DayMeal) error {
+func CreateDayMeal(db *gorm.DB, dayMeal *DayMeal) error {
     if err := db.Create(&dayMeal).Error; err != nil {
         return err
     }

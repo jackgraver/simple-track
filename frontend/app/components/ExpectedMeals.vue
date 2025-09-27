@@ -3,6 +3,10 @@ import type { Meal, MealItem, MealPlanDay } from "~/types/models";
 import { computed } from "vue";
 import { useApiFetch } from "~/composables/useApiFetch";
 
+const props = defineProps<{
+    confirmMeal: (meal: Meal) => void;
+}>();
+
 const { data, pending, error } = useApiFetch<{
     date: string;
     days: MealPlanDay[];
@@ -17,9 +21,12 @@ const expectedMeals = computed(() => {
     );
 });
 
+const confirm = ref(-1);
+
 const emit = defineEmits<{ (e: "selectMeal", meal: Meal): void }>();
 
 function submitMeal(meal: Meal) {
+    confirm.value = meal.ID;
     emit("selectMeal", meal);
 }
 </script>
@@ -31,9 +38,21 @@ function submitMeal(meal: Meal) {
         <button
             v-for="dayMeal in expectedMeals"
             :key="dayMeal.ID"
-            @click="submitMeal(dayMeal.meal)"
+            @click="
+                confirm === dayMeal.meal.ID
+                    ? confirmMeal(dayMeal.meal)
+                    : submitMeal(dayMeal.meal)
+            "
+            :class="confirm === dayMeal.meal.ID ? 'confirm-meal' : ''"
         >
             {{ dayMeal.meal.name }}
         </button>
     </div>
 </template>
+
+<style scoped>
+button.confirm-meal {
+    background-color: rgb(84, 231, 39);
+    color: white;
+}
+</style>
