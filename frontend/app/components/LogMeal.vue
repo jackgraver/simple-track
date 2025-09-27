@@ -6,16 +6,15 @@ const {
     data: foodRes,
     pending,
     error,
-} = useFetch<Food[]>("mealplan/food/all");
+} = useApiFetch<Food[]>("mealplan/food/all");
 
 const foodOptions = foodRes && foodRes.value ? foodRes.value : [];
-console.log("Food options:", foodOptions);
 
 const currentMeal = ref<Meal | null>(null);
 
 // Reactive form state
 const form = reactive({
-    ID: -1,
+    ID: 0,
     name: "",
     items: [] as Partial<MealItem>[],
 });
@@ -33,24 +32,26 @@ watch(currentMeal, (meal) => {
 });
 
 function newMealName(name: string) {
+    console.log("newMealName", name);
     form.name = name;
     form.items = [
         {
-            ID: -1,
-            meal_id: currentMeal.value?.ID ?? -1,
-            food_id: -1,
+            ID: 0,
+            meal_id: currentMeal.value?.ID ?? 0,
+            food_id: 0,
             amount: 0,
             food: undefined,
         },
     ];
+    console.log("form", form);
 }
 
 // Add a new empty food item
 function addFoodItem() {
     form.items.push({
-        ID: -1,
-        meal_id: currentMeal.value?.ID ?? -1,
-        food_id: -1,
+        ID: 0,
+        meal_id: currentMeal.value?.ID ?? 0,
+        food_id: 0,
         amount: 0,
         food: undefined,
     });
@@ -63,11 +64,11 @@ function removeFoodItem(index: number) {
 
 function onFoodSelect(item: MealItem) {
     item.food = foodOptions.find((f) => f.ID === item.food_id);
-    if (currentMeal && item.food_id !== -1) {
+    if (currentMeal && item.food_id !== 0) {
         const mealItem = currentMeal.value?.items.find(
             (mi) => mi.ID === item.ID,
         );
-        if (mealItem && mealItem.food_id === -1) {
+        if (mealItem && mealItem.food_id === 0) {
             mealItem.food_id = item.food_id!;
             mealItem.food = item.food;
         }
@@ -77,8 +78,8 @@ function onFoodSelect(item: MealItem) {
 // Submit the meal
 function onSubmit(e: Event) {
     e.preventDefault();
-    const newMeal: Meal = {
-        ID: currentMeal.value?.ID ?? -1,
+    const payload = {
+        meal_id: currentMeal.value?.ID ?? 0,
         name: form.name,
         items: form.items.map((i) => ({
             ID: i.ID!,
@@ -89,28 +90,58 @@ function onSubmit(e: Event) {
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
         })),
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
     };
-    console.log("Submitting meal:", newMeal);
-    // send to backend here
+    console.log("newMeal", payload);
+    const { data, error } = useApiFetch<Meal>("mealplan/meal/log", {
+        method: "POST",
+        body: payload,
+    });
+    if (error) {
+        console.log("error", error);
+    }
+    if (data) {
+        console.log("data", data);
+    }
+}
+
+function checkEmpty() {
+    // if (currentMeal?.value?.name || form.name) {
+    //     if (currentMeal.value?.items.length === 1 || form.items.length === 1) {
+    //         if (
+    //             currentMeal.value?.items[0]?.ID !== 0 ||
+    //             form.items[0]?.ID !== 0
+    //         ) {
+    //             return true;
+    //         }
+    //     } else if (
+    //         (currentMeal.value?.items.length ?? 0) > 1 ||
+    //         form.items.length > 1
+    //     ) {
+    //         return true;
+    //     }
+    // }
+    // return false;
+    return true;
 }
 </script>
 
 <template>
     <h1>Log Food</h1>
-    <ExpectedMeals @select-meal="(meal: Meal) => (currentMeal = meal)" />
+    <ExpectedMeals
+        @select-meal="(meal: Meal) => (currentMeal = meal)"
+        :confirmMeal="
+            (meal) => {
+                console.log('confirming meal', meal);
+            }
+        "
+    />
     <form @submit="onSubmit">
         <SearchMeals
+            :model-value="form.name"
+            @update:model-value="form.name = $event"
             @select-meal="(meal: Meal) => (currentMeal = meal)"
             @create-meal="newMealName"
         />
-        <!-- <input
-            type="text"
-            placeholder="Meal name..."
-            v-model="form.name"
-            style="margin-bottom: 8px"
-        /> -->
         <div
             v-for="(item, index) in form.items"
             :key="item.ID"
@@ -120,7 +151,7 @@ function onSubmit(e: Event) {
                 v-model="item.food_id"
                 @change="onFoodSelect(item as MealItem)"
             >
-                <option value="-1">Select food</option>
+                <option value="0">Select food</option>
                 <option v-for="f in foodOptions" :key="f.ID" :value="f.ID">
                     {{ f.name }}
                 </option>
@@ -134,8 +165,10 @@ function onSubmit(e: Event) {
                 X
             </button>
         </div>
-        <button type="button" @click="addFoodItem">Add Food Item</button>
-        <button type="submit" :disabled="!currentMeal?.name || currentMeal?.items.length === 0">Submit Meal</button>
+        <button type="button" @click="addFoodItem" v-if="checkEmpty()">
+            Add Food Item
+        </button>
+        <button type="submit" v-if="checkEmpty()">Submit Meal</button>
     </form>
 </template>
 

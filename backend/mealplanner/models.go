@@ -91,14 +91,6 @@ type MealPlanDay struct {
     Goals DayGoals    `json:"goals" gorm:"foreignKey:MealPlanDayID;constraint:OnUpdate:CASCADE,OnDelete:SET NULL"`
 }
 
-type DayGoals struct {
-    gorm.Model
-    MealPlanDayID uint    `json:"meal_plan_day_id" gorm:"uniqueIndex"` // each day has one goals record
-    Calories      float32 `json:"calories"`
-    Protein       float32 `json:"protein"`
-    Fiber         float32 `json:"fiber"`
-}
-
 type DayMeal struct {
     gorm.Model
     MealPlanDayID uint   `json:"meal_plan_day_id" gorm:"not null"` // FK back to MealPlanDay
@@ -111,6 +103,14 @@ type Meal struct {
     gorm.Model
     Name  string     `json:"name" gorm:"not null"`
     Items []MealItem `json:"items"`
+}
+
+type DayGoals struct {
+    gorm.Model
+    MealPlanDayID uint    `json:"meal_plan_day_id" gorm:"uniqueIndex"` // each day has one goals record
+    Calories      float32 `json:"calories"`
+    Protein       float32 `json:"protein"`
+    Fiber         float32 `json:"fiber"`
 }
 
 type MealItem struct {

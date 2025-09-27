@@ -1,6 +1,10 @@
 <script lang="ts" setup>
 import type { Meal } from "~/types/models";
 
+const props = defineProps<{
+    modelValue: string;
+}>();
+
 const {
     data: meals,
     pending,
@@ -8,6 +12,11 @@ const {
 } = useApiFetch<Meal[]>("mealplan/meal/all");
 
 let currentSearch = ref("");
+let showDropdown = ref(false);
+
+watch(currentSearch, (search) => {
+    emit("update:model-value", search);
+});
 
 const filteredMeals = computed(() => {
     if (!meals.value) return [];
@@ -19,16 +28,17 @@ const filteredMeals = computed(() => {
 const emit = defineEmits<{
     (e: "selectMeal", meal: Meal): void;
     (e: "createMeal", value: string): void;
+    (e: "update:model-value", value: string): void;
 }>();
 
 function createMeal(name: string) {
     emit("createMeal", name);
-    currentSearch.value = "";
+    showDropdown.value = false;
 }
 
 function submitMeal(meal: Meal) {
     emit("selectMeal", meal);
-    currentSearch.value = "";
+    showDropdown.value = false;
 }
 </script>
 <template>
@@ -36,15 +46,19 @@ function submitMeal(meal: Meal) {
         <input
             type="text"
             placeholder="Search meals..."
+            :value="modelValue"
             @input="
-                (e) => (currentSearch = (e.target as HTMLInputElement).value)
+                (e) => {
+                    currentSearch = (e.target as HTMLInputElement).value;
+                    showDropdown = true;
+                }
             "
         />
         <div v-if="pending">Loading Meals...</div>
         <div v-else-if="error">Error: {{ error.message }}</div>
-        <div v-else-if="currentSearch" class="dropdown">
+        <div v-else-if="showDropdown" class="dropdown">
             <div
-                v-if="currentSearch && filteredMeals.length === 0"
+                v-if="showDropdown && filteredMeals.length === 0"
                 @click="createMeal(currentSearch)"
             >
                 + Click to create new saved meal "{{ currentSearch }}"
