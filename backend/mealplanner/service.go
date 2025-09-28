@@ -16,19 +16,40 @@ func MealPlanToday(db *gorm.DB) ([]MealPlanDay, error) {
 	return days, nil
 }
 
-// MealPlanWeek returns a simple 7-day window centered on today
-func MealPlanWeek(db *gorm.DB) ([]MealPlanDay, error) {
+// MealPlanRange returns a simple 7-day window centered on today
+func MealPlanRange(db *gorm.DB, today time.Time, start time.Time, end time.Time) ([]MealPlanDay, error) {
     var days []MealPlanDay
-
-	today := time.Now()
-	start := today.AddDate(0, 0, -3) // 3 days before
-	end := today.AddDate(0, 0, 3)    // 3 days after
 
 	if err := db.
 		Preload("Meals.Meal.Items.Food").
 		Preload("Goals").
 		Where("date BETWEEN ? AND ?", start, end).
 		Order("date").
+		Find(&days).Error; err != nil {
+		return nil, err
+	}
+
+	return days, nil
+}
+
+func MealPlanDayByID(db *gorm.DB, id int) (*MealPlanDay, error) {
+    var day MealPlanDay
+
+    if err := db.
+        Preload("Meals.Meal.Items.Food").
+        Preload("Goals").
+		Preload("Meals").
+        First(&day, id).Error; err != nil {
+        return nil, err
+    }
+
+    return &day, nil
+}
+
+func AllMealDays(db *gorm.DB) ([]MealPlanDay, error) {
+    var days []MealPlanDay
+
+	if err := db.
 		Find(&days).Error; err != nil {
 		return nil, err
 	}
