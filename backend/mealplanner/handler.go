@@ -3,6 +3,7 @@ package mealplanner
 import (
 	"fmt"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -17,6 +18,8 @@ func SetEndpoints(router *gin.Engine, db *gorm.DB) {
     group := router.Group("/mealplan")
     group.GET("/today", getMealPlanToday)
     group.GET("/week", getMealPlanWeek)
+    group.GET("/month", getMealPlanMonth)
+    group.GET("/day/:id" , getMealPlanDay)
     group.GET("/goals/today", getGoalsToday)
     group.GET("/food/all", getAllFoods)
     group.GET("/meal/all", getAllMeals)
@@ -36,7 +39,10 @@ func getMealPlanToday(c *gin.Context) {
 }
 
 func getMealPlanWeek(c *gin.Context) {
-    data, err := MealPlanWeek(mealplannerDB)
+    today := time.Now()
+    start := today.AddDate(0, 0, -3) // 3 days before
+	end := today.AddDate(0, 0, 3)    // 3 days after
+    data, err := MealPlanRange(mealplannerDB, today, start, end)
     if err != nil {
         c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
         return
@@ -45,6 +51,40 @@ func getMealPlanWeek(c *gin.Context) {
 		"days": data,
 		"today": time.Now(),
 	})
+}
+
+func getMealPlanMonth(c *gin.Context) {
+    today := time.Now()
+    start := time.Date(today.Year(), today.Month(), 1, 0, 0, 0, 0, today.Location())
+    end := start.AddDate(0, 1, -1) 
+    data, err := MealPlanRange(mealplannerDB, today, start, end)
+    if err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+        return
+    }
+    c.JSON(http.StatusOK, gin.H{
+		"days": data,
+		"today": time.Now(),
+	})
+}
+
+func getMealPlanDay(c *gin.Context) {
+    id, err := strconv.Atoi(c.Param("id"))
+    if err != nil {
+        c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+        return
+    }
+    data, err := MealPlanDayByID(mealplannerDB, id)
+    if err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+        return
+    }
+    if data == nil {
+        c.JSON(http.StatusNotFound, gin.H{"error": "Not Found"})
+        return
+    }
+
+    c.JSON(http.StatusOK, data)
 }
 
 func getGoalsToday(c *gin.Context) {

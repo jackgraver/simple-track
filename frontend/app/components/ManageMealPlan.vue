@@ -9,46 +9,6 @@ const {
     today: string;
     days: MealPlanDay[];
 }>("mealplan/week");
-
-function totalCaloriesEaten(day: MealPlanDay): string {
-    return day.meals
-        .filter((dm) => dm.status === "actual") // only actual meals
-        .reduce((sum, dm) => {
-            // sum calories for each MealItem in the meal
-            const mealCalories = dm.meal.items.reduce((mealSum, item) => {
-                if (!item.food) return mealSum;
-                return mealSum + item.food.calories * item.amount;
-            }, 0);
-            return sum + mealCalories;
-        }, 0)
-        .toFixed(2);
-}
-function totalProteinEaten(day: MealPlanDay): string {
-    return day.meals
-        .filter((dm) => dm.status === "actual") // only actual meals
-        .reduce((sum, dm) => {
-            // sum calories for each MealItem in the meal
-            const mealProtein = dm.meal.items.reduce((mealSum, item) => {
-                if (!item.food) return mealSum;
-                return mealSum + item.food.protein * item.amount;
-            }, 0);
-            return sum + mealProtein;
-        }, 0)
-        .toFixed(2);
-}
-function totalFiberEaten(day: MealPlanDay): string {
-    return day.meals
-        .filter((dm) => dm.status === "actual") // only actual meals
-        .reduce((sum, dm) => {
-            // sum calories for each MealItem in the meal
-            const mealFiber = dm.meal.items.reduce((mealSum, item) => {
-                if (!item.food) return mealSum;
-                return mealSum + item.food.fiber * item.amount;
-            }, 0);
-            return sum + mealFiber;
-        }, 0)
-        .toFixed(2);
-}
 </script>
 
 <template>
@@ -66,7 +26,7 @@ function totalFiberEaten(day: MealPlanDay): string {
                         : '',
                 ]"
             >
-                <p>{{ formatDateShort(day.date) }}</p>
+                <p>{{ formatDate(day.date) }}</p>
                 <p>{{ dayOfWeek(day.date) }}</p>
                 <span>
                     <p class="calories">

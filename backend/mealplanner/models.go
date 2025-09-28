@@ -61,9 +61,9 @@ func seed(db *gorm.DB) {
 	month := time.September
 	daysInMonth := 30 // September has 30 days
 
-	for day := 1; day <= daysInMonth; day++ {
+	for day := 2; day <= daysInMonth + 1; day++ {
 		date := time.Date(year, month, day, 0, 0, 0, 0, time.UTC)
-
+		fmt.Println("date", date)
 		mpd := MealPlanDay{
 			Date: date,
 			Meals: []DayMeal{

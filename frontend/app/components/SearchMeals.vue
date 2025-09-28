@@ -1,22 +1,27 @@
 <script lang="ts" setup>
-import type { Meal } from "~/types/models";
+import type { Meal, MealItem } from "~/types/models";
 
 const props = defineProps<{
-    modelValue: string;
+    ID: number;
+    name: string;
+    items: Partial<MealItem>[];
 }>();
+
+const emit = defineEmits<{
+    (e: "update:ID", value: number): void;
+    (e: "update:name", value: string): void;
+    (e: "update:items", value: Partial<MealItem>[]): void;
+    (e: "createMeal", value: string): void;
+}>();
+
+let currentSearch = ref("");
+let showDropdown = ref(false);
 
 const {
     data: meals,
     pending,
     error,
 } = useApiFetch<Meal[]>("mealplan/meal/all");
-
-let currentSearch = ref("");
-let showDropdown = ref(false);
-
-watch(currentSearch, (search) => {
-    emit("update:model-value", search);
-});
 
 const filteredMeals = computed(() => {
     if (!meals.value) return [];
@@ -25,19 +30,15 @@ const filteredMeals = computed(() => {
     return meals.value.filter((m) => m.name.toLowerCase().includes(search));
 });
 
-const emit = defineEmits<{
-    (e: "selectMeal", meal: Meal): void;
-    (e: "createMeal", value: string): void;
-    (e: "update:model-value", value: string): void;
-}>();
-
 function createMeal(name: string) {
     emit("createMeal", name);
     showDropdown.value = false;
 }
 
 function submitMeal(meal: Meal) {
-    emit("selectMeal", meal);
+    emit("update:ID", meal.ID);
+    emit("update:name", meal.name);
+    emit("update:items", meal.items);
     showDropdown.value = false;
 }
 </script>
@@ -46,9 +47,10 @@ function submitMeal(meal: Meal) {
         <input
             type="text"
             placeholder="Search meals..."
-            :value="modelValue"
+            :value="props.name"
             @input="
                 (e) => {
+                    emit('update:name', (e.target as HTMLInputElement).value);
                     currentSearch = (e.target as HTMLInputElement).value;
                     showDropdown = true;
                 }
