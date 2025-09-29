@@ -1,24 +1,35 @@
 package workout
 
-import "time"
+import (
+	"time"
 
-// NOTE: DB/storage is intentionally not implemented yet.
-// These types model the intended domain for workouts.
+	"gorm.io/gorm"
+)
+func MigrateWorkoutDatabase(db *gorm.DB) {
+	// db.Migrator().DropTable(&Food{}, &Meal{}, &MealItem{}, &DayGoals{}, &MealPlanDay{}, &DayMeal{})
+	db.AutoMigrate(&Exercise{}, &ExerciseSet{}, &DayExercise{}, &WorkoutDay{}, &Cardio{})
+	// seed(db)
+}
+
+type Cardio struct {
+    Minutes int `json:"minutes"`
+    Type    string `json:"type"`
+}
 
 type Exercise struct {
-    ID   uint   `json:"id"`
+    gorm.Model
     Name string `json:"name"`
 }
 
 type ExerciseSet struct {
-    ID         uint    `json:"id"`
+    gorm.Model
     ExerciseID uint    `json:"exercise_id"`
     Reps       int     `json:"reps"`
     Weight     float32 `json:"weight"`
 }
 
 type DayExercise struct {
-    ID            uint           `json:"id"`
+    gorm.Model
     WorkoutDayID  uint           `json:"workout_day_id"`
     ExerciseID    uint           `json:"exercise_id"`
     Exercise      Exercise       `json:"exercise"`
@@ -26,10 +37,9 @@ type DayExercise struct {
 }
 
 type WorkoutDay struct {
-    ID        uint          `json:"id"`
+    gorm.Model
     Name      string        `json:"name"` // e.g. "Push", "Pull", "Legs"
     Date      time.Time     `json:"date"`
     Exercises []DayExercise `json:"exercises"`
+    Cardio    Cardio        `json:"cardio"`
 }
-
-
