@@ -1,5 +1,7 @@
 <script lang="ts" setup>
 import type { MealPlanDay } from "~/types/models";
+import { dialogManager } from "~/composables/dialog/useDialog";
+import { toast } from "~/composables/toast/useToast";
 
 const {
     data: mealPlan,
@@ -34,10 +36,14 @@ const firstDayIndex = computed(() => {
     const firstDate = new Date(allDays.value[0]!.date);
     return firstDate.getDay(); // Sunday = 0
 });
+
+const a = async () => {
+    toast.push("Meal saved!", "success");
+};
 </script>
 
 <template>
-    <MealPlanDay v-if="selectedDay" :day="selectedDay" />
+    <!-- <MealPlanDay v-if="selectedDay" :day="selectedDay" /> -->
     <h1>Meal Plan</h1>
     <div v-if="pending">Loading...</div>
     <div v-else-if="error">Error: {{ error.message }}</div>
@@ -61,7 +67,7 @@ const firstDayIndex = computed(() => {
             ]"
             @click="
                 () => {
-                    selectedDay = day;
+                    a();
                 }
             "
         >
