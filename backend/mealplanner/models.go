@@ -58,11 +58,10 @@ func seed(db *gorm.DB) {
 	db.Create(&dinner)
 
 	year := 2025
-	month := time.September
-	daysInMonth := 30 // September has 30 days
+	start := time.Date(year, time.September, 1, 0, 0, 0, 0, time.UTC)
+	end := time.Date(year, time.December, 31, 0, 0, 0, 0, time.UTC)
 
-	for day := 2; day <= daysInMonth + 1; day++ {
-		date := time.Date(year, month, day, 0, 0, 0, 0, time.UTC)
+	for date := start; !date.After(end); date = date.AddDate(0, 0, 1) {
 		fmt.Println("date", date)
 		mpd := MealPlanDay{
 			Date: date,
@@ -86,7 +85,7 @@ func seed(db *gorm.DB) {
 
 type MealPlanDay struct {
     gorm.Model
-    Date  time.Time   `json:"date"`
+    Date  time.Time   `gorm:"type:date" json:"date"`
     Meals []DayMeal   `json:"meals"`
     Goals DayGoals    `json:"goals" gorm:"foreignKey:MealPlanDayID;constraint:OnUpdate:CASCADE,OnDelete:SET NULL"`
 }
