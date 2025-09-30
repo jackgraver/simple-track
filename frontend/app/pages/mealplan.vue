@@ -12,8 +12,6 @@ const {
     days: MealPlanDay[];
 }>("mealplan/month");
 
-const selectedDay = ref<MealPlanDay | null>(null);
-
 const weekdays = [
     "Sunday",
     "Monday",
@@ -37,8 +35,13 @@ const firstDayIndex = computed(() => {
     return firstDate.getDay(); // Sunday = 0
 });
 
-const a = async () => {
-    toast.push("Meal saved!", "success");
+const displayDayDialog = async (day: MealPlanDay) => {
+    dialogManager.confirm({
+        title: "Modify " + formatDate(day.date),
+        message: "Are you sure you want to modify this meal?",
+        confirmText: "Modify",
+        cancelText: "Cancel",
+    });
 };
 </script>
 
@@ -67,7 +70,7 @@ const a = async () => {
             ]"
             @click="
                 () => {
-                    a();
+                    displayDayDialog(day);
                 }
             "
         >

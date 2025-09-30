@@ -8,6 +8,8 @@ import { toast } from "~/composables/toast/useToast";
             v-for="t in toast.toasts.value"
             :key="t.id"
             :class="{
+                slideInRight: true,
+                toast: true,
                 success: t.type === 'success',
                 error: t.type === 'error',
                 info: t.type === 'info',
@@ -33,6 +35,12 @@ import { toast } from "~/composables/toast/useToast";
     color: white;
 }
 
+.toast {
+    padding: 1.5rem 2rem;
+    margin-top: 0.5rem;
+    font-size: 1.5rem;
+}
+
 .success {
     background-color: green;
 }
@@ -41,5 +49,24 @@ import { toast } from "~/composables/toast/useToast";
 }
 .info {
     background-color: blue;
+}
+
+@keyframes slideInRight {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+.slideInRight {
+    animation-name: slideInRight;
+    animation-duration: 0.25s;
+    animation-timing-function: ease-out;
+    animation-iteration-count: 1;
+    animation-fill-mode: forwards;
 }
 </style>
