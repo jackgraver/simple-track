@@ -2,6 +2,8 @@
 import type { MealPlanDay } from "~/types/models";
 import { dialogManager } from "~/composables/dialog/useDialog";
 import { toast } from "~/composables/toast/useToast";
+import { dialogManager } from "~/composables/dialog/useDialog";
+import { toast } from "~/composables/toast/useToast";
 
 const {
     data: mealPlan,
@@ -46,6 +48,7 @@ const displayDayDialog = async (day: MealPlanDay) => {
 </script>
 
 <template>
+    <!-- <MealPlanDay v-if="selectedDay" :day="selectedDay" /> -->
     <!-- <MealPlanDay v-if="selectedDay" :day="selectedDay" /> -->
     <h1>Meal Plan</h1>
     <div v-if="pending">Loading...</div>
