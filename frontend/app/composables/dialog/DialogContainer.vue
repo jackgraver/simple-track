@@ -51,15 +51,13 @@ function isConfirmDialogType(
 <style scoped>
 .dialog-container {
     position: absolute;
-    top: 25%; /* ~1/4 from the top */
-    left: 50%; /* center horizontally */
-    transform: translateX(-50%); /* shift left by half its width */
-
+    top: 25%;
+    left: 50%;
+    transform: translateX(-50%);
     background: rgb(71, 71, 71);
     z-index: 999;
-    max-height: 80%; /* optional: prevent going off-screen */
+    max-height: 80%;
     border-radius: 10px;
-
     display: flex;
     flex-direction: column;
 }
@@ -70,25 +68,21 @@ function isConfirmDialogType(
     align-items: center;
     padding: 1rem;
     border-bottom: 1px solid #ccc;
-
-    /* ensure children don't wrap */
     flex-wrap: nowrap;
 }
 
 .dialog-header h2 {
     margin: 0;
     font-size: 1.5rem;
-
-    /* prevent text from wrapping */
     white-space: nowrap;
-    overflow: hidden; /* optional: hide overflow */
-    text-overflow: ellipsis; /* optional: show "..." if too long */
-    max-width: calc(100% - 3rem); /* leave space for close button */
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: calc(100% - 3rem);
 }
 
 .template {
-    padding: 1rem; /* your current padding works fine */
-    overflow-y: auto; /* optional if content can scroll */
+    padding: 1rem;
+    overflow-y: auto;
     text-align: center;
 }
 
@@ -97,7 +91,7 @@ function isConfirmDialogType(
     border: none;
     font-size: 2rem;
     cursor: pointer;
-    margin-left: 1rem; /* optional extra space */
+    margin-left: 1rem;
 }
 
 .close-btn:hover {

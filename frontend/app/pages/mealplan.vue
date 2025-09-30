@@ -2,8 +2,6 @@
 import type { MealPlanDay } from "~/types/models";
 import { dialogManager } from "~/composables/dialog/useDialog";
 import { toast } from "~/composables/toast/useToast";
-import { dialogManager } from "~/composables/dialog/useDialog";
-import { toast } from "~/composables/toast/useToast";
 
 const {
     data: mealPlan,
