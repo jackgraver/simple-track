@@ -72,10 +72,10 @@ const firstDayIndex = computed(() => {
                         <div
                             class="macro-fill calories"
                             :style="{
-                                width: `${Math.min(100, (totalCaloriesEaten(day) / day.plan.calories) * 100)}%`,
+                                width: `${Math.min(100, (day.totalCalories ?? 0 / day.plan.calories) * 100)}%`,
                             }"
                         >
-                            {{ totalCaloriesEaten(day) }}
+                            {{ day.totalCalories ?? 0 }}
                         </div>
                     </div>
                     <div class="macro-goal">{{ day.plan.calories }}</div>
@@ -85,10 +85,10 @@ const firstDayIndex = computed(() => {
                         <div
                             class="macro-fill protein"
                             :style="{
-                                width: `${Math.min(100, (totalProteinEaten(day) / day.plan.protein) * 100)}%`,
+                                width: `${Math.min(100, (day.totalProtein ?? 0 / day.plan.protein) * 100)}%`,
                             }"
                         >
-                            {{ totalProteinEaten(day) }}g
+                            {{ day.totalProtein ?? 0 }}g
                         </div>
                     </div>
                     <div class="macro-goal">{{ day.plan.protein }}g</div>
@@ -98,10 +98,10 @@ const firstDayIndex = computed(() => {
                         <div
                             class="macro-fill fiber"
                             :style="{
-                                width: `${Math.min(100, (totalFiberEaten(day) / day.plan.fiber) * 100)}%`,
+                                width: `${Math.min(100, (day.totalFiber ?? 0 / day.plan.fiber) * 100)}%`,
                             }"
                         >
-                            {{ totalFiberEaten(day) }}g
+                            {{ day.totalFiber ?? 0 }}g
                         </div>
                     </div>
                     <div class="macro-goal">{{ day.plan.fiber }}g</div>

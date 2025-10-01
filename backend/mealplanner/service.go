@@ -19,8 +19,14 @@ func MealPlanToday(db *gorm.DB) ([]Day, error) {
 	return days, nil
 }
 
-// MealPlanRange returns a simple 7-day window centered on today
-func MealPlanRange(db *gorm.DB, today time.Time, start time.Time, end time.Time) ([]Day, error) {
+type DayWithTotals struct {
+    Day
+    TotalCalories float32 `json:"totalCalories"`
+    TotalProtein  float32 `json:"totalProtein"`
+    TotalFiber    float32 `json:"totalFiber"`
+}
+
+func MealPlanRange(db *gorm.DB, today time.Time, start time.Time, end time.Time) ([]DayWithTotals, error) {
     var days []Day
 
 	if err := db.
@@ -33,7 +39,19 @@ func MealPlanRange(db *gorm.DB, today time.Time, start time.Time, end time.Time)
 		return nil, err
 	}
 
-	return days, nil
+    result := make([]DayWithTotals, len(days))
+    for i, d := range days {
+        totals := DayWithTotals{Day: d}
+        for _, log := range d.Logs {
+            for _, item := range log.Meal.Items {
+                totals.TotalCalories += item.Food.Calories
+                totals.TotalProtein += item.Food.Protein
+                totals.TotalFiber += item.Food.Fiber
+            }
+        }
+        result[i] = totals
+    }
+    return result, nil
 }
 
 func MealPlanDayByID(db *gorm.DB, id int) (*Day, error) {

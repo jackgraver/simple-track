@@ -32,13 +32,13 @@ console.log("rec", mealPlan);
                 <p>{{ dayOfWeek(day.date) }}</p>
                 <span>
                     <p class="calories">
-                        C {{ totalCaloriesEaten(day) }}/{{ day.plan.calories }}
+                        C {{ day.totalCalories ?? 0 }}/{{ day.plan.calories }}
                     </p>
                     <p class="protein">
-                        P {{ totalProteinEaten(day) }}/{{ day.plan.protein }}g
+                        P {{ day.totalProtein ?? 0 }}/{{ day.plan.protein }}g
                     </p>
                     <p class="fiber">
-                        F {{ totalFiberEaten(day) }}/{{ day.plan.fiber }}g
+                        F {{ day.totalFiber ?? 0 }}/{{ day.plan.fiber }}g
                     </p>
                 </span>
             </div>
