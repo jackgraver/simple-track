@@ -1,14 +1,10 @@
 <script lang="ts" setup>
-import type { MealPlanDay } from "~/types/models";
+import type { Day } from "~/types/models";
 import { formatDateShort } from "~/utils/dateUtil";
 
 const props = defineProps<{
-    day: MealPlanDay;
+    day: Day;
 }>();
-
-// const { data, pending, error } = useApiFetch<MealPlanDay>(
-//     `mealplan/day/${props.meal_plan_day_id}`,
-// );
 </script>
 
 <template>
@@ -16,10 +12,7 @@ const props = defineProps<{
     <div v-else-if="error">Error: {{ error.message }}</div> -->
     <div class="container">
         <h1>Modify {{ formatDate(day.date) }}</h1>
-        <div
-            v-for="meal in day.meals.filter((m) => m.status === 'actual')"
-            :key="meal.ID"
-        >
+        <div v-for="meal in day.loggedMeals" :key="meal.ID">
             <h3>{{ meal.meal.name }}<button>X</button></h3>
 
             <p v-for="food in meal.meal.items" :key="food.ID">

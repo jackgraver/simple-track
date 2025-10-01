@@ -95,16 +95,16 @@ func seed(db *gorm.DB) {
 
 type Day struct {
     gorm.Model
-    Date   time.Time
+    Date   time.Time `json:"date"`
     PlanID uint `json:"plan_id"`            // FK to Plan
-    Plan   Plan `gorm:"foreignKey:PlanID"`   // the Plan object
-    PlannedMeals []PlannedMeal 
-    Logs         []DayLog
+    Plan   Plan `gorm:"foreignKey:PlanID" json:"plan"`   // the Plan object
+    PlannedMeals []PlannedMeal `json:"plannedMeals"`
+    Logs         []DayLog `json:"loggedMeals"`
 }
 
 type Plan struct {
     gorm.Model
-    Name string
+    Name string `json:"name"`
 	Calories float32 `json:"calories"`
     Protein  float32 `json:"protein"`
     Fiber    float32 `json:"fiber"`

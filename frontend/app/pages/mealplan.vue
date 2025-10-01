@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import type { MealPlanDay } from "~/types/models";
+import type { Day } from "~/types/models";
 
 const {
     data: mealPlan,
@@ -7,10 +7,10 @@ const {
     error,
 } = useApiFetch<{
     today: string;
-    days: MealPlanDay[];
+    days: Day[];
 }>("mealplan/month");
 
-const selectedDay = ref<MealPlanDay | null>(null);
+const selectedDay = ref<Day | null>(null);
 
 const weekdays = [
     "Sunday",
@@ -72,39 +72,39 @@ const firstDayIndex = computed(() => {
                         <div
                             class="macro-fill calories"
                             :style="{
-                                width: `${Math.min(100, (totalCaloriesEaten(day) / day.goals.calories) * 100)}%`,
+                                width: `${Math.min(100, (totalCaloriesEaten(day) / day.plan.calories) * 100)}%`,
                             }"
                         >
                             {{ totalCaloriesEaten(day) }}
                         </div>
                     </div>
-                    <div class="macro-goal">{{ day.goals.calories }}</div>
+                    <div class="macro-goal">{{ day.plan.calories }}</div>
                 </div>
                 <div class="macro">
                     <div class="macro-bar">
                         <div
                             class="macro-fill protein"
                             :style="{
-                                width: `${Math.min(100, (totalProteinEaten(day) / day.goals.protein) * 100)}%`,
+                                width: `${Math.min(100, (totalProteinEaten(day) / day.plan.protein) * 100)}%`,
                             }"
                         >
                             {{ totalProteinEaten(day) }}g
                         </div>
                     </div>
-                    <div class="macro-goal">{{ day.goals.protein }}g</div>
+                    <div class="macro-goal">{{ day.plan.protein }}g</div>
                 </div>
                 <div class="macro">
                     <div class="macro-bar">
                         <div
                             class="macro-fill fiber"
                             :style="{
-                                width: `${Math.min(100, (totalFiberEaten(day) / day.goals.fiber) * 100)}%`,
+                                width: `${Math.min(100, (totalFiberEaten(day) / day.plan.fiber) * 100)}%`,
                             }"
                         >
                             {{ totalFiberEaten(day) }}g
                         </div>
                     </div>
-                    <div class="macro-goal">{{ day.goals.fiber }}g</div>
+                    <div class="macro-goal">{{ day.plan.fiber }}g</div>
                 </div>
             </div>
         </div>

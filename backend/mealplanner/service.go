@@ -10,7 +10,10 @@ import (
 func MealPlanToday(db *gorm.DB) ([]Day, error) {
     today := time.Now().Truncate(24 * time.Hour)
 	var days []Day
-	if err := db.Preload("Meals.Meal.Items.Food").Preload("Goals").Where("date = ?", today).Find(&days).Error; err != nil {
+	if err := db.Preload("PlannedMeals.Meal.Items.Food").
+            Preload("Plan").
+            Preload("Logs.Meal.Items.Food").
+            Where("date = ?", today).Find(&days).Error; err != nil {
 		return nil, err
 	}
 	return days, nil
@@ -37,9 +40,9 @@ func MealPlanDayByID(db *gorm.DB, id int) (*Day, error) {
     var day Day
 
     if err := db.
-        Preload("Meals.Meal.Items.Food").
-        Preload("Goals").
-		Preload("Meals").
+        Preload("PlannedMeals.Meal.Items.Food").
+        Preload("Plan").
+        Preload("Logs.Meal.Items.Food").
         First(&day, id).Error; err != nil {
         return nil, err
     }
