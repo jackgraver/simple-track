@@ -166,10 +166,9 @@ func logMeal(c *gin.Context) {
     }
 
     // 2. Create DayMeal
-    dayMeal := DayMeal{
-        MealPlanDayID: day.ID,
+    dayMeal := DayLog{
+        DayID: day.ID,
         MealID:        mealID,
-        Status:        "actual",
     }
 
     if err := CreateDayMeal(mealplannerDB, &dayMeal); err != nil {
