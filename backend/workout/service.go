@@ -6,18 +6,34 @@ import (
 	"gorm.io/gorm"
 )
 
-// NOTE: No database calls yet. Keep functions simple and return TODO errors.
-
-func GetToday(database *gorm.DB) (WorkoutDay, error) {
+func GetToday(database *gorm.DB) (WorkoutLog, error) {
     today := time.Now().Truncate(24 * time.Hour)
-    var workoutDay WorkoutDay
-    if err := database.
-            Preload("Exercises").
-            Preload("Cardio").
-            First(&workoutDay, today).Error; err != nil {
-        return WorkoutDay{}, err
-    }
 
-    return WorkoutDay{}, nil
+    var workoutDay WorkoutLog
+    err := database.
+        Preload("WorkoutPlan.Exercises.Sets").
+        Preload("Cardio").
+        Preload("Exercises.Sets").
+        Where("date = ?", today).
+        First(&workoutDay).Error
+
+    if err != nil {
+        return WorkoutLog{}, err
+    }
+    return workoutDay, nil
 }
 
+func GetAll(database *gorm.DB) ([]WorkoutLog, error) {
+    var workoutDay []WorkoutLog
+
+    err := database.
+        Preload("WorkoutPlan.Exercises.Sets").
+        Preload("Cardio").
+        Preload("Exercises.Sets").
+        Find(&workoutDay).Error
+
+    if err != nil {
+        return []WorkoutLog{}, err
+    }
+    return workoutDay, nil
+}
