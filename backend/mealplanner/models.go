@@ -8,8 +8,22 @@ import (
 )
 
 func MigrateMealPlanDatabase(db *gorm.DB) {
-	db.Migrator().DropTable(&Food{}, &Meal{}, &MealItem{}, &Day{}, &PlannedMeal{}, &DayLog{})
-	db.AutoMigrate(&Food{}, &Meal{}, &MealItem{}, &Day{}, &PlannedMeal{}, &DayLog{})
+	db.Migrator().DropTable(
+		&SavedMealItem{}, &SavedMeal{},
+		&MealItem{}, &Meal{},
+		&PlannedMeal{},
+		&Food{},
+		&Plan{},
+		&Day{},
+	)
+	db.AutoMigrate(
+		&Plan{},
+		&Day{},
+		&Meal{}, &MealItem{},
+		&SavedMeal{}, &SavedMealItem{},
+		&PlannedMeal{},
+		&Food{},
+	)
 	seed(db)
 }
 
@@ -132,11 +146,28 @@ type Meal struct {
 
 type MealItem struct {
     gorm.Model
-    MealID uint  `json:"meal_id" gorm:"not null;index"`
-    Meal   Meal  `json:"meal"`
-    FoodID uint  `json:"food_id" gorm:"not null;index"`
-    Food   Food  `json:"food"`
+    MealID uint `json:"meal_id" gorm:"not null;index"`
+    FoodID uint `json:"food_id" gorm:"not null;index"`
     Amount float64 `json:"amount"`
+
+    Meal Meal
+    Food Food
+}
+
+type SavedMeal struct {
+	gorm.Model
+	Name  string     `json:"name" gorm:"not null"`
+	Items []SavedMealItem `json:"items" gorm:"constraint:OnDelete:CASCADE;"`
+}
+
+type SavedMealItem struct {
+    gorm.Model
+    SavedMealID uint `json:"saved_meal_id" gorm:"not null;index"`
+    FoodID      uint `json:"food_id" gorm:"not null;index"`
+    Amount      float64 `json:"amount"`
+
+    SavedMeal SavedMeal
+    Food      Food
 }
 
 type Food struct {

@@ -52,3 +52,24 @@ export interface Food extends BaseModel {
     protein: number;
     fiber: number;
 }
+
+export interface SavedMeal extends BaseModel {
+    name: string;
+    items: SavedMealItem[];
+}
+
+export interface SavedMealItem extends BaseModel {
+    saved_meal_id: number;
+    saved_meal: SavedMeal;
+    saved_food_id: number;
+    saved_food: SavedFood;
+    amount: number;
+}
+
+export interface SavedFood extends BaseModel {
+    name: string;
+    unit: string;
+    calories: number;
+    protein: number;
+    fiber: number;
+}
