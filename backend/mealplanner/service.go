@@ -7,38 +7,60 @@ import (
 )
 
 // MealPlanToday returns today's meal plan day with meals and goals
-func MealPlanToday(db *gorm.DB) ([]MealPlanDay, error) {
+func MealPlanToday(db *gorm.DB) ([]Day, error) {
     today := time.Now().Truncate(24 * time.Hour)
-	var days []MealPlanDay
-	if err := db.Preload("Meals.Meal.Items.Food").Preload("Goals").Where("date = ?", today).Find(&days).Error; err != nil {
+	var days []Day
+	if err := db.Preload("PlannedMeals.Meal.Items.Food").
+            Preload("Plan").
+            Preload("Logs.Meal.Items.Food").
+            Where("date = ?", today).Find(&days).Error; err != nil {
 		return nil, err
 	}
 	return days, nil
 }
 
-// MealPlanRange returns a simple 7-day window centered on today
-func MealPlanRange(db *gorm.DB, today time.Time, start time.Time, end time.Time) ([]MealPlanDay, error) {
-    var days []MealPlanDay
+type DayWithTotals struct {
+    Day
+    TotalCalories float32 `json:"totalCalories"`
+    TotalProtein  float32 `json:"totalProtein"`
+    TotalFiber    float32 `json:"totalFiber"`
+}
+
+func MealPlanRange(db *gorm.DB, today time.Time, start time.Time, end time.Time) ([]DayWithTotals, error) {
+    var days []Day
 
 	if err := db.
-		Preload("Meals.Meal.Items.Food").
-		Preload("Goals").
+		Preload("PlannedMeals.Meal.Items.Food").
+		Preload("Plan").
+        Preload("Logs.Meal.Items.Food").
 		Where("date BETWEEN ? AND ?", start, end).
 		Order("date").
 		Find(&days).Error; err != nil {
 		return nil, err
 	}
 
-	return days, nil
+    result := make([]DayWithTotals, len(days))
+    for i, d := range days {
+        totals := DayWithTotals{Day: d}
+        for _, log := range d.Logs {
+            for _, item := range log.Meal.Items {
+                totals.TotalCalories += item.Food.Calories
+                totals.TotalProtein += item.Food.Protein
+                totals.TotalFiber += item.Food.Fiber
+            }
+        }
+        result[i] = totals
+    }
+    return result, nil
 }
 
-func MealPlanDayByID(db *gorm.DB, id int) (*MealPlanDay, error) {
-    var day MealPlanDay
+func MealPlanDayByID(db *gorm.DB, id int) (*Day, error) {
+    var day Day
 
     if err := db.
-        Preload("Meals.Meal.Items.Food").
-        Preload("Goals").
-		Preload("Meals").
+        Preload("PlannedMeals.Meal.Items.Food").
+        Preload("Plan").
+        Preload("Logs.Meal.Items.Food").
         First(&day, id).Error; err != nil {
         return nil, err
     }
@@ -46,8 +68,8 @@ func MealPlanDayByID(db *gorm.DB, id int) (*MealPlanDay, error) {
     return &day, nil
 }
 
-func AllMealDays(db *gorm.DB) ([]MealPlanDay, error) {
-    var days []MealPlanDay
+func AllMealDays(db *gorm.DB) ([]Day, error) {
+    var days []Day
 
 	if err := db.
 		Find(&days).Error; err != nil {
@@ -57,15 +79,15 @@ func AllMealDays(db *gorm.DB) ([]MealPlanDay, error) {
 	return days, nil
 }
 
-func GoalsToday(db *gorm.DB) (*DayGoals, error) {
+func GoalsToday(db *gorm.DB) (*Plan, error) {
     today := time.Now().Truncate(24 * time.Hour)
 
-	var todayPlan MealPlanDay
+	var todayPlan Day
 	if err := db.Where("date = ?", today.Format("2006-01-02")).First(&todayPlan).Error; err != nil {
 		return nil, err
 	}
 
-	var goals DayGoals
+	var goals Plan
 	if err := db.Where("meal_plan_day_id = ?", todayPlan.ID).First(&goals).Error; err != nil {
 		return nil, err
 	}
@@ -89,8 +111,8 @@ func AllMeals(db *gorm.DB) ([]Meal, error) {
     return meals, nil
 }
 
-func FindMealPlanDay(db *gorm.DB, date time.Time) (*MealPlanDay, error) {
-    var day MealPlanDay
+func FindMealPlanDay(db *gorm.DB, date time.Time) (*Day, error) {
+    var day Day
     err := db.Where("date = ?", date).First(&day).Error
     if err != nil {
         if err == gorm.ErrRecordNotFound {
@@ -103,7 +125,7 @@ func FindMealPlanDay(db *gorm.DB, date time.Time) (*MealPlanDay, error) {
 }
 
 
-func CreateDayMeal(db *gorm.DB, dayMeal *DayMeal) error {
+func CreateDayMeal(db *gorm.DB, dayMeal *DayLog) error {
     if err := db.Create(&dayMeal).Error; err != nil {
         return err
     }

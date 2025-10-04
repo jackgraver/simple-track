@@ -27,13 +27,14 @@ func SetEndpoints(router *gin.Engine, db *gorm.DB) {
 }
 
 func getMealPlanToday(c *gin.Context) {
-    data, err := MealPlanToday(mealplannerDB)
-    if err != nil {
-        c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+    days, daysErr := MealPlanToday(mealplannerDB)
+    if daysErr != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{"error": daysErr.Error()})
         return
     }
+    
     c.JSON(http.StatusOK, gin.H{
-		"days": data,
+		"days": days,
 		"today": time.Now(),
 	})
 }
@@ -166,10 +167,9 @@ func logMeal(c *gin.Context) {
     }
 
     // 2. Create DayMeal
-    dayMeal := DayMeal{
-        MealPlanDayID: day.ID,
+    dayMeal := DayLog{
+        DayID: day.ID,
         MealID:        mealID,
-        Status:        "actual",
     }
 
     if err := CreateDayMeal(mealplannerDB, &dayMeal); err != nil {
