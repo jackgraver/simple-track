@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import type { MealPlanDay } from "~/types/models";
+import type { Day } from "~/types/models";
 
 const {
     data: mealPlan,
@@ -7,8 +7,10 @@ const {
     error,
 } = useApiFetch<{
     today: string;
-    days: MealPlanDay[];
+    days: Day[];
 }>("mealplan/week");
+
+console.log("rec", mealPlan);
 </script>
 
 <template>
@@ -30,13 +32,13 @@ const {
                 <p>{{ dayOfWeek(day.date) }}</p>
                 <span>
                     <p class="calories">
-                        C {{ totalCaloriesEaten(day) }}/{{ day.goals.calories }}
+                        C {{ day.totalCalories ?? 0 }}/{{ day.plan.calories }}
                     </p>
                     <p class="protein">
-                        P {{ totalProteinEaten(day) }}/{{ day.goals.protein }}g
+                        P {{ day.totalProtein ?? 0 }}/{{ day.plan.protein }}g
                     </p>
                     <p class="fiber">
-                        F {{ totalFiberEaten(day) }}/{{ day.goals.fiber }}g
+                        F {{ day.totalFiber ?? 0 }}/{{ day.plan.fiber }}g
                     </p>
                 </span>
             </div>
