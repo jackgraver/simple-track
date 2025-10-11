@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import type { Meal, MealItem, MealPlanDay } from "~/types/models";
+import type { Meal, MealItem, Day } from "~/types/models";
 import { computed } from "vue";
 import { useApiFetch } from "~/composables/useApiFetch";
 
@@ -20,19 +20,8 @@ const confirm = ref(-1);
 
 const { data, pending, error } = useApiFetch<{
     date: string;
-    days: MealPlanDay[];
+    days: Day[];
 }>("mealplan/today");
-
-const expectedMeals = computed(() => {
-    if (!data.value?.days || data.value.days.length === 0) return [];
-    return (
-        data?.value?.days[0]?.meals?.filter(
-            (m: any) => m.status === "expected",
-        ) || []
-    );
-});
-
-// const emit = defineEmits<{ (e: "selectMeal", meal: Meal): void }>();
 
 function confirmMealInner(meal: Meal) {
     confirm.value = meal.ID;
@@ -68,7 +57,7 @@ function submitMeal(meal: Meal) {
     <div v-else-if="error">Error: {{ error.message }}</div>
     <div v-else>
         <button
-            v-for="dayMeal in expectedMeals"
+            v-for="dayMeal in data?.days[0]?.plannedMeals"
             :key="dayMeal.ID"
             @click="
                 confirm === dayMeal.meal.ID
