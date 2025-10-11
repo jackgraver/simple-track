@@ -2,6 +2,7 @@ package db
 
 import (
 	"be-simpletracker/mealplanner"
+	"be-simpletracker/workout"
 
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -16,6 +17,7 @@ func ConnectToDB() *gorm.DB {
 	}
 
 	mealplanner.MigrateMealPlanDatabase(db)
+	workout.MigrateWorkoutDatabase(db)
 
 	return db
 }
