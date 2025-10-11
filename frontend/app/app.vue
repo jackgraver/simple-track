@@ -1,6 +1,14 @@
+<script setup lang="ts">
+import ToastContainer from "./composables/toast/ToastContainer.vue";
+import DialogContainer from "./composables/dialog/DialogContainer.vue";
+</script>
+
 <template>
     <div>
+        <Header />
         <NuxtPage />
+        <ToastContainer />
+        <DialogContainer />
     </div>
 </template>
 

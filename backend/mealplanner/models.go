@@ -8,8 +8,22 @@ import (
 )
 
 func MigrateMealPlanDatabase(db *gorm.DB) {
-	db.Migrator().DropTable(&Food{}, &Meal{}, &MealItem{}, &DayGoals{}, &MealPlanDay{}, &DayMeal{})
-	db.AutoMigrate(&Food{}, &Meal{}, &MealItem{}, &DayGoals{}, &MealPlanDay{}, &DayMeal{})
+	db.Migrator().DropTable(
+		&SavedMealItem{}, &SavedMeal{},
+		&MealItem{}, &Meal{},
+		&PlannedMeal{},
+		&Food{},
+		&Plan{},
+		&Day{},
+	)
+	db.AutoMigrate(
+		&Plan{},
+		&Day{},
+		&Meal{}, &MealItem{},
+		&SavedMeal{}, &SavedMealItem{},
+		&PlannedMeal{},
+		&Food{},
+	)
 	seed(db)
 }
 
@@ -57,25 +71,34 @@ func seed(db *gorm.DB) {
 	db.Create(&breakfast)
 	db.Create(&dinner)
 
-	year := 2025
-	month := time.September
-	daysInMonth := 30 // September has 30 days
-
-	for day := 2; day <= daysInMonth + 1; day++ {
-		date := time.Date(year, month, day, 0, 0, 0, 0, time.UTC)
-		fmt.Println("date", date)
-		mpd := MealPlanDay{
-			Date: date,
-			Meals: []DayMeal{
-				{MealID: breakfast.ID, Status: "expected"},
-				{MealID: breakfast.ID, Status: "actual"},
-				{MealID: dinner.ID, Status: "expected"},
-			},
-			Goals: DayGoals{
-				Calories: 2000,
+	cut := Plan{Name: "Cut",
+				Calories: 1400,
 				Protein:  150,
-				Fiber:    50,
+				Fiber:    30,
+			}
+	db.Create(&cut)
+	bulk := Plan{Name: "Bulk",
+				Calories: 2800,
+				Protein:  150,
+				Fiber:    30,
+			}
+	db.Create(&bulk)
+
+	year := 2025
+	start := time.Date(year, time.September, 1, 0, 0, 0, 0, time.UTC)
+	end := time.Date(year, time.December, 31, 0, 0, 0, 0, time.UTC)
+
+	for date := start; !date.After(end); date = date.AddDate(0, 0, 1) {
+		mpd := Day{
+			Date: date,
+			PlannedMeals: []PlannedMeal {
+				{MealID: breakfast.ID},
+				{MealID: dinner.ID},
 			},
+			Logs: []DayLog {
+				{MealID: breakfast.ID},
+			},
+			Plan: cut,
 		}
 
 		if err := db.Create(&mpd).Error; err != nil {
@@ -84,49 +107,74 @@ func seed(db *gorm.DB) {
 	}
 }
 
-type MealPlanDay struct {
+type Day struct {
     gorm.Model
-    Date  time.Time   `json:"date"`
-    Meals []DayMeal   `json:"meals"`
-    Goals DayGoals    `json:"goals" gorm:"foreignKey:MealPlanDayID;constraint:OnUpdate:CASCADE,OnDelete:SET NULL"`
+    Date   time.Time `json:"date"`
+    PlanID uint `json:"plan_id"`            // FK to Plan
+    Plan   Plan `gorm:"foreignKey:PlanID" json:"plan"`   // the Plan object
+    PlannedMeals []PlannedMeal `json:"plannedMeals"`
+    Logs         []DayLog `json:"loggedMeals"`
 }
 
-type DayMeal struct {
+type Plan struct {
     gorm.Model
-    MealPlanDayID uint   `json:"meal_plan_day_id" gorm:"not null"` // FK back to MealPlanDay
-    Meal          Meal   `json:"meal"`
-    MealID        uint   `json:"meal_id" gorm:"not null"`          // explicit FK to Meal
-    Status        string `json:"status" gorm:"not null;default:'expected'"`
+    Name string `json:"name"`
+	Calories float32 `json:"calories"`
+    Protein  float32 `json:"protein"`
+    Fiber    float32 `json:"fiber"`
+}
+type PlannedMeal struct {
+    gorm.Model
+    DayID  uint `json:"day_id" gorm:"not null"`
+    Day    Day  `json:"day"`
+    MealID uint `json:"meal_id" gorm:"not null"`
+    Meal   Meal `json:"meal"`
+}
+
+type DayLog struct {
+    gorm.Model
+    DayID uint `json:"day_id" gorm:"not null"`
+    MealID uint `json:"meal_id" gorm:"not null"`
+    Meal   Meal `json:"meal"`
 }
 
 type Meal struct {
     gorm.Model
     Name  string     `json:"name" gorm:"not null"`
-    Items []MealItem `json:"items"`
-}
-
-type DayGoals struct {
-    gorm.Model
-    MealPlanDayID uint    `json:"meal_plan_day_id" gorm:"uniqueIndex"` // each day has one goals record
-    Calories      float32 `json:"calories"`
-    Protein       float32 `json:"protein"`
-    Fiber         float32 `json:"fiber"`
+    Items []MealItem `json:"items" gorm:"constraint:OnDelete:CASCADE;"`
 }
 
 type MealItem struct {
     gorm.Model
-    MealID uint    `json:"meal_id" gorm:"not null"` // belongs to Meal
-    FoodID uint    `json:"food_id" gorm:"not null"` // belongs to Food
-    Food   Food    `json:"food"`
+    MealID uint `json:"meal_id" gorm:"not null;index"`
+    FoodID uint `json:"food_id" gorm:"not null;index"`
     Amount float64 `json:"amount"`
+
+    Meal Meal
+    Food Food
+}
+
+type SavedMeal struct {
+	gorm.Model
+	Name  string     `json:"name" gorm:"not null"`
+	Items []SavedMealItem `json:"items" gorm:"constraint:OnDelete:CASCADE;"`
+}
+
+type SavedMealItem struct {
+    gorm.Model
+    SavedMealID uint `json:"saved_meal_id" gorm:"not null;index"`
+    FoodID      uint `json:"food_id" gorm:"not null;index"`
+    Amount      float64 `json:"amount"`
+
+    SavedMeal SavedMeal
+    Food      Food
 }
 
 type Food struct {
     gorm.Model
-    Name     string  `json:"name" gorm:"not null"`
+    Name     string  `json:"name" gorm:"not null;uniqueIndex"`
     Unit     string  `json:"unit" gorm:"not null"`
     Calories float32 `json:"calories" gorm:"not null"`
     Protein  float32 `json:"protein"`
     Fiber    float32 `json:"fiber"`
 }
-
