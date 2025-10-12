@@ -8,26 +8,43 @@ import (
 )
 
 func MigrateMealPlanDatabase(db *gorm.DB) {
-	db.Migrator().DropTable(
-		&SavedMealItem{}, &SavedMeal{},
-		&MealItem{}, &Meal{},
+	fmt.Println("Migrating meal plan database")
+	if err := db.Migrator().DropTable(
+		&DayLog{},
 		&PlannedMeal{},
+		&MealItem{},
+		&SavedMealItem{},
+		&Meal{},
+		&SavedMeal{},
 		&Food{},
+		&Day{},
+		&Plan{},
+	); err != nil {
+		fmt.Printf("Failed to drop meal plan database: %v\n", err)
+	}
+
+	if err := db.AutoMigrate(
 		&Plan{},
 		&Day{},
-	)
-	db.AutoMigrate(
-		&Plan{},
-		&Day{},
-		&Meal{}, &MealItem{},
-		&SavedMeal{}, &SavedMealItem{},
+		&Meal{},
+		&MealItem{},
+		&SavedMeal{},
+		&SavedMealItem{},
 		&PlannedMeal{},
+		&DayLog{},
 		&Food{},
-	)
-	seed(db)
+	); err != nil {
+		fmt.Printf("Failed to migrate meal plan database: %v\n", err)
+	}
+
+	if err := seed(db); err != nil {
+		fmt.Printf("Failed to seed meal plan database: %v\n", err)
+	}
 }
 
-func seed(db *gorm.DB) {
+func seed(db *gorm.DB) error {
+	fmt.Println("Seeding meal plan database")
+
 	egg := Food{Name: "Egg", Unit: "Serving", Calories: 140, Protein: 12, Fiber: 0}
 	sausage    := Food{Name: "Maple Breakfast Sausage", Unit: "Serving", Calories: 140, Protein: 12, Fiber: 0}
 	keto_bread  := Food{Name: "Keto Bread", Unit: "Serving", Calories: 140, Protein: 12, Fiber: 15}
@@ -105,6 +122,7 @@ func seed(db *gorm.DB) {
 			fmt.Printf("Failed to create day %v: %v\n", date, err)
 		}
 	}
+	return nil;
 }
 
 type Day struct {

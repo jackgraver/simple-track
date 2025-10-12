@@ -27,6 +27,14 @@ const router = useRouter();
             >
                 Meal Plan
             </h2>
+            <h2
+                @click="router.push('/gym')"
+                :class="
+                    router.currentRoute.value.path === '/gym' ? 'active' : ''
+                "
+            >
+                Workouts
+            </h2>
         </div>
     </header>
 </template>

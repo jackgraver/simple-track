@@ -9,8 +9,6 @@ const {
     today: string;
     days: Day[];
 }>("mealplan/week");
-
-console.log("rec", mealPlan);
 </script>
 
 <template>

@@ -11,7 +11,7 @@ import (
 )
 
 func main() {
-	db := db.ConnectToDB()
+	db := db.ConnectToSqlite()
 
 	router := gin.Default()
 

@@ -70,3 +70,7 @@ pnpm-debug.log*
 .DS_Store
 
 frontend-vite/
+
+*.log
+
+*.db

@@ -1,23 +1,16 @@
 package workout
 
 import (
+	"fmt"
 	"math/rand"
 	"time"
 
 	"gorm.io/gorm"
 )
-func MigrateWorkoutDatabase(db *gorm.DB) {
-    db.Migrator().DropTable(
-        &WorkoutPlan{},
-        &PlannedExercise{},
-        &PlannedSet{},
-        &WorkoutLog{},
-        &LoggedExercise{},
-        &LoggedSet{},
-        &Cardio{},
-    )
 
-    db.AutoMigrate(
+func MigrateWorkoutDatabase(db *gorm.DB) {
+	fmt.Println("Migrating workout database")
+    if err := db.Migrator().DropTable(
         &WorkoutPlan{},
         &PlannedExercise{},
         &PlannedSet{},
@@ -25,72 +18,126 @@ func MigrateWorkoutDatabase(db *gorm.DB) {
         &LoggedExercise{},
         &LoggedSet{},
         &Cardio{},
-    )
-	seed(db)
+    ); err != nil {
+		fmt.Printf("Failed to drop workout database: %v\n", err)
+	}
+
+    if err := db.AutoMigrate(
+        &WorkoutPlan{},
+        &PlannedExercise{},
+        &PlannedSet{},
+        &WorkoutLog{},
+        &LoggedExercise{},
+        &LoggedSet{},
+        &Cardio{},
+    ); err != nil {
+		fmt.Printf("Failed to migrate workout database: %v\n", err)
+	}
+
+	if err := seed(db); err != nil {
+		fmt.Printf("Failed to seed workout database: %v\n", err)
+	}
 }
 
-func seed(db *gorm.DB) {
+func seed(db *gorm.DB) error {
+	fmt.Println("Seeding workout database")
+
 	push := WorkoutPlan{
-		Name: "Push Day",
+		Name: "Push",
 		Exercises: []PlannedExercise{
 			{
-				Name: "Bench Press",
+				Name: "Incline Press",
 				Sets: []PlannedSet{
-					{Reps: 10, Weight: 100},
-					{Reps: 10, Weight: 100},
-					{Reps: 8, Weight: 105},
-					{Reps: 6, Weight: 110},
+					{Reps: 6, Weight: 40},
+					{Reps: 6, Weight: 40},
 				},
 			},
 			{
-				Name: "Overhead Press",
+				Name: "Chest Fly",
 				Sets: []PlannedSet{
-					{Reps: 8, Weight: 60},
-					{Reps: 8, Weight: 60},
-					{Reps: 6, Weight: 65},
+					{Reps: 6, Weight: 70},
+					{Reps: 6, Weight: 70},
 				},
 			},
 			{
-				Name: "Tricep Pushdown",
+				Name: "Lat Raise",
 				Sets: []PlannedSet{
-					{Reps: 12, Weight: 45},
-					{Reps: 12, Weight: 45},
-					{Reps: 12, Weight: 45},
+					{Reps: 12, Weight: 10},
+					{Reps: 12, Weight: 10},
+				},
+			},
+			{
+				Name: "Shoulder Press",
+				Sets: []PlannedSet{
+					{Reps: 6, Weight: 60},
+					{Reps: 6, Weight: 60},
+				},
+			},
+			{
+				Name: "JM Press",
+				Sets: []PlannedSet{
+					{Reps: 6, Weight: 25},
+					{Reps: 6, Weight: 25},
+				},
+			},
+			{
+				Name: "Extensions",
+				Sets: []PlannedSet{
+					{Reps: 6, Weight: 50},
+					{Reps: 6, Weight: 50},
 				},
 			},
 		},
 	}
 	pull := WorkoutPlan{
-		Name: "Pull Day",
+		Name: "Pull",
 		Exercises: []PlannedExercise{
 			{
-				Name: "Pull-ups",
+				Name: "Pulldowns",
 				Sets: []PlannedSet{
-					{Reps: 10, Weight: 0},
-					{Reps: 8, Weight: 0},
-					{Reps: 6, Weight: 0},
+					{Reps: 6, Weight: 90},
+					{Reps: 6, Weight: 90},
 				},
 			},
 			{
-				Name: "Barbell Row",
+				Name: "Barbell Rows",
 				Sets: []PlannedSet{
-					{Reps: 10, Weight: 95},
-					{Reps: 10, Weight: 100},
-					{Reps: 8, Weight: 105},
+					{Reps: 6, Weight: 10},
+					{Reps: 6, Weight: 10},
 				},
-			},
+			},			
 			{
-				Name: "Bicep Curl",
+				Name: "Face Pulls",
 				Sets: []PlannedSet{
-					{Reps: 12, Weight: 25},
-					{Reps: 12, Weight: 25},
-					{Reps: 10, Weight: 30},
+					{Reps: 8, Weight: 30},
+					{Reps: 8, Weight: 30},
+				},
+			},			
+			{
+				Name: "Rear delt",
+				Sets: []PlannedSet{
+					{Reps: 9, Weight: 30},
+					{Reps: 9, Weight: 30},
+				},
+			},			
+			{
+				Name: "Incline Curls",
+				Sets: []PlannedSet{
+					{Reps: 6, Weight: 20},
+					{Reps: 6, Weight: 20},
+				},
+			},			
+			{
+				Name: "Hammer Curls",
+				Sets: []PlannedSet{
+					{Reps: 6, Weight: 20},
+					{Reps: 6, Weight: 20},
 				},
 			},
 		},
 	}
 	legs := WorkoutPlan{
-		Name: "Leg Day",
+		Name: "Legs",
 		Exercises: []PlannedExercise{
 			{
 				Name: "Squat",
@@ -118,9 +165,55 @@ func seed(db *gorm.DB) {
 		},
 	}
 
+	upper := WorkoutPlan{
+		Name: "Upper",
+		Exercises: []PlannedExercise{
+			{
+				Name: "Push-ups",
+				Sets: []PlannedSet{
+					{Reps: 10, Weight: 0},
+					{Reps: 8, Weight: 0},
+					{Reps: 6, Weight: 0},
+				},
+			},
+			{
+				Name: "Bicep Curl",
+				Sets: []PlannedSet{
+					{Reps: 12, Weight: 25},
+					{Reps: 12, Weight: 25},
+					{Reps: 10, Weight: 30},
+				},
+			},
+		},
+	}
+
+	lower := WorkoutPlan{
+		Name: "Lower",
+		Exercises: []PlannedExercise{
+			{
+				Name: "Squat",
+				Sets: []PlannedSet{
+					{Reps: 8, Weight: 135},
+					{Reps: 8, Weight: 155},
+					{Reps: 6, Weight: 175},
+				},
+			},
+			{
+				Name: "Deadlift",
+				Sets: []PlannedSet{
+					{Reps: 5, Weight: 185},
+					{Reps: 5, Weight: 205},
+					{Reps: 3, Weight: 225},
+				},
+			},
+		},
+	}
+
 	db.Create(&push)
 	db.Create(&pull)
 	db.Create(&legs)
+	db.Create(&upper)
+	db.Create(&lower)
 
 	year := 2025
 	start := time.Date(year, time.September, 1, 0, 0, 0, 0, time.UTC)
@@ -172,6 +265,7 @@ func seed(db *gorm.DB) {
 
 		planIndex++
 	}
+	return nil;
 }
 
 type WorkoutPlan struct {
