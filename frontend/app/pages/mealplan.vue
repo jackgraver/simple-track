@@ -1,26 +1,54 @@
 <script lang="ts" setup>
 import type { Day } from "~/types/models";
-import { dialogManager } from "~/composables/dialog/useDialog";
-import { toast } from "~/composables/toast/useToast";
 import MacrosDate from "~/components/MacrosDate.vue";
 
-const {
-    data: mealPlan,
-    pending,
-    error,
-} = useApiFetch<{
-    today: string;
-    days: Day[];
-}>("mealplan/month");
+const monthOffset = ref(0);
 
-const displayDayDialog = async (day: Day) => {
-    dialogManager.confirm({
-        title: "Modify " + formatDate(day.date),
-        message: "Are you sure you want to modify this meal?",
-        confirmText: "Modify",
-        cancelText: "Cancel",
-    });
-};
+const data = ref<{ today: string; days: Day[] } | null>(null);
+const pending = ref(false);
+const error = ref<Error | null>(null);
+
+async function fetchMealPlan() {
+    pending.value = true;
+    error.value = null;
+    try {
+        const res = await useApiFetch<{ today: string; days: Day[] }>(
+            "mealplan/month",
+            {
+                query: {
+                    monthoffset: monthOffset.value,
+                },
+            },
+        );
+        console.log(data.value);
+        data.value = res.data.value ?? null;
+        console.log(data.value);
+    } catch (err) {
+        error.value = err as Error;
+    } finally {
+        pending.value = false;
+    }
+}
+
+function setCurrentMonth() {
+    console.log("?");
+    monthOffset.value = 0;
+    fetchMealPlan();
+}
+
+function nextMonth() {
+    monthOffset.value += 1;
+    fetchMealPlan();
+}
+
+function prevMonth() {
+    monthOffset.value -= 1;
+    fetchMealPlan();
+}
+
+onMounted(() => {
+    setCurrentMonth();
+});
 </script>
 
 <template>
@@ -29,9 +57,7 @@ const displayDayDialog = async (day: Day) => {
     <div v-else-if="error">Error: {{ error.message }}</div>
     <Calendar
         v-else
-        :days="mealPlan?.days ?? []"
+        :fetchURL="'mealplan/month'"
         :display-component="MacrosDate"
     />
 </template>
-
-<style scoped></style>

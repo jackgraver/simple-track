@@ -28,16 +28,5 @@ func main() {
 	mealplanner.SetEndpoints(router, db)
 	workout.SetEndpoints(router, db)
 
-	// router.GET("/api/foods", h.GetFoods)
-	// router.POST("/api/foods", h.AddFood)
-
-	// router.GET("/api/meals", h.GetMeals)
-	// router.POST("/api/meals", h.AddMeal)
-
-	// router.GET("/api/daily-goals", h.GetDailyGoals)
-
-	// router.GET("/api/today-meal-plan", h.GetTodayMealPlan)
-	// router.GET("/api/meal-plan-days", h.GetMealPlanDays)
-
 	router.Run("127.0.0.1:8080")
 }

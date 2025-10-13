@@ -23,6 +23,22 @@ func GetToday(database *gorm.DB) (WorkoutLog, error) {
     return workoutDay, nil
 }
 
+func WorkoutRange(db *gorm.DB, today time.Time, start time.Time, end time.Time) ([]WorkoutLog, error) {
+    var logs []WorkoutLog
+
+	if err := db.
+		Preload("WorkoutPlan.Exercises.Sets").
+		Preload("Cardio").
+		Preload("Exercises.Sets").
+		Where("date BETWEEN ? AND ?", start, end).
+		Order("date").
+		Find(&logs).Error; err != nil {
+		return nil, err
+	}
+    return logs, nil
+}
+
+
 func GetAll(database *gorm.DB) ([]WorkoutLog, error) {
     var workoutDay []WorkoutLog
 

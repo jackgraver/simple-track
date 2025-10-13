@@ -23,6 +23,11 @@ export function formatDateShort(isoDate: string): string {
     return `${day}${suffix}`;
 }
 
+export function monthName(isoDate: string): string {
+    const date = new Date(isoDate);
+    return date.toLocaleString("en-US", { month: "long" });
+}
+
 export function isSameDay(a: string | Date, b: string | Date): boolean {
     const dateA = new Date(a);
     const dateB = new Date(b);
@@ -32,6 +37,12 @@ export function isSameDay(a: string | Date, b: string | Date): boolean {
         dateA.getUTCMonth() === dateB.getUTCMonth() &&
         dateA.getUTCDate() === dateB.getUTCDate()
     );
+}
+
+export function isSameMonth(month: number, b: string | Date): boolean {
+    const dateB = new Date(b);
+
+    return month - 1 === dateB.getUTCMonth();
 }
 
 export function dayOfWeek(dateStr: string): string {

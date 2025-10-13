@@ -1,9 +1,11 @@
-<script setup lang="ts"></script>
+<script setup lang="ts">
+import GymDate from "~/components/GymDate.vue";
+</script>
 
 <template>
     <div>
         <h1>Workouts</h1>
-        <Calendar :days="[]" :display-component="null" />
+        <Calendar :fetchURL="`workout/month`" :display-component="GymDate" />
     </div>
 </template>
 

@@ -103,19 +103,11 @@ func seed(db *gorm.DB) error {
 
 	year := 2025
 	start := time.Date(year, time.September, 1, 0, 0, 0, 0, time.UTC)
-	end := time.Date(year, time.December, 31, 0, 0, 0, 0, time.UTC)
+	end := time.Date(2026, time.April, 30, 0, 0, 0, 0, time.UTC)
 
 	for date := start; !date.After(end); date = date.AddDate(0, 0, 1) {
 		mpd := Day{
 			Date: date,
-			PlannedMeals: []PlannedMeal {
-				{MealID: breakfast.ID},
-				{MealID: dinner.ID},
-			},
-			Logs: []DayLog {
-				{MealID: breakfast.ID},
-			},
-			Plan: cut,
 		}
 
 		if err := db.Create(&mpd).Error; err != nil {

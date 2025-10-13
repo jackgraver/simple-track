@@ -209,25 +209,49 @@ func seed(db *gorm.DB) error {
 		},
 	}
 
+	active_rest := WorkoutPlan{
+		Name: "Active Rest",
+		Exercises: []PlannedExercise{
+			{
+				Name: "Abs",
+				Sets: []PlannedSet{
+					{Reps: 6, Weight: 100},
+					{Reps: 6, Weight: 100},
+				},
+			},
+		},
+	}
+
+	rest := WorkoutPlan{
+		Name: "Rest",
+		Exercises: []PlannedExercise{},
+	}
+
 	db.Create(&push)
 	db.Create(&pull)
 	db.Create(&legs)
 	db.Create(&upper)
 	db.Create(&lower)
+	db.Create(&active_rest)
+	db.Create(&rest)
 
 	year := 2025
 	start := time.Date(year, time.September, 1, 0, 0, 0, 0, time.UTC)
 	end := time.Date(year, time.December, 31, 0, 0, 0, 0, time.UTC)
 
-	plans := []WorkoutPlan{push, pull, legs}
-	planIndex := 0
+	// Map weekday → workout plan
+	weekdayPlans := map[time.Weekday]WorkoutPlan{
+		time.Monday:    push,
+		time.Tuesday:   pull,
+		time.Wednesday: legs,
+		time.Thursday:  active_rest,
+		time.Friday:    upper,
+		time.Saturday:  lower,
+		time.Sunday:    rest,
+	}
 
 	for date := start; !date.After(end); date = date.AddDate(0, 0, 1) {
-        if date.Weekday() == time.Sunday {
-            continue
-        }
-
-		plan := plans[planIndex%len(plans)]
+		plan := weekdayPlans[date.Weekday()]
 
 		var loggedExercises []LoggedExercise
 		for _, pe := range plan.Exercises {
@@ -244,26 +268,26 @@ func seed(db *gorm.DB) error {
 			})
 		}
 
+		// Add treadmill on leg days
 		if plan.Name == "Leg Day" {
 			loggedExercises = append(loggedExercises, LoggedExercise{
 				Name: "Treadmill",
 			})
 		}
 
-        cardio := Cardio{
-            Minutes: 20 + rand.Intn(15),
-            Type:    "Running",
-        }
+		cardio := Cardio{
+			Minutes: 20 + rand.Intn(15),
+			Type:    "Running",
+		}
 
 		wl := WorkoutLog{
 			WorkoutPlanID: &plan.ID,
 			Date:          date,
-            Cardio:        &cardio,
+			Cardio:        &cardio,
 			Exercises:     loggedExercises,
 		}
-		db.Create(&wl)
 
-		planIndex++
+		db.Create(&wl)
 	}
 	return nil;
 }

@@ -1,8 +1,58 @@
 <script setup lang="ts">
+import { isSameMonth } from "~/utils/dateUtil";
+
 const props = defineProps<{
-    days: any[];
+    // days: any[];
+    fetchURL: string;
     displayComponent: any;
 }>();
+
+const monthOffset = ref(0);
+
+const data = ref<{ today: string; days: any[]; month: number } | null>(null);
+const pending = ref(false);
+const error = ref<Error | null>(null);
+
+async function fetchMealPlan() {
+    pending.value = true;
+    error.value = null;
+    try {
+        const res = await useApiFetch<{
+            today: string;
+            days: any[];
+            month: number;
+        }>(props.fetchURL, {
+            query: {
+                monthoffset: monthOffset.value,
+            },
+        });
+        data.value = res.data.value ?? null;
+        console.log(data.value);
+    } catch (err) {
+        error.value = err as Error;
+    } finally {
+        pending.value = false;
+    }
+}
+
+function setCurrentMonth() {
+    monthOffset.value = 0;
+    fetchMealPlan();
+}
+
+function nextMonth() {
+    monthOffset.value += 1;
+    fetchMealPlan();
+}
+
+function prevMonth() {
+    monthOffset.value -= 1;
+    fetchMealPlan();
+}
+
+onMounted(() => {
+    setCurrentMonth();
+});
 
 const today = ref(new Date());
 
@@ -15,37 +65,32 @@ const weekdays = [
     "Friday",
     "Saturday",
 ];
-
-const allDays = computed(() => {
-    if (!props.days) return [];
-    return [...props.days].sort(
-        (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime(),
-    );
-});
-
-const firstDayIndex = computed(() => {
-    if (!allDays.value.length) return 0;
-    const firstDate = new Date(allDays.value[0]!.date);
-    return firstDate.getDay(); // Sunday = 0
-});
 </script>
 
 <template>
+    <h1>
+        {{ monthName(data?.days[Math.floor(data?.days.length / 2)]?.date) }}
+    </h1>
+    <div class="flex gap-2">
+        <button @click="prevMonth"><-</button>
+        <button @click="setCurrentMonth" :disabled="monthOffset === 0">
+            Today
+        </button>
+        <button @click="nextMonth">-></button>
+    </div>
     <div class="grid-container">
         <div v-for="weekday in weekdays" :key="weekday" class="weekday-header">
             {{ weekday }}
         </div>
         <div
-            v-for="n in firstDayIndex"
-            :key="'empty-' + n"
-            class="grid-item empty"
-        ></div>
-        <div
-            v-for="day in allDays"
+            v-for="day in data?.days"
             :key="day.ID"
             :class="[
                 'grid-item',
                 today && isSameDay(today, day.date) ? 'today' : '',
+                today && !isSameMonth(data?.month ?? 0, day.date)
+                    ? 'faded'
+                    : '',
             ]"
             @click="() => {}"
         >
@@ -83,6 +128,11 @@ const firstDayIndex = computed(() => {
 
 .today {
     background-color: #808080;
+}
+
+.faded {
+    opacity: 0.3;
+    filter: grayscale(1);
 }
 
 .grid-item > span:first-child {

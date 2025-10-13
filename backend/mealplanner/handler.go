@@ -55,18 +55,34 @@ func getMealPlanWeek(c *gin.Context) {
 }
 
 func getMealPlanMonth(c *gin.Context) {
+    offsetStr := c.Query("monthoffset")
+    offset, _ := strconv.Atoi(offsetStr)
+
     today := time.Now()
-    start := time.Date(today.Year(), today.Month(), 1, 0, 0, 0, 0, today.Location())
-    end := start.AddDate(0, 1, -1) 
+    target := today.AddDate(0, offset, 0)
+
+    startOfMonth := time.Date(target.Year(), target.Month(), 1, 0, 0, 0, 0, target.Location())
+    endOfMonth := startOfMonth.AddDate(0, 1, -1)
+
+    start := startOfMonth.AddDate(0, 0, -int(startOfMonth.Weekday()))
+    end := endOfMonth.AddDate(0, 0, 7-int(endOfMonth.Weekday()))
+
     data, err := MealPlanRange(mealplannerDB, today, start, end)
     if err != nil {
         c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
         return
     }
+
     c.JSON(http.StatusOK, gin.H{
-		"days": data,
-		"today": time.Now(),
-	})
+        "days":  data,
+        "today": today,
+        "range": gin.H{
+            "start": start,
+            "end":   end,
+        },
+        "month": target.Month(),
+        "offset": offset,
+    })
 }
 
 func getMealPlanDay(c *gin.Context) {
