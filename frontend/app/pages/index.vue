@@ -3,4 +3,5 @@
 <template>
     <LogMeal />
     <ManageMealPlan />
+    <LogWorkout />
 </template>

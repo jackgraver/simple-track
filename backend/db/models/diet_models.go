@@ -1,4 +1,4 @@
-package mealplanner
+package models
 
 import (
 	"fmt"
@@ -7,9 +7,17 @@ import (
 	"gorm.io/gorm"
 )
 
-func MigrateMealPlanDatabase(db *gorm.DB) {
+type MealPlanModel struct{
+	db *gorm.DB
+}
+
+func NewMealPlanModel(db *gorm.DB) *MealPlanModel {
+	return &MealPlanModel{db: db}
+}
+
+func (m *MealPlanModel) MigrateDatabase() {
 	fmt.Println("Migrating meal plan database")
-	if err := db.Migrator().DropTable(
+	if err := m.db.Migrator().DropTable(
 		&DayLog{},
 		&PlannedMeal{},
 		&MealItem{},
@@ -23,7 +31,7 @@ func MigrateMealPlanDatabase(db *gorm.DB) {
 		fmt.Printf("Failed to drop meal plan database: %v\n", err)
 	}
 
-	if err := db.AutoMigrate(
+	if err := m.db.AutoMigrate(
 		&Plan{},
 		&Day{},
 		&Meal{},
@@ -37,12 +45,12 @@ func MigrateMealPlanDatabase(db *gorm.DB) {
 		fmt.Printf("Failed to migrate meal plan database: %v\n", err)
 	}
 
-	if err := seed(db); err != nil {
+	if err := m.seedDatabase(m.db); err != nil {
 		fmt.Printf("Failed to seed meal plan database: %v\n", err)
 	}
 }
 
-func seed(db *gorm.DB) error {
+func (m *MealPlanModel) seedDatabase(db *gorm.DB) error {
 	fmt.Println("Seeding meal plan database")
 
 	egg := Food{Name: "Egg", Unit: "Serving", Calories: 140, Protein: 12, Fiber: 0}
@@ -117,6 +125,10 @@ func seed(db *gorm.DB) error {
 	return nil;
 }
 
+func (m *MealPlanModel) Preloads() []string {
+	return []string{"PlannedMeals.Meal.Items.Food", "Plan", "Logs.Meal.Items.Food"}
+}
+
 type Day struct {
     gorm.Model
     Date   time.Time `json:"date"`
@@ -124,6 +136,10 @@ type Day struct {
     Plan   Plan `gorm:"foreignKey:PlanID" json:"plan"`   // the Plan object
     PlannedMeals []PlannedMeal `json:"plannedMeals"`
     Logs         []DayLog `json:"loggedMeals"`
+}
+
+func (d *Day) Preloads() []string {
+    return []string{"PlannedMeals.Meal.Items.Food", "Plan", "Logs.Meal.Items.Food"}
 }
 
 type Plan struct {

@@ -1,4 +1,4 @@
-package workout
+package models
 
 import (
 	"fmt"
@@ -8,9 +8,17 @@ import (
 	"gorm.io/gorm"
 )
 
-func MigrateWorkoutDatabase(db *gorm.DB) {
+type WorkoutModel struct {
+	db *gorm.DB
+}
+
+func NewWorkoutModel(db *gorm.DB) *WorkoutModel {
+	return &WorkoutModel{db: db}
+}
+
+func (m *WorkoutModel) MigrateDatabase() {
 	fmt.Println("Migrating workout database")
-    if err := db.Migrator().DropTable(
+    if err := m.db.Migrator().DropTable(
         &WorkoutPlan{},
         &PlannedExercise{},
         &PlannedSet{},
@@ -22,7 +30,7 @@ func MigrateWorkoutDatabase(db *gorm.DB) {
 		fmt.Printf("Failed to drop workout database: %v\n", err)
 	}
 
-    if err := db.AutoMigrate(
+    if err := m.db.AutoMigrate(
         &WorkoutPlan{},
         &PlannedExercise{},
         &PlannedSet{},
@@ -34,12 +42,12 @@ func MigrateWorkoutDatabase(db *gorm.DB) {
 		fmt.Printf("Failed to migrate workout database: %v\n", err)
 	}
 
-	if err := seed(db); err != nil {
+	if err := m.seedDatabase(); err != nil {
 		fmt.Printf("Failed to seed workout database: %v\n", err)
 	}
 }
 
-func seed(db *gorm.DB) error {
+func (m *WorkoutModel) seedDatabase() error {
 	fmt.Println("Seeding workout database")
 
 	push := WorkoutPlan{
@@ -227,13 +235,13 @@ func seed(db *gorm.DB) error {
 		Exercises: []PlannedExercise{},
 	}
 
-	db.Create(&push)
-	db.Create(&pull)
-	db.Create(&legs)
-	db.Create(&upper)
-	db.Create(&lower)
-	db.Create(&active_rest)
-	db.Create(&rest)
+	m.db.Create(&push)
+	m.db.Create(&pull)
+	m.db.Create(&legs)
+	m.db.Create(&upper)
+	m.db.Create(&lower)
+	m.db.Create(&active_rest)
+	m.db.Create(&rest)
 
 	year := 2025
 	start := time.Date(year, time.September, 1, 0, 0, 0, 0, time.UTC)
@@ -287,9 +295,13 @@ func seed(db *gorm.DB) error {
 			Exercises:     loggedExercises,
 		}
 
-		db.Create(&wl)
+		m.db.Create(&wl)
 	}
 	return nil;
+}
+
+func (m *WorkoutModel) Preloads() []string {
+	return []string{"WorkoutPlan.Exercises.Sets", "Cardio", "Exercises.Sets"}
 }
 
 type WorkoutPlan struct {
@@ -319,6 +331,10 @@ type WorkoutLog struct {
     WorkoutPlan   *WorkoutPlan `json:"workout_plan"`
     Exercises []LoggedExercise `json:"exercises" gorm:"constraint:OnDelete:CASCADE;"`
     Cardio    *Cardio          `json:"cardio" gorm:"constraint:OnDelete:CASCADE;"`
+}
+
+func (w *WorkoutLog) Preloads() []string {
+    return []string{"WorkoutPlan.Exercises.Sets", "Cardio", "Exercises.Sets"}
 }
 
 type LoggedExercise struct {

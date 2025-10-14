@@ -1,6 +1,8 @@
-package mealplanner
+package api
 
 import (
+	"be-simpletracker/db/models"
+	"be-simpletracker/db/services"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -10,24 +12,37 @@ import (
 	"gorm.io/gorm"
 )
 
-var mealplannerDB *gorm.DB
-
-func SetEndpoints(router *gin.Engine, db *gorm.DB) {
-    mealplannerDB = db
-
-    group := router.Group("/mealplan")
-    group.GET("/today", getMealPlanToday)
-    group.GET("/week", getMealPlanWeek)
-    group.GET("/month", getMealPlanMonth)
-    group.GET("/day/:id" , getMealPlanDay)
-    group.GET("/goals/today", getGoalsToday)
-    group.GET("/food/all", getAllFoods)
-    group.GET("/meal/all", getAllMeals)
-    group.POST("/meal/log", logMeal)
+type MealPlanFeature struct {
+	BaseFeature[models.MealPlanModel]
 }
 
-func getMealPlanToday(c *gin.Context) {
-    days, daysErr := MealPlanToday(mealplannerDB)
+func NewMealPlanFeature(db *gorm.DB) *MealPlanFeature {
+    var feature = models.NewMealPlanModel(db)
+    feature.MigrateDatabase()
+
+	return &MealPlanFeature{
+		BaseFeature[models.MealPlanModel]{
+			db: db,
+		},
+	}
+}
+
+func (f *MealPlanFeature) SetEndpoints(router *gin.Engine) {
+    group := router.Group("/mealplan") 
+    {
+        group.GET("/today", f.getMealPlanToday)
+        group.GET("/week", f.getMealPlanWeek)
+        group.GET("/month", f.getMealPlanMonth)
+        group.GET("/day/:id" , f.getMealPlanDay)
+        group.GET("/goals/today", f.getGoalsToday)
+        group.GET("/food/all", f.getAllFoods)
+        group.GET("/meal/all", f.getAllMeals)
+        group.POST("/meal/log", f.logMeal)
+    }
+}
+
+func (f *MealPlanFeature) getMealPlanToday(c *gin.Context) {
+    days, daysErr := services.MealPlanToday(f.db)
     if daysErr != nil {
         c.JSON(http.StatusInternalServerError, gin.H{"error": daysErr.Error()})
         return
@@ -39,11 +54,12 @@ func getMealPlanToday(c *gin.Context) {
 	})
 }
 
-func getMealPlanWeek(c *gin.Context) {
+func (f *MealPlanFeature) getMealPlanWeek(c *gin.Context) {
     today := time.Now()
     start := today.AddDate(0, 0, -3) // 3 days before
 	end := today.AddDate(0, 0, 3)    // 3 days after
-    data, err := MealPlanRange(mealplannerDB, today, start, end)
+    // data, err := services.MealPlanRange(f.db, today, start, end)
+    data, err := services.ObjectRange[*models.Day](f.db, start, end)
     if err != nil {
         c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
         return
@@ -54,7 +70,7 @@ func getMealPlanWeek(c *gin.Context) {
 	})
 }
 
-func getMealPlanMonth(c *gin.Context) {
+func (f *MealPlanFeature) getMealPlanMonth(c *gin.Context) {
     offsetStr := c.Query("monthoffset")
     offset, _ := strconv.Atoi(offsetStr)
 
@@ -67,7 +83,9 @@ func getMealPlanMonth(c *gin.Context) {
     start := startOfMonth.AddDate(0, 0, -int(startOfMonth.Weekday()))
     end := endOfMonth.AddDate(0, 0, 7-int(endOfMonth.Weekday()))
 
-    data, err := MealPlanRange(mealplannerDB, today, start, end)
+    // data, err := services.MealPlanRange(f.db, today, start, end)
+    //TODO do business logic for grouping totals here
+    data, err := services.ObjectRange[*models.Day](f.db, start, end)
     if err != nil {
         c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
         return
@@ -85,13 +103,13 @@ func getMealPlanMonth(c *gin.Context) {
     })
 }
 
-func getMealPlanDay(c *gin.Context) {
+func (f *MealPlanFeature) getMealPlanDay(c *gin.Context) {
     id, err := strconv.Atoi(c.Param("id"))
     if err != nil {
         c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
         return
     }
-    data, err := MealPlanDayByID(mealplannerDB, id)
+    data, err := services.MealPlanDayByID(f.db, id)
     if err != nil {
         c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
         return
@@ -104,8 +122,8 @@ func getMealPlanDay(c *gin.Context) {
     c.JSON(http.StatusOK, data)
 }
 
-func getGoalsToday(c *gin.Context) {
-    data, err := GoalsToday(mealplannerDB)
+func (f *MealPlanFeature) getGoalsToday(c *gin.Context) {
+    data, err := services.GoalsToday(f.db)
     if err != nil {
         c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
         return
@@ -113,9 +131,9 @@ func getGoalsToday(c *gin.Context) {
     c.JSON(http.StatusOK, data)
 }
 
-func getAllFoods(c *gin.Context) {
+func (f *MealPlanFeature) getAllFoods(c *gin.Context) {
     time.Sleep(3 * time.Second)
-    data, err := AllFoods(mealplannerDB)
+    data, err := services.AllFoods(f.db)
     if err != nil {
         c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
         return
@@ -123,8 +141,8 @@ func getAllFoods(c *gin.Context) {
     c.JSON(http.StatusOK, data)
 }
 
-func getAllMeals(c *gin.Context) {
-    data, err := AllMeals(mealplannerDB)
+func (f *MealPlanFeature) getAllMeals(c *gin.Context) {
+    data, err := services.AllMeals(f.db)
     if err != nil {
         c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
         return
@@ -135,10 +153,10 @@ func getAllMeals(c *gin.Context) {
 type CreateDayMealRequest struct {
     MealID uint       `json:"meal_id"`
     Name   string     `json:"name"`
-    Items  []MealItem `json:"items"`
+    Items  []models.MealItem `json:"items"`
 }
 
-func logMeal(c *gin.Context) {
+func (f *MealPlanFeature) logMeal(c *gin.Context) {
     var req CreateDayMealRequest
     if err := c.BindJSON(&req); err != nil {
         fmt.Println("BindJSON error:", err) // log to console
@@ -148,7 +166,7 @@ func logMeal(c *gin.Context) {
 
     // 1. Find or create MealPlanDay
     dayDate := time.Now().Truncate(24 * time.Hour)
-    day, derr := FindMealPlanDay(mealplannerDB, dayDate)
+    day, derr := services.FindMealPlanDay(f.db, dayDate)
     if derr != nil {
         c.JSON(http.StatusInternalServerError, gin.H{"error": derr.Error()})
         return
@@ -169,12 +187,13 @@ func logMeal(c *gin.Context) {
             return
         }
 
-        newMeal := Meal{
+        newMeal := models.Meal{
             Name:  req.Name,
             Items: req.Items,
         }
 
-        if err := mealplannerDB.Create(&newMeal).Error; err != nil {
+        //TODO: move to service
+        if err := f.db.Create(&newMeal).Error; err != nil {
             c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
             return
         }
@@ -183,18 +202,19 @@ func logMeal(c *gin.Context) {
     }
 
     // 2. Create DayMeal
-    dayMeal := DayLog{
+    dayMeal := models.DayLog{
         DayID: day.ID,
         MealID:        mealID,
     }
 
-    if err := CreateDayMeal(mealplannerDB, &dayMeal); err != nil {
+    if err := services.CreateDayMeal(f.db, &dayMeal); err != nil {
         c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
         return
     }
 
+    //TODO here too
     // Optionally preload Meal and Items for response
-    mealplannerDB.Preload("Meal.Items").First(&dayMeal, dayMeal.ID)
+    f.db.Preload("Meal.Items").First(&dayMeal, dayMeal.ID)
 
     c.JSON(http.StatusOK, dayMeal)
 }
