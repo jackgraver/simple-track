@@ -9,9 +9,6 @@ export interface Day extends BaseModel {
     plan: Plan;
     plannedMeals: PlannedMeal[];
     loggedMeals: DayLog[];
-    totalCalories?: number;
-    totalProtein?: number;
-    totalFiber?: number;
 }
 
 export interface Plan extends BaseModel {

@@ -41,6 +41,7 @@ const router = useRouter();
 
 <style scoped>
 header {
+    background-color: black;
     position: sticky;
     top: 0;
     display: flex;

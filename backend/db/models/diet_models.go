@@ -174,7 +174,7 @@ type MealItem struct {
     gorm.Model
     MealID uint `json:"meal_id" gorm:"not null;index"`
     FoodID uint `json:"food_id" gorm:"not null;index"`
-    Amount float64 `json:"amount"`
+    Amount float32 `json:"amount"`
 
     Meal Meal
     Food Food

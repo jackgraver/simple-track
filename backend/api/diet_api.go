@@ -42,16 +42,38 @@ func (f *MealPlanFeature) SetEndpoints(router *gin.Engine) {
 }
 
 func (f *MealPlanFeature) getMealPlanToday(c *gin.Context) {
-    days, daysErr := services.MealPlanToday(f.db)
+    day, daysErr := services.MealPlanToday(f.db)
     if daysErr != nil {
         c.JSON(http.StatusInternalServerError, gin.H{"error": daysErr.Error()})
         return
     }
     
+    totalCalories := float32(0)
+    totalProtein := float32(0)
+    totalFiber := float32(0)
+    for _, log := range day.Logs {
+        for _, item := range log.Meal.Items {
+            totalCalories += item.Food.Calories * item.Amount
+            totalProtein += item.Food.Protein * item.Amount
+            totalFiber += item.Food.Fiber * item.Amount
+        }
+    }
+
     c.JSON(http.StatusOK, gin.H{
-		"days": days,
+		"day": day,
+        "totalCalories": totalCalories,
+        "totalProtein": totalProtein,
+        "totalFiber": totalFiber,
 		"today": time.Now(),
 	})
+}
+
+func sum(list []any) int {
+    total := 0
+    for _, item := range list {
+        total += item.(int)
+    }
+    return total
 }
 
 func (f *MealPlanFeature) getMealPlanWeek(c *gin.Context) {

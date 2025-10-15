@@ -4,27 +4,21 @@ import type { LoggedExercise, WorkoutLog } from "~/types/workout";
 
 const log = ref(false);
 
-const loggedExercises = ref<LoggedExercise[]>([]);
-
 const { data, pending, error } = useApiFetch<WorkoutLog>(`workout/previous`);
 
 const workoutLog = data && data.value ? data?.value : null;
 
-watch(data, (val) => {
-    if (!val) return;
-    loggedExercises.value = val.exercises.map((e) => ({
-        name: e.name,
-        workout_log_id: val.ID,
-        sets: e.sets.map((s) => ({
-            reps: s.reps,
-            weight: s.weight,
-        })),
-    }));
-});
+const todayLog: WorkoutLog = {
+    date: "",
+    exercises: workoutLog?.exercises ?? [],
+    ID: 0,
+    created_at: "",
+    updated_at: "",
+};
+console.log("today", todayLog);
 
 const logWorkout = () => {
-    console.log("logging workout", loggedExercises.value);
-
+    console.log(todayLog);
     log.value = false;
 };
 </script>
@@ -42,7 +36,8 @@ const logWorkout = () => {
                 :key="e.ID"
                 class="exercise-card"
             >
-                <h2>{{ e.name }}</h2>
+                <ExcerciseLog :exercise="e" />
+                <!-- <h2>{{ e.name }}</h2>
                 <div class="set-row">
                     <div class="previous-sets">
                         <h3>Previous</h3>
@@ -50,22 +45,23 @@ const logWorkout = () => {
                             {{ s.reps }} x {{ s.weight }}
                         </p>
                     </div>
-                    <div class="current-sets" v-if="log">
-                        <h3>Today</h3>
-                        <div v-for="s in e.sets" :key="s.ID" class="set-inputs">
-                            <input
-                                type="number"
-                                v-model.number="s.reps"
-                                placeholder="Reps"
-                            />
-                            <span>x</span>
-                            <input
-                                type="number"
-                                v-model.number="s.weight"
-                                placeholder="Weight"
-                            />
-                        </div>
-                    </div>
+                </div> -->
+            </div>
+            <div class="current-sets" v-if="log">
+                <h3>Today</h3>
+                <div
+                    v-for="e in todayLog.exercises"
+                    :key="e.ID"
+                    class="set-inputs"
+                >
+                    <div v-for="s in e.sets" :key="s.ID"></div>
+                    <input type="number" :value="todayLog" placeholder="Reps" />
+                    <span>x</span>
+                    <input
+                        type="number"
+                        v-model="todayLog"
+                        placeholder="Weight"
+                    />
                 </div>
             </div>
         </div>

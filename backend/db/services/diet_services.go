@@ -8,23 +8,20 @@ import (
 )
 
 // MealPlanToday returns today's meal plan day with meals and goals
-func MealPlanToday(db *gorm.DB) ([]models.Day, error) {
-    today := time.Now().Truncate(24 * time.Hour)
-	var days []models.Day
+func MealPlanToday(db *gorm.DB) (models.Day, error) {
+    now := time.Now().UTC()
+	start := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
+	end := start.Add(24 * time.Hour)
+
+	var days models.Day
 	if err := db.Preload("PlannedMeals.Meal.Items.Food").
             Preload("Plan").
             Preload("Logs.Meal.Items.Food").
-            Where("date = ?", today).Find(&days).Error; err != nil {
-		return nil, err
+            Where("date >= ? AND date < ?", start, end).
+            First(&days).Error; err != nil {
+		return models.Day{}, err
 	}
 	return days, nil
-}
-
-type DayWithTotals struct {
-    models.Day
-    TotalCalories float32 `json:"totalCalories"`
-    TotalProtein  float32 `json:"totalProtein"`
-    TotalFiber    float32 `json:"totalFiber"`
 }
 
 func MealPlanDayByID(db *gorm.DB, id int) (*models.Day, error) {
