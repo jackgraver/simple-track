@@ -35,8 +35,8 @@ button:disabled:hover {
     cursor: not-allowed;
 }
 
-button:hover && button:not(:disabled) {
-    background: #4baeff;
+button:hover:not(:disabled) {
+    background: #58b4ff;
 }
 
 input,

@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import type { Day } from "~/types/models";
+import type { Day } from "~/types/diet";
 import MacrosDate from "~/components/MacrosDate.vue";
 
 const monthOffset = ref(0);

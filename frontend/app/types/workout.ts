@@ -1,4 +1,4 @@
-import type { BaseModel } from "./models";
+import type { BaseModel } from "./diet";
 
 export interface PlannedSet extends BaseModel {
     planned_exercise_id: number;

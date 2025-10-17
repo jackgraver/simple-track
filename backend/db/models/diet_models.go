@@ -103,9 +103,9 @@ func (m *MealPlanModel) seedDatabase(db *gorm.DB) error {
 			}
 	db.Create(&cut)
 	bulk := Plan{Name: "Bulk",
-				Calories: 2800,
+				Calories: 2400,
 				Protein:  150,
-				Fiber:    30,
+				Fiber:    50,
 			}
 	db.Create(&bulk)
 
@@ -116,6 +116,15 @@ func (m *MealPlanModel) seedDatabase(db *gorm.DB) error {
 	for date := start; !date.After(end); date = date.AddDate(0, 0, 1) {
 		mpd := Day{
 			Date: date,
+			Plan: bulk,
+			Logs: []DayLog{
+				{MealID: breakfast.ID},
+				{MealID: dinner.ID},
+			},
+			PlannedMeals: []PlannedMeal{
+				{MealID: breakfast.ID},
+				{MealID: dinner.ID},
+			},
 		}
 
 		if err := db.Create(&mpd).Error; err != nil {
@@ -176,8 +185,8 @@ type MealItem struct {
     FoodID uint `json:"food_id" gorm:"not null;index"`
     Amount float32 `json:"amount"`
 
-    Meal Meal
-    Food Food
+    Meal Meal `json:"meal"`
+    Food Food `json:"food"`
 }
 
 type SavedMeal struct {

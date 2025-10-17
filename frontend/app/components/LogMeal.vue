@@ -1,6 +1,6 @@
 <script lang="ts" setup>
 import { reactive, ref, watch } from "vue";
-import type { Meal, MealItem, Food } from "~/types/models";
+import type { Meal, MealItem, Food } from "~/types/diet";
 
 const {
     data: foodRes,

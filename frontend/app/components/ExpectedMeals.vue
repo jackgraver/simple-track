@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import type { Meal, MealItem, Day } from "~/types/models";
+import type { Meal, MealItem, Day } from "~/types/diet";
 import { computed } from "vue";
 import { useApiFetch } from "~/composables/useApiFetch";
 

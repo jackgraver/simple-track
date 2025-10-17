@@ -16,8 +16,9 @@ type WorkoutFeature struct {
 }
 
 func NewWorkoutFeature(db *gorm.DB) *WorkoutFeature {
-    var feature = models.NewWorkoutModel(db)
-    feature.MigrateDatabase()
+    models.NewWorkoutModel(db)
+    // var feature = models.NewWorkoutModel(db)
+    // feature.MigrateDatabase()
 
 	return &WorkoutFeature{
 		BaseFeature[models.WorkoutModel]{

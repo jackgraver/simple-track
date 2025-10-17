@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import type { Meal, MealItem } from "~/types/models";
+import type { Meal, MealItem } from "~/types/diet";
 
 const props = defineProps<{
     ID: number;

@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import type { Day } from "~/types/models";
+import type { Day } from "~/types/diet";
 import { formatDateShort } from "~/utils/dateUtil";
 
 const props = defineProps<{

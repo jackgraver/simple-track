@@ -328,7 +328,7 @@ type WorkoutLog struct {
     gorm.Model
     Date          time.Time    `json:"date"`
     WorkoutPlanID *uint        `json:"workout_plan_id"`
-    WorkoutPlan   *WorkoutPlan `json:"workout_plan"`
+    WorkoutPlan   *WorkoutPlan `json:"workout_plan"` //TODO deprecate plan other than unique name? no exercise tracking because we can just look at previous weeks
     Exercises []LoggedExercise `json:"exercises" gorm:"constraint:OnDelete:CASCADE;"`
     Cardio    *Cardio          `json:"cardio" gorm:"constraint:OnDelete:CASCADE;"`
 }

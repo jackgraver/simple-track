@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { Day, Meal } from "~/types/models";
+import type { Day, Meal } from "~/types/diet";
 
 const { data, pending, error } = useApiFetch<{
     day: Day;
@@ -7,47 +7,157 @@ const { data, pending, error } = useApiFetch<{
     totalProtein: number;
     totalFiber: number;
 }>(`mealplan/today`);
-
-console.log("data?", data);
+console.log(data.value);
 </script>
 
 <template>
     <div v-if="pending">Loading...</div>
     <div v-else-if="error">Error: {{ error.message }}</div>
-    <div v-else>
-        <h1>Today</h1>
-        <div
-            v-if="data"
-            class="macro-fill calories"
-            :style="{
-                width: `${Math.min(100, (data?.totalCalories ?? 0 / data?.day.plan.calories) * 100)}%`,
-            }"
-        >
-            {{ data?.totalCalories ?? 0 }}
-        </div>
-        <div
-            v-if="data"
-            class="macro-fill protein"
-            :style="{
-                width: `${Math.min(100, (data?.totalProtein ?? 0 / data?.day.plan.protein) * 100)}%`,
-            }"
-        >
-            {{ data?.totalProtein ?? 0 }}
-        </div>
-        <div
-            v-if="data"
-            class="macro-fill fiber"
-            :style="{
-                width: `${Math.min(100, (data?.totalFiber ?? 0 / data?.day.plan.fiber) * 100)}%`,
-            }"
-        >
-            {{ data?.totalFiber ?? 0 }}
+    <div v-else class="container">
+        <div v-if="data">
+            <h1>Today</h1>
+            <div class="bars-container">
+                <div v-if="data" class="fill-container">
+                    <div
+                        class="fill calories"
+                        :style="{
+                            width: `${Math.min(100, (data?.totalCalories / data?.day.plan.calories) * 100)}%`,
+                        }"
+                    >
+                        <span>{{ data?.totalCalories ?? 0 }}</span>
+                    </div>
+                </div>
+                <div v-if="data" class="fill-container">
+                    <div
+                        class="fill protein"
+                        :style="{
+                            width: `${Math.min(100, (data?.totalProtein / data?.day.plan.protein) * 100)}%`,
+                        }"
+                    >
+                        <span>{{ data?.totalProtein ?? 0 }}</span>
+                    </div>
+                </div>
+                <div v-if="data" class="fill-container">
+                    <div
+                        class="fill fiber"
+                        :style="{
+                            width: `${Math.min(100, (data?.totalFiber / data?.day.plan.fiber) * 100)}%`,
+                        }"
+                    >
+                        <span>{{ data?.totalFiber ?? 0 }}</span>
+                    </div>
+                </div>
+            </div>
+            <div class="meals-section">
+                <div class="meals-container">
+                    <div
+                        v-for="meal in data.day.loggedMeals"
+                        :key="meal.ID"
+                        class="meal"
+                    >
+                        <div class="expected-header">
+                            <h3>{{ meal.meal.name }} {{ " 0C / 0P / 0F" }}</h3>
+                            <button>Delete</button>
+                            <button>Edit</button>
+                        </div>
+                        <span
+                            v-for="food in meal.meal.items"
+                            :key="food.ID"
+                            class="food"
+                        >
+                            {{ food.food?.name }}
+                            <span class="details">
+                                <span class="cal"
+                                    >{{
+                                        food.food?.calories ?? 0 * food.amount
+                                    }}C</span
+                                >
+                                /
+                                <span class="pro"
+                                    >{{
+                                        food.food?.protein ?? 0 * food.amount
+                                    }}P</span
+                                >
+                                /
+                                <span class="fib"
+                                    >{{
+                                        food.food?.fiber ?? 0 * food.amount
+                                    }}F</span
+                                >
+                            </span>
+                        </span>
+                    </div>
+                </div>
+                <div class="meals-container">
+                    <div
+                        v-for="meal in data.day.plannedMeals"
+                        :key="meal.ID"
+                        class="meal"
+                    >
+                        <div class="expected-header">
+                            <h3>{{ meal.meal.name }} {{ " 0C / 0P / 0F" }}</h3>
+                            <button>Log Edited</button>
+                            <button>Log</button>
+                        </div>
+                        <span
+                            v-for="food in meal.meal.items"
+                            :key="food.ID"
+                            class="food"
+                        >
+                            {{ food.food?.name }}
+                            <span class="details">
+                                <span class="cal"
+                                    >{{
+                                        food.food?.calories ?? 0 * food.amount
+                                    }}C</span
+                                >
+                                /
+                                <span class="pro"
+                                    >{{
+                                        food.food?.protein ?? 0 * food.amount
+                                    }}P</span
+                                >
+                                /
+                                <span class="fib"
+                                    >{{
+                                        food.food?.fiber ?? 0 * food.amount
+                                    }}F</span
+                                >
+                            </span>
+                        </span>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 </template>
 
 <style scoped>
-.macro-fill {
+.container {
+    display: flex;
+    flex-direction: row;
+    gap: 1rem;
+    width: 75%;
+}
+
+.bars-container {
+    display: flex;
+    flex-direction: row;
+    gap: 0.5rem;
+    width: 100%;
+}
+
+.fill-container {
+    flex: 1;
+    height: 20px;
+    width: 250px;
+    border: #ffffff;
+    border-radius: 4px;
+    background-color: #252525;
+    border-color: #8d8d8d;
+}
+
+.fill {
     height: 100%;
     color: #ffffff;
     font-weight: bold;
@@ -66,5 +176,80 @@ console.log("data?", data);
 }
 .fiber {
     background-color: green;
+}
+
+.meals-section {
+    display: flex;
+    flex-direction: row;
+    gap: 0.5rem;
+    padding-top: 1rem;
+}
+
+.meals-container {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding-top: 1rem;
+}
+
+.meal {
+    display: flex;
+    flex-direction: column;
+    padding: 1rem;
+    border: 1px solid #333;
+    border-radius: 0.5rem;
+    background: #1a1a1a;
+    color: #fff;
+    align-items: left;
+    width: 500px;
+}
+
+.meal h3 {
+    margin-top: 0;
+    margin-bottom: 0.5rem;
+}
+
+.food .details {
+    opacity: 0;
+    visibility: hidden;
+    margin-left: 0.25rem;
+    transition: visibility 0.3s ease;
+    transition-delay: 0.5s;
+}
+
+.meal h3:hover ~ .food .details {
+    opacity: 1;
+    visibility: visible;
+    transition-delay: 0s;
+}
+
+.food:hover .details {
+    opacity: 1;
+    visibility: visible;
+    transition-delay: 0s;
+}
+
+.meal span {
+    color: gray;
+}
+
+.meal span:hover {
+    color: white;
+    transition-delay: 0s;
+}
+
+.details .cal {
+    color: #f87171;
+}
+.details .pro {
+    color: #60a5fa;
+}
+.details .fib {
+    color: #34d399;
+}
+
+.expected-header {
+    display: flex;
+    flex-direction: row;
 }
 </style>
