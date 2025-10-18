@@ -10,6 +10,7 @@ export function useAPIGet<T>(endpoint: string, options: any = {}) {
 
 export async function useAPIPost<T>(
     endpoint: string,
+    method: "POST" | "DELETE" = "POST",
     body: Record<string, any>,
     options: any = {},
 ) {
@@ -19,7 +20,7 @@ export async function useAPIPost<T>(
     const { data, error, status } = await useFetch<T>(
         `${baseUrl}/${endpoint}`,
         {
-            method: "POST",
+            method: method,
             body,
             ...options,
             onResponse({ response }) {

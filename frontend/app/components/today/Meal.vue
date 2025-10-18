@@ -22,7 +22,7 @@ const logPlannedMeal = async (meal: Meal) => {
         totalCalories: number;
         totalProtein: number;
         totalFiber: number;
-    }>(`mealplan/meal/log-planned`, {
+    }>(`mealplan/meal/log-planned`, "POST", {
         meal_id: meal.ID,
     });
 
@@ -58,6 +58,32 @@ const logEditedMeal = (meal: Meal) => {
     //     method: "POST",
     //     body: JSON.stringify({ meal }),
     // });
+};
+
+const deleteLoggedMeal = async (meal: Meal) => {
+    const { response, error } = await useAPIPost<{
+        day: Day;
+        totalCalories: number;
+        totalProtein: number;
+        totalFiber: number;
+    }>(`mealplan/meal/logged`, "DELETE", {
+        meal_id: meal.ID,
+        day_id: data.value?.day.ID,
+    });
+
+    if (error) {
+        toast.push("Delete Failed!", "error");
+    } else if (response) {
+        toast.push("Delete Successfully!", "success");
+        if (data.value) {
+            data.value = {
+                day: response.day,
+                totalCalories: response.totalCalories,
+                totalProtein: response.totalProtein,
+                totalFiber: response.totalFiber,
+            };
+        }
+    }
 };
 </script>
 
@@ -101,7 +127,17 @@ const logEditedMeal = (meal: Meal) => {
             </div>
             <div class="meals-section">
                 <div class="meals-container">
-                    <h2>Logged</h2>
+                    <div
+                        style="
+                            display: flex;
+                            flex-direction: row;
+                            gap: 1rem;
+                            align-items: center;
+                        "
+                    >
+                        <h2>Logged</h2>
+                        <button>Log Other</button>
+                    </div>
                     <div
                         v-for="meal in data.day.loggedMeals"
                         :key="meal.ID"
@@ -109,7 +145,9 @@ const logEditedMeal = (meal: Meal) => {
                     >
                         <div class="expected-header">
                             <h3>{{ meal.meal.name }} {{ " 0C / 0P / 0F" }}</h3>
-                            <button>Delete</button>
+                            <button @click="() => deleteLoggedMeal(meal.meal)">
+                                Delete
+                            </button>
                             <button>Edit</button>
                         </div>
                         <span
@@ -291,7 +329,6 @@ const logEditedMeal = (meal: Meal) => {
 }
 
 .meal span:hover {
-    color: white;
     transition-delay: 0s;
 }
 

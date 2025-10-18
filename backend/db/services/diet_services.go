@@ -58,6 +58,7 @@ func CalculateTotals(db *gorm.DB, dayID uint) (float32, float32, float32) {
         JOIN meal_items mi ON mi.meal_id = m.id
         JOIN foods f       ON f.id = mi.food_id
         WHERE dl.day_id = ?
+        AND dl.deleted_at IS NULL
     `, dayID).Scan(&totals)
     
     return totals.TotalCalories, totals.TotalProtein, totals.TotalFiber
@@ -151,4 +152,12 @@ func SetPlannedMealLogged(db *gorm.DB, dayID uint, mealID uint) error {
     }
     meal.Logged = true
     return db.Save(&meal).Error
+}
+
+func DeleteLoggedMeal(db *gorm.DB, dayID uint, mealID uint) error {
+    var meal models.DayLog
+    if err := db.Where("day_id = ? AND meal_id = ?", dayID, mealID).First(&meal).Error; err != nil {
+        return err
+    }
+    return db.Delete(&meal).Error
 }

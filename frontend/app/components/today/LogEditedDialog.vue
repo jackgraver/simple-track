@@ -12,6 +12,7 @@ meal.ID = 0;
 const logEditedMeal = async () => {
     const { response, error } = await useAPIPost<Day>(
         `mealplan/meal/logedited`,
+        "POST",
         {
             meal: meal,
         },
