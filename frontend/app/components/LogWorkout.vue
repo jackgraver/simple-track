@@ -4,7 +4,7 @@ import type { LoggedExercise, WorkoutLog } from "~/types/workout";
 
 const log = ref(false);
 
-const { data, pending, error } = useApiFetch<WorkoutLog>(`workout/previous`);
+const { data, pending, error } = useAPIGet<WorkoutLog>(`workout/previous`);
 
 const workoutLog = data && data.value ? data?.value : null;
 

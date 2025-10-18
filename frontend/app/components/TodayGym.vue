@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { WorkoutLog } from "~/types/workout";
 
-const { data, pending, error } = useApiFetch<WorkoutLog>(`workout/previous`);
+const { data, pending, error } = useAPIGet<WorkoutLog>(`workout/previous`);
 
 const day = data.value;
 </script>

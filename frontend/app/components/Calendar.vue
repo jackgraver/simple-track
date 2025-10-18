@@ -17,7 +17,7 @@ async function fetchMealPlan() {
     pending.value = true;
     error.value = null;
     try {
-        const res = await useApiFetch<{
+        const res = await useAPIGet<{
             today: string;
             days: any[];
             month: number;

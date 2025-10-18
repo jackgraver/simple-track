@@ -1,13 +1,48 @@
 <script setup lang="ts">
+import { useDialog } from "~/composables/dialog/useDialog";
 import type { Day, Meal } from "~/types/diet";
 
-const { data, pending, error } = useApiFetch<{
+const { data, pending, error } = useAPIGet<{
     day: Day;
     totalCalories: number;
     totalProtein: number;
     totalFiber: number;
 }>(`mealplan/today`);
-console.log(data.value);
+
+const logPlannedMeal = async (meal: Meal) => {
+    const { response, error } = await useAPIPost<Day>(
+        `mealplan/meal/log-planned`,
+        {
+            meal_id: meal.ID,
+        },
+    );
+
+    if (error) {
+        console.error("API error:", error.message);
+    } else if (response) {
+        console.log("Response:", response);
+    }
+};
+
+const logEditedMeal = () => {
+    const dialog = useDialog();
+    dialog
+        .confirm({
+            title: "Log Edited Meal",
+            message: "Are you sure you want to log this meal as edited?",
+            confirmText: "Log",
+            cancelText: "Cancel",
+        })
+        .then((confirmed) => {
+            if (confirmed) {
+                // logEditedMeal(meal);
+            }
+        });
+    // useApiFetch(`mealplan/log-edited-meal`, {
+    //     method: "POST",
+    //     body: JSON.stringify({ meal }),
+    // });
+};
 </script>
 
 <template>
@@ -50,6 +85,7 @@ console.log(data.value);
             </div>
             <div class="meals-section">
                 <div class="meals-container">
+                    <h2>Logged</h2>
                     <div
                         v-for="meal in data.day.loggedMeals"
                         :key="meal.ID"
@@ -89,6 +125,7 @@ console.log(data.value);
                     </div>
                 </div>
                 <div class="meals-container">
+                    <h2>Planned</h2>
                     <div
                         v-for="meal in data.day.plannedMeals"
                         :key="meal.ID"
@@ -96,8 +133,10 @@ console.log(data.value);
                     >
                         <div class="expected-header">
                             <h3>{{ meal.meal.name }} {{ " 0C / 0P / 0F" }}</h3>
-                            <button>Log Edited</button>
-                            <button>Log</button>
+                            <button @click="logEditedMeal">Log Edited</button>
+                            <button @click="() => logPlannedMeal(meal.meal)">
+                                Log
+                            </button>
                         </div>
                         <span
                             v-for="food in meal.meal.items"

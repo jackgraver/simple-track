@@ -14,7 +14,9 @@ func MealPlanToday(db *gorm.DB) (models.Day, error) {
 	end := start.Add(24 * time.Hour)
 
 	var days models.Day
-	if err := db.Preload("PlannedMeals.Meal.Items.Food").
+	if err := db.
+            Preload("PlannedMeals", "logged = ?", false).
+            Preload("PlannedMeals.Meal.Items.Food").
             Preload("Plan").
             Preload("Logs.Meal.Items.Food").
             Where("date >= ? AND date < ?", start, end).
@@ -81,6 +83,14 @@ func AllMeals(db *gorm.DB) ([]models.Meal, error) {
     return meals, nil
 }
 
+func MealByID(db *gorm.DB, id uint) (*models.Meal, error) {
+    var meal models.Meal
+    if err := db.Preload("Items.Food").First(&meal, id).Error; err != nil {
+        return nil, err
+    }
+    return &meal, nil
+}
+
 func FindMealPlanDay(db *gorm.DB, date time.Time) (*models.Day, error) {
     var day models.Day
     err := db.Where("date = ?", date).First(&day).Error
@@ -94,10 +104,18 @@ func FindMealPlanDay(db *gorm.DB, date time.Time) (*models.Day, error) {
     return &day, nil
 }
 
-
 func CreateDayMeal(db *gorm.DB, dayMeal *models.DayLog) error {
     if err := db.Create(&dayMeal).Error; err != nil {
         return err
     }
     return nil
+}
+
+func SetPlannedMealLogged(db *gorm.DB, dayID uint, mealID uint) error {
+    var meal models.PlannedMeal
+    if err := db.Where("day_id = ? AND meal_id = ?", dayID, mealID).First(&meal).Error; err != nil {
+        return err
+    }
+    meal.Logged = true
+    return db.Save(&meal).Error
 }

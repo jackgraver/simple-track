@@ -5,7 +5,7 @@ const {
     data: mealPlan,
     pending,
     error,
-} = useApiFetch<{
+} = useAPIGet<{
     today: string;
     days: Day[];
 }>("mealplan/week");

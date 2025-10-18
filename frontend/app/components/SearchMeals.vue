@@ -17,11 +17,7 @@ const emit = defineEmits<{
 let currentSearch = ref("");
 let showDropdown = ref(false);
 
-const {
-    data: meals,
-    pending,
-    error,
-} = useApiFetch<Meal[]>("mealplan/meal/all");
+const { data: meals, pending, error } = useAPIGet<Meal[]>("mealplan/meal/all");
 
 const filteredMeals = computed(() => {
     if (!meals.value) return [];

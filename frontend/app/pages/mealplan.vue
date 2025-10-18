@@ -12,7 +12,7 @@ async function fetchMealPlan() {
     pending.value = true;
     error.value = null;
     try {
-        const res = await useApiFetch<{ today: string; days: Day[] }>(
+        const res = await useAPIGet<{ today: string; days: Day[] }>(
             "mealplan/month",
             {
                 query: {

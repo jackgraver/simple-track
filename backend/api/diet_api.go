@@ -3,6 +3,7 @@ package api
 import (
 	"be-simpletracker/db/models"
 	"be-simpletracker/db/services"
+	"be-simpletracker/utils"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -38,7 +39,8 @@ func (f *MealPlanFeature) SetEndpoints(router *gin.Engine) {
         group.GET("/goals/today", f.getGoalsToday)
         group.GET("/food/all", f.getAllFoods)
         group.GET("/meal/all", f.getAllMeals)
-        group.POST("/meal/log", f.logMeal)
+        group.POST("/meal/log-planned", f.postLogPlanned)
+        group.POST("/meal/logedited", NotImplemented)
     }
 }
 
@@ -67,14 +69,6 @@ func (f *MealPlanFeature) getMealPlanToday(c *gin.Context) {
         "totalFiber": totalFiber,
 		"today": time.Now(),
 	})
-}
-
-func sum(list []any) int {
-    total := 0
-    for _, item := range list {
-        total += item.(int)
-    }
-    return total
 }
 
 func (f *MealPlanFeature) getMealPlanWeek(c *gin.Context) {
@@ -173,71 +167,59 @@ func (f *MealPlanFeature) getAllMeals(c *gin.Context) {
     c.JSON(http.StatusOK, data)
 }
 
-type CreateDayMealRequest struct {
-    MealID uint       `json:"meal_id"`
-    Name   string     `json:"name"`
-    Items  []models.MealItem `json:"items"`
+
+type LogPlannedMealRequest struct {
+    MealID uint `json:"meal_id"`
 }
 
-func (f *MealPlanFeature) logMeal(c *gin.Context) {
-    var req CreateDayMealRequest
+func (f *MealPlanFeature) postLogPlanned(c *gin.Context) {
+    var req LogPlannedMealRequest
     if err := c.BindJSON(&req); err != nil {
         fmt.Println("BindJSON error:", err) // log to console
         c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
         return
     }
 
-    // 1. Find or create MealPlanDay
-    dayDate := time.Now().Truncate(24 * time.Hour)
-    day, derr := services.FindMealPlanDay(f.db, dayDate)
+    day, derr := services.FindMealPlanDay(f.db, utils.ZerodTime())
     if derr != nil {
         c.JSON(http.StatusInternalServerError, gin.H{"error": derr.Error()})
         return
     }
 
-    var mealID uint
-
-    fmt.Println("req.MealID", req.MealID)
-    if req.MealID != 0 {
-        fmt.Println("Meal Exists")
-        // Meal exists: use it
-        mealID = req.MealID
-    } else {
-        fmt.Println("Meal Doesn't Exist")
-        // Meal doesn't exist: create it
-        if req.Name == "" {
-            c.JSON(http.StatusBadRequest, gin.H{"error": "Meal name is required for new meal"})
-            return
-        }
-
-        newMeal := models.Meal{
-            Name:  req.Name,
-            Items: req.Items,
-        }
-
-        //TODO: move to service
-        if err := f.db.Create(&newMeal).Error; err != nil {
-            c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-            return
-        }
-
-        mealID = newMeal.ID
+    if day == nil {
+        c.JSON(http.StatusNotFound, gin.H{"error": "Not Found"})
+        return
     }
 
-    // 2. Create DayMeal
-    dayMeal := models.DayLog{
-        DayID: day.ID,
-        MealID:        mealID,
-    }
-
-    if err := services.CreateDayMeal(f.db, &dayMeal); err != nil {
+    meal, err:= services.MealByID(f.db, req.MealID)
+    if err != nil {
         c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
         return
     }
 
-    //TODO here too
-    // Optionally preload Meal and Items for response
-    f.db.Preload("Meal.Items").First(&dayMeal, dayMeal.ID)
+    error := services.CreateDayMeal(f.db, &models.DayLog{
+        DayID: day.ID,
+        MealID: meal.ID,
+    })
 
-    c.JSON(http.StatusOK, dayMeal)
+    if error != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{"error": error.Error()})
+        return
+    }
+
+    error = services.SetPlannedMealLogged(f.db, day.ID, meal.ID)
+    if error != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{"error": error.Error()})
+        return
+    }
+
+    day, err = services.MealPlanDayByID(f.db, int(day.ID))
+    if err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+        return
+    }
+    fmt.Println(day.ID)
+    c.JSON(http.StatusOK, gin.H{
+        "day": day,
+    })
 }

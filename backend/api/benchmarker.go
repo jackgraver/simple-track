@@ -1,7 +1,6 @@
 package api
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -36,7 +35,6 @@ func (b *Benchmarker) AddBenchmark(path string, totalTime float64) {
 	benchark := b.GetBenchmarks(path)
 	if benchark != nil {
 		benchark.TotalHits += 1
-		fmt.Println(totalTime, (benchark.TotalTime + totalTime))
 		benchark.TotalTime += totalTime
 	} else {
 		benchmark := Benchmark{
@@ -46,7 +44,6 @@ func (b *Benchmarker) AddBenchmark(path string, totalTime float64) {
 		}
 		b.Benchmarks[path] = &benchmark
 	}
-	fmt.Println(b.Benchmarks["/mealplan/today"])
 }
 
 func (b *Benchmarker) GetBenchmarks(Path string) *Benchmark {

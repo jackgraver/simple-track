@@ -6,7 +6,7 @@ const {
     data: foodRes,
     pending,
     error,
-} = useApiFetch<Food[]>("mealplan/food/all");
+} = useAPIGet<Food[]>("mealplan/food/all");
 
 const foodOptions = foodRes && foodRes.value ? foodRes.value : [];
 
@@ -70,7 +70,7 @@ function onSubmit(e: Event) {
             updated_at: new Date().toISOString(),
         })),
     };
-    const { data, error } = useApiFetch<Meal>("mealplan/meal/log", {
+    const { data, error } = useAPIGet<Meal>("mealplan/meal/log", {
         method: "POST",
         body: payload,
     });

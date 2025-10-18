@@ -158,12 +158,14 @@ type Plan struct {
     Protein  float32 `json:"protein"`
     Fiber    float32 `json:"fiber"`
 }
+
 type PlannedMeal struct {
     gorm.Model
     DayID  uint `json:"day_id" gorm:"not null"`
     Day    Day  `json:"day"`
     MealID uint `json:"meal_id" gorm:"not null"`
     Meal   Meal `json:"meal"`
+	Logged bool `json:"logged"`
 }
 
 type DayLog struct {
