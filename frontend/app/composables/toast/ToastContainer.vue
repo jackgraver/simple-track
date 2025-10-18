@@ -25,48 +25,31 @@ import { toast } from "~/composables/toast/useToast";
     position: fixed;
     bottom: 1rem;
     right: 1rem;
-    z-index: 999;
-}
-
-.toast-container > div {
-    padding-left: 1rem;
-    padding-right: 1rem;
-    border-radius: 0.25rem;
-    color: white;
+    z-index: 9999;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.5rem;
+    pointer-events: none; /* allow clicks through */
 }
 
 .toast {
-    padding: 1.5rem 2rem;
-    margin-top: 0.5rem;
-    font-size: 1.5rem;
+    background-color: gray;
+    color: white;
+    border-radius: 6px;
+    padding: 0.4rem 0.8rem;
+    font-size: 0.85rem;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+    pointer-events: auto;
 }
 
 .success {
-    background-color: green;
+    background-color: #28a745;
 }
 .error {
-    background-color: red;
+    background-color: #dc3545;
 }
 .info {
-    background-color: blue;
-}
-
-@keyframes slideInRight {
-    from {
-        transform: translateX(100%);
-        opacity: 0;
-    }
-    to {
-        transform: translateX(0);
-        opacity: 1;
-    }
-}
-
-.slideInRight {
-    animation-name: slideInRight;
-    animation-duration: 0.25s;
-    animation-timing-function: ease-out;
-    animation-iteration-count: 1;
-    animation-fill-mode: forwards;
+    background-color: #007bff;
 }
 </style>

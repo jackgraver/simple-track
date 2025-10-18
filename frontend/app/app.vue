@@ -4,12 +4,10 @@ import DialogContainer from "./composables/dialog/DialogContainer.vue";
 </script>
 
 <template>
-    <div>
-        <!-- <Header /> -->
-        <NuxtPage />
-        <ToastContainer />
-        <DialogContainer />
-    </div>
+    <!-- <Header /> -->
+    <NuxtPage />
+    <ToastContainer />
+    <DialogContainer />
 </template>
 
 <style>

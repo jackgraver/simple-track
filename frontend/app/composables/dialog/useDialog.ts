@@ -9,7 +9,8 @@ export type DialogOptions = {
 
 type CustomDialogOptions = {
     title?: string;
-    content: VNode; // arbitrary content
+    component: Component; // <-- accept a Vue component, not a VNode
+    props?: Record<string, any>; // optional props to pass in
 };
 
 const dialog = ref<DialogOptions | CustomDialogOptions | null>(null);

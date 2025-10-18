@@ -41,7 +41,10 @@ function isConfirmDialogType(
             </template>
             <template v-else>
                 <div class="template">
-                    <component :is="dialogManager.dialog.value?.content" />
+                    <component
+                        :is="dialogManager.dialog.value?.component"
+                        v-bind="dialogManager.dialog.value?.props"
+                    />
                 </div>
             </template>
         </div>

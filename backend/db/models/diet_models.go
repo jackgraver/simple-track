@@ -59,11 +59,8 @@ func (m *MealPlanModel) seedDatabase(db *gorm.DB) error {
 	blueberries := Food{Name: "Blueberries", Unit: "Serving", Calories: 20, Protein: 0.3, Fiber: 0.9}
 	kiwi := Food{Name: "Kiwi", Unit: "Piece", Calories: 40, Protein: 0.8, Fiber: 2}
 
-	db.Create(&egg)
-	db.Create(&sausage)
-	db.Create(&keto_bread)
-	db.Create(&blueberries)
-	db.Create(&kiwi)
+	foods := []*Food{&egg, &sausage, &keto_bread, &blueberries, &kiwi}
+	db.Create(&foods)
 
 	beef := Food{Name: "Beef", Unit: "Serving", Calories: 200, Protein: 24, Fiber: 0} 
 	rice    := Food{Name: "Rice", Unit: "Serving", Calories: 80, Protein: 0, Fiber: 0}

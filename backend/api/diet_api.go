@@ -40,7 +40,7 @@ func (f *MealPlanFeature) SetEndpoints(router *gin.Engine) {
         group.GET("/food/all", f.getAllFoods)
         group.GET("/meal/all", f.getAllMeals)
         group.POST("/meal/log-planned", f.postLogPlanned)
-        group.POST("/meal/logedited", NotImplemented)
+        group.POST("/meal/logedited", f.postLogEdited)
     }
 }
 
@@ -51,16 +51,7 @@ func (f *MealPlanFeature) getMealPlanToday(c *gin.Context) {
         return
     }
     
-    totalCalories := float32(0)
-    totalProtein := float32(0)
-    totalFiber := float32(0)
-    for _, log := range day.Logs {
-        for _, item := range log.Meal.Items {
-            totalCalories += item.Food.Calories * item.Amount
-            totalProtein += item.Food.Protein * item.Amount
-            totalFiber += item.Food.Fiber * item.Amount
-        }
-    }
+    totalCalories, totalProtein, totalFiber := services.CalculateTotals(f.db, day.ID)
 
     c.JSON(http.StatusOK, gin.H{
 		"day": day,
@@ -218,8 +209,73 @@ func (f *MealPlanFeature) postLogPlanned(c *gin.Context) {
         c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
         return
     }
-    fmt.Println(day.ID)
+    
+    totalCalories, totalProtein, totalFiber := services.CalculateTotals(f.db, day.ID)
+
     c.JSON(http.StatusOK, gin.H{
         "day": day,
+        "totalCalories": totalCalories,
+        "totalProtein": totalProtein,
+        "totalFiber": totalFiber,
+    })
+}
+
+type LogEditedMealRequest struct {
+    Meal models.Meal `json:"meal"`
+}
+
+//TODO: consolodate with other function that does very similar things
+func (f *MealPlanFeature) postLogEdited(c *gin.Context) {
+    //bind body
+    var req LogEditedMealRequest
+    if err := c.BindJSON(&req); err != nil {
+        fmt.Println("BindJSON error:", err) // log to console
+        c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+        return
+    }
+
+    //get current day
+    day, derr := services.FindMealPlanDay(f.db, utils.ZerodTime())
+    if derr != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{"error": derr.Error()})
+        return
+    }
+    if day == nil {
+        c.JSON(http.StatusNotFound, gin.H{"error": "Not Found"})
+        return
+    }
+
+    //create new meal
+    newMealID, err := services.CreateMeal(f.db, &req.Meal)
+    if err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+        return
+    }
+
+    fmt.Println("new meal id", newMealID)
+    // add new meal to day
+    err = services.CreateDayMeal(f.db, &models.DayLog{
+        DayID: day.ID,
+        MealID: newMealID,
+    })
+    if err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+        return
+    }
+
+    //get updated day
+    day, err = services.MealPlanDayByID(f.db, int(day.ID))
+    if err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+        return
+    }
+        
+    totalCalories, totalProtein, totalFiber := services.CalculateTotals(f.db, day.ID)
+
+    c.JSON(http.StatusOK, gin.H{
+        "day": day,
+        "totalCalories": totalCalories,
+        "totalProtein": totalProtein,
+        "totalFiber": totalFiber,
     })
 }

@@ -1,6 +1,13 @@
 <script setup lang="ts">
 import { useDialog } from "~/composables/dialog/useDialog";
 import type { Day, Meal } from "~/types/diet";
+import TodayLogEditedDialog from "~/components/today/LogEditedDialog.vue";
+import { toast } from "~/composables/toast/useToast";
+
+function formatNum(n: number): string {
+    const s = n.toFixed(2); // always 2 decimals
+    return s.replace(/\.?0+$/, ""); // drop trailing zeros and optional dot
+}
 
 const { data, pending, error } = useAPIGet<{
     day: Day;
@@ -10,33 +17,42 @@ const { data, pending, error } = useAPIGet<{
 }>(`mealplan/today`);
 
 const logPlannedMeal = async (meal: Meal) => {
-    const { response, error } = await useAPIPost<Day>(
-        `mealplan/meal/log-planned`,
-        {
-            meal_id: meal.ID,
-        },
-    );
+    const { response, error } = await useAPIPost<{
+        day: Day;
+        totalCalories: number;
+        totalProtein: number;
+        totalFiber: number;
+    }>(`mealplan/meal/log-planned`, {
+        meal_id: meal.ID,
+    });
 
     if (error) {
-        console.error("API error:", error.message);
+        toast.push("Planned Meal Log Failed!", "error");
     } else if (response) {
-        console.log("Response:", response);
+        toast.push("Planned Meal Log Successfully!", "success");
+        if (data.value) {
+            data.value = {
+                day: response.day,
+                totalCalories: response.totalCalories,
+                totalProtein: response.totalProtein,
+                totalFiber: response.totalFiber,
+            };
+        }
     }
 };
 
-const logEditedMeal = () => {
+const logEditedMeal = (meal: Meal) => {
     const dialog = useDialog();
     dialog
-        .confirm({
+        .custom({
             title: "Log Edited Meal",
-            message: "Are you sure you want to log this meal as edited?",
-            confirmText: "Log",
-            cancelText: "Cancel",
+            component: TodayLogEditedDialog,
+            props: {
+                meal,
+            },
         })
         .then((confirmed) => {
-            if (confirmed) {
-                // logEditedMeal(meal);
-            }
+            console.log("confirmed", confirmed);
         });
     // useApiFetch(`mealplan/log-edited-meal`, {
     //     method: "POST",
@@ -59,7 +75,7 @@ const logEditedMeal = () => {
                             width: `${Math.min(100, (data?.totalCalories / data?.day.plan.calories) * 100)}%`,
                         }"
                     >
-                        <span>{{ data?.totalCalories ?? 0 }}</span>
+                        <span>{{ formatNum(data?.totalCalories ?? 0) }}</span>
                     </div>
                 </div>
                 <div v-if="data" class="fill-container">
@@ -69,7 +85,7 @@ const logEditedMeal = () => {
                             width: `${Math.min(100, (data?.totalProtein / data?.day.plan.protein) * 100)}%`,
                         }"
                     >
-                        <span>{{ data?.totalProtein ?? 0 }}</span>
+                        <span>{{ formatNum(data?.totalProtein ?? 0) }}</span>
                     </div>
                 </div>
                 <div v-if="data" class="fill-container">
@@ -79,7 +95,7 @@ const logEditedMeal = () => {
                             width: `${Math.min(100, (data?.totalFiber / data?.day.plan.fiber) * 100)}%`,
                         }"
                     >
-                        <span>{{ data?.totalFiber ?? 0 }}</span>
+                        <span>{{ formatNum(data?.totalFiber ?? 0) }}</span>
                     </div>
                 </div>
             </div>
@@ -133,7 +149,9 @@ const logEditedMeal = () => {
                     >
                         <div class="expected-header">
                             <h3>{{ meal.meal.name }} {{ " 0C / 0P / 0F" }}</h3>
-                            <button @click="logEditedMeal">Log Edited</button>
+                            <button @click="() => logEditedMeal(meal.meal)">
+                                Log Edited
+                            </button>
                             <button @click="() => logPlannedMeal(meal.meal)">
                                 Log
                             </button>

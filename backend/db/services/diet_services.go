@@ -30,14 +30,37 @@ func MealPlanDayByID(db *gorm.DB, id int) (*models.Day, error) {
     var day models.Day
 
     if err := db.
-        Preload("PlannedMeals.Meal.Items.Food").
-        Preload("Plan").
-        Preload("Logs.Meal.Items.Food").
-        First(&day, id).Error; err != nil {
+            Preload("PlannedMeals", "logged = ?", false).
+            Preload("PlannedMeals.Meal.Items.Food").
+            Preload("Plan").
+            Preload("Logs.Meal.Items.Food").
+            First(&day, id).Error; err != nil {
         return nil, err
     }
 
     return &day, nil
+}
+
+func CalculateTotals(db *gorm.DB, dayID uint) (float32, float32, float32) {
+    var totals struct {
+        TotalCalories float32 `json:"total_calories"`
+        TotalProtein  float32 `json:"total_protein"`
+        TotalFiber    float32 `json:"total_fiber"`
+    }
+
+    db.Raw(`
+        SELECT
+            SUM(f.calories * mi.amount) AS total_calories,
+            SUM(f.protein  * mi.amount) AS total_protein,
+            SUM(f.fiber    * mi.amount) AS total_fiber
+        FROM day_logs dl
+        JOIN meals m       ON dl.meal_id = m.id
+        JOIN meal_items mi ON mi.meal_id = m.id
+        JOIN foods f       ON f.id = mi.food_id
+        WHERE dl.day_id = ?
+    `, dayID).Scan(&totals)
+    
+    return totals.TotalCalories, totals.TotalProtein, totals.TotalFiber
 }
 
 func AllMealDays(db *gorm.DB) ([]models.Day, error) {
@@ -96,7 +119,6 @@ func FindMealPlanDay(db *gorm.DB, date time.Time) (*models.Day, error) {
     err := db.Where("date = ?", date).First(&day).Error
     if err != nil {
         if err == gorm.ErrRecordNotFound {
-            // Explicitly return nil if no record exists
             return nil, nil
         }
         return nil, err
@@ -109,6 +131,17 @@ func CreateDayMeal(db *gorm.DB, dayMeal *models.DayLog) error {
         return err
     }
     return nil
+}
+
+func CreateMeal(db *gorm.DB, meal *models.Meal) (uint, error) {
+    for i := range meal.Items {
+        meal.Items[i].ID = 0 
+    }
+
+    if err := db.Create(meal).Error; err != nil {
+        return 0, err
+    }
+    return meal.ID, nil
 }
 
 func SetPlannedMealLogged(db *gorm.DB, dayID uint, mealID uint) error {

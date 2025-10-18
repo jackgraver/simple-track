@@ -2,10 +2,10 @@
 
 <template>
     <body>
-        <div class="section">
+        <div>
             <TodayMeal />
         </div>
-        <div class="section">
+        <div>
             <TodayGym />
         </div>
     </body>
