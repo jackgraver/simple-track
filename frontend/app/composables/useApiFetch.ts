@@ -1,3 +1,5 @@
+//TODO: grouped request
+
 export function useAPIGet<T>(endpoint: string, options: any = {}) {
     const config = useRuntimeConfig();
 

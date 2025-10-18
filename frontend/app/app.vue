@@ -25,6 +25,14 @@ button {
     border: none;
 }
 
+.delete-button {
+    background: #ff2b2b;
+}
+
+.confirm-button {
+    background: #62ff33;
+}
+
 button:disabled {
     background: #ccc;
 }

@@ -107,8 +107,8 @@ func (m *MealPlanModel) seedDatabase(db *gorm.DB) error {
 	db.Create(&bulk)
 
 	year := 2025
-	start := time.Date(year, time.September, 1, 0, 0, 0, 0, time.UTC)
-	end := time.Date(2026, time.April, 30, 0, 0, 0, 0, time.UTC)
+	start := time.Date(year, time.September, 1, 0, 0, 0, 0, time.Local)
+	end := time.Date(2026, time.April, 30, 0, 0, 0, 0, time.Local)
 
 	for date := start; !date.After(end); date = date.AddDate(0, 0, 1) {
 		mpd := Day{

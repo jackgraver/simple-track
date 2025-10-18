@@ -161,3 +161,20 @@ func DeleteLoggedMeal(db *gorm.DB, dayID uint, mealID uint) error {
     }
     return db.Delete(&meal).Error
 }
+
+func GetAllPlans(db *gorm.DB) ([]models.Plan, error) {
+    var plans []models.Plan
+    if err := db.Find(&plans).Error; err != nil {
+        return nil, err
+    }
+    return plans, nil
+}
+
+func UpdateDayLogMeal(db *gorm.DB, dayID uint, oldMealID uint, newMealID uint) error {
+    var meal models.DayLog
+    if err := db.Where("day_id = ? AND meal_id = ?", dayID, oldMealID).First(&meal).Error; err != nil {
+        return err
+    }
+    meal.MealID = newMealID
+    return db.Save(&meal).Error
+}

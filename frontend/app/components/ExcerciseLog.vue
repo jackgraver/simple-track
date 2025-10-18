@@ -49,7 +49,7 @@ const logToday = () => {
     <button @click="logToday">Submit</button>
 </template>
 
-<style>
+<style scoped>
 .exercise-container {
     display: flex;
     align-items: center;

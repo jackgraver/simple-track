@@ -7,14 +7,14 @@ export type DialogOptions = {
     cancelText?: string;
 };
 
-type CustomDialogOptions = {
+export type CustomDialogOptions<T = any> = {
     title?: string;
-    component: Component; // <-- accept a Vue component, not a VNode
-    props?: Record<string, any>; // optional props to pass in
+    component: Component;
+    props?: Record<string, any>;
 };
 
 const dialog = ref<DialogOptions | CustomDialogOptions | null>(null);
-let resolver: ((value: boolean) => void) | null = null;
+let resolver: ((value: any) => void) | null = null;
 
 export function useDialog() {
     // Confirm Dialog (predefined template)
@@ -26,10 +26,10 @@ export function useDialog() {
     }
 
     // General-purpose custom dialog
-    function custom(options: CustomDialogOptions): Promise<void> {
+    function custom<T>(options: CustomDialogOptions<T>): Promise<T> {
         dialog.value = options;
-        return new Promise((resolve) => {
-            resolver = () => resolve(); // resolve without boolean
+        return new Promise<T>((resolve) => {
+            resolver = resolve as (value: T) => void;
         });
     }
 

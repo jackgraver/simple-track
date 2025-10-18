@@ -4,25 +4,14 @@ import type { Day, Meal } from "~/types/diet";
 //TODO: better interaction between dialog and close dialog
 const props = defineProps<{
     meal: Meal;
+    onResolve: (meal: Meal) => void;
 }>();
 
 const meal = props.meal;
 meal.ID = 0;
 
 const logEditedMeal = async () => {
-    const { response, error } = await useAPIPost<Day>(
-        `mealplan/meal/logedited`,
-        "POST",
-        {
-            meal: meal,
-        },
-    );
-
-    if (error) {
-        console.error("API error:", error.message);
-    } else if (response) {
-        console.log("Response:", response);
-    }
+    props.onResolve(meal);
 };
 </script>
 
@@ -37,7 +26,9 @@ const logEditedMeal = async () => {
             </div>
         </div>
 
-        <button @click="logEditedMeal">Log Edited</button>
+        <button class="confirm-button" @click="logEditedMeal">
+            Log Edited
+        </button>
     </div>
 </template>
 

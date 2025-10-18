@@ -5,9 +5,9 @@
         <div>
             <TodayMeal />
         </div>
-        <div>
+        <!-- <div>
             <TodayGym />
-        </div>
+        </div> -->
     </body>
 </template>
 
