@@ -17,8 +17,8 @@ type WorkoutFeature struct {
 
 func NewWorkoutFeature(db *gorm.DB) *WorkoutFeature {
     models.NewWorkoutModel(db)
-    // var feature = models.NewWorkoutModel(db)
-    // feature.MigrateDatabase()
+    var feature = models.NewWorkoutModel(db)
+    feature.MigrateDatabase()
 
 	return &WorkoutFeature{
 		BaseFeature[models.WorkoutModel]{
@@ -99,5 +99,5 @@ func (f *WorkoutFeature) getPreviousWorkout(c *gin.Context) {
         return
     }
 
-    c.JSON(http.StatusOK, day)
+    c.JSON(http.StatusOK, gin.H{"day": day})
 }

@@ -244,18 +244,18 @@ func (m *WorkoutModel) seedDatabase() error {
 	m.db.Create(&rest)
 
 	year := 2025
-	start := time.Date(year, time.September, 1, 0, 0, 0, 0, time.UTC)
-	end := time.Date(year, time.December, 31, 0, 0, 0, 0, time.UTC)
+	start := time.Date(year, time.September, 1, 0, 0, 0, 0, time.Local)
+	end := time.Date(year, time.December, 31, 0, 0, 0, 0, time.Local)
 
 	// Map weekday → workout plan
 	weekdayPlans := map[time.Weekday]WorkoutPlan{
-		time.Monday:    push,
-		time.Tuesday:   pull,
-		time.Wednesday: legs,
-		time.Thursday:  active_rest,
-		time.Friday:    upper,
-		time.Saturday:  lower,
-		time.Sunday:    rest,
+		time.Sunday:    lower,
+		time.Monday:    rest,
+		time.Tuesday:   push,
+		time.Wednesday: pull,
+		time.Thursday:  legs,
+		time.Friday:    active_rest,
+		time.Saturday:  upper,	
 	}
 
 	for date := start; !date.After(end); date = date.AddDate(0, 0, 1) {

@@ -9,15 +9,14 @@ import (
 
 func GetToday(database *gorm.DB) (models.WorkoutLog, error) {
 	now := time.Now().UTC()
-	start := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
-	end := start.Add(24 * time.Hour)
+	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.Local)
 
 	var workoutDay models.WorkoutLog
 	err := database.
 		Preload("WorkoutPlan.Exercises.Sets").
 		Preload("Cardio").
 		Preload("Exercises.Sets").
-		Where("date >= ? AND date < ?", start, end).
+		Where("date = ?", today).
 		First(&workoutDay).Error
 
 	if err != nil {
