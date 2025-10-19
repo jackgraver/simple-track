@@ -5,11 +5,6 @@ import { toast } from "~/composables/toast/useToast";
 import { dialogManager } from "~/composables/dialog/useDialog";
 import LogOtherMealDialog from "../LogOtherMealDialog.vue";
 
-function formatNum(n: number): string {
-    const s = n.toFixed(2); // always 2 decimals
-    return s.replace(/\.?0+$/, ""); // drop trailing zeros and optional dot
-}
-
 const { data, pending, error } = useAPIGet<{
     day: Day;
     totalCalories: number;
@@ -162,13 +157,33 @@ const logOtherMeal = async () => {
         props: { meal: null },
     });
 };
+
+const start = ref(0);
+
+const visibleItems = computed(() =>
+    data.value?.day.plannedMeals.slice(start.value, start.value + 2),
+);
+
+console.log(visibleItems);
+
+function next() {
+    console.log("next", start.value);
+    start.value = Math.min(
+        start.value + 1,
+        (data?.value?.day?.plannedMeals?.length ?? 0) - 2,
+    );
+    console.log(start.value);
+}
+function prev() {
+    start.value = Math.max(start.value - 1, 0);
+}
 </script>
 
 <template>
     <div v-if="pending">Loading...</div>
     <div v-else-if="error">Error: {{ error.message }}</div>
     <div v-else class="container">
-        <div v-if="data">
+        <div v-if="data" style="width: 100%">
             <div class="title-row">
                 <h1 style="flex: 1">
                     {{
@@ -177,9 +192,10 @@ const logOtherMeal = async () => {
                         dayOfWeek(data.day.date)
                     }}
                 </h1>
-                <NuxtLink class="link" to="/mealplan"
+                <!-- <NuxtLink class="link" to="/mealplan"
                     >Manage Meal Plan</NuxtLink
-                >
+                > -->
+                <button @click="logOtherMeal">Log Meal</button>
             </div>
             <TodayBars
                 :totalCalories="data?.totalCalories ?? 0"
@@ -191,10 +207,7 @@ const logOtherMeal = async () => {
             />
             <div class="meals-section">
                 <div class="meals-container">
-                    <div class="title-row">
-                        <h2>Logged</h2>
-                        <button @click="logOtherMeal">Log Other</button>
-                    </div>
+                    <h2>Logged</h2>
                     <TodayMealCard
                         v-for="log in data.day.loggedMeals"
                         :key="log.ID"
@@ -207,11 +220,13 @@ const logOtherMeal = async () => {
                     />
                 </div>
                 <div class="meals-container">
-                    <div class="title-row">
+                    <div class="small-title-row">
                         <h2>Planned</h2>
+                        <button @click="prev">^</button>
+                        <button @click="next">v</button>
                     </div>
                     <TodayMealCard
-                        v-for="log in data.day.plannedMeals"
+                        v-for="log in visibleItems"
                         :key="log.ID"
                         :meal="log.meal"
                         :on-log-planned="logPlannedMeal"
@@ -229,9 +244,10 @@ const logOtherMeal = async () => {
 <style scoped>
 .container {
     display: flex;
-    flex-direction: row;
+    flex-direction: column;
     gap: 1rem;
-    width: 75%;
+    /* Fill the width provided by the page wrapper */
+    width: 100%;
 }
 
 .title-row {
@@ -241,34 +257,45 @@ const logOtherMeal = async () => {
     align-items: center;
 }
 
-.link {
-    color: rgb(177, 177, 177);
-    text-decoration: none;
-    background-color: rgb(56, 56, 56);
-    padding: 6px 12px;
+.title-row button {
     margin-top: 6px;
-    border-radius: 0.25rem;
+    border-radius: 4px;
+    font-size: large;
+    padding: 6px 12px;
     font-weight: bold;
+    text-decoration: none;
+    font-size: large;
+    padding: 6px 16px;
 }
 
-.link:hover {
-    color: rgb(199, 199, 199);
-    transition: color 0.3s;
-    background-color: rgb(82, 82, 82);
+.small-title-row {
+    display: flex;
+    flex-direction: row;
+    align-items: end;
+}
+
+.small-title-row h2 {
+    flex: 1;
 }
 
 .meals-section {
     display: flex;
     flex-direction: row;
     gap: 0.5rem;
-    padding-top: 1rem;
+    width: 100%;
 }
 
 .meals-container {
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
-    padding-top: 1rem;
+    padding-top: 0.5rem;
+    /* Split the meals section evenly (50/50) */
+    flex: 1 1 0%;
+}
+
+.meals-container h2 {
+    margin-bottom: 0;
 }
 
 .expected-header {

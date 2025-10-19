@@ -90,8 +90,30 @@ func (m *MealPlanModel) seedDatabase(db *gorm.DB) error {
 		},
 	}
 	
+	m2 := Meal{
+		Name: "Meal 2",
+		Items: []MealItem{
+			{FoodID: beef.ID, Amount: 1},
+			{FoodID: keto_bread.ID, Amount: 1},
+			{FoodID: blueberries.ID, Amount: 1},
+		},
+	}
+
+	m3 := Meal{
+		Name: "Meal 3",
+		Items: []MealItem{
+			{FoodID: egg.ID, Amount: 1},
+			{FoodID: rice.ID, Amount: 1},
+			{FoodID: vegetables.ID, Amount: 1},
+			{FoodID: blueberries.ID, Amount: 1},
+			{FoodID: kiwi.ID, Amount: 1},
+		},
+	}
+	
 	db.Create(&breakfast)
 	db.Create(&dinner)
+	db.Create(&m2)
+	db.Create(&m3)
 
 	cut := Plan{Name: "Cut",
 				Calories: 1400,
@@ -121,6 +143,8 @@ func (m *MealPlanModel) seedDatabase(db *gorm.DB) error {
 			PlannedMeals: []PlannedMeal{
 				{MealID: breakfast.ID},
 				{MealID: dinner.ID},
+				{MealID: m2.ID},
+				{MealID: m3.ID},
 			},
 		}
 

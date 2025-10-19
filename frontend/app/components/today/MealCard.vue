@@ -25,7 +25,7 @@ function mealMacros(meal: Meal) {
     ]);
 }
 
-defineProps<{
+const props = defineProps<{
     meal: Meal;
     type: "planned" | "logged";
     onLogPlanned: (meal: Meal) => void;
@@ -103,8 +103,6 @@ defineProps<{
     border-radius: 0.5rem;
     background: #1a1a1a;
     color: #fff;
-    width: 500px;
-    /* gap: 1rem; */
 }
 
 .meal {
@@ -166,13 +164,13 @@ defineProps<{
 }
 
 .details .cal {
-    color: #f87171;
+    color: orange;
 }
 .details .pro {
     color: #60a5fa;
 }
 .details .fib {
-    color: #34d399;
+    color: green;
 }
 
 .actions {

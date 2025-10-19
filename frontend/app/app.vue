@@ -17,13 +17,16 @@ html {
 }
 
 button {
-    background: #3a88c7;
+    background: #2c2c2c;
     padding: 6px 12px;
     margin: 4px;
     border-radius: 4px;
+    border: 2px solid #a7a7a7;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
     color: white;
     border: none;
 }
+
 button:disabled {
     background: #ccc;
 }
@@ -33,7 +36,7 @@ button:disabled:hover {
 }
 
 button:hover:not(:disabled) {
-    background: #58b4ff;
+    background: #525252;
 }
 
 .delete-button {
@@ -45,11 +48,11 @@ button:hover:not(:disabled) {
 }
 
 .confirm-button {
-    background: #62ff33;
+    background: #55db2c;
 }
 
 .confirm-button:hover:not(:disabled) {
-    background: #41c419;
+    background: #38a716;
 }
 
 input,

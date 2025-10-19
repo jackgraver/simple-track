@@ -59,7 +59,7 @@ defineProps<{
     background-color: orange;
 }
 .protein {
-    background-color: blue;
+    background-color: #60a5fa;
 }
 .fiber {
     background-color: green;
