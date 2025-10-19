@@ -4,6 +4,8 @@ import type { WorkoutLog } from "~/types/workout";
 const { data, pending, error } = useAPIGet<WorkoutLog>(`workout/previous`);
 
 const day = data.value;
+
+console.log(day);
 </script>
 
 <template>

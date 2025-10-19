@@ -4,7 +4,7 @@ import DialogContainer from "./composables/dialog/DialogContainer.vue";
 </script>
 
 <template>
-    <!-- <Header /> -->
+    <Header />
     <NuxtPage />
     <ToastContainer />
     <DialogContainer />
@@ -24,15 +24,6 @@ button {
     color: white;
     border: none;
 }
-
-.delete-button {
-    background: #ff2b2b;
-}
-
-.confirm-button {
-    background: #62ff33;
-}
-
 button:disabled {
     background: #ccc;
 }
@@ -43,6 +34,22 @@ button:disabled:hover {
 
 button:hover:not(:disabled) {
     background: #58b4ff;
+}
+
+.delete-button {
+    background: #ff2b2b;
+}
+
+.delete-button:hover:not(:disabled) {
+    background: #c91e1e;
+}
+
+.confirm-button {
+    background: #62ff33;
+}
+
+.confirm-button:hover:not(:disabled) {
+    background: #41c419;
 }
 
 input,

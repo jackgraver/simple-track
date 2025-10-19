@@ -53,18 +53,18 @@ func (m *MealPlanModel) MigrateDatabase() {
 func (m *MealPlanModel) seedDatabase(db *gorm.DB) error {
 	fmt.Println("Seeding meal plan database")
 
-	egg := Food{Name: "Egg", Unit: "Serving", Calories: 140, Protein: 12, Fiber: 0}
-	sausage    := Food{Name: "Maple Breakfast Sausage", Unit: "Serving", Calories: 140, Protein: 12, Fiber: 0}
-	keto_bread  := Food{Name: "Keto Bread", Unit: "Serving", Calories: 140, Protein: 12, Fiber: 15}
-	blueberries := Food{Name: "Blueberries", Unit: "Serving", Calories: 20, Protein: 0.3, Fiber: 0.9}
-	kiwi := Food{Name: "Kiwi", Unit: "Piece", Calories: 40, Protein: 0.8, Fiber: 2}
+	egg := Food{Name: "Egg", Calories: 140, Protein: 12, Fiber: 0}
+	sausage    := Food{Name: "Maple Breakfast Sausage", Calories: 140, Protein: 12, Fiber: 0}
+	keto_bread  := Food{Name: "Keto Bread", Calories: 140, Protein: 12, Fiber: 15}
+	blueberries := Food{Name: "Blueberries", Unit: "g", Calories: 20, Protein: 0.3, Fiber: 0.9}
+	kiwi := Food{Name: "Kiwi", Calories: 40, Protein: 0.8, Fiber: 2}
 
 	foods := []*Food{&egg, &sausage, &keto_bread, &blueberries, &kiwi}
 	db.Create(&foods)
 
-	beef := Food{Name: "Beef", Unit: "Serving", Calories: 200, Protein: 24, Fiber: 0} 
-	rice    := Food{Name: "Rice", Unit: "Serving", Calories: 80, Protein: 0, Fiber: 0}
-	vegetables  := Food{Name: "Vegetables", Unit: "Serving", Calories: 50, Protein: 1, Fiber: 2}
+	beef := Food{Name: "Beef", Unit: "g", Calories: 200, Protein: 24, Fiber: 0} 
+	rice    := Food{Name: "Rice", Unit: "g", Calories: 80, Protein: 0, Fiber: 0}
+	vegetables  := Food{Name: "Vegetables", Unit: "g", Calories: 50, Protein: 1, Fiber: 2}
 
 	db.Create(&beef)
 	db.Create(&rice)

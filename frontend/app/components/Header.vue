@@ -5,7 +5,7 @@ const router = useRouter();
 </script>
 
 <template>
-    <header>
+    <header v-if="router.currentRoute.value.path !== '/'">
         <div class="logo">
             <img src="/favicon.ico" alt="logo" />
             <h1>Simple Tracker</h1>

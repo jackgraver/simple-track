@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { Day, Meal } from "~/types/diet";
+//TODO: calculate amount based on inputting "xg" or "1.5 servings"
 
 //TODO: better interaction between dialog and close dialog
 const props = defineProps<{
@@ -13,6 +14,14 @@ meal.ID = 0;
 const logEditedMeal = async () => {
     props.onResolve(meal);
 };
+
+function addFoodItem() {
+    //TODO: Need to think about how to handle foods that are not in the food list
+}
+
+function removeFoodItem(index: number) {
+    meal.items.splice(index, 1);
+}
 </script>
 
 <template>
@@ -20,12 +29,21 @@ const logEditedMeal = async () => {
         <input type="text" id="name" v-model="meal.name" />
 
         <div class="items-grid">
-            <div v-for="item in meal.items" :key="item.ID" class="item-row">
+            <div
+                v-for="(item, i) in meal.items"
+                :key="item.ID"
+                class="item-row"
+            >
                 <span>{{ item.food?.name }}</span>
-                <input type="number" v-model="item.amount" />
+                <div class="right">
+                    <input type="number" v-model="item.amount" />
+                    <button class="delete-button" @click="removeFoodItem(i)">
+                        X
+                    </button>
+                </div>
             </div>
         </div>
-
+        <button @click="addFoodItem">Add Food Item</button>
         <button class="confirm-button" @click="logEditedMeal">
             Log Edited
         </button>
@@ -51,6 +69,11 @@ const logEditedMeal = async () => {
 .item-row {
     display: contents; /* keep grid alignment without extra nesting */
     text-align: left;
+}
+
+.right {
+    display: flex;
+    flex-direction: row;
 }
 
 input {

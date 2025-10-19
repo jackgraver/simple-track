@@ -5,9 +5,9 @@
         <div>
             <TodayMeal />
         </div>
-        <!-- <div>
+        <div>
             <TodayGym />
-        </div> -->
+        </div>
     </body>
 </template>
 
@@ -16,7 +16,6 @@ body {
     display: flex;
     flex-direction: column;
     gap: 1rem;
-    padding: 1rem;
     justify-content: center;
     align-items: center;
     font-family:
