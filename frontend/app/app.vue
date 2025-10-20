@@ -12,8 +12,17 @@ import DialogContainer from "./composables/dialog/DialogContainer.vue";
 
 <style>
 html {
-    color: white;
+    color: rgb(218, 218, 218);
     background-color: black;
+    font-family:
+        system-ui,
+        -apple-system,
+        BlinkMacSystemFont,
+        "Segoe UI",
+        Roboto,
+        "Helvetica Neue",
+        Arial,
+        sans-serif;
 }
 
 button {
@@ -37,6 +46,11 @@ button:disabled:hover {
 
 button:hover:not(:disabled) {
     background: #525252;
+}
+
+button svg {
+    vertical-align: middle;
+    pointer-events: none;
 }
 
 .delete-button {

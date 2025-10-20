@@ -3,6 +3,7 @@ import {
     dialogManager,
     type DialogOptions,
 } from "~/composables/dialog/useDialog";
+import { X } from "lucide-vue-next";
 
 function isConfirmDialogType(
     d: typeof dialogManager.dialog.value,
@@ -12,31 +13,47 @@ function isConfirmDialogType(
 </script>
 
 <template>
-    <div v-if="dialogManager.dialog.value" class="dialog-backdrop">
+    <div
+        v-if="dialogManager.dialog.value"
+        class="dialog-backdrop"
+        :class="{
+            'top-dialog': isConfirmDialogType(dialogManager.dialog.value),
+        }"
+    >
         <div class="dialog-container">
             <header class="dialog-header">
                 <h2>{{ dialogManager.dialog.value.title }}</h2>
-                <button class="close-btn" @click="dialogManager.resolve(false)">
-                    ×
+                <button
+                    class="close-btn"
+                    @click="dialogManager.resolve(false)"
+                    v-if="!isConfirmDialogType(dialogManager.dialog.value)"
+                >
+                    <X />
                 </button>
             </header>
             <template v-if="isConfirmDialogType(dialogManager.dialog.value)">
-                <div class="template">
-                    <p>{{ dialogManager.dialog.value.message }}</p>
-                    <button
-                        @click="dialogManager.resolve(true)"
-                        class="confirm-btn"
-                    >
-                        {{
-                            dialogManager.dialog.value?.confirmText || "Confirm"
-                        }}
-                    </button>
-                    <button
-                        @click="dialogManager.resolve(false)"
-                        class="cancel-btn"
-                    >
-                        {{ dialogManager.dialog.value?.cancelText || "Cancel" }}
-                    </button>
+                <div class="confirm-template">
+                    <h3>{{ dialogManager.dialog.value.message }}</h3>
+                    <div class="confirm-buttons">
+                        <button
+                            @click="dialogManager.resolve(true)"
+                            class="confirm-btn"
+                        >
+                            {{
+                                dialogManager.dialog.value?.confirmText ||
+                                "Confirm"
+                            }}
+                        </button>
+                        <button
+                            @click="dialogManager.resolve(false)"
+                            class="cancel-btn"
+                        >
+                            {{
+                                dialogManager.dialog.value?.cancelText ||
+                                "Cancel"
+                            }}
+                        </button>
+                    </div>
                 </div>
             </template>
             <template v-else>
@@ -55,59 +72,85 @@ function isConfirmDialogType(
 </template>
 
 <style scoped>
+.dialog-backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 998;
+}
+
+.top-dialog {
+    align-items: flex-start;
+    padding-top: 10vh;
+}
+
 .dialog-container {
-    position: absolute;
-    top: 25%;
-    left: 50%;
-    transform: translateX(-50%);
-    background: rgb(71, 71, 71);
-    z-index: 999;
-    max-height: 80%;
-    border-radius: 10px;
+    position: relative;
     display: flex;
     flex-direction: column;
+    background: rgb(26, 26, 26);
+    border: 1px solid #3d3d3d;
+    border-radius: 10px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+    padding: 0;
+    overflow: hidden;
+}
+
+.dialog-container > * {
+    width: auto;
 }
 
 .dialog-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 1rem;
+    padding: 1rem 0.8rem;
     border-bottom: 1px solid #ccc;
-    flex-wrap: nowrap;
 }
 
 .dialog-header h2 {
     margin: 0;
-    font-size: 1.5rem;
-    white-space: nowrap;
+    font-size: 1.25rem;
     overflow: hidden;
     text-overflow: ellipsis;
-    max-width: calc(100% - 3rem);
+    white-space: nowrap;
+    flex: 1;
 }
 
 .template {
-    padding: 1rem;
-    overflow-y: auto;
-    text-align: center;
+    flex: 1;
+    padding: 0 1rem;
+    overflow: visible;
+    text-align: left;
 }
 
-.close-btn {
-    background: transparent;
-    border: none;
-    font-size: 2rem;
-    cursor: pointer;
-    margin-left: 1rem;
+.confirm-template {
+    display: flex;
+    flex-direction: column;
+    /* gap: 0.5rem; */
+    padding: 0rem 1rem 0.5rem 1rem;
 }
 
-.close-btn:hover {
-    background-color: #ccc;
+.confirm-buttons {
+    display: flex;
+    flex-direction: row;
+    gap: 0.5rem;
+    justify-content: center;
+}
+
+button {
+    padding: 8px 16px;
 }
 
 .confirm-btn {
     background: green;
 }
-
 .confirm-btn:hover {
     background: rgb(0, 155, 0);
 }
@@ -115,7 +158,6 @@ function isConfirmDialogType(
 .cancel-btn {
     background: rgb(211, 0, 0);
 }
-
 .cancel-btn:hover {
     background: rgb(255, 0, 0);
 }

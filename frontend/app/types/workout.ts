@@ -10,6 +10,7 @@ export interface PlannedExercise extends BaseModel {
     workout_plan_id: number;
     name: string;
     sets: PlannedSet[];
+    threshold: number;
 }
 
 export interface WorkoutPlan extends BaseModel {

@@ -28,7 +28,7 @@ const day = data.value?.day;
                     {{ exercise.sets[exercise.sets.length - 1]?.weight ?? "X" }}
                 </header>
                 <span>Use 2 45 plates</span>
-                <span class="info">Time to increase!</span>
+                <span class="info">Up weight next session</span>
                 <span class="fact">Up 5% since last workout</span>
             </article>
         </div>

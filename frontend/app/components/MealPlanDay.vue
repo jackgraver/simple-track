@@ -1,6 +1,7 @@
 <script lang="ts" setup>
 import type { Day } from "~/types/diet";
 import { formatDateShort } from "~/utils/dateUtil";
+import { X } from "lucide-vue-next";
 
 const props = defineProps<{
     day: Day;
@@ -13,11 +14,13 @@ const props = defineProps<{
     <div class="container">
         <h1>Modify {{ formatDate(day.date) }}</h1>
         <div v-for="meal in day.loggedMeals" :key="meal.ID">
-            <h3>{{ meal.meal.name }}<button>X</button></h3>
+            <h3>
+                {{ meal.meal.name }}<button><X /></button>
+            </h3>
 
             <p v-for="food in meal.meal.items" :key="food.ID">
                 {{ food?.food?.name }} {{ food.amount }}
-                <button>X</button>
+                <button><X /></button>
             </p>
         </div>
     </div>

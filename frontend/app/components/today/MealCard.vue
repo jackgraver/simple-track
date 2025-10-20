@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { Meal } from "~/types/diet";
+import { Trash2, SquarePen, Check } from "lucide-vue-next";
 
 function formatNum(n: number) {
     const s = n.toFixed(2); // always 2 decimals
@@ -76,16 +77,19 @@ const props = defineProps<{
             </div>
             <div class="right">
                 <div class="actions" v-if="type === 'logged'">
-                    <button class="delete-button" @click="onDelete(meal)">
-                        Delete
+                    <button @click="onEdit(meal)">
+                        <SquarePen :size="20" /></button
+                    ><button class="delete-button" @click="onDelete(meal)">
+                        <Trash2 :size="20" />
                     </button>
-                    <button @click="onEdit(meal)">Edit</button>
                 </div>
 
                 <div class="actions" v-else-if="type === 'planned'">
-                    <button @click="onLogEdited(meal)">Log Edited</button>
+                    <button @click="onLogEdited(meal)">
+                        <SquarePen :size="20" />
+                    </button>
                     <button class="confirm-button" @click="onLogPlanned(meal)">
-                        Log
+                        <Check :size="20" />
                     </button>
                 </div>
             </div>

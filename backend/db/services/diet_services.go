@@ -2,6 +2,8 @@ package services
 
 import (
 	"be-simpletracker/db/models"
+	"be-simpletracker/utils"
+	"fmt"
 	"time"
 
 	"gorm.io/gorm"
@@ -9,9 +11,11 @@ import (
 
 // MealPlanToday returns today's meal plan day with meals and goals
 func MealPlanToday(db *gorm.DB) (models.Day, error) {
-    now := time.Now().UTC()
-	start := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
-	end := start.Add(24 * time.Hour)
+    // now := time.Now().UTC()
+	// start := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
+	// end := start.Add(24 * time.Hour)
+    today := utils.ZerodTime()
+    fmt.Println("today", today)
 
 	var days models.Day
 	if err := db.
@@ -19,7 +23,7 @@ func MealPlanToday(db *gorm.DB) (models.Day, error) {
             Preload("PlannedMeals.Meal.Items.Food").
             Preload("Plan").
             Preload("Logs.Meal.Items.Food").
-            Where("date >= ? AND date < ?", start, end).
+            Where("date = ?", today).
             First(&days).Error; err != nil {
 		return models.Day{}, err
 	}

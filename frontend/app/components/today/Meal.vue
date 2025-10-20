@@ -4,6 +4,7 @@ import TodayLogEditedDialog from "~/components/today/LogEditedDialog.vue";
 import { toast } from "~/composables/toast/useToast";
 import { dialogManager } from "~/composables/dialog/useDialog";
 import LogOtherMealDialog from "../LogOtherMealDialog.vue";
+import { ChevronDown, ChevronUp } from "lucide-vue-next";
 
 const { data, pending, error } = useAPIGet<{
     day: Day;
@@ -222,8 +223,8 @@ function prev() {
                 <div class="meals-container">
                     <div class="small-title-row">
                         <h2>Planned</h2>
-                        <button @click="prev">^</button>
-                        <button @click="next">v</button>
+                        <button @click="prev"><ChevronUp /></button>
+                        <button @click="next"><ChevronDown /></button>
                     </div>
                     <TodayMealCard
                         v-for="log in visibleItems"

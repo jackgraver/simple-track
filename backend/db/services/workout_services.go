@@ -2,14 +2,14 @@ package services
 
 import (
 	"be-simpletracker/db/models"
+	"be-simpletracker/utils"
 	"time"
 
 	"gorm.io/gorm"
 )
 
 func GetToday(database *gorm.DB) (models.WorkoutLog, error) {
-	now := time.Now().UTC()
-	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.Local)
+	today := utils.ZerodTime()
 
 	var workoutDay models.WorkoutLog
 	err := database.
