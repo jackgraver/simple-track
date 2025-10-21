@@ -87,13 +87,13 @@ func (f *WorkoutFeature) getWorkoutAll(c *gin.Context) {
 }   
 
 func (f *WorkoutFeature) getPreviousWorkout(c *gin.Context) {
-    today, err := services.GetToday(f.db)
-    if err != nil {
-        c.JSON(http.StatusNotImplemented, gin.H{"error": err.Error()})
-        return
-    }
+    // today, err := services.GetToday(f.db)
+    // if err != nil {
+    //     c.JSON(http.StatusNotImplemented, gin.H{"error": err.Error()})
+    //     return
+    // }
 
-    day, err := services.GetPrevious(f.db, today.WorkoutPlan.Name)
+    day, err := services.GetPrevious(f.db, "Push")
     if err != nil {
         c.JSON(http.StatusNotImplemented, gin.H{"error": err.Error()})
         return

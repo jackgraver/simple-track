@@ -103,6 +103,13 @@ func AllFoods(db *gorm.DB) ([]models.Food, error) {
     return foods, nil
 }
 
+func CreateFood(db *gorm.DB, food *models.Food) (*models.Food, error) {
+    if err := db.Create(food).Error; err != nil {
+        return nil, err
+    }
+    return food, nil
+}
+
 func AllMeals(db *gorm.DB) ([]models.Meal, error) {
     var meals []models.Meal
     if err := db.Preload("Items.Food").Find(&meals).Distinct("name").Error; err != nil {

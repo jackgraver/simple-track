@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import type { Day, Meal } from "~/types/diet";
-import { Check, Plus, Trash2 } from "lucide-vue-next";
+import type { Day, Food, Meal, MealItem } from "~/types/diet";
+import { Check, Plus, Trash2, ChevronUp, ChevronDown } from "lucide-vue-next";
 //TODO: calculate amount based on inputting "xg" or "1.5 servings"
 
 //TODO: better interaction between dialog and close dialog
@@ -10,6 +10,7 @@ const props = defineProps<{
 }>();
 
 const addNew = ref(false);
+const foodsReady = ref(false);
 
 const meal = props.meal;
 meal.ID = 0;
@@ -18,9 +19,14 @@ const logEditedMeal = async () => {
     props.onResolve(meal);
 };
 
-function addFoodItem() {
-    addNew.value = true;
-    //TODO: Need to think about how to handle foods that are not in the food list
+function addFoodItem(food: Food) {
+    addNew.value = false;
+    props.meal.items.push({
+        meal_id: meal.ID,
+        food_id: food.ID,
+        food: food,
+        amount: 1,
+    } as MealItem);
 }
 
 function removeFoodItem(index: number) {
@@ -38,17 +44,30 @@ function removeFoodItem(index: number) {
                 :key="item.ID"
                 class="item-row"
             >
+                <button @click="item.amount--"><ChevronDown /></button>
+                <input class="small-input" type="text" v-model="item.amount" />
+                <span v-if="item.food!.unit === `g`">g</span>
                 <span>{{ item.food?.name }}</span>
-                <div class="right">
-                    <input type="number" v-model="item.amount" />
-                    <button class="delete-button" @click="removeFoodItem(i)">
-                        <Trash2 :size="20" />
-                    </button>
-                </div>
+                <button @click="item.amount++"><ChevronUp /></button>
+                <span
+                    >{{ item.amount * item.food!.calories }}C /
+                    {{ item.amount * item.food!.protein }}P /
+                    {{ item.amount * item.food!.fiber }}F</span
+                >
+
+                <button class="delete-button" @click="removeFoodItem(i)">
+                    <Trash2 :size="20" />
+                </button>
             </div>
         </div>
-        <input v-if="addNew" type="text" placeholder="Food Name" />
-        <button @click="addFoodItem"><Plus :size="20" /></button>
+        <SearchFoods
+            v-show="addNew"
+            :on-select="addFoodItem"
+            @loaded="foodsReady = true"
+        />
+        <button :disabled="!foodsReady" @click="addNew = true">
+            <Plus :size="20" />
+        </button>
         <button class="confirm-button" @click="logEditedMeal">
             <Check :size="20" />
         </button>
@@ -83,11 +102,8 @@ function removeFoodItem(index: number) {
     flex-direction: row;
     padding-left: 12px;
 }
-/* 
-input {
-    background-color: rgb(50, 50, 50);
-    color: white;
-    border: none;
-    padding: 0.5rem;
-} */
+
+.small-input {
+    width: 15px;
+}
 </style>

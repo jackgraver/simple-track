@@ -15,15 +15,6 @@
 .page {
     display: grid;
     row-gap: 1.25rem;
-    font-family:
-        system-ui,
-        -apple-system,
-        BlinkMacSystemFont,
-        "Segoe UI",
-        Roboto,
-        "Helvetica Neue",
-        Arial,
-        sans-serif;
 }
 
 .home-section {

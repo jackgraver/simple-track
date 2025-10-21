@@ -38,6 +38,7 @@ func (f *MealPlanFeature) SetEndpoints(router *gin.Engine) {
         group.GET("/day/:id" , f.getMealPlanDay)
         group.GET("/goals/today", f.getGoalsToday)
         group.GET("/food/all", f.getAllFoods)
+        group.POST("/food/add", f.postAddFood)
         group.GET("/meal/all", f.getAllMeals)
         group.POST("/meal/log-planned", f.postLogPlanned)
         group.POST("/meal/logedited", f.postLogEdited)
@@ -143,13 +144,33 @@ func (f *MealPlanFeature) getGoalsToday(c *gin.Context) {
 }
 
 func (f *MealPlanFeature) getAllFoods(c *gin.Context) {
-    time.Sleep(3 * time.Second)
     data, err := services.AllFoods(f.db)
     if err != nil {
         c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
         return
     }
-    c.JSON(http.StatusOK, data)
+    c.JSON(http.StatusOK, gin.H{"foods": data})
+}
+
+type AddFoodRequest struct {
+    Food models.Food `json:"food"`
+}
+
+func (f *MealPlanFeature) postAddFood(c *gin.Context) {
+    var req AddFoodRequest
+    if err := c.BindJSON(&req); err != nil {
+        fmt.Println("BindJSON error:", err)
+        c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+        return
+    }
+
+    food, err := services.CreateFood(f.db, &req.Food)
+    if err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+        return
+    }
+
+    c.JSON(http.StatusOK, gin.H{"food": food})
 }
 
 func (f *MealPlanFeature) getAllMeals(c *gin.Context) {

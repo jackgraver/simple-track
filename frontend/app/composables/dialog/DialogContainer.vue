@@ -93,13 +93,14 @@ function isConfirmDialogType(
 .dialog-container {
     position: relative;
     display: flex;
+    top: -10vh;
+    min-width: 30%;
     flex-direction: column;
     background: rgb(26, 26, 26);
     border: 1px solid #3d3d3d;
     border-radius: 10px;
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
     padding: 0;
-    overflow: hidden;
 }
 
 .dialog-container > * {
