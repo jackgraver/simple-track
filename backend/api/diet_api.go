@@ -40,6 +40,7 @@ func (f *MealPlanFeature) SetEndpoints(router *gin.Engine) {
         group.GET("/food/all", f.getAllFoods)
         group.POST("/food/add", f.postAddFood)
         group.GET("/meal/all", f.getAllMeals)
+        group.GET("/meal/:id", f.getMeal)
         group.POST("/meal/log-planned", f.postLogPlanned)
         group.POST("/meal/logedited", f.postLogEdited)
         group.POST("/meal/editlogged", f.postEditLogged)
@@ -144,7 +145,15 @@ func (f *MealPlanFeature) getGoalsToday(c *gin.Context) {
 }
 
 func (f *MealPlanFeature) getAllFoods(c *gin.Context) {
-    data, err := services.AllFoods(f.db)
+    excludeParam := c.QueryArray("exclude") // e.g. /mealplan/food/all?exclude=1&exclude=3
+    var excludeIDs []uint
+    for _, idStr := range excludeParam {
+        if id, err := strconv.ParseUint(idStr, 10, 32); err == nil {
+            excludeIDs = append(excludeIDs, uint(id))
+        }
+    }
+
+    data, err := services.AllFoods(f.db, excludeIDs)
     if err != nil {
         c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
         return
@@ -174,7 +183,15 @@ func (f *MealPlanFeature) postAddFood(c *gin.Context) {
 }
 
 func (f *MealPlanFeature) getAllMeals(c *gin.Context) {
-    data, err := services.AllMeals(f.db)
+    excludeParam := c.QueryArray("exclude") // e.g. /mealplan/food/all?exclude=1&exclude=3
+    var excludeIDs []uint
+    for _, idStr := range excludeParam {
+        if id, err := strconv.ParseUint(idStr, 10, 32); err == nil {
+            excludeIDs = append(excludeIDs, uint(id))
+        }
+    }
+
+    data, err := services.AllMeals(f.db, excludeIDs)
     if err != nil {
         c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
         return
@@ -182,6 +199,23 @@ func (f *MealPlanFeature) getAllMeals(c *gin.Context) {
     c.JSON(http.StatusOK, data)
 }
 
+func (f *MealPlanFeature) getMeal(c *gin.Context) {
+    id, err := strconv.Atoi(c.Param("id"))
+    if err != nil {
+        c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+        return
+    }
+    data, err := services.MealByID(f.db, uint(id))
+    if err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+        return
+    }
+    if data == nil {
+        c.JSON(http.StatusNotFound, gin.H{"error": "Not Found"})
+        return
+    }    
+    c.JSON(http.StatusOK, gin.H{"meal": data})
+}
 
 type LogPlannedMealRequest struct {
     MealID uint `json:"meal_id"`

@@ -6,6 +6,8 @@ import { dialogManager } from "~/composables/dialog/useDialog";
 import LogOtherMealDialog from "../LogOtherMealDialog.vue";
 import { ChevronDown, ChevronUp } from "lucide-vue-next";
 
+const router = useRouter();
+
 const { data, pending, error } = useAPIGet<{
     day: Day;
     totalCalories: number;

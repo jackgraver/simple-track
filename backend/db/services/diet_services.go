@@ -95,9 +95,13 @@ func GoalsToday(db *gorm.DB) (*models.Plan, error) {
 	return &goals, nil
 }
 
-func AllFoods(db *gorm.DB) ([]models.Food, error) {
+func AllFoods(db *gorm.DB, excludeIDs []uint) ([]models.Food, error) {
     var foods []models.Food
-    if err := db.Find(&foods).Error; err != nil {
+    query := db.Model(&models.Food{})
+    if len(excludeIDs) > 0 {
+        query = query.Where("id NOT IN ?", excludeIDs)
+    }
+    if err := query.Find(&foods).Error; err != nil {
         return nil, err
     }
     return foods, nil
@@ -110,9 +114,13 @@ func CreateFood(db *gorm.DB, food *models.Food) (*models.Food, error) {
     return food, nil
 }
 
-func AllMeals(db *gorm.DB) ([]models.Meal, error) {
+func AllMeals(db *gorm.DB, excludeIDs []uint) ([]models.Meal, error) {
     var meals []models.Meal
-    if err := db.Preload("Items.Food").Find(&meals).Distinct("name").Error; err != nil {
+    query := db.Model(&models.Meal{})
+    if len(excludeIDs) > 0 {
+        query = query.Where("id NOT IN ?", excludeIDs)
+    }
+    if err := query.Preload("Items.Food").Find(&meals).Distinct("name").Error; err != nil {
         return nil, err
     }
     return meals, nil
