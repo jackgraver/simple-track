@@ -30,6 +30,14 @@ const filteredList = computed(() => {
         ? list.value.filter((f) => f.name.toLowerCase().includes(term))
         : list.value;
 });
+
+const handleFunctionCall = async <T extends (arg: any) => Promise<boolean>>(
+    fn?: T,
+) => {
+    if (!fn) return;
+    const success = await fn(search.value);
+    if (success) search.value = "";
+};
 </script>
 
 <template>
@@ -42,11 +50,7 @@ const filteredList = computed(() => {
                 <button
                     v-for="(item, index) in filteredList"
                     :key="item.id ?? item.ID ?? index"
-                    @click="
-                        props.onSelect(item).then((res) => {
-                            if (res) search = '';
-                        })
-                    "
+                    @click="handleFunctionCall(onSelect)"
                     class="item"
                     role="option"
                 >
@@ -64,12 +68,9 @@ const filteredList = computed(() => {
             <div v-else class="item empty-option">
                 <template v-if="onCreate">
                     <button
+                        type="button"
                         class="create-button"
-                        @click="
-                            onCreate(search).then((res) => {
-                                if (res) search = '';
-                            })
-                        "
+                        @click="handleFunctionCall(onCreate)"
                     >
                         <Plus :size="18" />
                         <span>Create “{{ search }}”</span>
@@ -137,6 +138,10 @@ const filteredList = computed(() => {
     justify-content: center;
     padding: 0.6rem 0.8rem;
     cursor: pointer;
-    background-color: none;
+    background-color: transparent;
+    box-shadow: none;
+}
+.create-button:hover {
+    background-color: transparent;
 }
 </style>

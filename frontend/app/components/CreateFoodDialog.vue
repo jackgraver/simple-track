@@ -66,8 +66,11 @@ const createFood = async () => {
         <div class="field">
             <label for="unit">Unit</label>
             <select id="unit" v-model="meal.unit">
-                <option value="Grams">Grams</option>
+                <option value="none" selected disabled hidden>
+                    Select Unit Type
+                </option>
                 <option value="Unit">Unit</option>
+                <option value="Grams">Grams</option>
             </select>
         </div>
         <button @click="createFood">Create</button>
