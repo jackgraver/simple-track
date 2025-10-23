@@ -3,7 +3,8 @@ import { Plus } from "lucide-vue-next";
 
 const props = defineProps<{
     route: string;
-    onSelect: (item: any) => void;
+    onSelect: (item: any) => Promise<boolean>;
+    onCreate?: (name: string) => Promise<boolean>;
     displayComponent?: Component;
     prefilter?: any[];
 }>();
@@ -41,7 +42,11 @@ const filteredList = computed(() => {
                 <button
                     v-for="(item, index) in filteredList"
                     :key="item.id ?? item.ID ?? index"
-                    @click="props.onSelect(item)"
+                    @click="
+                        props.onSelect(item).then((res) => {
+                            if (res) search = '';
+                        })
+                    "
                     class="item"
                     role="option"
                 >
@@ -57,8 +62,24 @@ const filteredList = computed(() => {
                 </button>
             </template>
             <div v-else class="item empty-option">
-                <Plus :size="18" />
-                <span>Create “{{ search }}”</span>
+                <template v-if="onCreate">
+                    <button
+                        class="create-button"
+                        @click="
+                            onCreate(search).then((res) => {
+                                if (res) search = '';
+                            })
+                        "
+                    >
+                        <Plus :size="18" />
+                        <span>Create “{{ search }}”</span>
+                    </button>
+                </template>
+                <template v-else>
+                    <span class="no-hover-empty-option"
+                        >“{{ search }}” does not exist</span
+                    >
+                </template>
             </div>
         </div>
     </div>
@@ -87,12 +108,12 @@ const filteredList = computed(() => {
     padding: 1rem;
     border: 1px solid rgb(82, 82, 82);
     border-radius: 5px;
-    background-color: rgb(73, 73, 73);
+    background-color: rgb(48, 48, 48);
     cursor: pointer;
     transition: background-color 0.2s ease-in-out;
 }
 
-.item:hover {
+.item:hover:not(:has(.no-hover-empty-option)) {
     background-color: rgb(82, 82, 82);
 }
 
@@ -103,5 +124,19 @@ const filteredList = computed(() => {
     justify-content: center;
     padding: 0.6rem 0.8rem;
     cursor: pointer;
+}
+
+.no-hover-empty-option {
+    cursor: default;
+}
+
+.create-button {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    justify-content: center;
+    padding: 0.6rem 0.8rem;
+    cursor: pointer;
+    background-color: none;
 }
 </style>

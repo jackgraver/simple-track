@@ -40,41 +40,46 @@ const logPlannedMeal = async (meal: Meal) => {
     }
 };
 
-const logEditedMeal = async (meal: Meal) => {
-    dialogManager
-        .custom<Meal>({
-            title: "Log Edited Meal",
-            component: TodayLogEditedDialog,
-            props: { meal },
-        })
-        .then(async (editedMeal) => {
-            if (editedMeal) {
-                const { response, error } = await useAPIPost<{
-                    day: Day;
-                    totalCalories: number;
-                    totalProtein: number;
-                    totalFiber: number;
-                }>("mealplan/meal/logedited", "POST", { meal: editedMeal });
+const logMeal = async (
+    meal: Meal | null,
+    type: "edit" | "editlogged" | "create",
+) => {
+    console.log("type", type);
+    router.push(`/logmeal?type=${type}&id=${meal?.ID}`);
+    // dialogManager
+    //     .custom<Meal>({
+    //         title: "Log Edited Meal",
+    //         component: TodayLogEditedDialog,
+    //         props: { meal },
+    //     })
+    //     .then(async (editedMeal) => {
+    //         if (editedMeal) {
+    //             const { response, error } = await useAPIPost<{
+    //                 day: Day;
+    //                 totalCalories: number;
+    //                 totalProtein: number;
+    //                 totalFiber: number;
+    //             }>("mealplan/meal/logedited", "POST", { meal: editedMeal });
 
-                if (error)
-                    toast.push("Log Edited Failed!" + error.message, "error");
-                else if (response) {
-                    toast.push("Planned Meal Log Successfully!", "success");
-                    if (data.value) {
-                        data.value = {
-                            day: response.day,
-                            totalCalories: response.totalCalories,
-                            totalProtein: response.totalProtein,
-                            totalFiber: response.totalFiber,
-                        };
-                    }
-                }
-            }
-        })
-        .catch((err) => {
-            console.error("Dialog error:", err);
-            toast.push("Dialog Error", "error");
-        });
+    //             if (error)
+    //                 toast.push("Log Edited Failed!" + error.message, "error");
+    //             else if (response) {
+    //                 toast.push("Planned Meal Log Successfully!", "success");
+    //                 if (data.value) {
+    //                     data.value = {
+    //                         day: response.day,
+    //                         totalCalories: response.totalCalories,
+    //                         totalProtein: response.totalProtein,
+    //                         totalFiber: response.totalFiber,
+    //                     };
+    //                 }
+    //             }
+    //         }
+    //     })
+    //     .catch((err) => {
+    //         console.error("Dialog error:", err);
+    //         toast.push("Dialog Error", "error");
+    //     });
 };
 
 const deleteLoggedMeal = async (meal: Meal) => {
@@ -167,8 +172,6 @@ const visibleItems = computed(() =>
     data.value?.day.plannedMeals.slice(start.value, start.value + 2),
 );
 
-console.log(visibleItems);
-
 function next() {
     console.log("next", start.value);
     start.value = Math.min(
@@ -198,7 +201,7 @@ function prev() {
                 <!-- <NuxtLink class="link" to="/mealplan"
                     >Manage Meal Plan</NuxtLink
                 > -->
-                <button @click="logOtherMeal">Log Meal</button>
+                <button @click="logMeal(null, 'create')">Log Meal</button>
             </div>
             <TodayBars
                 :totalCalories="data?.totalCalories ?? 0"
@@ -216,7 +219,7 @@ function prev() {
                         :key="log.ID"
                         :meal="log.meal"
                         :on-log-planned="logPlannedMeal"
-                        :on-log-edited="logEditedMeal"
+                        :on-log-edited="logMeal"
                         :on-delete="deleteLoggedMeal"
                         :on-edit="editLogMeal"
                         type="logged"
@@ -233,7 +236,7 @@ function prev() {
                         :key="log.ID"
                         :meal="log.meal"
                         :on-log-planned="logPlannedMeal"
-                        :on-log-edited="logEditedMeal"
+                        :on-log-edited="logMeal"
                         :on-delete="deleteLoggedMeal"
                         :on-edit="editLogMeal"
                         type="planned"

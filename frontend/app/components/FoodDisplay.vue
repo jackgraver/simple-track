@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { Food } from "~/types/diet";
+import SimpleMacros from "./SimpleMacros.vue";
 
 const props = defineProps<{
     item: Food;
@@ -9,11 +10,11 @@ const props = defineProps<{
 <template>
     <div class="food-container">
         <h3 class="name">{{ item.name }}</h3>
-        <div class="macros">
-            <span class="macro calories">{{ item.calories }}C</span>
-            <span class="macro protein">{{ item.protein }}P</span>
-            <span class="macro fiber">{{ item.fiber }}F</span>
-        </div>
+        <SimpleMacros
+            :calories="item.calories"
+            :protein="item.protein"
+            :fiber="item.fiber"
+        />
     </div>
 </template>
 
@@ -31,26 +32,5 @@ const props = defineProps<{
     font-size: 1rem;
     margin: 0;
     font-weight: 600;
-}
-
-.macros {
-    display: flex;
-    gap: 0.6rem;
-    font-weight: 500;
-    margin-top: 0.25rem;
-}
-
-.macro {
-    font-size: 0.9rem;
-}
-
-.calories {
-    color: #facc15;
-}
-.protein {
-    color: #60a5fa;
-}
-.fiber {
-    color: #34d399;
 }
 </style>

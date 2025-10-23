@@ -30,7 +30,7 @@ const props = defineProps<{
     meal: Meal;
     type: "planned" | "logged";
     onLogPlanned: (meal: Meal) => void;
-    onLogEdited: (meal: Meal) => void;
+    onLogEdited: (meal: Meal, type: "edit" | "editlogged") => void;
     onDelete: (meal: Meal) => void;
     onEdit: (meal: Meal) => void;
 }>();
@@ -77,7 +77,7 @@ const props = defineProps<{
             </div>
             <div class="right">
                 <div class="actions" v-if="type === 'logged'">
-                    <button @click="onEdit(meal)">
+                    <button @click="onLogEdited(meal, 'edit')">
                         <SquarePen :size="20" /></button
                     ><button class="delete-button" @click="onDelete(meal)">
                         <Trash2 :size="20" />
@@ -85,7 +85,7 @@ const props = defineProps<{
                 </div>
 
                 <div class="actions" v-else-if="type === 'planned'">
-                    <button @click="onLogEdited(meal)">
+                    <button @click="onLogEdited(meal, 'editlogged')">
                         <SquarePen :size="20" />
                     </button>
                     <button class="confirm-button" @click="onLogPlanned(meal)">

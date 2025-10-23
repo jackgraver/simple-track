@@ -75,7 +75,11 @@ select {
     color: white;
     border: none;
     padding: 6px 12px;
-    margin: 4px;
+    margin: 4px 0 4px 0;
     border-radius: 4px;
+}
+
+input:focus {
+    outline: none;
 }
 </style>
