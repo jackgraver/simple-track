@@ -39,16 +39,21 @@ const day = data.value?.day;
 .container {
     display: flex;
     flex-direction: column;
-    gap: 1rem;
-    /* Fill the width provided by the page wrapper */
+    gap: 0.5rem;
     width: 100%;
 }
 
 .workout-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
     gap: 0.75rem;
     width: 100%;
+}
+
+@media (min-width: calc(5 * 220px)) {
+    .workout-grid {
+        grid-template-columns: repeat(4, 1fr);
+    }
 }
 
 .title-row {
@@ -60,10 +65,11 @@ const day = data.value?.day;
 
 .title-row h2 {
     flex: 1;
+    margin-bottom: 0;
 }
 
 .title-row button {
-    margin-top: 6px;
+    margin: 0px;
     border-radius: 4px;
     font-size: large;
     padding: 6px 12px;
@@ -71,6 +77,7 @@ const day = data.value?.day;
     text-decoration: none;
     font-size: large;
     padding: 6px 16px;
+    align-self: end;
 }
 
 .workout-card {

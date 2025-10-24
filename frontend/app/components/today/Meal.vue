@@ -44,42 +44,7 @@ const logMeal = async (
     meal: Meal | null,
     type: "edit" | "editlogged" | "create",
 ) => {
-    console.log("type", type);
     router.push(`/logmeal?type=${type}&id=${meal?.ID}`);
-    // dialogManager
-    //     .custom<Meal>({
-    //         title: "Log Edited Meal",
-    //         component: TodayLogEditedDialog,
-    //         props: { meal },
-    //     })
-    //     .then(async (editedMeal) => {
-    //         if (editedMeal) {
-    //             const { response, error } = await useAPIPost<{
-    //                 day: Day;
-    //                 totalCalories: number;
-    //                 totalProtein: number;
-    //                 totalFiber: number;
-    //             }>("mealplan/meal/logedited", "POST", { meal: editedMeal });
-
-    //             if (error)
-    //                 toast.push("Log Edited Failed!" + error.message, "error");
-    //             else if (response) {
-    //                 toast.push("Planned Meal Log Successfully!", "success");
-    //                 if (data.value) {
-    //                     data.value = {
-    //                         day: response.day,
-    //                         totalCalories: response.totalCalories,
-    //                         totalProtein: response.totalProtein,
-    //                         totalFiber: response.totalFiber,
-    //                     };
-    //                 }
-    //             }
-    //         }
-    //     })
-    //     .catch((err) => {
-    //         console.error("Dialog error:", err);
-    //         toast.push("Dialog Error", "error");
-    //     });
 };
 
 const deleteLoggedMeal = async (meal: Meal) => {
@@ -173,7 +138,6 @@ const visibleItems = computed(() =>
 );
 
 function next() {
-    console.log("next", start.value);
     start.value = Math.min(
         start.value + 1,
         (data?.value?.day?.plannedMeals?.length ?? 0) - 2,
@@ -198,9 +162,6 @@ function prev() {
                         dayOfWeek(data.day.date)
                     }}
                 </h1>
-                <!-- <NuxtLink class="link" to="/mealplan"
-                    >Manage Meal Plan</NuxtLink
-                > -->
                 <button @click="logMeal(null, 'create')">Log Meal</button>
             </div>
             <TodayBars
@@ -214,6 +175,9 @@ function prev() {
             <div class="meals-section">
                 <div class="meals-container">
                     <h2>Logged</h2>
+                    <span v-if="data.day.loggedMeals.length === 0">
+                        Nothing logged yet.
+                    </span>
                     <TodayMealCard
                         v-for="log in data.day.loggedMeals"
                         :key="log.ID"
@@ -231,6 +195,9 @@ function prev() {
                         <button @click="prev"><ChevronUp /></button>
                         <button @click="next"><ChevronDown /></button>
                     </div>
+                    <span v-if="visibleItems?.length === 0">
+                        Nothing else planned.
+                    </span>
                     <TodayMealCard
                         v-for="log in visibleItems"
                         :key="log.ID"
@@ -281,6 +248,10 @@ function prev() {
 
 .small-title-row h2 {
     flex: 1;
+}
+
+.small-title-row button {
+    margin-bottom: 0;
 }
 
 .meals-section {

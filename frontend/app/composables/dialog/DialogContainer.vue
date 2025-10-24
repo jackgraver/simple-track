@@ -74,14 +74,12 @@ function isConfirmDialogType(
 <style scoped>
 .dialog-backdrop {
     position: fixed;
-    top: 0;
-    left: 0;
-    width: 100vw;
-    height: 100vh;
+    inset: 0;
     background: rgba(0, 0, 0, 0.5);
     display: flex;
-    align-items: center;
     justify-content: center;
+    align-items: flex-start;
+    padding-top: 10vh;
     z-index: 998;
 }
 
@@ -93,16 +91,14 @@ function isConfirmDialogType(
 .dialog-container {
     position: relative;
     display: flex;
-    top: -10vh;
-    min-width: 30%;
     flex-direction: column;
+    min-width: 30%;
     background: rgb(26, 26, 26);
     border: 1px solid #3d3d3d;
     border-radius: 10px;
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
     padding: 0;
 }
-
 .dialog-container > * {
     width: auto;
 }
