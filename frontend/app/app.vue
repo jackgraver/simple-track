@@ -34,6 +34,7 @@ button {
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
     color: white;
     border: none;
+    cursor: pointer;
 }
 
 button:disabled {

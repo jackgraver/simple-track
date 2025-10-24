@@ -33,9 +33,10 @@ const filteredList = computed(() => {
 
 const handleFunctionCall = async <T extends (arg: any) => Promise<boolean>>(
     fn?: T,
+    args?: any,
 ) => {
     if (!fn) return;
-    const success = await fn(search.value);
+    const success = await fn(args);
     if (success) search.value = "";
 };
 </script>
@@ -50,7 +51,7 @@ const handleFunctionCall = async <T extends (arg: any) => Promise<boolean>>(
                 <button
                     v-for="(item, index) in filteredList"
                     :key="item.id ?? item.ID ?? index"
-                    @click="handleFunctionCall(onSelect)"
+                    @click="handleFunctionCall(onSelect, item)"
                     class="item"
                     role="option"
                 >
@@ -90,8 +91,10 @@ const handleFunctionCall = async <T extends (arg: any) => Promise<boolean>>(
 .search-container {
     display: flex;
     flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
     gap: 1rem;
-    width: 100%;
+    overflow: hidden;
 }
 
 .items-container {
@@ -99,6 +102,7 @@ const handleFunctionCall = async <T extends (arg: any) => Promise<boolean>>(
     flex-direction: column;
     gap: 0.6rem;
     width: 100%;
+    overflow: auto;
 }
 
 .item {

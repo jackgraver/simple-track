@@ -252,7 +252,6 @@ function prev() {
     display: flex;
     flex-direction: column;
     gap: 1rem;
-    /* Fill the width provided by the page wrapper */
     width: 100%;
 }
 

@@ -41,6 +41,7 @@ func (f *MealPlanFeature) SetEndpoints(router *gin.Engine) {
         group.POST("/food/add", f.postAddFood)
         group.GET("/meal/all", f.getAllMeals)
         group.GET("/meal/:id", f.getMeal)
+        group.POST("/meal/new", f.postNewMeal)
         group.POST("/meal/log-planned", f.postLogPlanned)
         group.POST("/meal/logedited", f.postLogEdited)
         group.POST("/meal/editlogged", f.postEditLogged)
@@ -216,6 +217,46 @@ func (f *MealPlanFeature) getMeal(c *gin.Context) {
     }    
     c.JSON(http.StatusOK, gin.H{"meal": data})
 }
+
+type NewMealRequest struct {
+    Meal models.Meal `json:"meal"`
+    Log bool `json:"log"`
+}
+
+func (f *MealPlanFeature) postNewMeal(c *gin.Context) {
+    var req NewMealRequest
+    if err := c.BindJSON(&req); err != nil {
+        fmt.Println("BindJSON error:", err)
+        c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+        return
+    }
+
+    meal, err := services.CreateMeal(f.db, &req.Meal)
+    if err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+        return
+    }
+
+    if req.Log {
+        day, derr := services.FindMealPlanDay(f.db, utils.ZerodTime())
+        if derr != nil {
+            c.JSON(http.StatusInternalServerError, gin.H{"error": derr.Error()})
+            return
+        }
+
+        err = services.CreateDayMeal(f.db, &models.DayLog{
+            DayID: day.ID,
+            MealID: meal,
+        })
+        if err != nil {
+            c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+            return
+        }
+    }
+
+    c.JSON(http.StatusOK, gin.H{"meal_id": meal})
+}
+
 
 type LogPlannedMealRequest struct {
     MealID uint `json:"meal_id"`

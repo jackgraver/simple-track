@@ -8,10 +8,21 @@ function calcWidth(total: number, planned: number): number {
     return Math.min(100, (total / planned) * 100);
 }
 
-defineProps<{
+function determineOverflow(total: number, planned: number): string {
+    if (planned <= 0 || !props.indicateOverflow) return "";
+    const overflow = (total / planned) * 100 - 100;
+
+    if (overflow > 20) return "num30";
+    if (overflow > 10) return "num20";
+    if (overflow > 0) return "num10";
+    return "";
+}
+
+const props = defineProps<{
     total: number;
     planned: number;
-    type: "calories" | "protein" | "fiber";
+    type: "calories" | "protein" | "fiber" | "carbs";
+    indicateOverflow?: boolean;
 }>();
 </script>
 
@@ -24,7 +35,7 @@ defineProps<{
                 width: `${calcWidth(total, planned)}%`,
             }"
         >
-            <span>{{
+            <span :class="determineOverflow(total, planned)">{{
                 formatNum(total ?? 0) + " / " + formatNum(planned ?? 0)
             }}</span>
         </div>
@@ -63,5 +74,15 @@ defineProps<{
 }
 .fiber {
     background-color: green;
+}
+
+.num10 {
+    color: yellow;
+}
+.num20 {
+    color: orange;
+}
+.num30 {
+    color: red;
 }
 </style>

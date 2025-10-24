@@ -13,6 +13,8 @@ function formatNum(n: number): number {
     return Number(s.replace(/\.?0+$/, "")); // drop trailing zeros and optional dot
 }
 
+const router = useRouter();
+
 const route = useRoute();
 const type = route.query.type as string | undefined;
 const id = Number(route.query.id ?? 0);
@@ -72,11 +74,10 @@ const totalMacros = computed(() => {
 });
 
 const addFood = async (food: Food): Promise<boolean> => {
-    for (const item of meal.value.items) {
-        if (item?.food?.ID === food.ID) {
-            item.amount++;
-            return true;
-        }
+    const existing = meal.value.items.find((i) => i?.food?.ID === food.ID);
+    if (existing) {
+        existing.amount++;
+        return true;
     }
 
     meal.value.items.push({
@@ -119,6 +120,77 @@ const setMeal = async (newMeal: Meal): Promise<boolean> => {
     meal.value = newMeal;
     return true;
 };
+
+//TODO: potential bug this gets called every character input to meal name
+const createMeal = async (log: boolean) => {
+    meal.value.ID = 0;
+    const { response, error } = await useAPIPost<{
+        meal_id: number;
+    }>(`mealplan/meal/new`, "POST", {
+        meal: meal.value,
+        log: log,
+    });
+    if (error) {
+        toast.push("Create Meal Failed!" + error.message, "error");
+    } else if (response) {
+        toast.push("Meal Created Successfully!", "success");
+        if (log) {
+            router.push("/");
+        } else {
+            meal.value = {
+                ID: 0,
+                created_at: "",
+                updated_at: "",
+                name: "",
+                items: [],
+            };
+        }
+    }
+};
+
+const logEditedMeal = async () => {
+    meal.value.ID = 0;
+    const { response, error } = await useAPIPost<{
+        day: Day;
+        totalCalories: number;
+        totalProtein: number;
+        totalFiber: number;
+    }>(`mealplan/meal/logedited`, "POST", {
+        meal: meal.value,
+    });
+
+    if (error) {
+        toast.push("Log Edited Failed!" + error.message, "error");
+    } else if (response) {
+        console.log(response);
+        if (response.day) {
+            toast.push("Planned Meal Log Successfully!", "success");
+            router.push("/");
+        }
+    }
+};
+
+const updateLoggedMeal = async () => {
+    const oldMealID = meal.value.ID;
+    meal.value.ID = 0;
+    const { response, error } = await useAPIPost<{
+        day: Day;
+        totalCalories: number;
+        totalProtein: number;
+        totalFiber: number;
+    }>(`mealplan/meal/editlogged`, "POST", {
+        meal: meal.value,
+        oldMealID: oldMealID,
+    });
+    if (error) {
+        toast.push("Log Edited Failed!" + error.message, "error");
+    } else if (response) {
+        if (response.day) {
+            toast.push("Planned Meal Log Successfully!", "success");
+            router.push("/");
+        }
+    }
+};
 </script>
 
 <template>
@@ -139,6 +211,7 @@ const setMeal = async (newMeal: Meal): Promise<boolean> => {
                         :calories="totalMacros.calories"
                         :protein="totalMacros.protein"
                         :fiber="totalMacros.fiber"
+                        font-size="1.3rem"
                     />
                 </div>
 
@@ -174,10 +247,18 @@ const setMeal = async (newMeal: Meal): Promise<boolean> => {
                         </button>
                     </div>
                 </div>
-                <button v-if="type === 'edit'">Update</button>
-                <button v-if="type === 'editlogged'">Log</button>
-                <button v-if="type === 'create'">Create</button>
-                <button v-if="type === 'create'">Create and Log</button>
+                <button v-if="type === 'edit'" @click="updateLoggedMeal">
+                    Update
+                </button>
+                <button v-if="type === 'editlogged'" @click="logEditedMeal">
+                    Log
+                </button>
+                <button v-if="type === 'create'" @click="createMeal(false)">
+                    Create
+                </button>
+                <button v-if="type === 'create'" @click="createMeal(true)">
+                    Create and Log
+                </button>
                 <!-- TODO: Removed 0'd items on submit  -->
                 <TodayBars
                     :totalCalories="
@@ -199,7 +280,6 @@ const setMeal = async (newMeal: Meal): Promise<boolean> => {
                     :onSelect="addFood"
                     :onCreate="createFood"
                     :displayComponent="FoodDisplay"
-                    :prefilter="meal?.items.map((i) => i.ID)"
                 />
             </div>
             <div class="cell right-bottom">
@@ -208,7 +288,6 @@ const setMeal = async (newMeal: Meal): Promise<boolean> => {
                     :key="meal.ID"
                     :route="'mealplan/meal/all'"
                     :on-select="setMeal"
-                    :prefilter="[meal.ID]"
                 />
             </div>
         </div>
@@ -220,7 +299,7 @@ const setMeal = async (newMeal: Meal): Promise<boolean> => {
     display: flex;
     justify-content: center;
     align-items: center;
-    height: 100vh;
+    height: 98vh;
     padding-block: 2rem;
     box-sizing: border-box;
     overflow: hidden;
@@ -261,9 +340,11 @@ const setMeal = async (newMeal: Meal): Promise<boolean> => {
 }
 
 .cell {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
     border: 1px solid rgb(56, 56, 56);
     border-radius: 5px;
-    overflow: auto;
     min-height: 0;
     background: rgb(27, 27, 27);
 }
