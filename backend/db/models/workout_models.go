@@ -56,43 +56,36 @@ func (m *WorkoutModel) seedDatabase() error {
 			{
 				Name: "Incline Press",
 				Sets: []PlannedSet{
-					{Reps: 6, Weight: 40},
-					{Reps: 6, Weight: 40},
 				},
 			},
 			{
 				Name: "Chest Fly",
 				Sets: []PlannedSet{
-					{Reps: 6, Weight: 70},
-					{Reps: 6, Weight: 70},
+				},
+			},
+			{
+				Name: "Dips",
+				Sets: []PlannedSet{
 				},
 			},
 			{
 				Name: "Lat Raise",
 				Sets: []PlannedSet{
-					{Reps: 12, Weight: 10},
-					{Reps: 12, Weight: 10},
 				},
 			},
 			{
 				Name: "Shoulder Press",
 				Sets: []PlannedSet{
-					{Reps: 6, Weight: 60},
-					{Reps: 6, Weight: 60},
 				},
 			},
 			{
 				Name: "JM Press",
 				Sets: []PlannedSet{
-					{Reps: 6, Weight: 25},
-					{Reps: 6, Weight: 25},
 				},
 			},
 			{
 				Name: "Extensions",
 				Sets: []PlannedSet{
-					{Reps: 6, Weight: 50},
-					{Reps: 6, Weight: 50},
 				},
 			},
 		},
@@ -101,45 +94,28 @@ func (m *WorkoutModel) seedDatabase() error {
 		Name: "Pull",
 		Exercises: []PlannedExercise{
 			{
-				Name: "Pulldowns",
-				Sets: []PlannedSet{
-					{Reps: 6, Weight: 90},
-					{Reps: 6, Weight: 90},
-				},
-			},
-			{
 				Name: "Barbell Rows",
 				Sets: []PlannedSet{
-					{Reps: 6, Weight: 10},
-					{Reps: 6, Weight: 10},
 				},
-			},			
+			},	
 			{
 				Name: "Face Pulls",
 				Sets: []PlannedSet{
-					{Reps: 8, Weight: 30},
-					{Reps: 8, Weight: 30},
 				},
-			},			
+			},
 			{
-				Name: "Rear delt",
+				Name: "Pulldowns",
 				Sets: []PlannedSet{
-					{Reps: 9, Weight: 30},
-					{Reps: 9, Weight: 30},
 				},
-			},			
+			},		
 			{
 				Name: "Incline Curls",
 				Sets: []PlannedSet{
-					{Reps: 6, Weight: 20},
-					{Reps: 6, Weight: 20},
 				},
 			},			
 			{
 				Name: "Hammer Curls",
 				Sets: []PlannedSet{
-					{Reps: 6, Weight: 20},
-					{Reps: 6, Weight: 20},
 				},
 			},
 		},
@@ -148,26 +124,43 @@ func (m *WorkoutModel) seedDatabase() error {
 		Name: "Legs",
 		Exercises: []PlannedExercise{
 			{
+				Name: "Outer Thigh",
+				Sets: []PlannedSet{
+				},
+			},
+			{
+				Name: "Inner Thigh",
+				Sets: []PlannedSet{
+				},
+			},
+			{
+				Name: "Leg Extensions",
+				Sets: []PlannedSet{
+				},
+			},
+			{
+				Name: "Hamstring Cruls",
+				Sets: []PlannedSet{
+				},
+			},
+			{
 				Name: "Squat",
 				Sets: []PlannedSet{
-					{Reps: 8, Weight: 135},
-					{Reps: 8, Weight: 155},
-					{Reps: 6, Weight: 175},
 				},
 			},
 			{
 				Name: "Deadlift",
 				Sets: []PlannedSet{
-					{Reps: 5, Weight: 185},
-					{Reps: 5, Weight: 205},
-					{Reps: 3, Weight: 225},
 				},
 			},
 			{
-				Name: "Lunges",
+				Name: "Calf Raises",
 				Sets: []PlannedSet{
-					{Reps: 12, Weight: 40},
-					{Reps: 12, Weight: 40},
+				},
+			},
+			{
+				Name: "Ab Crunches",
+				Sets: []PlannedSet{
 				},
 			},
 		},
@@ -177,19 +170,63 @@ func (m *WorkoutModel) seedDatabase() error {
 		Name: "Upper",
 		Exercises: []PlannedExercise{
 			{
-				Name: "Push-ups",
+				Name: "Incline Press",
 				Sets: []PlannedSet{
-					{Reps: 10, Weight: 0},
-					{Reps: 8, Weight: 0},
-					{Reps: 6, Weight: 0},
 				},
 			},
 			{
-				Name: "Bicep Curl",
+				Name: "Chest Fly",
 				Sets: []PlannedSet{
-					{Reps: 12, Weight: 25},
-					{Reps: 12, Weight: 25},
-					{Reps: 10, Weight: 30},
+				},
+			},
+			{
+				Name: "Dips",
+				Sets: []PlannedSet{
+				},
+			},
+			{
+				Name: "Lat Raise",
+				Sets: []PlannedSet{
+				},
+			},
+			{
+				Name: "Shoulder Press",
+				Sets: []PlannedSet{
+				},
+			},
+						{
+				Name: "Barbell Rows",
+				Sets: []PlannedSet{
+				},
+			},	
+			{
+				Name: "Face Pulls",
+				Sets: []PlannedSet{
+				},
+			},
+			{
+				Name: "Pulldowns",
+				Sets: []PlannedSet{
+				},
+			},
+			{
+				Name: "JM Press",
+				Sets: []PlannedSet{
+				},
+			},
+			{
+				Name: "Extensions",
+				Sets: []PlannedSet{
+				},
+			},		
+			{
+				Name: "Incline Curls",
+				Sets: []PlannedSet{
+				},
+			},			
+			{
+				Name: "Hammer Curls",
+				Sets: []PlannedSet{
 				},
 			},
 		},
@@ -199,19 +236,53 @@ func (m *WorkoutModel) seedDatabase() error {
 		Name: "Lower",
 		Exercises: []PlannedExercise{
 			{
+				Name: "Outer Thigh",
+				Sets: []PlannedSet{
+				},
+			},
+			{
+				Name: "Inner Thigh",
+				Sets: []PlannedSet{
+				},
+			},
+			{
+				Name: "Leg Extensions",
+				Sets: []PlannedSet{
+				},
+			},
+			{
+				Name: "Hamstring Cruls",
+				Sets: []PlannedSet{
+				},
+			},
+			{
 				Name: "Squat",
 				Sets: []PlannedSet{
-					{Reps: 8, Weight: 135},
-					{Reps: 8, Weight: 155},
-					{Reps: 6, Weight: 175},
 				},
 			},
 			{
 				Name: "Deadlift",
 				Sets: []PlannedSet{
-					{Reps: 5, Weight: 185},
-					{Reps: 5, Weight: 205},
-					{Reps: 3, Weight: 225},
+				},
+			},
+			{
+				Name: "Hip Hinge",
+				Sets: []PlannedSet{
+				},
+			},
+			{
+				Name: "Leg Press",
+				Sets: []PlannedSet{
+				},
+			},
+			{
+				Name: "Calf Raises",
+				Sets: []PlannedSet{
+				},
+			},
+			{
+				Name: "Ab Crunches",
+				Sets: []PlannedSet{
 				},
 			},
 		},
@@ -223,8 +294,6 @@ func (m *WorkoutModel) seedDatabase() error {
 			{
 				Name: "Abs",
 				Sets: []PlannedSet{
-					{Reps: 6, Weight: 100},
-					{Reps: 6, Weight: 100},
 				},
 			},
 		},
@@ -244,8 +313,9 @@ func (m *WorkoutModel) seedDatabase() error {
 	m.db.Create(&rest)
 
 	year := 2025
-	start := time.Date(year, time.September, 1, 0, 0, 0, 0, time.Local)
-	end := time.Date(year, time.December, 31, 0, 0, 0, 0, time.Local)
+	now := time.Now()
+	start := time.Date(year, time.September, 1, 0, 0, 0, 0, now.Location())
+	end := time.Date(year, time.December, 31, 0, 0, 0, 0, now.Location())
 
 	// Map weekday → workout plan
 	weekdayPlans := map[time.Weekday]WorkoutPlan{

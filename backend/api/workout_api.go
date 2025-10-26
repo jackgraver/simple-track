@@ -17,8 +17,8 @@ type WorkoutFeature struct {
 
 func NewWorkoutFeature(db *gorm.DB) *WorkoutFeature {
     models.NewWorkoutModel(db)
-    var feature = models.NewWorkoutModel(db)
-    feature.MigrateDatabase()
+    // var feature = models.NewWorkoutModel(db)
+    // feature.MigrateDatabase()
 
 	return &WorkoutFeature{
 		BaseFeature[models.WorkoutModel]{
@@ -87,17 +87,21 @@ func (f *WorkoutFeature) getWorkoutAll(c *gin.Context) {
 }   
 
 func (f *WorkoutFeature) getPreviousWorkout(c *gin.Context) {
-    // today, err := services.GetToday(f.db)
-    // if err != nil {
-    //     c.JSON(http.StatusNotImplemented, gin.H{"error": err.Error()})
-    //     return
-    // }
-
-    day, err := services.GetPrevious(f.db, "Push")
+    today, err := services.GetToday(f.db)
     if err != nil {
         c.JSON(http.StatusNotImplemented, gin.H{"error": err.Error()})
         return
     }
 
-    c.JSON(http.StatusOK, gin.H{"day": day})
+    previousExerciseLogs := make([]models.LoggedExercise, 0)
+    for _, exercise := range today.Exercises {
+        exerciseLog, err := services.GetPreviousExerciseLog(f.db, today.Date, exercise.Name)
+        if err != nil {
+            c.JSON(http.StatusNotImplemented, gin.H{"error": err.Error()})
+            return
+        }
+        previousExerciseLogs = append(previousExerciseLogs, exerciseLog)
+    }
+
+    c.JSON(http.StatusOK, gin.H{"exercises": previousExerciseLogs, "day": today})
 }

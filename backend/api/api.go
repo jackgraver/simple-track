@@ -2,6 +2,8 @@ package api
 
 import (
 	"be-simpletracker/db"
+	"io"
+	"os"
 	"time"
 
 	"github.com/gin-contrib/cors"
@@ -9,7 +11,26 @@ import (
 )
 
 func InitAPI() {
+	f, _ := os.Create("api/gin.log")
+
+	gin.DefaultWriter = io.MultiWriter(f, os.Stdout)	 
+
 	router := gin.Default()
+
+	// router.Use(gin.LoggerWithFormatter(func(param gin.LogFormatterParams) string {
+	// 	// Custom format
+	// 	return fmt.Sprintf("[GIN] %s - [%s] \"%s %s %s %d %s \"%s\" %s\"\n",
+	// 	param.TimeStamp.Format(time.RFC1123),
+	// 	param.ClientIP,
+	// 	param.Method,
+	// 	param.Path,
+	// 	param.Request.Proto,
+	// 	param.StatusCode,
+	// 	param.Latency,
+	// 	param.Request.UserAgent(),
+	// 	param.ErrorMessage,
+	// 	)
+	// }))
 
 	router.Use(BenchmarkMiddleware(router))
 

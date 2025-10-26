@@ -59,3 +59,22 @@ func GetPrevious(db *gorm.DB, day string) (models.WorkoutLog, error) {
     }
     return workoutDay, nil
 }
+
+func GetPreviousExerciseLog(db *gorm.DB, day time.Time, exercise string) (models.LoggedExercise, error) {
+    var exerciseLog models.LoggedExercise
+
+    err := db.Debug().
+        Preload("Sets").
+        Joins("JOIN workout_logs ON workout_logs.id = logged_exercises.workout_log_id").
+        Where("name = ?", exercise).
+        Where("workout_logs.date != ?", day).
+        Where("workout_logs.date < ?", day).
+        Order("workout_logs.date DESC").
+        Limit(1).
+        Find(&exerciseLog).Error
+
+    if err != nil {
+        return models.LoggedExercise{}, err
+    }
+    return exerciseLog, nil
+}
