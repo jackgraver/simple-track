@@ -95,6 +95,9 @@ func (f *WorkoutFeature) getPreviousWorkout(c *gin.Context) {
 
     previousExerciseLogs := make([]models.LoggedExercise, 0)
     for _, exercise := range today.Exercises {
+        if exercise.Exercise == nil {
+            continue
+        }
         exerciseLog, err := services.GetPreviousExerciseLog(f.db, today.Date, exercise.Exercise.Name)
         if err != nil {
             c.JSON(http.StatusNotImplemented, gin.H{"error": err.Error()})

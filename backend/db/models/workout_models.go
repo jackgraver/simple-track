@@ -379,7 +379,7 @@ func (m *WorkoutModel) seedDatabase() error {
 				},
 			},			
 			{
-				Exercise: hammerCurls,
+				Exercise: &hammerCurls,
 				Sets: []LoggedSet{
 					{Reps: 5, Weight: 22.5},
 					{Reps: 6, Weight: 22.5},
@@ -495,7 +495,7 @@ type WorkoutLog struct {
 }
 
 func (w *WorkoutLog) Preloads() []string {
-    return []string{"WorkoutPlan.Exercises.Sets", "Cardio", "Exercises.Sets"}
+    return []string{"Cardio", "Exercises.Sets"}
 }
 
 type LoggedExercise struct {

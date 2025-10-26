@@ -13,7 +13,6 @@ func GetToday(database *gorm.DB) (models.WorkoutLog, error) {
 
 	var workoutDay models.WorkoutLog
 	err := database.
-		Preload("WorkoutPlan.Exercises.Sets").
 		Preload("Cardio").
 		Preload("Exercises.Sets").
 		Where("date = ?", today).
@@ -29,7 +28,6 @@ func GetAll(database *gorm.DB) ([]models.WorkoutLog, error) {
     var workoutDay []models.WorkoutLog
 
     err := database.
-        Preload("WorkoutPlan.Exercises.Sets").
         Preload("Cardio").
         Preload("Exercises.Sets").
         Find(&workoutDay).Error
@@ -44,8 +42,6 @@ func GetPrevious(db *gorm.DB, day string) (models.WorkoutLog, error) {
     var workoutDay models.WorkoutLog
 
     err := db.
-        Joins("WorkoutPlan").
-        Preload("WorkoutPlan.Exercises.Sets").
         Preload("Cardio").
         Preload("Exercises.Sets").
         Where("WorkoutPlan.name = ?", day).
