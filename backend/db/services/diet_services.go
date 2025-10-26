@@ -45,18 +45,20 @@ func MealPlanDayByID(db *gorm.DB, id int) (*models.Day, error) {
     return &day, nil
 }
 
-func CalculateTotals(db *gorm.DB, dayID uint) (float32, float32, float32) {
+func CalculateTotals(db *gorm.DB, dayID uint) (float32, float32, float32, float32) {
     var totals struct {
         TotalCalories float32 `json:"total_calories"`
         TotalProtein  float32 `json:"total_protein"`
         TotalFiber    float32 `json:"total_fiber"`
+        TotalCarbs    float32 `json:"total_carbs"`
     }
 
     db.Raw(`
         SELECT
             SUM(f.calories * mi.amount) AS total_calories,
             SUM(f.protein  * mi.amount) AS total_protein,
-            SUM(f.fiber    * mi.amount) AS total_fiber
+            SUM(f.fiber    * mi.amount) AS total_fiber,
+            SUM(f.carbs    * mi.amount) AS total_carbs
         FROM day_logs dl
         JOIN meals m       ON dl.meal_id = m.id
         JOIN meal_items mi ON mi.meal_id = m.id
@@ -65,7 +67,7 @@ func CalculateTotals(db *gorm.DB, dayID uint) (float32, float32, float32) {
         AND dl.deleted_at IS NULL
     `, dayID).Scan(&totals)
     
-    return totals.TotalCalories, totals.TotalProtein, totals.TotalFiber
+    return totals.TotalCalories, totals.TotalProtein, totals.TotalFiber, totals.TotalCarbs
 }
 
 func AllMealDays(db *gorm.DB) ([]models.Day, error) {

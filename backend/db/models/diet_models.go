@@ -53,18 +53,18 @@ func (m *MealPlanModel) MigrateDatabase() {
 func (m *MealPlanModel) seedDatabase(db *gorm.DB) error {
 	fmt.Println("Seeding meal plan database")
 
-	egg := Food{Name: "Egg", Calories: 140, Protein: 12, Fiber: 0}
-	sausage    := Food{Name: "Maple Breakfast Sausage", Calories: 140, Protein: 12, Fiber: 0}
-	keto_bread  := Food{Name: "Keto Bread", Calories: 140, Protein: 12, Fiber: 15}
-	blueberries := Food{Name: "Blueberries", Unit: "g", Calories: 20, Protein: 0.3, Fiber: 0.9}
-	kiwi := Food{Name: "Kiwi", Calories: 40, Protein: 0.8, Fiber: 2}
+	egg := Food{Name: "Egg", Calories: 140, Protein: 12, Fiber: 0, Carbs: 0}
+	sausage    := Food{Name: "Maple Breakfast Sausage", Calories: 140, Protein: 12, Fiber: 0, Carbs: 0}
+	keto_bread  := Food{Name: "Keto Bread", Calories: 140, Protein: 12, Fiber: 15, Carbs: 0}
+	blueberries := Food{Name: "Blueberries", Unit: "g", Calories: 20, Protein: 0.3, Fiber: 0.9, Carbs: 0}
+	kiwi := Food{Name: "Kiwi", Calories: 40, Protein: 0.8, Fiber: 2, Carbs: 0}
 
 	foods := []*Food{&egg, &sausage, &keto_bread, &blueberries, &kiwi}
 	db.Create(&foods)
 
-	beef := Food{Name: "Beef", Unit: "g", Calories: 200, Protein: 24, Fiber: 0} 
-	rice    := Food{Name: "Rice", Unit: "g", Calories: 80, Protein: 0, Fiber: 0}
-	vegetables  := Food{Name: "Vegetables", Unit: "g", Calories: 50, Protein: 1, Fiber: 2}
+	beef := Food{Name: "Beef", Unit: "g", Calories: 200, Protein: 24, Fiber: 0, Carbs: 0} 
+	rice    := Food{Name: "Rice", Unit: "g", Calories: 80, Protein: 0, Fiber: 0, Carbs: 0}
+	vegetables  := Food{Name: "Vegetables", Unit: "g", Calories: 50, Protein: 1, Fiber: 2, Carbs: 0}
 
 	db.Create(&beef)
 	db.Create(&rice)
@@ -119,12 +119,14 @@ func (m *MealPlanModel) seedDatabase(db *gorm.DB) error {
 				Calories: 1400,
 				Protein:  150,
 				Fiber:    30,
+				Carbs:    150,
 			}
 	db.Create(&cut)
 	bulk := Plan{Name: "Bulk",
 				Calories: 2400,
 				Protein:  150,
 				Fiber:    50,
+				Carbs:    150,
 			}
 	db.Create(&bulk)
 
@@ -178,6 +180,7 @@ type Plan struct {
 	Calories float32 `json:"calories"`
     Protein  float32 `json:"protein"`
     Fiber    float32 `json:"fiber"`
+	Carbs    float32 `json:"carbs"`
 }
 
 type PlannedMeal struct {
@@ -235,4 +238,5 @@ type Food struct {
     Calories float32 `json:"calories" gorm:"not null"`
     Protein  float32 `json:"protein"`
     Fiber    float32 `json:"fiber"`
+	Carbs    float32 `json:"carbs"`
 }

@@ -16,6 +16,7 @@ export interface Plan extends BaseModel {
     calories: number;
     protein: number;
     fiber: number;
+    carbs: number;
 }
 
 export interface PlannedMeal extends BaseModel {
@@ -48,6 +49,7 @@ export interface Food extends BaseModel {
     calories: number;
     protein: number;
     fiber: number;
+    carbs: number;
 }
 
 export interface SavedMeal extends BaseModel {

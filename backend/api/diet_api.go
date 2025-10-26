@@ -57,13 +57,14 @@ func (f *MealPlanFeature) getMealPlanToday(c *gin.Context) {
         return
     }
     
-    totalCalories, totalProtein, totalFiber := services.CalculateTotals(f.db, day.ID)
+    totalCalories, totalProtein, totalFiber, totalCarbs := services.CalculateTotals(f.db, day.ID)
 
     c.JSON(http.StatusOK, gin.H{
 		"day": day,
         "totalCalories": totalCalories,
         "totalProtein": totalProtein,
         "totalFiber": totalFiber,
+        "totalCarbs": totalCarbs,
 		"today": time.Now(),
 	})
 }
@@ -337,13 +338,14 @@ func (f *MealPlanFeature) postLogMeal(c *gin.Context, mealID uint, setLogged boo
         return
     }
     
-    totalCalories, totalProtein, totalFiber := services.CalculateTotals(f.db, day.ID)
+    totalCalories, totalProtein, totalFiber, totalCarbs := services.CalculateTotals(f.db, day.ID)
 
     c.JSON(http.StatusOK, gin.H{
         "day": day,
         "totalCalories": totalCalories,
         "totalProtein": totalProtein,
         "totalFiber": totalFiber,
+        "totalCarbs": totalCarbs,
     })
 }
 
@@ -377,13 +379,14 @@ func (f *MealPlanFeature) deleteLoggedMeal(c *gin.Context) {
         return
     }
     
-    totalCalories, totalProtein, totalFiber := services.CalculateTotals(f.db, day.ID)
+    totalCalories, totalProtein, totalFiber, totalCarbs := services.CalculateTotals(f.db, day.ID)
 
     c.JSON(http.StatusOK, gin.H{
         "day": day,
         "totalCalories": totalCalories,
         "totalProtein": totalProtein,
         "totalFiber": totalFiber,
+        "totalCarbs": totalCarbs,
     })
 }
 
@@ -438,12 +441,13 @@ func (f *MealPlanFeature) postEditLogged(c *gin.Context) {
         return
     }
     
-    totalCalories, totalProtein, totalFiber := services.CalculateTotals(f.db, day.ID)
+    totalCalories, totalProtein, totalFiber, totalCarbs := services.CalculateTotals(f.db, day.ID)
 
     c.JSON(http.StatusOK, gin.H{
         "day": day,
         "totalCalories": totalCalories,
         "totalProtein": totalProtein,
         "totalFiber": totalFiber,
+        "totalCarbs": totalCarbs,
     })
 }
