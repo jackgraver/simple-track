@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import type { WorkoutLog } from "~/types/workout";
+import type { LoggedExercise, WorkoutLog } from "~/types/workout";
 
 const { data, pending, error } = useAPIGet<{
     day: WorkoutLog;
+    exercises: LoggedExercise[];
 }>(`workout/previous`);
 
 const day = data.value?.day;
@@ -19,7 +20,7 @@ const day = data.value?.day;
         <div class="workout-grid">
             <article
                 class="workout-card"
-                v-for="exercise in day?.exercises"
+                v-for="exercise in data?.exercises"
                 :key="exercise.ID"
             >
                 <header class="card-header">

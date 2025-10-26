@@ -2,7 +2,6 @@ package models
 
 import (
 	"fmt"
-	"math/rand"
 	"time"
 
 	"gorm.io/gorm"
@@ -20,8 +19,6 @@ func (m *WorkoutModel) MigrateDatabase() {
 	fmt.Println("Migrating workout database")
     if err := m.db.Migrator().DropTable(
         &WorkoutPlan{},
-        &PlannedExercise{},
-        &PlannedSet{},
         &WorkoutLog{},
         &LoggedExercise{},
         &LoggedSet{},
@@ -32,8 +29,6 @@ func (m *WorkoutModel) MigrateDatabase() {
 
     if err := m.db.AutoMigrate(
         &WorkoutPlan{},
-        &PlannedExercise{},
-        &PlannedSet{},
         &WorkoutLog{},
         &LoggedExercise{},
         &LoggedSet{},
@@ -50,321 +45,432 @@ func (m *WorkoutModel) MigrateDatabase() {
 func (m *WorkoutModel) seedDatabase() error {
 	fmt.Println("Seeding workout database")
 
-	push := WorkoutPlan{
+	inclinePress := Exercise{Name: "Incline Press", RepRollover: 0}
+	chestFly := Exercise{Name: "Chest Fly", RepRollover: 0}
+	dips := Exercise{Name: "Dips", RepRollover: 0}
+	latRaise := Exercise{Name: "Lat Raise", RepRollover: 0}
+	shoulderPress := Exercise{Name: "Shoulder Press", RepRollover: 0}
+	squat := Exercise{Name: "Squat", RepRollover: 0}
+	deadlift := Exercise{Name: "Deadlift", RepRollover: 0}
+	benchPress := Exercise{Name: "Bench Press", RepRollover: 0}
+	cableRows := Exercise{Name: "Cable Rows", RepRollover: 0}
+	barbellRows := Exercise{Name: "Barbell Rows", RepRollover: 0}
+	facePulls := Exercise{Name: "Face Pulls", RepRollover: 0}
+	pulldowns := Exercise{Name: "Pulldowns", RepRollover: 0}
+	JMPress := Exercise{Name: "JM Press", RepRollover: 0}
+	extensions := Exercise{Name: "Extensions", RepRollover: 0}
+	inclineCurls := Exercise{Name: "Incline Curls", RepRollover: 0}
+	hammerCurls := Exercise{Name: "Hammer Curls", RepRollover: 0}
+	calfRaise := Exercise{Name: "Calf Raises", RepRollover: 0}
+	abCrunches := Exercise{Name: "Ab Crunches", RepRollover: 0}
+	legPress := Exercise{Name: "Leg Press", RepRollover: 0}
+	legExtensions := Exercise{Name: "Leg Extensions", RepRollover: 0}
+	hamstringCurls := Exercise{Name: "Hamstring Curls", RepRollover: 0}
+	hipPress := Exercise{Name: "Hip Press", RepRollover: 0}
+	hipExtensions := Exercise{Name: "Hip Extensions", RepRollover: 0}
+	outerThigh := Exercise{Name: "Outer Thigh", RepRollover: 0}
+	innerThigh := Exercise{Name: "Inner Thigh", RepRollover: 0}
+
+	exercises := []*Exercise{
+		&inclinePress,
+		&chestFly,
+		&dips,
+		&latRaise,
+		&shoulderPress,
+		&squat,
+		&deadlift,
+		&benchPress,
+		&cableRows,
+		&barbellRows,
+		&facePulls,
+		&pulldowns,
+		&JMPress,
+		&extensions,
+		&inclineCurls,
+		&hammerCurls,
+		&calfRaise,
+		&abCrunches,
+		&legPress,
+		&legExtensions,
+		&hamstringCurls,
+		&hipPress,
+		&hipExtensions,
+		&outerThigh,
+		&innerThigh,
+	}
+
+	for _, exercise := range exercises {
+		m.db.Create(exercise)
+	}
+
+	push_plan := WorkoutPlan{
 		Name: "Push",
-		Exercises: []PlannedExercise{
-			{
-				Name: "Incline Press",
-				Sets: []PlannedSet{
-				},
-			},
-			{
-				Name: "Chest Fly",
-				Sets: []PlannedSet{
-				},
-			},
-			{
-				Name: "Dips",
-				Sets: []PlannedSet{
-				},
-			},
-			{
-				Name: "Lat Raise",
-				Sets: []PlannedSet{
-				},
-			},
-			{
-				Name: "Shoulder Press",
-				Sets: []PlannedSet{
-				},
-			},
-			{
-				Name: "JM Press",
-				Sets: []PlannedSet{
-				},
-			},
-			{
-				Name: "Extensions",
-				Sets: []PlannedSet{
-				},
-			},
-		},
 	}
-	pull := WorkoutPlan{
+	pull_plan := WorkoutPlan{
 		Name: "Pull",
-		Exercises: []PlannedExercise{
-			{
-				Name: "Barbell Rows",
-				Sets: []PlannedSet{
-				},
-			},	
-			{
-				Name: "Face Pulls",
-				Sets: []PlannedSet{
-				},
-			},
-			{
-				Name: "Pulldowns",
-				Sets: []PlannedSet{
-				},
-			},		
-			{
-				Name: "Incline Curls",
-				Sets: []PlannedSet{
-				},
-			},			
-			{
-				Name: "Hammer Curls",
-				Sets: []PlannedSet{
-				},
-			},
-		},
 	}
-	legs := WorkoutPlan{
+	legs_plan := WorkoutPlan{
 		Name: "Legs",
-		Exercises: []PlannedExercise{
+	}
+	upper_plan := WorkoutPlan{
+		Name: "Upper",
+	}
+	lower_plan := WorkoutPlan{
+		Name: "Lower",
+	}
+	active_rest_plan := WorkoutPlan{
+		Name: "Active Rest",
+	}
+	rest_plan := WorkoutPlan{
+		Name: "Rest",
+	}
+	
+	m.db.Create(&push_plan)
+	m.db.Create(&pull_plan)
+	m.db.Create(&legs_plan)
+	m.db.Create(&upper_plan)
+	m.db.Create(&lower_plan)
+	m.db.Create(&active_rest_plan)
+	m.db.Create(&rest_plan)
+
+	now := time.Now()
+
+	push_log := WorkoutLog{
+		Date: time.Date(2025, time.October, 21, 0, 0, 0, 0, now.Location()),
+		WorkoutPlan: &push_plan,
+		Exercises: []LoggedExercise{
 			{
-				Name: "Outer Thigh",
-				Sets: []PlannedSet{
+				Exercise: &inclinePress,
+				Sets: []LoggedSet{
+					{Reps: 9, Weight: 40},
+					{Reps: 8, Weight: 40},
 				},
 			},
 			{
-				Name: "Inner Thigh",
-				Sets: []PlannedSet{
+				Exercise: &chestFly,
+				Sets: []LoggedSet{
+					{Reps: 9, Weight: 75},
+					{Reps: 8, Weight: 75},
 				},
 			},
 			{
-				Name: "Leg Extensions",
-				Sets: []PlannedSet{
+				Exercise: &dips,
+				Sets: []LoggedSet{
+					{Reps: 8, Weight: -110},
 				},
 			},
 			{
-				Name: "Hamstring Cruls",
-				Sets: []PlannedSet{
+				Exercise: &latRaise,
+				Sets: []LoggedSet{
+					{Reps: 15, Weight: 10},
+					{Reps: 14, Weight: 10},
 				},
 			},
 			{
-				Name: "Squat",
-				Sets: []PlannedSet{
+				Exercise: &shoulderPress,
+				Sets: []LoggedSet{
+					{Reps: 8, Weight: 75},
+					{Reps: 7, Weight: 75},
 				},
 			},
 			{
-				Name: "Deadlift",
-				Sets: []PlannedSet{
+				Exercise: &JMPress,
+				Sets: []LoggedSet{
+					{Reps: 7, Weight: 105},
+					{Reps: 6, Weight: 105},
 				},
 			},
 			{
-				Name: "Calf Raises",
-				Sets: []PlannedSet{
-				},
-			},
-			{
-				Name: "Ab Crunches",
-				Sets: []PlannedSet{
+				Exercise: &extensions,
+				Sets: []LoggedSet{
+					{Reps: 6, Weight: 40},
+					{Reps: 6, Weight: 40},
 				},
 			},
 		},
 	}
-
-	upper := WorkoutPlan{
-		Name: "Upper",
-		Exercises: []PlannedExercise{
+	pull_log := WorkoutLog{
+		Date: time.Date(2025, time.October, 22, 0, 0, 0, 0, now.Location()),
+		WorkoutPlan: &pull_plan,
+		Exercises: []LoggedExercise{
 			{
-				Name: "Incline Press",
-				Sets: []PlannedSet{
-				},
-			},
-			{
-				Name: "Chest Fly",
-				Sets: []PlannedSet{
-				},
-			},
-			{
-				Name: "Dips",
-				Sets: []PlannedSet{
-				},
-			},
-			{
-				Name: "Lat Raise",
-				Sets: []PlannedSet{
-				},
-			},
-			{
-				Name: "Shoulder Press",
-				Sets: []PlannedSet{
-				},
-			},
-						{
-				Name: "Barbell Rows",
-				Sets: []PlannedSet{
+				Exercise: &barbellRows,
+				Sets: []LoggedSet{
+					{Reps: 7, Weight: 95},
+					{Reps: 6, Weight: 95},
 				},
 			},	
 			{
-				Name: "Face Pulls",
-				Sets: []PlannedSet{
+				Exercise: &facePulls,
+				Sets: []LoggedSet{
+					{Reps: 10, Weight: 40},
+					{Reps: 10, Weight: 40},
 				},
 			},
 			{
-				Name: "Pulldowns",
-				Sets: []PlannedSet{
-				},
-			},
-			{
-				Name: "JM Press",
-				Sets: []PlannedSet{
-				},
-			},
-			{
-				Name: "Extensions",
-				Sets: []PlannedSet{
+				Exercise: &pulldowns,
+				Sets: []LoggedSet{
+					{Reps: 6, Weight: 100},
+					{Reps: 6, Weight: 100},
 				},
 			},		
 			{
-				Name: "Incline Curls",
-				Sets: []PlannedSet{
+				Exercise: &cableRows,
+				Sets: []LoggedSet{
+					{Reps: 9, Weight: 60},
+					{Reps: 9, Weight: 60},
+				},
+			},	
+			{
+				Exercise: &inclineCurls,
+				Sets: []LoggedSet{
+					{Reps: 6, Weight: 20},
+					{Reps: 6, Weight: 20},
 				},
 			},			
 			{
-				Name: "Hammer Curls",
-				Sets: []PlannedSet{
+				Exercise: &hammerCurls,
+				Sets: []LoggedSet{
+					{Reps: 6, Weight: 22.5},
+					{Reps: 6, Weight: 22.5},
 				},
 			},
 		},
 	}
-
-	lower := WorkoutPlan{
-		Name: "Lower",
-		Exercises: []PlannedExercise{
+	legs_log := WorkoutLog{
+		Date: time.Date(2025, time.October, 23, 0, 0, 0, 0, now.Location()),
+		WorkoutPlan: &legs_plan,
+		Exercises: []LoggedExercise{
 			{
-				Name: "Outer Thigh",
-				Sets: []PlannedSet{
+				Exercise: &outerThigh,
+				Sets: []LoggedSet{
+					{Reps: 11, Weight: 80},
 				},
 			},
 			{
-				Name: "Inner Thigh",
-				Sets: []PlannedSet{
+				Exercise: &innerThigh,
+				Sets: []LoggedSet{
+					{Reps: 12, Weight: 70},
 				},
 			},
 			{
-				Name: "Leg Extensions",
-				Sets: []PlannedSet{
+				Exercise: &legExtensions,
+				Sets: []LoggedSet{
+					{Reps: 7, Weight: 80},
+					{Reps: 7, Weight: 80},
+					{Reps: 7, Weight: 80},
 				},
 			},
 			{
-				Name: "Hamstring Cruls",
-				Sets: []PlannedSet{
+				Exercise: &hamstringCurls,
+				Sets: []LoggedSet{
+					{Reps: 7, Weight: 75},
+					{Reps: 7, Weight: 75},
 				},
 			},
 			{
-				Name: "Squat",
-				Sets: []PlannedSet{
+				Exercise: &squat,
+				Sets: []LoggedSet{
+					{Reps: 7, Weight: 115},
+					{Reps: 8, Weight: 115},
 				},
 			},
 			{
-				Name: "Deadlift",
-				Sets: []PlannedSet{
+				Exercise: &deadlift,
+				Sets: []LoggedSet{
+					{Reps: 7, Weight: 115},
+					{Reps: 6, Weight: 115},
 				},
 			},
 			{
-				Name: "Hip Hinge",
-				Sets: []PlannedSet{
+				Exercise: &calfRaise,
+				Sets: []LoggedSet{
+					{Reps: 13, Weight: 90},
+					{Reps: 13, Weight: 90},
 				},
 			},
 			{
-				Name: "Leg Press",
-				Sets: []PlannedSet{
-				},
-			},
-			{
-				Name: "Calf Raises",
-				Sets: []PlannedSet{
-				},
-			},
-			{
-				Name: "Ab Crunches",
-				Sets: []PlannedSet{
-				},
-			},
-		},
-	}
-
-	active_rest := WorkoutPlan{
-		Name: "Active Rest",
-		Exercises: []PlannedExercise{
-			{
-				Name: "Abs",
-				Sets: []PlannedSet{
+				Exercise: &abCrunches,
+				Sets: []LoggedSet{
+					{Reps: 8, Weight: 110},
+					{Reps: 8, Weight: 110},
 				},
 			},
 		},
 	}
-
-	rest := WorkoutPlan{
-		Name: "Rest",
-		Exercises: []PlannedExercise{},
+	upper_log := WorkoutLog{
+		Date: time.Date(2025, time.October, 25, 0, 0, 0, 0, now.Location()),
+		WorkoutPlan: &upper_plan,
+		Exercises: []LoggedExercise{
+			{
+				Exercise: &inclinePress,
+				Sets: []LoggedSet{
+					{Reps: 5, Weight: 45},
+					{Reps: 5, Weight: 45},
+				},
+			},
+			{
+				Exercise: &chestFly,
+				Sets: []LoggedSet{
+					{Reps: 7, Weight: 80},
+					{Reps: 7, Weight: 80},
+				},
+			},
+			{
+				Exercise: &dips,
+				Sets: []LoggedSet{
+					{Reps: 9, Weight: -100},
+				},
+			},
+			{
+				Exercise: &latRaise,
+				Sets: []LoggedSet{
+					{Reps: 16, Weight: 10},
+					{Reps: 14, Weight: 10},
+				},
+			},
+			{
+				Exercise: &shoulderPress,
+				Sets: []LoggedSet{
+					{Reps: 7, Weight: 80},
+					{Reps: 6, Weight: 80},
+				},
+			},
+			{
+				Exercise: &barbellRows,
+				Sets: []LoggedSet{
+					{Reps: 7, Weight: 95},
+					{Reps: 7, Weight: 95},
+				},
+			},	
+			{
+				Exercise: &facePulls,
+				Sets: []LoggedSet{
+					{Reps: 8, Weight: 40},
+					{Reps: 8, Weight: 40},
+				},
+			},
+			{
+				Exercise: &pulldowns,
+				Sets: []LoggedSet{
+					{Reps: 6, Weight: 100},
+					{Reps: 6, Weight: 100},
+				},
+			},
+			{
+				Exercise: &JMPress,
+				Sets: []LoggedSet{
+					{Reps: 7, Weight: 105},
+					{Reps: 7, Weight: 105},
+				},
+			},
+			{
+				Exercise: &extensions,
+				Sets: []LoggedSet{
+					{Reps: 7, Weight: 80},
+					{Reps: 6, Weight: 80},
+				},
+			},		
+			{
+				Exercise: &inclineCurls,
+				Sets: []LoggedSet{
+					{Reps: 9, Weight: 20},
+					{Reps: 7, Weight: 20},
+				},
+			},			
+			{
+				Exercise: hammerCurls,
+				Sets: []LoggedSet{
+					{Reps: 5, Weight: 22.5},
+					{Reps: 6, Weight: 22.5},
+				},
+			},
+		},
+	}
+	lower_log := WorkoutLog{
+		Date: time.Date(2025, time.October, 26, 0, 0, 0, 0, now.Location()),
+		WorkoutPlan: &lower_plan,
+		Exercises: []LoggedExercise{
+			{
+				Exercise: &outerThigh,
+				Sets: []LoggedSet{
+				},
+			},
+			{
+				Exercise: &innerThigh,
+				Sets: []LoggedSet{
+				},
+			},
+			{
+				Exercise: &legExtensions,
+				Sets: []LoggedSet{
+				},
+			},
+			{
+				Exercise: &hamstringCurls,
+				Sets: []LoggedSet{
+				},
+			},
+			{
+				Exercise: &squat,
+				Sets: []LoggedSet{
+				},
+			},
+			{
+				Exercise: &deadlift,
+				Sets: []LoggedSet{
+				},
+			},
+			{
+				Exercise: &hipExtensions,
+				Sets: []LoggedSet{
+				},
+			},
+			{
+				Exercise: &legPress,
+				Sets: []LoggedSet{
+				},
+			},
+			{
+				Exercise: &calfRaise,
+				Sets: []LoggedSet{
+				},
+			},
+			{
+				Exercise: &abCrunches,
+				Sets: []LoggedSet{
+				},
+			},
+		},
+	}
+	active_rest_log := WorkoutLog{
+		Date: time.Date(2025, time.October, 20, 0, 0, 0, 0, now.Location()),
+		WorkoutPlan: &active_rest_plan,
+		Exercises: []LoggedExercise{
+		},
+	}
+	rest_log := WorkoutLog{
+		Date: time.Date(2025, time.October, 24, 0, 0, 0, 0, now.Location()),
+		WorkoutPlan: &rest_plan,
+		Exercises: []LoggedExercise{},
 	}
 
-	m.db.Create(&push)
-	m.db.Create(&pull)
-	m.db.Create(&legs)
-	m.db.Create(&upper)
-	m.db.Create(&lower)
-	m.db.Create(&active_rest)
-	m.db.Create(&rest)
+	m.db.Create(&push_log)
+	m.db.Create(&pull_log)
+	m.db.Create(&legs_log)
+	m.db.Create(&upper_log)
+	m.db.Create(&lower_log)
+	m.db.Create(&active_rest_log)
+	m.db.Create(&rest_log)
 
 	year := 2025
-	now := time.Now()
 	start := time.Date(year, time.September, 1, 0, 0, 0, 0, now.Location())
 	end := time.Date(year, time.December, 31, 0, 0, 0, 0, now.Location())
 
-	// Map weekday → workout plan
-	weekdayPlans := map[time.Weekday]WorkoutPlan{
-		time.Sunday:    lower,
-		time.Monday:    rest,
-		time.Tuesday:   push,
-		time.Wednesday: pull,
-		time.Thursday:  legs,
-		time.Friday:    active_rest,
-		time.Saturday:  upper,	
-	}
-
 	for date := start; !date.After(end); date = date.AddDate(0, 0, 1) {
-		plan := weekdayPlans[date.Weekday()]
-
-		var loggedExercises []LoggedExercise
-		for _, pe := range plan.Exercises {
-			var loggedSets []LoggedSet
-			for _, ps := range pe.Sets {
-				loggedSets = append(loggedSets, LoggedSet{
-					Reps:   ps.Reps + (rand.Intn(3) - 1),
-					Weight: ps.Weight + float32((rand.Intn(3)-1)*5),
-				})
-			}
-			loggedExercises = append(loggedExercises, LoggedExercise{
-				Name: pe.Name,
-				Sets: loggedSets,
-			})
-		}
-
-		// Add treadmill on leg days
-		if plan.Name == "Leg Day" {
-			loggedExercises = append(loggedExercises, LoggedExercise{
-				Name: "Treadmill",
-			})
-		}
-
-		cardio := Cardio{
-			Minutes: 20 + rand.Intn(15),
-			Type:    "Running",
-		}
-
 		wl := WorkoutLog{
-			WorkoutPlanID: &plan.ID,
-			Date:          date,
-			Cardio:        &cardio,
-			Exercises:     loggedExercises,
+			Date: date,
 		}
-
 		m.db.Create(&wl)
 	}
 	return nil;
@@ -377,28 +483,13 @@ func (m *WorkoutModel) Preloads() []string {
 type WorkoutPlan struct {
     gorm.Model
     Name      string            `json:"name"`
-    Exercises []PlannedExercise `json:"exercises" gorm:"constraint:OnDelete:CASCADE;"`
-}
-
-type PlannedExercise struct {
-    gorm.Model
-    WorkoutPlanID uint           `json:"workout_plan_id"`
-    Name          string         `json:"name"`
-    Sets          []PlannedSet   `json:"sets" gorm:"constraint:OnDelete:CASCADE;"`
-}
-
-type PlannedSet struct {
-    gorm.Model
-    PlannedExerciseID uint   `json:"planned_exercise_id"`
-    Reps              int    `json:"reps"`
-    Weight            float32 `json:"weight"`
 }
 
 type WorkoutLog struct {
     gorm.Model
     Date          time.Time    `json:"date"`
     WorkoutPlanID *uint        `json:"workout_plan_id"`
-    WorkoutPlan   *WorkoutPlan `json:"workout_plan"` //TODO deprecate plan other than unique name? no exercise tracking because we can just look at previous weeks
+    WorkoutPlan   *WorkoutPlan `json:"workout_plan"`
     Exercises []LoggedExercise `json:"exercises" gorm:"constraint:OnDelete:CASCADE;"`
     Cardio    *Cardio          `json:"cardio" gorm:"constraint:OnDelete:CASCADE;"`
 }
@@ -410,7 +501,8 @@ func (w *WorkoutLog) Preloads() []string {
 type LoggedExercise struct {
     gorm.Model
     WorkoutLogID uint         `json:"workout_log_id"`
-    Name         string       `json:"name"`
+    ExerciseID   uint         `json:"exercise_id"`
+	Exercise     *Exercise    `json:"exercise"`
     Sets         []LoggedSet  `json:"sets" gorm:"constraint:OnDelete:CASCADE;"`
 }
 
@@ -421,10 +513,15 @@ type LoggedSet struct {
     Weight           float32 `json:"weight"`
 }
 
+type Exercise struct {
+	gorm.Model
+	Name string `json:"name"`
+	RepRollover uint `json:"rep_rollover"`
+}
+
 type Cardio struct {
     gorm.Model
     WorkoutLogID uint   `json:"workout_log_id" gorm:"uniqueIndex;not null"`
     Minutes      int    `json:"minutes"`
     Type         string `json:"type"`
 }
-

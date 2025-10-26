@@ -17,8 +17,8 @@ type WorkoutFeature struct {
 
 func NewWorkoutFeature(db *gorm.DB) *WorkoutFeature {
     models.NewWorkoutModel(db)
-    // var feature = models.NewWorkoutModel(db)
-    // feature.MigrateDatabase()
+    var feature = models.NewWorkoutModel(db)
+    feature.MigrateDatabase()
 
 	return &WorkoutFeature{
 		BaseFeature[models.WorkoutModel]{
@@ -95,7 +95,7 @@ func (f *WorkoutFeature) getPreviousWorkout(c *gin.Context) {
 
     previousExerciseLogs := make([]models.LoggedExercise, 0)
     for _, exercise := range today.Exercises {
-        exerciseLog, err := services.GetPreviousExerciseLog(f.db, today.Date, exercise.Name)
+        exerciseLog, err := services.GetPreviousExerciseLog(f.db, today.Date, exercise.Exercise.Name)
         if err != nil {
             c.JSON(http.StatusNotImplemented, gin.H{"error": err.Error()})
             return
