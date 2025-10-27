@@ -21,6 +21,7 @@ func (m *WorkoutModel) MigrateDatabase() {
         &WorkoutPlan{},
         &WorkoutLog{},
         &LoggedExercise{},
+		&Exercise{},
         &LoggedSet{},
         &Cardio{},
     ); err != nil {
@@ -31,6 +32,7 @@ func (m *WorkoutModel) MigrateDatabase() {
         &WorkoutPlan{},
         &WorkoutLog{},
         &LoggedExercise{},
+		&Exercise{},
         &LoggedSet{},
         &Cardio{},
     ); err != nil {
@@ -45,31 +47,31 @@ func (m *WorkoutModel) MigrateDatabase() {
 func (m *WorkoutModel) seedDatabase() error {
 	fmt.Println("Seeding workout database")
 
-	inclinePress := Exercise{Name: "Incline Press", RepRollover: 0}
-	chestFly := Exercise{Name: "Chest Fly", RepRollover: 0}
-	dips := Exercise{Name: "Dips", RepRollover: 0}
-	latRaise := Exercise{Name: "Lat Raise", RepRollover: 0}
-	shoulderPress := Exercise{Name: "Shoulder Press", RepRollover: 0}
-	squat := Exercise{Name: "Squat", RepRollover: 0}
-	deadlift := Exercise{Name: "Deadlift", RepRollover: 0}
-	benchPress := Exercise{Name: "Bench Press", RepRollover: 0}
-	cableRows := Exercise{Name: "Cable Rows", RepRollover: 0}
-	barbellRows := Exercise{Name: "Barbell Rows", RepRollover: 0}
-	facePulls := Exercise{Name: "Face Pulls", RepRollover: 0}
-	pulldowns := Exercise{Name: "Pulldowns", RepRollover: 0}
-	JMPress := Exercise{Name: "JM Press", RepRollover: 0}
-	extensions := Exercise{Name: "Extensions", RepRollover: 0}
-	inclineCurls := Exercise{Name: "Incline Curls", RepRollover: 0}
-	hammerCurls := Exercise{Name: "Hammer Curls", RepRollover: 0}
-	calfRaise := Exercise{Name: "Calf Raises", RepRollover: 0}
-	abCrunches := Exercise{Name: "Ab Crunches", RepRollover: 0}
-	legPress := Exercise{Name: "Leg Press", RepRollover: 0}
-	legExtensions := Exercise{Name: "Leg Extensions", RepRollover: 0}
-	hamstringCurls := Exercise{Name: "Hamstring Curls", RepRollover: 0}
-	hipPress := Exercise{Name: "Hip Press", RepRollover: 0}
-	hipExtensions := Exercise{Name: "Hip Extensions", RepRollover: 0}
-	outerThigh := Exercise{Name: "Outer Thigh", RepRollover: 0}
-	innerThigh := Exercise{Name: "Inner Thigh", RepRollover: 0}
+	inclinePress := Exercise{Name: "Incline Press", RepRollover: 10}
+	chestFly := Exercise{Name: "Chest Fly", RepRollover: 10}
+	dips := Exercise{Name: "Dips", RepRollover: 10}
+	latRaise := Exercise{Name: "Lat Raise", RepRollover: 10}
+	shoulderPress := Exercise{Name: "Shoulder Press", RepRollover: 10}
+	squat := Exercise{Name: "Squat", RepRollover: 10}
+	deadlift := Exercise{Name: "Deadlift", RepRollover: 10}
+	benchPress := Exercise{Name: "Bench Press", RepRollover: 10}
+	cableRows := Exercise{Name: "Cable Rows", RepRollover: 10}
+	barbellRows := Exercise{Name: "Barbell Rows", RepRollover: 10}
+	facePulls := Exercise{Name: "Face Pulls", RepRollover: 10}
+	pulldowns := Exercise{Name: "Pulldowns", RepRollover: 10}
+	JMPress := Exercise{Name: "JM Press", RepRollover: 10}
+	extensions := Exercise{Name: "Extensions", RepRollover: 10}
+	inclineCurls := Exercise{Name: "Incline Curls", RepRollover: 10}
+	hammerCurls := Exercise{Name: "Hammer Curls", RepRollover: 10}
+	calfRaise := Exercise{Name: "Calf Raises", RepRollover: 10}
+	abCrunches := Exercise{Name: "Ab Crunches", RepRollover: 10}
+	legPress := Exercise{Name: "Leg Press", RepRollover: 10}
+	legExtensions := Exercise{Name: "Leg Extensions", RepRollover: 10}
+	hamstringCurls := Exercise{Name: "Hamstring Curls", RepRollover: 10}
+	hipPress := Exercise{Name: "Hip Press", RepRollover: 10}
+	hipExtensions := Exercise{Name: "Hip Extensions", RepRollover: 10}
+	outerThigh := Exercise{Name: "Outer Thigh", RepRollover: 10}
+	innerThigh := Exercise{Name: "Inner Thigh", RepRollover: 10}
 
 	exercises := []*Exercise{
 		&inclinePress,
@@ -140,48 +142,48 @@ func (m *WorkoutModel) seedDatabase() error {
 		WorkoutPlan: &push_plan,
 		Exercises: []LoggedExercise{
 			{
-				Exercise: &inclinePress,
+				ExerciseID: inclinePress.ID,
 				Sets: []LoggedSet{
 					{Reps: 9, Weight: 40},
 					{Reps: 8, Weight: 40},
 				},
 			},
 			{
-				Exercise: &chestFly,
+				ExerciseID: chestFly.ID,
 				Sets: []LoggedSet{
 					{Reps: 9, Weight: 75},
 					{Reps: 8, Weight: 75},
 				},
 			},
 			{
-				Exercise: &dips,
+				ExerciseID: dips.ID,
 				Sets: []LoggedSet{
 					{Reps: 8, Weight: -110},
 				},
 			},
 			{
-				Exercise: &latRaise,
+				ExerciseID: latRaise.ID,
 				Sets: []LoggedSet{
 					{Reps: 15, Weight: 10},
 					{Reps: 14, Weight: 10},
 				},
 			},
 			{
-				Exercise: &shoulderPress,
+				ExerciseID: shoulderPress.ID,
 				Sets: []LoggedSet{
 					{Reps: 8, Weight: 75},
 					{Reps: 7, Weight: 75},
 				},
 			},
 			{
-				Exercise: &JMPress,
+				ExerciseID: JMPress.ID,
 				Sets: []LoggedSet{
 					{Reps: 7, Weight: 105},
 					{Reps: 6, Weight: 105},
 				},
 			},
 			{
-				Exercise: &extensions,
+				ExerciseID: extensions.ID,
 				Sets: []LoggedSet{
 					{Reps: 6, Weight: 40},
 					{Reps: 6, Weight: 40},
@@ -194,42 +196,42 @@ func (m *WorkoutModel) seedDatabase() error {
 		WorkoutPlan: &pull_plan,
 		Exercises: []LoggedExercise{
 			{
-				Exercise: &barbellRows,
+				ExerciseID: barbellRows.ID,
 				Sets: []LoggedSet{
 					{Reps: 7, Weight: 95},
 					{Reps: 6, Weight: 95},
 				},
 			},	
 			{
-				Exercise: &facePulls,
+				ExerciseID: facePulls.ID,
 				Sets: []LoggedSet{
 					{Reps: 10, Weight: 40},
 					{Reps: 10, Weight: 40},
 				},
 			},
 			{
-				Exercise: &pulldowns,
+				ExerciseID: pulldowns.ID,
 				Sets: []LoggedSet{
 					{Reps: 6, Weight: 100},
 					{Reps: 6, Weight: 100},
 				},
 			},		
 			{
-				Exercise: &cableRows,
+				ExerciseID: cableRows.ID,
 				Sets: []LoggedSet{
 					{Reps: 9, Weight: 60},
 					{Reps: 9, Weight: 60},
 				},
 			},	
 			{
-				Exercise: &inclineCurls,
+				ExerciseID: inclineCurls.ID,
 				Sets: []LoggedSet{
 					{Reps: 6, Weight: 20},
 					{Reps: 6, Weight: 20},
 				},
 			},			
 			{
-				Exercise: &hammerCurls,
+				ExerciseID: hammerCurls.ID,
 				Sets: []LoggedSet{
 					{Reps: 6, Weight: 22.5},
 					{Reps: 6, Weight: 22.5},
@@ -242,19 +244,19 @@ func (m *WorkoutModel) seedDatabase() error {
 		WorkoutPlan: &legs_plan,
 		Exercises: []LoggedExercise{
 			{
-				Exercise: &outerThigh,
+				ExerciseID: outerThigh.ID,
 				Sets: []LoggedSet{
 					{Reps: 11, Weight: 80},
 				},
 			},
 			{
-				Exercise: &innerThigh,
+				ExerciseID: innerThigh.ID,
 				Sets: []LoggedSet{
 					{Reps: 12, Weight: 70},
 				},
 			},
 			{
-				Exercise: &legExtensions,
+				ExerciseID: legExtensions.ID,
 				Sets: []LoggedSet{
 					{Reps: 7, Weight: 80},
 					{Reps: 7, Weight: 80},
@@ -262,35 +264,35 @@ func (m *WorkoutModel) seedDatabase() error {
 				},
 			},
 			{
-				Exercise: &hamstringCurls,
+				ExerciseID: hamstringCurls.ID,
 				Sets: []LoggedSet{
 					{Reps: 7, Weight: 75},
 					{Reps: 7, Weight: 75},
 				},
 			},
 			{
-				Exercise: &squat,
+				ExerciseID: squat.ID,
 				Sets: []LoggedSet{
 					{Reps: 7, Weight: 115},
 					{Reps: 8, Weight: 115},
 				},
 			},
 			{
-				Exercise: &deadlift,
+				ExerciseID: deadlift.ID,
 				Sets: []LoggedSet{
 					{Reps: 7, Weight: 115},
 					{Reps: 6, Weight: 115},
 				},
 			},
 			{
-				Exercise: &calfRaise,
+				ExerciseID: calfRaise.ID,
 				Sets: []LoggedSet{
 					{Reps: 13, Weight: 90},
 					{Reps: 13, Weight: 90},
 				},
 			},
 			{
-				Exercise: &abCrunches,
+				ExerciseID: abCrunches.ID,
 				Sets: []LoggedSet{
 					{Reps: 8, Weight: 110},
 					{Reps: 8, Weight: 110},
@@ -303,83 +305,83 @@ func (m *WorkoutModel) seedDatabase() error {
 		WorkoutPlan: &upper_plan,
 		Exercises: []LoggedExercise{
 			{
-				Exercise: &inclinePress,
+				ExerciseID: inclinePress.ID,
 				Sets: []LoggedSet{
 					{Reps: 5, Weight: 45},
 					{Reps: 5, Weight: 45},
 				},
 			},
 			{
-				Exercise: &chestFly,
+				ExerciseID: chestFly.ID,
 				Sets: []LoggedSet{
 					{Reps: 7, Weight: 80},
 					{Reps: 7, Weight: 80},
 				},
 			},
 			{
-				Exercise: &dips,
+				ExerciseID: dips.ID,
 				Sets: []LoggedSet{
 					{Reps: 9, Weight: -100},
 				},
 			},
 			{
-				Exercise: &latRaise,
+				ExerciseID: latRaise.ID,
 				Sets: []LoggedSet{
 					{Reps: 16, Weight: 10},
 					{Reps: 14, Weight: 10},
 				},
 			},
 			{
-				Exercise: &shoulderPress,
+				ExerciseID: shoulderPress.ID,
 				Sets: []LoggedSet{
 					{Reps: 7, Weight: 80},
 					{Reps: 6, Weight: 80},
 				},
 			},
 			{
-				Exercise: &barbellRows,
+				ExerciseID: barbellRows.ID,
 				Sets: []LoggedSet{
 					{Reps: 7, Weight: 95},
 					{Reps: 7, Weight: 95},
 				},
 			},	
 			{
-				Exercise: &facePulls,
+				ExerciseID: facePulls.ID,
 				Sets: []LoggedSet{
 					{Reps: 8, Weight: 40},
 					{Reps: 8, Weight: 40},
 				},
 			},
 			{
-				Exercise: &pulldowns,
+				ExerciseID: pulldowns.ID,
 				Sets: []LoggedSet{
 					{Reps: 6, Weight: 100},
 					{Reps: 6, Weight: 100},
 				},
 			},
 			{
-				Exercise: &JMPress,
+				ExerciseID: JMPress.ID,
 				Sets: []LoggedSet{
 					{Reps: 7, Weight: 105},
 					{Reps: 7, Weight: 105},
 				},
 			},
 			{
-				Exercise: &extensions,
+				ExerciseID: extensions.ID,
 				Sets: []LoggedSet{
 					{Reps: 7, Weight: 80},
 					{Reps: 6, Weight: 80},
 				},
 			},		
 			{
-				Exercise: &inclineCurls,
+				ExerciseID: inclineCurls.ID,
 				Sets: []LoggedSet{
 					{Reps: 9, Weight: 20},
 					{Reps: 7, Weight: 20},
 				},
 			},			
 			{
-				Exercise: &hammerCurls,
+				ExerciseID: hammerCurls.ID,
 				Sets: []LoggedSet{
 					{Reps: 5, Weight: 22.5},
 					{Reps: 6, Weight: 22.5},
@@ -392,53 +394,73 @@ func (m *WorkoutModel) seedDatabase() error {
 		WorkoutPlan: &lower_plan,
 		Exercises: []LoggedExercise{
 			{
-				Exercise: &outerThigh,
+				ExerciseID: outerThigh.ID,
 				Sets: []LoggedSet{
+					{Reps: 7, Weight: 80},
 				},
 			},
 			{
-				Exercise: &innerThigh,
+				ExerciseID: innerThigh.ID,
 				Sets: []LoggedSet{
+					{Reps: 7, Weight: 80},
 				},
 			},
 			{
-				Exercise: &legExtensions,
+				ExerciseID: legExtensions.ID,
 				Sets: []LoggedSet{
+					{Reps: 7, Weight: 80},
+					{Reps: 7, Weight: 80},
 				},
 			},
 			{
-				Exercise: &hamstringCurls,
+				ExerciseID: hamstringCurls.ID,
 				Sets: []LoggedSet{
+					{Reps: 7, Weight: 80},
+					{Reps: 7, Weight: 80},
+					{Reps: 7, Weight: 80},
 				},
 			},
 			{
-				Exercise: &squat,
+				ExerciseID: squat.ID,
 				Sets: []LoggedSet{
+					{Reps: 7, Weight: 80},
+					{Reps: 7, Weight: 80},
+				},
+				WeightSetup: "2 35lbs",
+			},
+			{
+				ExerciseID: deadlift.ID,
+				Sets: []LoggedSet{
+					{Reps: 7, Weight: 80},
+					{Reps: 7, Weight: 80},
+				},
+				WeightSetup: "35 x 2",
+			},
+			{
+				ExerciseID: hipExtensions.ID,
+				Sets: []LoggedSet{
+					{Reps: 7, Weight: 80},
 				},
 			},
 			{
-				Exercise: &deadlift,
+				ExerciseID: legPress.ID,
 				Sets: []LoggedSet{
+					{Reps: 7, Weight: 80},
 				},
+				WeightSetup: "2x45",
 			},
 			{
-				Exercise: &hipExtensions,
+				ExerciseID: calfRaise.ID,
 				Sets: []LoggedSet{
+					{Reps: 7, Weight: 80},
 				},
+				WeightSetup: "2 45 plates",
 			},
 			{
-				Exercise: &legPress,
+				ExerciseID: abCrunches.ID,
 				Sets: []LoggedSet{
-				},
-			},
-			{
-				Exercise: &calfRaise,
-				Sets: []LoggedSet{
-				},
-			},
-			{
-				Exercise: &abCrunches,
-				Sets: []LoggedSet{
+					{Reps: 7, Weight: 80},
+					{Reps: 7, Weight: 80},
 				},
 			},
 		},
@@ -467,7 +489,24 @@ func (m *WorkoutModel) seedDatabase() error {
 	start := time.Date(year, time.September, 1, 0, 0, 0, 0, now.Location())
 	end := time.Date(year, time.December, 31, 0, 0, 0, 0, now.Location())
 
+	skip_dates := []time.Time{
+		time.Date(2025, time.October, 20, 0, 0, 0, 0, now.Location()),
+		time.Date(2025, time.October, 21, 0, 0, 0, 0, now.Location()),
+		time.Date(2025, time.October, 22, 0, 0, 0, 0, now.Location()),
+		time.Date(2025, time.October, 23, 0, 0, 0, 0, now.Location()),
+		time.Date(2025, time.October, 24, 0, 0, 0, 0, now.Location()),
+		time.Date(2025, time.October, 25, 0, 0, 0, 0, now.Location()),
+		time.Date(2025, time.October, 26, 0, 0, 0, 0, now.Location()),
+	}
+	skipMap := make(map[time.Time]struct{})
+	for _, d := range skip_dates {
+		skipMap[d] = struct{}{}
+	}
+
 	for date := start; !date.After(end); date = date.AddDate(0, 0, 1) {
+		if _, skip := skipMap[date]; skip {
+			continue
+		}
 		wl := WorkoutLog{
 			Date: date,
 		}
@@ -504,18 +543,20 @@ type LoggedExercise struct {
     ExerciseID   uint         `json:"exercise_id"`
 	Exercise     *Exercise    `json:"exercise"`
     Sets         []LoggedSet  `json:"sets" gorm:"constraint:OnDelete:CASCADE;"`
+	WeightSetup  string  	  `json:"weight_setup"`
+	PercentChange float32     `json:"percent_change" gorm:"-"`
 }
 
 type LoggedSet struct {
     gorm.Model
-    LoggedExerciseID uint   `json:"logged_exercise_id"`
-    Reps             int    `json:"reps"`
+    LoggedExerciseID uint    `json:"logged_exercise_id"`
+    Reps             uint     `json:"reps"`
     Weight           float32 `json:"weight"`
 }
 
 type Exercise struct {
 	gorm.Model
-	Name string `json:"name"`
+	Name string `gorm:"uniqueIndex;not null" json:"name"`
 	RepRollover uint `json:"rep_rollover"`
 }
 

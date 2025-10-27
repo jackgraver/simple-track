@@ -26,8 +26,16 @@ export interface LoggedSet extends BaseModel {
 
 export interface LoggedExercise extends BaseModel {
     workout_log_id: number;
-    name: string;
+    exercise_id: number;
+    exercise: Exercise;
     sets: LoggedSet[];
+    weight_setup: string;
+    percent_change?: number;
+}
+
+export interface Exercise extends BaseModel {
+    name: string;
+    rep_rollover: number;
 }
 
 export interface Cardio extends BaseModel {

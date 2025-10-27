@@ -18,20 +18,44 @@ const day = data.value?.day;
             <button>Log Workout</button>
         </div>
         <div class="workout-grid">
-            <article
-                class="workout-card"
-                v-for="exercise in data?.exercises"
-                :key="exercise.ID"
-            >
-                <header class="card-header">
-                    <h3>{{ exercise.name }}</h3>
-                    {{ exercise.sets[exercise.sets.length - 1]?.reps ?? "X" }} x
-                    {{ exercise.sets[exercise.sets.length - 1]?.weight ?? "X" }}
-                </header>
-                <span>Use 2 45 plates</span>
-                <span class="info">Up weight next session</span>
-                <span class="fact">Up 5% since last workout</span>
-            </article>
+            <template v-for="exercise in data?.exercises" :key="exercise.ID">
+                <article
+                    v-if="exercise.sets && exercise.sets.length"
+                    class="workout-card"
+                >
+                    <header class="card-header">
+                        <h3>{{ exercise.exercise?.name }}</h3>
+                        {{
+                            exercise.sets[exercise.sets.length - 1]?.weight ??
+                            "X"
+                        }}
+                        x
+                        {{
+                            exercise.sets[exercise.sets.length - 1]?.reps ?? "X"
+                        }}
+                    </header>
+                    <span v-if="exercise.weight_setup !== ''">
+                        {{ exercise.weight_setup }}
+                    </span>
+                    <span
+                        v-if="
+                            (exercise.sets[exercise.sets.length - 1]?.reps ??
+                                0) > exercise.exercise?.rep_rollover
+                        "
+                        class="info"
+                        >Up weight next session</span
+                    >
+                    <span
+                        v-if="
+                            exercise?.percent_change &&
+                            exercise.percent_change >= 5
+                        "
+                        class="fact"
+                        >Up {{ exercise.percent_change }}% since last
+                        workout</span
+                    >
+                </article>
+            </template>
         </div>
     </div>
 </template>

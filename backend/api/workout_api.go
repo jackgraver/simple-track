@@ -86,25 +86,49 @@ func (f *WorkoutFeature) getWorkoutAll(c *gin.Context) {
     c.JSON(http.StatusOK, days)
 }   
 
+func totalVolume(log models.LoggedExercise) float32 {
+	var total float32
+	for _, s := range log.Sets {
+		total += s.Weight * float32(s.Reps)
+	}
+	return total
+}
+
 func (f *WorkoutFeature) getPreviousWorkout(c *gin.Context) {
-    today, err := services.GetToday(f.db)
-    if err != nil {
-        c.JSON(http.StatusNotImplemented, gin.H{"error": err.Error()})
-        return
-    }
+	today, err := services.GetToday(f.db)
+	if err != nil {
+		c.JSON(http.StatusNotImplemented, gin.H{"error": err.Error()})
+		return
+	}
 
-    previousExerciseLogs := make([]models.LoggedExercise, 0)
-    for _, exercise := range today.Exercises {
-        if exercise.Exercise == nil {
-            continue
-        }
-        exerciseLog, err := services.GetPreviousExerciseLog(f.db, today.Date, exercise.Exercise.Name)
-        if err != nil {
-            c.JSON(http.StatusNotImplemented, gin.H{"error": err.Error()})
-            return
-        }
-        previousExerciseLogs = append(previousExerciseLogs, exerciseLog)
-    }
+	results := make([]models.LoggedExercise, 0)
 
-    c.JSON(http.StatusOK, gin.H{"exercises": previousExerciseLogs, "day": today})
+	for _, exercise := range today.Exercises {
+		if exercise.Exercise == nil {
+			continue
+		}
+
+		exerciseLog, err := services.GetPreviousExerciseLog(f.db, today.Date, exercise.Exercise.Name, 0)
+		if err != nil {
+			c.JSON(http.StatusNotImplemented, gin.H{"error": err.Error()})
+			return
+		}
+
+		prevLog, err := services.GetPreviousExerciseLog(f.db, today.Date, exercise.Exercise.Name, 1)
+		if err != nil {
+			c.JSON(http.StatusNotImplemented, gin.H{"error": err.Error()})
+			return
+		}
+
+		currentVol := totalVolume(exerciseLog)
+		prevVol := totalVolume(prevLog)
+
+		if prevVol > 0 {
+			exerciseLog.PercentChange = ((currentVol - prevVol) / prevVol) * 100
+		}
+
+		results = append(results, exerciseLog)
+	}
+
+	c.JSON(http.StatusOK, gin.H{"exercises": results, "day": today})
 }

@@ -3,7 +3,6 @@ package services
 import (
 	"be-simpletracker/db/models"
 	"be-simpletracker/utils"
-	"fmt"
 	"time"
 
 	"gorm.io/gorm"
@@ -11,11 +10,7 @@ import (
 
 // MealPlanToday returns today's meal plan day with meals and goals
 func MealPlanToday(db *gorm.DB) (models.Day, error) {
-    // now := time.Now().UTC()
-	// start := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
-	// end := start.Add(24 * time.Hour)
     today := utils.ZerodTime()
-    fmt.Println("today", today)
 
 	var days models.Day
 	if err := db.

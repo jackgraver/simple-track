@@ -15,6 +15,8 @@ func GetToday(database *gorm.DB) (models.WorkoutLog, error) {
 	err := database.
 		Preload("Cardio").
 		Preload("Exercises.Sets").
+        Preload("Exercises.Exercise").
+        Preload("WorkoutPlan").
 		Where("date = ?", today).
 		First(&workoutDay).Error
 
@@ -56,16 +58,19 @@ func GetPrevious(db *gorm.DB, day string) (models.WorkoutLog, error) {
     return workoutDay, nil
 }
 
-func GetPreviousExerciseLog(db *gorm.DB, day time.Time, exercise string) (models.LoggedExercise, error) {
+func GetPreviousExerciseLog(db *gorm.DB, day time.Time, exercise string, offset int) (models.LoggedExercise, error) {
     var exerciseLog models.LoggedExercise
 
-    err := db.Debug().
-        Preload("Sets").
+    err := db.
         Joins("JOIN workout_logs ON workout_logs.id = logged_exercises.workout_log_id").
-        Where("name = ?", exercise).
+        Joins("JOIN exercises ON exercises.id = logged_exercises.exercise_id").
+        Where("exercises.name = ?", exercise).
         Where("workout_logs.date != ?", day).
         Where("workout_logs.date < ?", day).
+        Preload("Sets").
+        Preload("Exercise").
         Order("workout_logs.date DESC").
+        Offset(offset).
         Limit(1).
         Find(&exerciseLog).Error
 
