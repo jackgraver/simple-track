@@ -3,6 +3,8 @@ package api
 import (
 	"be-simpletracker/db/models"
 	"be-simpletracker/db/services"
+	"fmt"
+	"math"
 	"net/http"
 	"strconv"
 	"time"
@@ -33,6 +35,7 @@ func (f *WorkoutFeature) SetEndpoints(router *gin.Engine) {
     group.GET("/month", f.getWorkoutMonth)
     group.GET("/all", f.getWorkoutAll)
     group.GET("/previous", f.getPreviousWorkout)
+	group.POST("/exercise/log", f.logExercise)
 }
 
 func (f *WorkoutFeature) getWorkoutToday(c *gin.Context) {
@@ -94,6 +97,8 @@ func totalVolume(log models.LoggedExercise) float32 {
 	return total
 }
 
+
+//TODO: needs a lot more work, I think we need more data before were able to do more complex stuff like this
 func (f *WorkoutFeature) getPreviousWorkout(c *gin.Context) {
 	today, err := services.GetToday(f.db)
 	if err != nil {
@@ -113,8 +118,9 @@ func (f *WorkoutFeature) getPreviousWorkout(c *gin.Context) {
 			c.JSON(http.StatusNotImplemented, gin.H{"error": err.Error()})
 			return
 		}
+		fmt.Println(exerciseLog.WeightSetup)
 
-		prevLog, err := services.GetPreviousExerciseLog(f.db, today.Date, exercise.Exercise.Name, 1)
+		prevLog, err := services.GetPreviousExerciseLog(f.db, today.Date, exercise.Exercise.Name, -1)
 		if err != nil {
 			c.JSON(http.StatusNotImplemented, gin.H{"error": err.Error()})
 			return
@@ -124,11 +130,44 @@ func (f *WorkoutFeature) getPreviousWorkout(c *gin.Context) {
 		prevVol := totalVolume(prevLog)
 
 		if prevVol > 0 {
-			exerciseLog.PercentChange = ((currentVol - prevVol) / prevVol) * 100
+			difference := ((currentVol - prevVol) / prevVol) * 100
+			if math.Abs(float64(difference)) >= 5 {
+				exerciseLog.PercentChange = float32(difference)
+			}
 		}
 
 		results = append(results, exerciseLog)
 	}
 
 	c.JSON(http.StatusOK, gin.H{"exercises": results, "day": today})
+}
+
+
+type LogExerciseRequest struct {
+	Exercise models.LoggedExercise `json:"exercise"`
+}
+
+func (f *WorkoutFeature) logExercise(c *gin.Context) {
+	var request LogExerciseRequest
+	if err := c.ShouldBindJSON(&request); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	today, err := services.GetToday(f.db)
+    if err != nil {
+        c.JSON(http.StatusNotImplemented, gin.H{"error": err.Error()})
+        return
+    }
+	fmt.Println(today)
+
+	request.Exercise.WorkoutLogID = today.ID
+
+	err = services.LogExercise(f.db, request.Exercise)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"exercise": request.Exercise})
 }

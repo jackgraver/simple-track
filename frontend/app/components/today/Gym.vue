@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { LoggedExercise, WorkoutLog } from "~/types/workout";
+import { Info } from "lucide-vue-next";
 
 const { data, pending, error } = useAPIGet<{
     day: WorkoutLog;
@@ -15,46 +16,11 @@ const day = data.value?.day;
     <div v-else class="container">
         <div class="title-row">
             <h2>{{ day?.workout_plan?.name }} Day</h2>
-            <button>Log Workout</button>
+            <button>Live Workout</button>
         </div>
         <div class="workout-grid">
             <template v-for="exercise in data?.exercises" :key="exercise.ID">
-                <article
-                    v-if="exercise.sets && exercise.sets.length"
-                    class="workout-card"
-                >
-                    <header class="card-header">
-                        <h3>{{ exercise.exercise?.name }}</h3>
-                        {{
-                            exercise.sets[exercise.sets.length - 1]?.weight ??
-                            "X"
-                        }}
-                        x
-                        {{
-                            exercise.sets[exercise.sets.length - 1]?.reps ?? "X"
-                        }}
-                    </header>
-                    <span v-if="exercise.weight_setup !== ''">
-                        {{ exercise.weight_setup }}
-                    </span>
-                    <span
-                        v-if="
-                            (exercise.sets[exercise.sets.length - 1]?.reps ??
-                                0) > exercise.exercise?.rep_rollover
-                        "
-                        class="info"
-                        >Up weight next session</span
-                    >
-                    <span
-                        v-if="
-                            exercise?.percent_change &&
-                            exercise.percent_change >= 5
-                        "
-                        class="fact"
-                        >Up {{ exercise.percent_change }}% since last
-                        workout</span
-                    >
-                </article>
+                <TodayGymCard :exercise="exercise" />
             </template>
         </div>
     </div>
@@ -103,89 +69,5 @@ const day = data.value?.day;
     font-size: large;
     padding: 6px 16px;
     align-self: end;
-}
-
-.workout-card {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-    padding: 0.75rem;
-    border: 1px solid #333;
-    border-radius: 0.5rem;
-    background: #1a1a1a;
-    color: #fff;
-    min-height: 120px;
-}
-
-.workout-card span {
-    font-size: small;
-}
-/*
-.workout-card h2 {
-    margin-top: 0;
-    margin-bottom: 0.5rem;
-    width: 100%;
-} */
-
-.card-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.5rem;
-}
-
-.card-header h3 {
-    margin: 0;
-    font-weight: 600;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-.workout-card .info {
-    color: rgb(206, 206, 48);
-}
-
-.workout-card .fact {
-    color: rgb(63, 197, 46);
-}
-
-.sets {
-    display: grid;
-    grid-auto-rows: min-content;
-    row-gap: 0.25rem;
-    padding: 0;
-    margin: 0;
-    list-style: none;
-}
-
-.set {
-    display: inline-grid;
-    grid-auto-flow: column;
-    column-gap: 0.25rem;
-    justify-content: start;
-    align-items: baseline;
-    color: #ddd;
-}
-
-.times {
-    opacity: 0.7;
-}
-
-.card-footer {
-    min-height: 0.5rem; /* reserved space for future indicators */
-}
-
-.badge {
-    display: inline-block;
-    font-size: 0.75rem;
-    padding: 0.1rem 0.35rem;
-    border-radius: 0.25rem;
-}
-
-.badge-inc {
-    background: rgba(0, 200, 83, 0.15);
-    color: #6ee7b7;
-    border: 1px solid rgba(0, 200, 83, 0.25);
 }
 </style>

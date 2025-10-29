@@ -181,6 +181,7 @@ func (m *WorkoutModel) seedDatabase() error {
 					{Reps: 7, Weight: 105},
 					{Reps: 6, Weight: 105},
 				},
+				WeightSetup: "2 25lbs + 2 5lbs",
 			},
 			{
 				ExerciseID: extensions.ID,
@@ -191,6 +192,61 @@ func (m *WorkoutModel) seedDatabase() error {
 			},
 		},
 	}
+	// push_log2 := WorkoutLog{
+	// 	Date: time.Date(2025, time.October, 28, 0, 0, 0, 0, now.Location()),
+	// 	WorkoutPlan: &push_plan,
+	// 	Exercises: []LoggedExercise{
+	// 		{
+	// 			ExerciseID: inclinePress.ID,
+	// 			Sets: []LoggedSet{
+	// 				{Reps: 9, Weight: 40},
+	// 				{Reps: 8, Weight: 40},
+	// 			},
+	// 		},
+	// 		{
+	// 			ExerciseID: chestFly.ID,
+	// 			Sets: []LoggedSet{
+	// 				{Reps: 9, Weight: 75},
+	// 				{Reps: 8, Weight: 75},
+	// 			},
+	// 		},
+	// 		{
+	// 			ExerciseID: dips.ID,
+	// 			Sets: []LoggedSet{
+	// 				{Reps: 8, Weight: -110},
+	// 			},
+	// 		},
+	// 		{
+	// 			ExerciseID: latRaise.ID,
+	// 			Sets: []LoggedSet{
+	// 				{Reps: 15, Weight: 10},
+	// 				{Reps: 14, Weight: 10},
+	// 			},
+	// 		},
+	// 		{
+	// 			ExerciseID: shoulderPress.ID,
+	// 			Sets: []LoggedSet{
+	// 				{Reps: 8, Weight: 75},
+	// 				{Reps: 7, Weight: 75},
+	// 			},
+	// 		},
+	// 		{
+	// 			ExerciseID: JMPress.ID,
+	// 			Sets: []LoggedSet{
+	// 				{Reps: 7, Weight: 105},
+	// 				{Reps: 6, Weight: 105},
+	// 			},
+	// 			WeightSetup: "2 25lbs + 2 5lbs",
+	// 		},
+	// 		{
+	// 			ExerciseID: extensions.ID,
+	// 			Sets: []LoggedSet{
+	// 				{Reps: 6, Weight: 40},
+	// 				{Reps: 6, Weight: 40},
+	// 			},
+	// 		},
+	// 	},
+	// }
 	pull_log := WorkoutLog{
 		Date: time.Date(2025, time.October, 22, 0, 0, 0, 0, now.Location()),
 		WorkoutPlan: &pull_plan,
@@ -478,6 +534,7 @@ func (m *WorkoutModel) seedDatabase() error {
 	}
 
 	m.db.Create(&push_log)
+	// m.db.Create(&push_log2)
 	m.db.Create(&pull_log)
 	m.db.Create(&legs_log)
 	m.db.Create(&upper_log)
