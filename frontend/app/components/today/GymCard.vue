@@ -5,24 +5,50 @@ import { dialogManager } from "~/composables/dialog/useDialog";
 import TodayLogExerciseDialog from "./LogExerciseDialog.vue";
 import { toast } from "~/composables/toast/useToast";
 
+const weightString = (log: LoggedExercise): string => {
+    if (log.sets[0]?.weight) {
+        return log.sets[0]?.weight + " lbs";
+    }
+    return "";
+};
+
 const props = defineProps<{
     exercise: LoggedExercise;
+    previous: LoggedExercise;
     planned: boolean;
 }>();
+console.log("p", props.exercise, "\n", props.previous);
 
-const actualExercise = props.exercise.exercise;
+const localExercise = ref<LoggedExercise>(props.exercise);
+const localPlanned = ref<boolean>(props.planned);
+
+const actualExercise = computed<Exercise>(() => localExercise.value.exercise);
 
 const logExercise = async () => {
+    if (localExercise.value.sets.length === 0) {
+        localExercise.value.sets = [
+            {
+                ID: 0,
+                created_at: "",
+                updated_at: "",
+                logged_exercise_id: 0,
+                reps: 0,
+                weight: 0,
+            },
+        ];
+    }
     dialogManager
-        .custom({
-            title: "Log " + actualExercise.name,
+        .custom<LoggedExercise>({
+            title: "Log " + actualExercise.value.name,
             component: TodayLogExerciseDialog,
             props: {
-                exercise: props.exercise,
+                exercise: localExercise,
             },
         })
-        .then((success) => {
-            if (success) {
+        .then((loggedExercise) => {
+            if (loggedExercise) {
+                localExercise.value = loggedExercise;
+                localPlanned.value = false;
                 toast.push("Log Exercise Successfully!", "success");
             } else {
                 toast.push("Log Exercise Failed!", "error");
@@ -35,38 +61,42 @@ const logExercise = async () => {
     <article class="workout-card">
         <header class="card-header">
             <h2>{{ actualExercise?.name }}</h2>
-            <template v-if="!planned">
-                {{
-                    props.exercise.sets[props.exercise.sets.length - 1]
-                        ?.weight ?? "X"
-                }}
-                x
-                {{
-                    props.exercise.sets[props.exercise.sets.length - 1]?.reps ??
-                    "X"
-                }}
+            <template v-if="previous">
+                <h3>{{ weightString(previous) }}</h3>
             </template>
         </header>
-        <template v-if="!planned">
-            <span v-if="props.exercise.weight_setup">
-                {{ props.exercise.weight_setup }}
+        <div class="sets">
+            <template v-if="localExercise.sets.length > 0">
+                <span v-for="set in localExercise.sets" :key="set.ID">
+                    {{ set.reps }} x {{ set.weight }}
+                </span>
+            </template>
+            <template v-else>
+                <span v-for="set in previous.sets" :key="set.ID">
+                    {{ set.reps }} x {{ set.weight }}
+                </span>
+            </template>
+        </div>
+        <template v-if="!localPlanned">
+            <span v-if="localExercise.weight_setup">
+                {{ localExercise.weight_setup }}
             </span>
             <span
                 v-if="
-                    (props.exercise.sets[props.exercise.sets.length - 1]
-                        ?.reps ?? 0) > props.exercise.exercise?.rep_rollover
+                    (localExercise.sets[localExercise.sets.length - 1]?.reps ??
+                        0) > localExercise.exercise?.rep_rollover
                 "
                 class="info"
             >
                 Up weight next session
             </span>
-            <span v-if="props.exercise.percent_change" class="fact">
-                {{ props.exercise.percent_change < 0 ? "Down" : "Up" }}
-                {{ props.exercise.percent_change.toFixed(2) }}% since last
+            <span v-if="localExercise.percent_change" class="fact">
+                {{ localExercise.percent_change < 0 ? "Down" : "Up" }}
+                {{ localExercise.percent_change.toFixed(2) }}% since last
                 workout
             </span>
         </template>
-        <footer v-if="planned">
+        <footer v-if="localPlanned">
             <button @click="logExercise" class="check">
                 <Check />
             </button>
@@ -106,6 +136,17 @@ const logExercise = async () => {
     display: flex;
     justify-content: flex-end;
     margin-top: auto; /* pushes footer to bottom */
+}
+
+.sets {
+    display: flex;
+    flex-direction: row;
+    gap: 0.3rem;
+}
+
+.sets span:not(:last-child)::after {
+    content: ",";
+    margin-left: 0.05rem;
 }
 
 .card-header h3 {

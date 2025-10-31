@@ -5,7 +5,7 @@ import { toast } from "~/composables/toast/useToast";
 
 const props = defineProps<{
     exercise: LoggedExercise;
-    onResolve?: (success: boolean) => void;
+    onResolve?: (loggedExercise: LoggedExercise | null) => void;
 }>();
 
 props.exercise.ID = 0;
@@ -51,9 +51,9 @@ const logExercise = async () => {
     });
 
     if (error) {
-        props.onResolve?.(false);
+        props.onResolve?.(null);
     } else if (response) {
-        props.onResolve?.(true);
+        props.onResolve?.(response.exercise);
     }
 };
 </script>

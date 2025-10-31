@@ -3,8 +3,6 @@ package api
 import (
 	"be-simpletracker/db/models"
 	"be-simpletracker/db/services"
-	"fmt"
-	"math"
 	"net/http"
 	"strconv"
 	"time"
@@ -99,28 +97,8 @@ func totalVolume(log models.LoggedExercise) float32 {
 
 
 //TODO: needs a lot more work, I think we need more data before were able to do more complex stuff like this
-func (f *WorkoutFeature) getPreviousWorkout(c *gin.Context) {
-	today, err := services.GetToday(f.db)
-	if err != nil {
-		c.JSON(http.StatusNotImplemented, gin.H{"error": err.Error()})
-		return
-	}
-
-	results := make([]models.LoggedExercise, 0)
-
-	for _, exercise := range today.Exercises {
-		if exercise.Exercise == nil {
-			continue
-		}
-
-		exerciseLog, err := services.GetPreviousExerciseLog(f.db, today.Date, exercise.Exercise.Name, 0)
-		if err != nil {
-			c.JSON(http.StatusNotImplemented, gin.H{"error": err.Error()})
-			return
-		}
-		fmt.Println(exerciseLog.WeightSetup)
-
-		prevLog, err := services.GetPreviousExerciseLog(f.db, today.Date, exercise.Exercise.Name, -1)
+/*
+		prevLog, err := services.GetPreviousExerciseLog(f.db, today.Date, exercise.Name, -1)
 		if err != nil {
 			c.JSON(http.StatusNotImplemented, gin.H{"error": err.Error()})
 			return
@@ -135,11 +113,69 @@ func (f *WorkoutFeature) getPreviousWorkout(c *gin.Context) {
 				exerciseLog.PercentChange = float32(difference)
 			}
 		}
+*/
+type ExerciseGroup struct {
+    Planned         *models.Exercise       `json:"planned,omitempty"`
+    Logged          *models.LoggedExercise `json:"logged,omitempty"`
+    Previous        *models.LoggedExercise `json:"previous,omitempty"`
+}
+func (f *WorkoutFeature) getPreviousWorkout(c *gin.Context) {
+    today, err := services.GetToday(f.db)
+    if err != nil {
+        c.JSON(http.StatusNotImplemented, gin.H{"error": err.Error()})
+        return
+    }
 
-		results = append(results, exerciseLog)
-	}
+    logged := today.Exercises
+    planned := today.WorkoutPlan.Exercises
 
-	c.JSON(http.StatusOK, gin.H{"exercises": results, "day": today})
+    // Build a map for logged exercises keyed by name
+    loggedMap := make(map[string]models.LoggedExercise)
+    for _, l := range logged {
+        if l.Exercise != nil {
+            loggedMap[l.Exercise.Name] = l
+        }
+    }
+
+    // Prepare grouped list
+    results := make([]ExerciseGroup, 0)
+
+    // First, handle planned exercises (ensures order by plan)
+    for _, p := range planned {
+        group := ExerciseGroup{Planned: &p}
+
+        // if already logged, attach it
+        if log, ok := loggedMap[p.Name]; ok {
+            group.Logged = &log
+            delete(loggedMap, p.Name) // remove to avoid duplicates
+        }
+
+        // get previous log
+        prev, err := services.GetPreviousExerciseLog(f.db, today.Date, p.Name, 0)
+        if err == nil {
+            group.Previous = &prev
+        }
+
+        results = append(results, group)
+    }
+
+    // Any leftover logged exercises not part of the plan (edge case)
+    for _, l := range loggedMap {
+        prev, err := services.GetPreviousExerciseLog(f.db, today.Date, l.Exercise.Name, 0)
+        if err == nil {
+            results = append(results, ExerciseGroup{
+                Logged:   &l,
+                Previous: &prev,
+            })
+        } else {
+            results = append(results, ExerciseGroup{Logged: &l})
+        }
+    }
+
+    c.JSON(http.StatusOK, gin.H{
+        "day":        today,
+        "previous_exercises":  results,
+    })
 }
 
 
