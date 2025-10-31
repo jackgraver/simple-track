@@ -15,7 +15,7 @@ export interface PlannedExercise extends BaseModel {
 
 export interface WorkoutPlan extends BaseModel {
     name: string;
-    exercises: PlannedExercise[];
+    exercises: Exercise[];
 }
 
 export interface LoggedSet extends BaseModel {

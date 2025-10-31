@@ -107,18 +107,71 @@ func (m *WorkoutModel) seedDatabase() error {
 
 	push_plan := WorkoutPlan{
 		Name: "Push",
+		Exercises: []Exercise{
+			inclinePress,
+			chestFly,
+			dips,
+			latRaise,
+			shoulderPress,
+			JMPress,
+			extensions,
+		},
 	}
 	pull_plan := WorkoutPlan{
 		Name: "Pull",
+		Exercises: []Exercise{
+			barbellRows,
+			facePulls,
+			pulldowns,
+			cableRows,
+			inclineCurls,
+			hammerCurls,
+		},
 	}
 	legs_plan := WorkoutPlan{
 		Name: "Legs",
+		Exercises: []Exercise{
+			outerThigh,
+			innerThigh,
+			legExtensions,
+			hamstringCurls,
+			squat,
+			deadlift,
+			calfRaise,
+			abCrunches,
+		},
 	}
 	upper_plan := WorkoutPlan{
 		Name: "Upper",
+		Exercises: []Exercise{
+			inclinePress,
+			chestFly,
+			dips,
+			latRaise,
+			shoulderPress,
+			barbellRows,
+			facePulls,
+			pulldowns,
+			JMPress,
+			extensions,
+			inclineCurls,	
+			hammerCurls,
+		},
 	}
 	lower_plan := WorkoutPlan{
 		Name: "Lower",
+		Exercises: []Exercise{
+				outerThigh,
+			innerThigh,
+			legExtensions,
+			hamstringCurls,
+			squat,
+			deadlift,
+			hipExtensions,
+			legPress,
+			calfRaise,
+			abCrunches,
+		},
 	}
 	active_rest_plan := WorkoutPlan{
 		Name: "Active Rest",
@@ -192,61 +245,61 @@ func (m *WorkoutModel) seedDatabase() error {
 			},
 		},
 	}
-	// push_log2 := WorkoutLog{
-	// 	Date: time.Date(2025, time.October, 28, 0, 0, 0, 0, now.Location()),
-	// 	WorkoutPlan: &push_plan,
-	// 	Exercises: []LoggedExercise{
-	// 		{
-	// 			ExerciseID: inclinePress.ID,
-	// 			Sets: []LoggedSet{
-	// 				{Reps: 9, Weight: 40},
-	// 				{Reps: 8, Weight: 40},
-	// 			},
-	// 		},
-	// 		{
-	// 			ExerciseID: chestFly.ID,
-	// 			Sets: []LoggedSet{
-	// 				{Reps: 9, Weight: 75},
-	// 				{Reps: 8, Weight: 75},
-	// 			},
-	// 		},
-	// 		{
-	// 			ExerciseID: dips.ID,
-	// 			Sets: []LoggedSet{
-	// 				{Reps: 8, Weight: -110},
-	// 			},
-	// 		},
-	// 		{
-	// 			ExerciseID: latRaise.ID,
-	// 			Sets: []LoggedSet{
-	// 				{Reps: 15, Weight: 10},
-	// 				{Reps: 14, Weight: 10},
-	// 			},
-	// 		},
-	// 		{
-	// 			ExerciseID: shoulderPress.ID,
-	// 			Sets: []LoggedSet{
-	// 				{Reps: 8, Weight: 75},
-	// 				{Reps: 7, Weight: 75},
-	// 			},
-	// 		},
-	// 		{
-	// 			ExerciseID: JMPress.ID,
-	// 			Sets: []LoggedSet{
-	// 				{Reps: 7, Weight: 105},
-	// 				{Reps: 6, Weight: 105},
-	// 			},
-	// 			WeightSetup: "2 25lbs + 2 5lbs",
-	// 		},
-	// 		{
-	// 			ExerciseID: extensions.ID,
-	// 			Sets: []LoggedSet{
-	// 				{Reps: 6, Weight: 40},
-	// 				{Reps: 6, Weight: 40},
-	// 			},
-	// 		},
-	// 	},
-	// }
+	push_log2 := WorkoutLog{
+		Date: time.Date(2025, time.October, 28, 0, 0, 0, 0, now.Location()),
+		WorkoutPlan: &push_plan,
+		Exercises: []LoggedExercise{
+			{
+				ExerciseID: inclinePress.ID,
+				Sets: []LoggedSet{
+					{Reps: 9, Weight: 40},
+					{Reps: 8, Weight: 40},
+				},
+			},
+			{
+				ExerciseID: chestFly.ID,
+				Sets: []LoggedSet{
+					{Reps: 9, Weight: 75},
+					{Reps: 8, Weight: 75},
+				},
+			},
+			{
+				ExerciseID: dips.ID,
+				Sets: []LoggedSet{
+					{Reps: 8, Weight: -110},
+				},
+			},
+			{
+				ExerciseID: latRaise.ID,
+				Sets: []LoggedSet{
+					{Reps: 15, Weight: 10},
+					{Reps: 14, Weight: 10},
+				},
+			},
+			{
+				ExerciseID: shoulderPress.ID,
+				Sets: []LoggedSet{
+					{Reps: 8, Weight: 75},
+					{Reps: 7, Weight: 75},
+				},
+			},
+			{
+				ExerciseID: JMPress.ID,
+				Sets: []LoggedSet{
+					{Reps: 7, Weight: 105},
+					{Reps: 6, Weight: 105},
+				},
+				WeightSetup: "2 25lbs + 2 5lbs",
+			},
+			{
+				ExerciseID: extensions.ID,
+				Sets: []LoggedSet{
+					{Reps: 6, Weight: 40},
+					{Reps: 6, Weight: 40},
+				},
+			},
+		},
+	}
 	pull_log := WorkoutLog{
 		Date: time.Date(2025, time.October, 22, 0, 0, 0, 0, now.Location()),
 		WorkoutPlan: &pull_plan,
@@ -534,7 +587,7 @@ func (m *WorkoutModel) seedDatabase() error {
 	}
 
 	m.db.Create(&push_log)
-	// m.db.Create(&push_log2)
+	m.db.Create(&push_log2)
 	m.db.Create(&pull_log)
 	m.db.Create(&legs_log)
 	m.db.Create(&upper_log)
@@ -560,12 +613,25 @@ func (m *WorkoutModel) seedDatabase() error {
 		skipMap[d] = struct{}{}
 	}
 
+	weekdayPlans := map[time.Weekday]WorkoutPlan{
+		time.Sunday:    lower_plan,
+		time.Monday:    rest_plan,
+		time.Tuesday:   push_plan,
+		time.Wednesday: pull_plan,
+		time.Thursday:  legs_plan,
+		time.Friday:    active_rest_plan,
+		time.Saturday:  upper_plan,	
+	}
+
 	for date := start; !date.After(end); date = date.AddDate(0, 0, 1) {
 		if _, skip := skipMap[date]; skip {
 			continue
 		}
+
+		plan := weekdayPlans[date.Weekday()]
 		wl := WorkoutLog{
 			Date: date,
+			WorkoutPlan: &plan,
 		}
 		m.db.Create(&wl)
 	}
@@ -579,6 +645,7 @@ func (m *WorkoutModel) Preloads() []string {
 type WorkoutPlan struct {
     gorm.Model
     Name      string            `json:"name"`
+    Exercises []Exercise  `gorm:"many2many:workout_plan_exercises;" json:"exercises"`
 }
 
 type WorkoutLog struct {
@@ -615,6 +682,7 @@ type Exercise struct {
 	gorm.Model
 	Name string `gorm:"uniqueIndex;not null" json:"name"`
 	RepRollover uint `json:"rep_rollover"`
+	WorkoutPlans []WorkoutPlan `gorm:"many2many:workout_plan_exercises;" json:"workout_plans"`
 }
 
 type Cardio struct {

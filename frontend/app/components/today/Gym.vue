@@ -1,5 +1,10 @@
 <script setup lang="ts">
-import type { LoggedExercise, WorkoutLog } from "~/types/workout";
+import type {
+    Exercise,
+    LoggedExercise,
+    LoggedSet,
+    WorkoutLog,
+} from "~/types/workout";
 import { Info } from "lucide-vue-next";
 
 const { data, pending, error } = useAPIGet<{
@@ -8,6 +13,20 @@ const { data, pending, error } = useAPIGet<{
 }>(`workout/previous`);
 
 const day = data.value?.day;
+
+// IDs of already logged exercises
+const loggedExerciseIds = computed(() =>
+    day?.exercises.map((e) => e.exercise?.ID),
+);
+
+// Filter out duplicates from the planned list
+const unloggedExercises = computed(
+    () =>
+        day?.workout_plan?.exercises.filter(
+            (planEx: Exercise) =>
+                !loggedExerciseIds?.value?.includes(planEx.ID),
+        ) ?? [],
+);
 </script>
 
 <template>
@@ -19,8 +38,34 @@ const day = data.value?.day;
             <button>Live Workout</button>
         </div>
         <div class="workout-grid">
-            <template v-for="exercise in data?.exercises" :key="exercise.ID">
-                <TodayGymCard :exercise="exercise" />
+            <template
+                v-if="data?.exercises"
+                v-for="exercise in data.exercises"
+                :key="exercise.ID"
+            >
+                <TodayGymCard :exercise="exercise" :planned="false" />
+            </template>
+
+            <!-- planned but not yet logged -->
+            <template
+                v-if="unloggedExercises.length"
+                v-for="exercise in unloggedExercises"
+                :key="exercise.ID"
+            >
+                <TodayGymCard
+                    :exercise="{
+                        ID: 0,
+                        created_at: '',
+                        updated_at: '',
+                        workout_log_id: day?.ID ?? 0,
+                        exercise_id: exercise.ID,
+                        sets: [] as LoggedSet[],
+                        exercise: exercise,
+                        weight_setup: '',
+                        percent_change: 0,
+                    }"
+                    :planned="true"
+                />
             </template>
         </div>
     </div>

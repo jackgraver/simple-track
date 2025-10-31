@@ -4,7 +4,12 @@ import TodayLogEditedDialog from "~/components/today/LogEditedDialog.vue";
 import { toast } from "~/composables/toast/useToast";
 import { dialogManager } from "~/composables/dialog/useDialog";
 import LogOtherMealDialog from "../LogOtherMealDialog.vue";
-import { ChevronDown, ChevronUp } from "lucide-vue-next";
+import {
+    ChevronDown,
+    ChevronUp,
+    ChevronLeft,
+    ChevronRight,
+} from "lucide-vue-next";
 
 const router = useRouter();
 
@@ -155,6 +160,7 @@ function prev() {
     <div v-else class="container">
         <div v-if="data" style="width: 100%">
             <div class="title-row">
+                <button><ChevronLeft /></button>
                 <h1 style="flex: 1">
                     {{
                         formatDate(data.day.date) +
@@ -162,6 +168,7 @@ function prev() {
                         dayOfWeek(data.day.date)
                     }}
                 </h1>
+                <button><ChevronRight /></button>
                 <button @click="logMeal(null, 'create')">Log Meal</button>
             </div>
             <TodayBars

@@ -5,12 +5,23 @@ import { toast } from "~/composables/toast/useToast";
 
 const props = defineProps<{
     exercise: LoggedExercise;
+    onResolve?: (success: boolean) => void;
 }>();
 
-console.log(props.exercise);
-props.exercise.workout_log_id = 0;
+props.exercise.ID = 0;
 
-const log = ref<LoggedSet[]>(props.exercise.sets);
+const log = ref<LoggedSet[]>(
+    props.exercise.sets || [
+        {
+            weight: 0,
+            reps: 0,
+            logged_exercise_id: 0,
+            ID: 0,
+            created_at: "",
+            updated_at: "",
+        },
+    ],
+);
 
 const weight = computed(() => {
     if (!log.value.length) return 0;
@@ -32,7 +43,7 @@ const addSet = () => {
 };
 
 const logExercise = async () => {
-    console.log(props.exercise);
+    console.log("log", props.exercise);
     const { response, error } = await useAPIPost<{
         exercise: LoggedExercise;
     }>(`workout/exercise/log`, "POST", {
@@ -40,9 +51,9 @@ const logExercise = async () => {
     });
 
     if (error) {
-        toast.push("Log Exercise Failed!", "error");
+        props.onResolve?.(false);
     } else if (response) {
-        toast.push("Log Exercise Successfully!", "success");
+        props.onResolve?.(true);
     }
 };
 </script>

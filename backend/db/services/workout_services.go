@@ -16,7 +16,7 @@ func GetToday(database *gorm.DB) (models.WorkoutLog, error) {
 		Preload("Cardio").
 		Preload("Exercises.Sets").
         Preload("Exercises.Exercise").
-        Preload("WorkoutPlan").
+        Preload("WorkoutPlan.Exercises").
 		Where("date = ?", today).
 		First(&workoutDay).Error
 
@@ -81,7 +81,7 @@ func GetPreviousExerciseLog(db *gorm.DB, day time.Time, exercise string, offset 
 }
 
 func LogExercise(db *gorm.DB, exercise models.LoggedExercise) error {
-    err := db.Create(&exercise).Error
+    err := db.Debug().Create(&exercise).Error
     if err != nil {
         return err
     }

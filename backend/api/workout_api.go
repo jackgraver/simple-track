@@ -154,16 +154,9 @@ func (f *WorkoutFeature) logExercise(c *gin.Context) {
 		return
 	}
 
-	today, err := services.GetToday(f.db)
-    if err != nil {
-        c.JSON(http.StatusNotImplemented, gin.H{"error": err.Error()})
-        return
-    }
-	fmt.Println(today)
+	request.Exercise.ID = 0
 
-	request.Exercise.WorkoutLogID = today.ID
-
-	err = services.LogExercise(f.db, request.Exercise)
+	err := services.LogExercise(f.db, request.Exercise)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

@@ -1,51 +1,76 @@
 <script setup lang="ts">
-import type { LoggedExercise, LoggedSet } from "~/types/workout";
-import { Check, Plus } from "lucide-vue-next";
+import type { Exercise, LoggedExercise } from "~/types/workout";
+import { Check } from "lucide-vue-next";
 import { dialogManager } from "~/composables/dialog/useDialog";
 import TodayLogExerciseDialog from "./LogExerciseDialog.vue";
+import { toast } from "~/composables/toast/useToast";
 
 const props = defineProps<{
     exercise: LoggedExercise;
+    planned: boolean;
 }>();
 
+const actualExercise = props.exercise.exercise;
+
 const logExercise = async () => {
-    dialogManager.custom({
-        title: "Log Exercise",
-        component: TodayLogExerciseDialog,
-        props: { exercise: props.exercise },
-    });
+    dialogManager
+        .custom({
+            title: "Log " + actualExercise.name,
+            component: TodayLogExerciseDialog,
+            props: {
+                exercise: props.exercise,
+            },
+        })
+        .then((success) => {
+            if (success) {
+                toast.push("Log Exercise Successfully!", "success");
+            } else {
+                toast.push("Log Exercise Failed!", "error");
+            }
+        });
 };
 </script>
 
 <template>
-    <article v-if="exercise.sets && exercise.sets.length" class="workout-card">
+    <article class="workout-card">
         <header class="card-header">
-            <h3>{{ exercise.exercise?.name }}</h3>
-            {{ exercise.sets[exercise.sets.length - 1]?.weight ?? "X" }}
-            x
-            {{ exercise.sets[exercise.sets.length - 1]?.reps ?? "X" }}
-            <h4 v-if="exercise.weight_setup !== ''">
-                {{ exercise.weight_setup }}
-            </h4>
+            <h2>{{ actualExercise?.name }}</h2>
+            <template v-if="!planned">
+                {{
+                    props.exercise.sets[props.exercise.sets.length - 1]
+                        ?.weight ?? "X"
+                }}
+                x
+                {{
+                    props.exercise.sets[props.exercise.sets.length - 1]?.reps ??
+                    "X"
+                }}
+            </template>
         </header>
-        <span v-if="exercise.weight_setup !== ''">
-            {{ exercise.weight_setup }}
-        </span>
-        <span
-            v-if="
-                (exercise.sets[exercise.sets.length - 1]?.reps ?? 0) >
-                exercise.exercise?.rep_rollover
-            "
-            class="info"
-            >Up weight next session</span
-        >
-        <span v-if="exercise.percent_change" class="fact"
-            >{{ exercise.percent_change < 0 ? "Down" : "Up" }}
-            {{ exercise.percent_change.toFixed(2) }}% since last workout</span
-        >
-        <button @click="logExercise" class="check">
-            <Check />
-        </button>
+        <template v-if="!planned">
+            <span v-if="props.exercise.weight_setup">
+                {{ props.exercise.weight_setup }}
+            </span>
+            <span
+                v-if="
+                    (props.exercise.sets[props.exercise.sets.length - 1]
+                        ?.reps ?? 0) > props.exercise.exercise?.rep_rollover
+                "
+                class="info"
+            >
+                Up weight next session
+            </span>
+            <span v-if="props.exercise.percent_change" class="fact">
+                {{ props.exercise.percent_change < 0 ? "Down" : "Up" }}
+                {{ props.exercise.percent_change.toFixed(2) }}% since last
+                workout
+            </span>
+        </template>
+        <footer v-if="planned">
+            <button @click="logExercise" class="check">
+                <Check />
+            </button>
+        </footer>
     </article>
 </template>
 
@@ -73,6 +98,16 @@ const logExercise = async () => {
     gap: 0.5rem;
 }
 
+.workout-card header h2 {
+    margin: 0;
+}
+
+.workout-card footer {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: auto; /* pushes footer to bottom */
+}
+
 .card-header h3 {
     margin: 0;
     font-weight: 600;
@@ -87,12 +122,6 @@ const logExercise = async () => {
 
 .workout-card .fact {
     color: rgb(63, 197, 46);
-}
-
-footer {
-    display: flex;
-    justify-content: flex-end;
-    padding-bottom: 0;
 }
 
 .check {
