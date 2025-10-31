@@ -17,7 +17,6 @@ const props = defineProps<{
     previous: LoggedExercise;
     planned: boolean;
 }>();
-console.log("p", props.exercise, "\n", props.previous);
 
 const localExercise = ref<LoggedExercise>(props.exercise);
 const localPlanned = ref<boolean>(props.planned);

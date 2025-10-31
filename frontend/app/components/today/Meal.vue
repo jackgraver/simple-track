@@ -13,12 +13,22 @@ import {
 
 const router = useRouter();
 
+const emit = defineEmits<{
+    (e: "date-change", direction: "next" | "prev"): void;
+}>();
+
+const props = defineProps<{
+    dateOffset: number;
+}>();
+
+console.log(props.dateOffset);
+
 const { data, pending, error } = useAPIGet<{
     day: Day;
     totalCalories: number;
     totalProtein: number;
     totalFiber: number;
-}>(`mealplan/today`);
+}>(`mealplan/today?offset=${props.dateOffset}`);
 
 const logPlannedMeal = async (meal: Meal) => {
     const { response, error } = await useAPIPost<{
@@ -160,7 +170,9 @@ function prev() {
     <div v-else class="container">
         <div v-if="data" style="width: 100%">
             <div class="title-row">
-                <button><ChevronLeft /></button>
+                <button @click="emit('date-change', 'prev')">
+                    <ChevronLeft />
+                </button>
                 <h1 style="flex: 1">
                     {{
                         formatDate(data.day.date) +
@@ -168,7 +180,9 @@ function prev() {
                         dayOfWeek(data.day.date)
                     }}
                 </h1>
-                <button><ChevronRight /></button>
+                <button @click="emit('date-change', 'next')">
+                    <ChevronRight />
+                </button>
                 <button @click="logMeal(null, 'create')">Log Meal</button>
             </div>
             <TodayBars

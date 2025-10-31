@@ -8,8 +8,8 @@ import (
 	"gorm.io/gorm"
 )
 
-func GetToday(database *gorm.DB) (models.WorkoutLog, error) {
-	today := utils.ZerodTime()
+func GetToday(database *gorm.DB, offset int) (models.WorkoutLog, error) {
+	today := utils.ZerodTime(offset)
 
 	var workoutDay models.WorkoutLog
 	err := database.

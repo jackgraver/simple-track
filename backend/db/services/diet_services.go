@@ -9,8 +9,8 @@ import (
 )
 
 // MealPlanToday returns today's meal plan day with meals and goals
-func MealPlanToday(db *gorm.DB) (models.Day, error) {
-    today := utils.ZerodTime()
+func MealPlanToday(db *gorm.DB, offset int) (models.Day, error) {
+    today := utils.ZerodTime(offset)
 
 	var days models.Day
 	if err := db.

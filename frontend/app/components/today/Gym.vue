@@ -13,10 +13,14 @@ type ExerciseGroup = {
     previous: LoggedExercise;
 };
 
+const props = defineProps<{
+    dateOffset: number;
+}>();
+
 const { data, pending, error } = useAPIGet<{
     day: WorkoutLog;
     previous_exercises: ExerciseGroup[];
-}>(`workout/previous`);
+}>(`workout/previous?offset=${props.dateOffset}`);
 
 const day = data.value?.day;
 </script>
@@ -26,7 +30,7 @@ const day = data.value?.day;
     <div v-else-if="error">Error: {{ error.message }}</div>
     <div v-else class="container">
         <div class="title-row">
-            <h2>{{ day?.workout_plan?.name }} Day</h2>
+            <h2>{{ day?.workout_plan?.name }} Day {{ dateOffset }}</h2>
             <button>Live Workout</button>
         </div>
         <div class="workout-grid">

@@ -1,12 +1,27 @@
-<script setup lang="ts"></script>
+<script setup lang="ts">
+const dateOffset = ref(0);
+
+const datechange = (direction: "next" | "prev") => {
+    if (direction === "next") {
+        dateOffset.value++;
+    } else if (direction === "prev") {
+        dateOffset.value--;
+    }
+    console.log(direction, dateOffset.value);
+};
+</script>
 
 <template>
     <main class="page">
         <section class="home-section">
-            <TodayMeal />
+            <TodayMeal
+                @date-change="datechange"
+                :date-offset="dateOffset"
+                :key="dateOffset"
+            />
         </section>
         <section class="home-section">
-            <TodayGym />
+            <TodayGym :date-offset="dateOffset" :key="dateOffset" />
         </section>
     </main>
 </template>

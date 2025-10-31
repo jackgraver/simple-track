@@ -3,6 +3,7 @@ package api
 import (
 	"be-simpletracker/db/models"
 	"be-simpletracker/db/services"
+	"fmt"
 	"net/http"
 	"strconv"
 	"time"
@@ -37,7 +38,7 @@ func (f *WorkoutFeature) SetEndpoints(router *gin.Engine) {
 }
 
 func (f *WorkoutFeature) getWorkoutToday(c *gin.Context) {
-    day, err := services.GetToday(f.db)
+    day, err := services.GetToday(f.db, 0)
     if err != nil {
         c.JSON(http.StatusNotImplemented, gin.H{"error": err.Error()})
         return
@@ -120,7 +121,11 @@ type ExerciseGroup struct {
     Previous        *models.LoggedExercise `json:"previous,omitempty"`
 }
 func (f *WorkoutFeature) getPreviousWorkout(c *gin.Context) {
-    today, err := services.GetToday(f.db)
+    offsetStr := c.Query("offset")
+    offset, _ := strconv.Atoi(offsetStr)
+    fmt.Println("offset", offset)
+
+    today, err := services.GetToday(f.db, offset)
     if err != nil {
         c.JSON(http.StatusNotImplemented, gin.H{"error": err.Error()})
         return

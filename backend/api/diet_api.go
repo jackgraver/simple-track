@@ -51,7 +51,10 @@ func (f *MealPlanFeature) SetEndpoints(router *gin.Engine) {
 }
 
 func (f *MealPlanFeature) getMealPlanToday(c *gin.Context) {
-    day, daysErr := services.MealPlanToday(f.db)
+    offsetStr := c.Query("offset")
+    offset, _ := strconv.Atoi(offsetStr)
+
+    day, daysErr := services.MealPlanToday(f.db, offset)
     if daysErr != nil {
         c.JSON(http.StatusInternalServerError, gin.H{"error": daysErr.Error()})
         return
@@ -239,7 +242,7 @@ func (f *MealPlanFeature) postNewMeal(c *gin.Context) {
     }
 
     if req.Log {
-        day, derr := services.FindMealPlanDay(f.db, utils.ZerodTime())
+        day, derr := services.FindMealPlanDay(f.db, utils.ZerodTime(0))
         if derr != nil {
             c.JSON(http.StatusInternalServerError, gin.H{"error": derr.Error()})
             return
@@ -304,7 +307,7 @@ func (f *MealPlanFeature) postLogEdited(c *gin.Context) {
 }
 
 func (f *MealPlanFeature) postLogMeal(c *gin.Context, mealID uint, setLogged bool) {
-    day, derr := services.FindMealPlanDay(f.db, utils.ZerodTime())
+    day, derr := services.FindMealPlanDay(f.db, utils.ZerodTime(0))
     if derr != nil {
         c.JSON(http.StatusInternalServerError, gin.H{"error": derr.Error()})
         return
@@ -361,7 +364,7 @@ func (f *MealPlanFeature) deleteLoggedMeal(c *gin.Context) {
         return
     }
     
-    day, err := services.FindMealPlanDay(f.db, utils.ZerodTime())
+    day, err := services.FindMealPlanDay(f.db, utils.ZerodTime(0))
     if err != nil {
         c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
         return
@@ -422,7 +425,7 @@ func (f *MealPlanFeature) postEditLogged(c *gin.Context) {
     }
     
     //get day
-    day, err := services.FindMealPlanDay(f.db, utils.ZerodTime())
+    day, err := services.FindMealPlanDay(f.db, utils.ZerodTime(0))
     if err != nil {
         c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
         return

@@ -1,11 +1,15 @@
 //TODO: grouped request
 
-export function useAPIGet<T>(endpoint: string, options: any = {}) {
+export function useAPIGet<T>(
+    endpoint: string | Ref<string>,
+    options: any = {},
+) {
     const config = useRuntimeConfig();
-
     const baseUrl = config.public.apiBase || "http://localhost:8080";
 
-    return useFetch<T>(`${baseUrl}/${endpoint}`, {
+    return useFetch<T>(endpoint, {
+        baseURL: baseUrl,
+        watch: [endpoint],
         ...options,
     });
 }
