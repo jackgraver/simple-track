@@ -3,7 +3,6 @@ import type { Day, Meal } from "~/types/diet";
 import TodayLogEditedDialog from "~/components/today/LogEditedDialog.vue";
 import { toast } from "~/composables/toast/useToast";
 import { dialogManager } from "~/composables/dialog/useDialog";
-import LogOtherMealDialog from "../LogOtherMealDialog.vue";
 import {
     ChevronDown,
     ChevronUp,
@@ -143,14 +142,6 @@ const editLogMeal = (meal: Meal) => {
             console.error("Dialog error:", err);
             toast.push("Dialog Error", "error");
         });
-};
-
-const logOtherMeal = async () => {
-    dialogManager.custom<any>({
-        title: "Log Other Meal",
-        component: LogOtherMealDialog,
-        props: { meal: null },
-    });
 };
 
 const start = ref(0);
