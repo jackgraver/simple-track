@@ -25,7 +25,7 @@ function isConfirmDialogType(
                 <h2>{{ dialogManager.dialog.value.title }}</h2>
                 <button
                     class="close-btn"
-                    @click="dialogManager.resolve(false)"
+                    @click="dialogManager.resolve('cancel')"
                     v-if="!isConfirmDialogType(dialogManager.dialog.value)"
                 >
                     <X />

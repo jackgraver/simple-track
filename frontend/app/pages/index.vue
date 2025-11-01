@@ -1,13 +1,12 @@
 <script setup lang="ts">
 const dateOffset = ref(0);
 
-const datechange = (direction: "next" | "prev") => {
+const datechange = (direction: "next" | "prev"): void => {
     if (direction === "next") {
         dateOffset.value++;
     } else if (direction === "prev") {
         dateOffset.value--;
     }
-    console.log(direction, dateOffset.value);
 };
 </script>
 

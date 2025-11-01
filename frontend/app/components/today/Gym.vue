@@ -30,7 +30,7 @@ const day = data.value?.day;
     <div v-else-if="error">Error: {{ error.message }}</div>
     <div v-else class="container">
         <div class="title-row">
-            <h2>{{ day?.workout_plan?.name }} Day {{ dateOffset }}</h2>
+            <h2>{{ day?.workout_plan?.name }} Day</h2>
             <button>Live Workout</button>
         </div>
         <div class="workout-grid">
@@ -41,7 +41,11 @@ const day = data.value?.day;
                 <template v-if="exercise.logged">
                     <TodayGymCard
                         :exercise="exercise.logged"
-                        :previous="exercise.previous"
+                        :previous="
+                            exercise.previous.exercise
+                                ? exercise.previous
+                                : null
+                        "
                         :planned="true"
                     />
                 </template>
@@ -58,7 +62,11 @@ const day = data.value?.day;
                             weight_setup: '',
                             percent_change: 0,
                         }"
-                        :previous="exercise.previous"
+                        :previous="
+                            exercise.previous.exercise
+                                ? exercise.previous
+                                : null
+                        "
                         :planned="true"
                     />
                 </template>

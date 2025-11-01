@@ -26,14 +26,14 @@ export function useDialog() {
     }
 
     // General-purpose custom dialog
-    function custom<T>(options: CustomDialogOptions<T>): Promise<T> {
+    function custom<T>(options: CustomDialogOptions<T>): Promise<T | "cancel"> {
         dialog.value = options;
         return new Promise<T>((resolve) => {
             resolver = resolve as (value: T) => void;
         });
     }
 
-    function resolve(result?: boolean) {
+    function resolve(result?: boolean | "cancel") {
         if (resolver) resolver(result as any);
         resolver = null;
         dialog.value = null;

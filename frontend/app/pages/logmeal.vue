@@ -13,6 +13,25 @@ function formatNum(n: number): number {
     return Number(s.replace(/\.?0+$/, "")); // drop trailing zeros and optional dot
 }
 
+function amountPlusMinus(item: MealItem, direction: "plus" | "minus") {
+    if (direction === "plus") {
+        item.amount += 1 / (item.food?.serving_amount || 1);
+    } else {
+        item.amount = Math.max(
+            item.amount - 1 / (item.food?.serving_amount || 1),
+            0,
+        );
+    }
+}
+
+function formatFoodLabel(item: any): string {
+    const servingAmount = (item.food?.serving_amount || 1) * item.amount;
+    const type = item.food?.serving_type === "g" ? "g" : "";
+    const name = item.food?.name ?? "";
+
+    return `(${servingAmount}${type}) ${name}`;
+}
+
 const router = useRouter();
 
 const route = useRoute();
@@ -48,6 +67,7 @@ const {
     totalCalories: number;
     totalProtein: number;
     totalFiber: number;
+    totalCarbs: number;
 }>(`mealplan/today`);
 
 const totalMacros = computed(() => {
@@ -67,6 +87,12 @@ const totalMacros = computed(() => {
         fiber: formatNum(
             meal.value.items.reduce(
                 (total, item) => total + item.amount * item.food!.fiber,
+                0,
+            ),
+        ),
+        carbs: formatNum(
+            meal.value.items.reduce(
+                (total, item) => total + item.amount * item.food!.carbs,
                 0,
             ),
         ),
@@ -92,10 +118,12 @@ const addFood = async (food: Food): Promise<boolean> => {
 const createFood = async (name: string): Promise<boolean> => {
     try {
         const food = await dialogManager.custom<Food>({
-            title: "Create Food",
+            title: "Create " + name,
             component: CreateFoodDialog,
             props: { foodName: name },
         });
+
+        if (food === "cancel") return false;
 
         if (food) {
             await addFood(food);
@@ -123,6 +151,7 @@ const setMeal = async (newMeal: Meal): Promise<boolean> => {
 
 //TODO: potential bug this gets called every character input to meal name
 const createMeal = async (log: boolean) => {
+    console.log(meal.value);
     meal.value.ID = 0;
     const { response, error } = await useAPIPost<{
         meal_id: number;
@@ -222,25 +251,20 @@ const updateLoggedMeal = async () => {
                         :key="item.ID"
                         class="items-rows"
                     >
-                        <span style="font-size: large">{{
-                            item.food?.name
-                        }}</span>
-                        <button
-                            @click="item.amount = Math.max(item.amount - 1, 0)"
-                        >
+                        <button @click="amountPlusMinus(item, 'minus')">
                             <Minus />
                         </button>
-                        <input
-                            class="small-input"
-                            type="text"
-                            v-model="item.amount"
-                        />
-                        <span v-if="item.food!.unit === 'g'">g</span
-                        ><button @click="item.amount++"><Plus /></button>
+                        <span style="font-size: large"
+                            >{{ formatFoodLabel(item) }}
+                        </span>
+                        <span v-if="item.food!.serving_type === 'g'">g</span
+                        ><button @click="amountPlusMinus(item, 'plus')">
+                            <Plus />
+                        </button>
                         <span>
-                            {{ item.amount * item.food!.calories }}C /
-                            {{ item.amount * item.food!.protein }}P /
-                            {{ item.amount * item.food!.fiber }}F
+                            {{ formatNum(item.amount * item.food!.calories) }}C
+                            / {{ formatNum(item.amount * item.food!.protein) }}P
+                            / {{ formatNum(item.amount * item.food!.fiber) }}F
                         </span>
                         <button class="delete-button" @click="removeFood(i)">
                             <Trash2 :size="20" />
@@ -268,9 +292,11 @@ const updateLoggedMeal = async () => {
                         totalMacros.protein + (today?.totalProtein ?? 0)
                     "
                     :totalFiber="totalMacros.fiber + (today?.totalFiber ?? 0)"
+                    :totalCarbs="totalMacros.carbs + (today?.totalCarbs ?? 0)"
                     :planned-calories="today?.day.plan.calories ?? 0"
                     :planned-protein="today?.day.plan.protein ?? 0"
                     :planned-fiber="today?.day.plan.fiber ?? 0"
+                    :planned-carbs="today?.day.plan.carbs ?? 0"
                 />
             </div>
             <div class="cell right-top">

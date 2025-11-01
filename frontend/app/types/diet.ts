@@ -45,7 +45,8 @@ export interface MealItem extends BaseModel {
 
 export interface Food extends BaseModel {
     name: string;
-    unit: string;
+    serving_type: string;
+    serving_amount: number;
     calories: number;
     protein: number;
     fiber: number;

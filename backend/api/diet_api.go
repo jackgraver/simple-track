@@ -18,9 +18,9 @@ type MealPlanFeature struct {
 }
 
 func NewMealPlanFeature(db *gorm.DB) *MealPlanFeature {
-    // models.NewMealPlanModel(db)
-    // var feature = models.NewMealPlanModel(db)
-    // feature.MigrateDatabase()
+    models.NewMealPlanModel(db)
+    var feature = models.NewMealPlanModel(db)
+    feature.MigrateDatabase()
 
 	return &MealPlanFeature{
 		BaseFeature[models.MealPlanModel]{

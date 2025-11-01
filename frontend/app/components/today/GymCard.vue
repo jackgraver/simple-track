@@ -14,7 +14,7 @@ const weightString = (log: LoggedExercise): string => {
 
 const props = defineProps<{
     exercise: LoggedExercise;
-    previous: LoggedExercise;
+    previous: LoggedExercise | null;
     planned: boolean;
 }>();
 
@@ -70,7 +70,7 @@ const logExercise = async () => {
                     {{ set.reps }} x {{ set.weight }}
                 </span>
             </template>
-            <template v-else>
+            <template v-else-if="previous">
                 <span v-for="set in previous.sets" :key="set.ID">
                     {{ set.reps }} x {{ set.weight }}
                 </span>

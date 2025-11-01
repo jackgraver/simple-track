@@ -28,6 +28,7 @@ const { data, pending, error } = useAPIGet<{
     totalCalories: number;
     totalProtein: number;
     totalFiber: number;
+    totalCarbs: number;
 }>(`mealplan/today?offset=${props.dateOffset}`);
 
 const logPlannedMeal = async (meal: Meal) => {
@@ -36,6 +37,7 @@ const logPlannedMeal = async (meal: Meal) => {
         totalCalories: number;
         totalProtein: number;
         totalFiber: number;
+        totalCarbs: number;
     }>(`mealplan/meal/log-planned`, "POST", {
         meal_id: meal.ID,
     });
@@ -50,6 +52,7 @@ const logPlannedMeal = async (meal: Meal) => {
                 totalCalories: response.totalCalories,
                 totalProtein: response.totalProtein,
                 totalFiber: response.totalFiber,
+                totalCarbs: response.totalCarbs,
             };
         }
     }
@@ -77,6 +80,7 @@ const deleteLoggedMeal = async (meal: Meal) => {
                 totalCalories: number;
                 totalProtein: number;
                 totalFiber: number;
+                totalCarbs: number;
             }>(`mealplan/meal/logged`, "DELETE", {
                 meal_id: meal.ID,
                 day_id: data.value?.day.ID,
@@ -92,6 +96,7 @@ const deleteLoggedMeal = async (meal: Meal) => {
                         totalCalories: response.totalCalories,
                         totalProtein: response.totalProtein,
                         totalFiber: response.totalFiber,
+                        totalCarbs: response.totalCarbs,
                     };
                 }
             }
@@ -113,6 +118,7 @@ const editLogMeal = (meal: Meal) => {
                 totalCalories: number;
                 totalProtein: number;
                 totalFiber: number;
+                totalCarbs: number;
             }>("mealplan/meal/editlogged", "POST", {
                 meal: editedMeal,
                 oldMealID: oldMealID,
@@ -128,6 +134,7 @@ const editLogMeal = (meal: Meal) => {
                         totalCalories: response.totalCalories,
                         totalProtein: response.totalProtein,
                         totalFiber: response.totalFiber,
+                        totalCarbs: response.totalCarbs,
                     };
                 }
             }
@@ -170,7 +177,7 @@ function prev() {
     <div v-else class="container">
         <div v-if="data" style="width: 100%">
             <div class="title-row">
-                <button @click="emit('date-change', 'prev')">
+                <button @click="emit('date-change', 'next')">
                     <ChevronLeft />
                 </button>
                 <h1 style="flex: 1">
@@ -180,7 +187,7 @@ function prev() {
                         dayOfWeek(data.day.date)
                     }}
                 </h1>
-                <button @click="emit('date-change', 'next')">
+                <button @click="emit('date-change', 'prev')">
                     <ChevronRight />
                 </button>
                 <button @click="logMeal(null, 'create')">Log Meal</button>
@@ -189,9 +196,11 @@ function prev() {
                 :totalCalories="data?.totalCalories ?? 0"
                 :totalProtein="data?.totalProtein ?? 0"
                 :totalFiber="data?.totalFiber ?? 0"
+                :totalCarbs="data?.totalCarbs ?? 0"
                 :plannedCalories="data?.day.plan.calories ?? 0"
                 :plannedProtein="data?.day.plan.protein ?? 0"
                 :plannedFiber="data?.day.plan.fiber ?? 0"
+                :plannedCarbs="data?.day.plan.carbs ?? 0"
             />
             <div class="meals-section">
                 <div class="meals-container">

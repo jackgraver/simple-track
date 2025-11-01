@@ -3,9 +3,11 @@ defineProps<{
     totalCalories: number;
     totalProtein: number;
     totalFiber: number;
+    totalCarbs: number;
     plannedCalories: number;
     plannedProtein: number;
     plannedFiber: number;
+    plannedCarbs: number;
 }>();
 </script>
 
@@ -24,7 +26,7 @@ defineProps<{
             :indicate-overflow="true"
         />
         <TodayBar :total="totalFiber" :planned="plannedFiber" type="fiber" />
-        <TodayBar :total="0" :planned="0" type="carbs" />
+        <TodayBar :total="totalCarbs" :planned="plannedCarbs" type="carbs" />
     </div>
 </template>
 

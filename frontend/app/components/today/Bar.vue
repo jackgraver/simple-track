@@ -75,6 +75,9 @@ const props = defineProps<{
 .fiber {
     background-color: green;
 }
+.carbs {
+    background-color: red;
+}
 
 .num10 {
     color: yellow;

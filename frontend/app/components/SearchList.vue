@@ -71,7 +71,7 @@ const handleFunctionCall = async <T extends (arg: any) => Promise<boolean>>(
                     <button
                         type="button"
                         class="create-button"
-                        @click="handleFunctionCall(onCreate)"
+                        @click="handleFunctionCall(onCreate, search)"
                     >
                         <Plus :size="18" />
                         <span>Create “{{ search }}”</span>
@@ -79,7 +79,7 @@ const handleFunctionCall = async <T extends (arg: any) => Promise<boolean>>(
                 </template>
                 <template v-else>
                     <span class="no-hover-empty-option"
-                        >“{{ search }}” does not exist</span
+                        >{{ search }} does not exist</span
                     >
                 </template>
             </div>

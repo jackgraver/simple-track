@@ -72,7 +72,7 @@ function createFoodOption() {}
                     @mousedown.prevent="createFoodOption"
                 >
                     <Plus :size="18" class="icon" />
-                    <span>Create “{{ search }}”</span>
+                    <span>Create {{ search }}"</span>
                 </div>
             </div>
         </div>
