@@ -5,7 +5,6 @@ import type {
     LoggedSet,
     WorkoutLog,
 } from "~/types/workout";
-import { Info } from "lucide-vue-next";
 
 type ExerciseGroup = {
     planned: Exercise;
@@ -22,7 +21,7 @@ const { data, pending, error } = useAPIGet<{
     previous_exercises: ExerciseGroup[];
 }>(`workout/previous?offset=${props.dateOffset}`);
 
-const day = data.value?.day;
+const day = computed(() => data.value?.day);
 </script>
 
 <template>

@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import type { LoggedExercise, LoggedSet } from "~/types/workout";
 import { Check, Plus } from "lucide-vue-next";
-import { toast } from "~/composables/toast/useToast";
 
 const props = defineProps<{
     exercise: LoggedExercise;
+    previousWeight: number;
     onResolve?: (loggedExercise: LoggedExercise | null) => void;
 }>();
 
@@ -24,12 +24,25 @@ const log = ref<LoggedSet[]>(
 );
 
 const weight = computed(() => {
-    if (!log.value.length) return 0;
+    if (!log.value.length) return props.previousWeight;
     return log.value.reduce(
         (max, set) => (set.weight > max ? set.weight : max),
         0,
     );
 });
+
+if (log.value.length === 0) {
+    log.value = [
+        {
+            ID: 0,
+            created_at: "",
+            updated_at: "",
+            logged_exercise_id: 0,
+            reps: 0,
+            weight: weight.value,
+        },
+    ];
+}
 
 const addSet = () => {
     log.value.push({

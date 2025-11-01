@@ -24,27 +24,19 @@ const localPlanned = ref<boolean>(props.planned);
 const actualExercise = computed<Exercise>(() => localExercise.value.exercise);
 
 const logExercise = async () => {
-    if (localExercise.value.sets.length === 0) {
-        localExercise.value.sets = [
-            {
-                ID: 0,
-                created_at: "",
-                updated_at: "",
-                logged_exercise_id: 0,
-                reps: 0,
-                weight: 0,
-            },
-        ];
-    }
     dialogManager
         .custom<LoggedExercise>({
             title: "Log " + actualExercise.value.name,
             component: TodayLogExerciseDialog,
             props: {
                 exercise: localExercise,
+                previousWeight: props.previous?.sets[0]?.weight,
             },
         })
         .then((loggedExercise) => {
+            if (loggedExercise === "cancel") {
+                return;
+            }
             if (loggedExercise) {
                 localExercise.value = loggedExercise;
                 localPlanned.value = false;

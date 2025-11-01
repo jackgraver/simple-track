@@ -56,15 +56,15 @@ func (m *MealPlanModel) seedDatabase(db *gorm.DB) error {
 	// egg := Food{Name: "Egg", Calories: 140, Protein: 12, Fiber: 0, Carbs: 0}
 	// sausage    := Food{Name: "Maple Breakfast Sausage", Calories: 140, Protein: 12, Fiber: 0, Carbs: 0}
 	// keto_bread  := Food{Name: "Keto Bread", Calories: 140, Protein: 12, Fiber: 15, Carbs: 0}
-	// blueberries := Food{Name: "Blueberries", Unit: "g", Calories: 20, Protein: 0.3, Fiber: 0.9, Carbs: 0}
+	// blueberries := Food{Name: "Blueberries", ServingType: "g", Calories: 20, Protein: 0.3, Fiber: 0.9, Carbs: 0}
 	// kiwi := Food{Name: "Kiwi", Calories: 40, Protein: 0.8, Fiber: 2, Carbs: 0}
 
 	// foods := []*Food{&egg, &sausage, &keto_bread, &blueberries, &kiwi}
 	// db.Create(&foods)
 
-	// beef := Food{Name: "Beef", Unit: "g", Calories: 200, Protein: 24, Fiber: 0, Carbs: 0} 
-	// rice    := Food{Name: "Rice", Unit: "g", Calories: 80, Protein: 0, Fiber: 0, Carbs: 0}
-	// vegetables  := Food{Name: "Vegetables", Unit: "g", Calories: 50, Protein: 1, Fiber: 2, Carbs: 0}
+	// beef := Food{Name: "Beef", ServingType: "g", Calories: 200, Protein: 24, Fiber: 0, Carbs: 0} 
+	// rice    := Food{Name: "Rice", ServingType: "g", Calories: 80, Protein: 0, Fiber: 0, Carbs: 0}
+	// vegetables  := Food{Name: "Vegetables", ServingType: "g", Calories: 50, Protein: 1, Fiber: 2, Carbs: 0}
 
 	// db.Create(&beef)
 	// db.Create(&rice)

@@ -20,8 +20,6 @@ const props = defineProps<{
     dateOffset: number;
 }>();
 
-console.log(props.dateOffset);
-
 const { data, pending, error } = useAPIGet<{
     day: Day;
     totalCalories: number;

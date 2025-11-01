@@ -195,7 +195,6 @@ func (f *WorkoutFeature) logExercise(c *gin.Context) {
 		return
 	}
 
-	request.Exercise.ID = 0
 
 	err := services.LogExercise(f.db, request.Exercise)
 	if err != nil {
