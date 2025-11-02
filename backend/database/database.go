@@ -4,7 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
-	"io/ioutil"
+	"log"
 	"net/http"
 	"os"
 	"os/exec"
@@ -17,13 +17,13 @@ import (
 )
 
 func DefineRoutes(router *gin.Engine) {
-	router.GET("/db/dump", func(c *gin.Context) {
+	router.POST("/db/dump", func(c *gin.Context) {
 		DumpSQLiteDB("st.db", "out_dump.sql")
 		c.String(http.StatusOK, "Dump Successful")
 	})
 
-	router.GET("/db/restore", func(c *gin.Context) {
-		RestoreSQLiteDB(c.MustGet("db").(*gorm.DB), "out_dump.sql")
+	router.POST("/db/restore", func(c *gin.Context) {
+		RestoreSQLiteDB("out_dump.sql")
 		c.String(http.StatusOK, "Restore Successful")
 	})
 }
@@ -86,15 +86,21 @@ func DumpSQLiteDB(dbPath string, dumpPath string) error {
 	return os.WriteFile(dumpPath, []byte(strings.Join(cleaned, "\n")), 0644)
 }
 
-func RestoreSQLiteDB(db *gorm.DB, dumpPath string) error {
-	content, err := ioutil.ReadFile(dumpPath)
+func RestoreSQLiteDB(dumpPath string) error {
+	conn, err := ConnectToSqlite()
 	if err != nil {
-		return fmt.Errorf("read dump failed: %w", err)
+		return err
 	}
+	inst, _ := conn.DB()
+	defer inst.Close()
 
-	sql := string(content)
+	sqlBytes, err := os.ReadFile("out.sql")
+    if err != nil {
+        log.Fatal(err)
+    }
 
-	// Execute without wrapping in transaction
-	result := db.Session(&gorm.Session{SkipDefaultTransaction: true}).Exec(sql)
+    sql := string(sqlBytes)
+
+	result := conn.Session(&gorm.Session{SkipDefaultTransaction: true}).Exec(sql)
 	return result.Error
 }
