@@ -1,3 +1,4 @@
+z
 <script setup lang="ts">
 import { isSameMonth } from "~/utils/dateUtil";
 
@@ -68,39 +69,57 @@ const weekdays = [
 </script>
 
 <template>
-    <h1>
-        {{ monthName(data?.days[Math.floor(data?.days.length / 2)]?.date) }}
-    </h1>
-    <div class="flex gap-2">
-        <button @click="prevMonth"><-</button>
-        <button @click="setCurrentMonth" :disabled="monthOffset === 0">
-            Today
-        </button>
-        <button @click="nextMonth">-></button>
-    </div>
-    <div class="grid-container">
-        <div v-for="weekday in weekdays" :key="weekday" class="weekday-header">
-            {{ weekday }}
+    <div class="page">
+        <h1>
+            {{ monthName(data?.days[Math.floor(data?.days.length / 2)]?.date) }}
+        </h1>
+        <div class="flex gap-2">
+            <button @click="prevMonth"><-</button>
+            <button @click="setCurrentMonth" :disabled="monthOffset === 0">
+                Today
+            </button>
+            <button @click="nextMonth">-></button>
         </div>
-        <div
-            v-for="day in data?.days"
-            :key="day.ID"
-            :class="[
-                'grid-item',
-                today && isSameDay(today, day.date) ? 'today' : '',
-                today && !isSameMonth(data?.month ?? 0, day.date)
-                    ? 'faded'
-                    : '',
-            ]"
-            @click="() => {}"
-        >
-            <span>{{ formatDateShort(day.date) }}</span>
-            <props.displayComponent :day="day" />
+        <div class="grid-container">
+            <div
+                v-for="weekday in weekdays"
+                :key="weekday"
+                class="weekday-header"
+            >
+                {{ weekday }}
+            </div>
+            <div
+                v-for="day in data?.days"
+                :key="day.ID"
+                :class="[
+                    'grid-item',
+                    today && isSameDay(today, day.date) ? 'today' : '',
+                    today && !isSameMonth(data?.month ?? 0, day.date)
+                        ? 'faded'
+                        : '',
+                ]"
+                @click="() => {}"
+            >
+                <span>{{ formatDateShort(day.date) }}</span>
+                <props.displayComponent :day="day" />
+            </div>
         </div>
     </div>
 </template>
 
 <style scoped>
+.page {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 1rem;
+    width: 75%;
+    max-width: 1200px;
+    margin: 0 auto;
+    min-height: 100vh;
+}
+
 .grid-container {
     display: grid;
     grid-template-columns: repeat(7, 1fr);

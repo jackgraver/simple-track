@@ -53,14 +53,14 @@ func (m *MealPlanModel) MigrateDatabase() {
 func (m *MealPlanModel) seedDatabase(db *gorm.DB) error {
 	fmt.Println("Seeding meal plan database")
 
-	// egg := Food{Name: "Egg", Calories: 140, Protein: 12, Fiber: 0, Carbs: 0}
-	// sausage    := Food{Name: "Maple Breakfast Sausage", Calories: 140, Protein: 12, Fiber: 0, Carbs: 0}
-	// keto_bread  := Food{Name: "Keto Bread", Calories: 140, Protein: 12, Fiber: 15, Carbs: 0}
-	// blueberries := Food{Name: "Blueberries", ServingType: "g", Calories: 20, Protein: 0.3, Fiber: 0.9, Carbs: 0}
-	// kiwi := Food{Name: "Kiwi", Calories: 40, Protein: 0.8, Fiber: 2, Carbs: 0}
+	egg := Food{Name: "Egg", ServingType: "unit", ServingAmount: 2, Calories: 160, Protein: 12, Fiber: 0, Carbs: 0}
+	sausage    := Food{Name: "Maple Breakfast Sausage", ServingType: "unit", ServingAmount: 3, Calories: 140, Protein: 12, Fiber: 0, Carbs: 0}
+	keto_bread  := Food{Name: "Keto Bread", Calories: 140, ServingType: "unit", ServingAmount: 2, Protein: 12, Fiber: 15, Carbs: 0}
+	blueberries := Food{Name: "Blueberries", ServingType: "g", ServingAmount: 50, Calories: 20, Protein: 0.3, Fiber: 0.9, Carbs: 0}
+	kiwi := Food{Name: "Kiwi", Calories: 40, ServingType: "unit", ServingAmount: 1, Protein: 0.8, Fiber: 2, Carbs: 0}
 
-	// foods := []*Food{&egg, &sausage, &keto_bread, &blueberries, &kiwi}
-	// db.Create(&foods)
+	foods := []*Food{&egg, &sausage, &keto_bread, &blueberries, &kiwi}
+	db.Create(&foods)
 
 	// beef := Food{Name: "Beef", ServingType: "g", Calories: 200, Protein: 24, Fiber: 0, Carbs: 0} 
 	// rice    := Food{Name: "Rice", ServingType: "g", Calories: 80, Protein: 0, Fiber: 0, Carbs: 0}
@@ -70,16 +70,16 @@ func (m *MealPlanModel) seedDatabase(db *gorm.DB) error {
 	// db.Create(&rice)
 	// db.Create(&vegetables)
 	
-	// breakfast := Meal{
-	// 	Name: "Egg & Sausage Breakfast",
-	// 	Items: []MealItem{
-	// 		{FoodID: egg.ID, Amount: 1},
-	// 		{FoodID: sausage.ID, Amount: 2},
-	// 		{FoodID: keto_bread.ID, Amount: 1},
-	// 		{FoodID: blueberries.ID, Amount: 1},
-	// 		{FoodID: kiwi.ID, Amount: 1},
-	// 	},
-	// }
+	breakfast := Meal{
+		Name: "Egg & Sausage Breakfast",
+		Items: []MealItem{
+			{FoodID: egg.ID, Amount: 2},
+			{FoodID: sausage.ID, Amount: 6},
+			{FoodID: keto_bread.ID, Amount: 2},
+			{FoodID: blueberries.ID, Amount: 40},
+			{FoodID: kiwi.ID, Amount: 1},
+		},
+	}
 
 	// dinner := Meal{
 	// 	Name: "Ground Beef Bowl",
@@ -110,7 +110,7 @@ func (m *MealPlanModel) seedDatabase(db *gorm.DB) error {
 	// 	},
 	// }
 	
-	// db.Create(&breakfast)
+	db.Create(&breakfast)
 	// db.Create(&dinner)
 	// db.Create(&m2)
 	// db.Create(&m3)
@@ -138,6 +138,7 @@ func (m *MealPlanModel) seedDatabase(db *gorm.DB) error {
 		mpd := Day{
 			Date: date,
 			Plan: bulk,
+			PlannedMeals: []PlannedMeal{{DayID: bulk.ID, MealID: breakfast.ID, Logged: false}},
 		}
 
 		if err := db.Create(&mpd).Error; err != nil {
