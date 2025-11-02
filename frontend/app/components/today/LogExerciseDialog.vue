@@ -24,6 +24,7 @@ const log = ref<LoggedSet[]>(
 );
 
 const weight = computed(() => {
+    if (!props.previousWeight) return 0;
     if (!log.value.length) return props.previousWeight;
     return log.value.reduce(
         (max, set) => (set.weight > max ? set.weight : max),
@@ -56,6 +57,7 @@ const addSet = () => {
 };
 
 const logExercise = async () => {
+    props.exercise.sets = log.value;
     console.log("log", props.exercise);
     const { response, error } = await useAPIPost<{
         exercise: LoggedExercise;

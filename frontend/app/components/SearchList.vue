@@ -11,8 +11,10 @@ const props = defineProps<{
 
 const search = ref("");
 
-const query = props.prefilter?.map((id) => `exclude=${id}`).join("&");
-const { data, pending, error } = useAPIGet<any[]>(props.route + "?" + query);
+const query = props.prefilter
+    ? "?" + props.prefilter.map((id) => `exclude=${id}`).join("&")
+    : "";
+const { data, pending, error } = useAPIGet<any[]>(props.route + query);
 
 const list = computed(() => {
     const value = data.value;

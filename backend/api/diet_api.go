@@ -188,6 +188,7 @@ func (f *MealPlanFeature) postAddFood(c *gin.Context) {
 }
 
 func (f *MealPlanFeature) getAllMeals(c *gin.Context) {
+    time.Sleep(2000 * time.Millisecond)
     excludeParam := c.QueryArray("exclude") // e.g. /mealplan/food/all?exclude=1&exclude=3
     var excludeIDs []uint
     for _, idStr := range excludeParam {

@@ -5,6 +5,7 @@ import DialogContainer from "./composables/dialog/DialogContainer.vue";
 
 <template>
     <!-- <Header /> -->
+    <SideBar />
     <NuxtPage />
     <ToastContainer />
     <DialogContainer />

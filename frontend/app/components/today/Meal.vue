@@ -59,6 +59,10 @@ const logMeal = async (
     meal: Meal | null,
     type: "edit" | "editlogged" | "create",
 ) => {
+    if (type === "create") {
+        router.push(`/logmeal?type=${type}`);
+        return;
+    }
     router.push(`/logmeal?type=${type}&id=${meal?.ID}`);
 };
 

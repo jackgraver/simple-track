@@ -193,7 +193,7 @@ func (f *WorkoutFeature) logExercise(c *gin.Context) {
 	if err := c.ShouldBindJSON(&request); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
-	}
+}
 
 
 	err := services.LogExercise(f.db, request.Exercise)
