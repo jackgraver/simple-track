@@ -1,7 +1,7 @@
 package api
 
 import (
-	"be-simpletracker/db"
+	"be-simpletracker/database"
 	"io"
 	"os"
 	"time"
@@ -44,16 +44,18 @@ func InitAPI() {
 
 	router.SetTrustedProxies(nil)
 
-	db, err := db.ConnectToSqlite()
+	db, err := database.ConnectToSqlite()
 	if err != nil {
 		panic(err)
 	}
-
+	database.DefineRoutes(router)
+	
 	diet := NewMealPlanFeature(db)
 	diet.SetEndpoints(router)
 
 	workout := NewWorkoutFeature(db)
 	workout.SetEndpoints(router)
+
 
 	router.Run("127.0.0.1:8080")
 }

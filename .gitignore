@@ -74,3 +74,5 @@ frontend-vite/
 *.log
 
 *.db
+
+*.sql

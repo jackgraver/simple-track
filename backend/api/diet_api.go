@@ -1,8 +1,8 @@
 package api
 
 import (
-	"be-simpletracker/db/models"
-	"be-simpletracker/db/services"
+	"be-simpletracker/database/models"
+	"be-simpletracker/database/services"
 	"be-simpletracker/utils"
 	"fmt"
 	"net/http"
@@ -19,8 +19,8 @@ type MealPlanFeature struct {
 
 func NewMealPlanFeature(db *gorm.DB) *MealPlanFeature {
     models.NewMealPlanModel(db)
-    var feature = models.NewMealPlanModel(db)
-    feature.MigrateDatabase()
+    // var feature = models.NewMealPlanModel(db)
+    // feature.MigrateDatabase()
 
 	return &MealPlanFeature{
 		BaseFeature[models.MealPlanModel]{
@@ -180,6 +180,7 @@ func (f *MealPlanFeature) postAddFood(c *gin.Context) {
 
     food, err := services.CreateFood(f.db, &req.Food)
     if err != nil {
+        fmt.Println(err.Error())
         c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
         return
     }

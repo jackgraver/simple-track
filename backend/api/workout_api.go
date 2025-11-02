@@ -1,8 +1,8 @@
 package api
 
 import (
-	"be-simpletracker/db/models"
-	"be-simpletracker/db/services"
+	"be-simpletracker/database/models"
+	"be-simpletracker/database/services"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -18,8 +18,8 @@ type WorkoutFeature struct {
 
 func NewWorkoutFeature(db *gorm.DB) *WorkoutFeature {
     models.NewWorkoutModel(db)
-    var feature = models.NewWorkoutModel(db)
-    feature.MigrateDatabase()
+    // var feature = models.NewWorkoutModel(db)
+    // feature.MigrateDatabase()
 
 	return &WorkoutFeature{
 		BaseFeature[models.WorkoutModel]{

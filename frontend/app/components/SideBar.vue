@@ -6,8 +6,8 @@ const route = useRoute();
 
 const links = [
     { name: "Home", path: "/", icon: Home },
-    { name: "Gym", path: "/gym", icon: Dumbbell },
     { name: "Diet", path: "/diet", icon: Utensils },
+    { name: "Gym", path: "/gym", icon: Dumbbell },
 ];
 </script>
 
