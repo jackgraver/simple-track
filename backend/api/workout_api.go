@@ -3,7 +3,6 @@ package api
 import (
 	"be-simpletracker/database/models"
 	"be-simpletracker/database/services"
-	"fmt"
 	"net/http"
 	"strconv"
 	"time"
@@ -123,7 +122,6 @@ type ExerciseGroup struct {
 func (f *WorkoutFeature) getPreviousWorkout(c *gin.Context) {
     offsetStr := c.Query("offset")
     offset, _ := strconv.Atoi(offsetStr)
-    fmt.Println("offset", offset)
 
     today, err := services.GetToday(f.db, offset)
     if err != nil {
