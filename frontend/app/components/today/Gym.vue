@@ -30,7 +30,11 @@ const day = computed(() => data.value?.day);
     <div v-else class="container">
         <div class="title-row">
             <h2>{{ day?.workout_plan?.name }} Day</h2>
-            <button>Live Workout</button>
+            <button>
+                <NuxtLink :to="'liveworkout'" class="link"
+                    >Live Workout</NuxtLink
+                >
+            </button>
         </div>
         <div class="workout-grid">
             <template
@@ -117,5 +121,13 @@ const day = computed(() => data.value?.day);
     font-size: large;
     padding: 6px 16px;
     align-self: end;
+}
+
+.link {
+    text-decoration: none;
+}
+
+.link:visited {
+    color: white;
 }
 </style>
