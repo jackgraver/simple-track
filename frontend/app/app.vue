@@ -4,8 +4,10 @@ import DialogContainer from "./composables/dialog/DialogContainer.vue";
 </script>
 
 <template>
-    <SideBar />
-    <NuxtPage />
+    <div class="page">
+        <SideBar />
+        <NuxtPage />
+    </div>
     <ToastContainer />
     <DialogContainer />
 </template>
@@ -23,6 +25,23 @@ html {
         "Helvetica Neue",
         Arial,
         sans-serif;
+}
+
+@media (max-width: 767px) {
+    .page {
+        background-color: blue;
+        display: flex;
+        flex-direction: column;
+    }
+}
+
+@media (min-width: 768px) {
+    .page {
+        background-color: red;
+        height: 100vh;
+        display: flex;
+        flex-direction: row;
+    }
 }
 
 button {
