@@ -29,7 +29,6 @@ html {
 
 @media (max-width: 767px) {
     .page {
-        background-color: blue;
         display: flex;
         flex-direction: column;
     }
@@ -37,11 +36,23 @@ html {
 
 @media (min-width: 768px) {
     .page {
-        background-color: red;
         height: 100vh;
         display: flex;
         flex-direction: row;
     }
+}
+
+a,
+.nuxt-link {
+    all: unset;
+    cursor: pointer;
+}
+
+a,
+.nuxt-link {
+    text-decoration: none;
+    color: inherit;
+    font: inherit;
 }
 
 button {
