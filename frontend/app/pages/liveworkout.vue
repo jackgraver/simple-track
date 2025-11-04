@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { Exercise, LoggedExercise, WorkoutLog } from "~/types/workout";
-import { Plus, Trash } from "lucide-vue-next";
+import { Check, Plus, Trash } from "lucide-vue-next";
 type ExerciseGroup = {
     planned: Exercise;
     logged: LoggedExercise;
@@ -41,6 +41,10 @@ const removeSet = (
     const index = exercise.sets.indexOf(set);
     exercise.sets.splice(index, 1);
 };
+
+const logExercise = async (exercise: LoggedExercise) => {};
+
+const confirmLogs = async () => {};
 </script>
 
 <template>
@@ -48,7 +52,10 @@ const removeSet = (
     <div v-else-if="error">Error: {{ error.message }}</div>
     <div v-else class="container">
         <article v-for="log in log">
-            <h1>{{ log.exercise.name }}</h1>
+            <header>
+                <h1>{{ log.exercise.name }}</h1>
+                <span>{{ log.weight_setup }}</span>
+            </header>
             <template v-for="(set, i) in log.sets">
                 <div class="set">
                     <div class="set-input">
@@ -65,8 +72,11 @@ const removeSet = (
                 </div>
             </template>
             <button @click="addSet(log)"><Plus /></button>
+            <button class="confirm-button" @click="logExercise(log)">
+                <Check />
+            </button>
         </article>
-        <button><NuxtLink to="/">Finish</NuxtLink></button>
+        <button @click="confirmLogs"><NuxtLink to="/">Finish</NuxtLink></button>
     </div>
 </template>
 
@@ -77,10 +87,23 @@ const removeSet = (
     gap: 1rem;
 }
 
+.container header {
+    display: flex;
+    flex-direction: row;
+    gap: 0.5rem;
+    align-items: center;
+    padding-bottom: 1rem;
+}
+
+.container header h1 {
+    flex: 1;
+}
+
 .container article {
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
+    max-width: 95%;
     border: 1px solid rgb(56, 56, 56);
     border-radius: 5px;
     background: rgb(27, 27, 27);
@@ -112,8 +135,17 @@ const removeSet = (
 }
 
 .set-input {
+    flex: 1;
+    min-width: 0;
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
+    justify-content: center;
+}
+
+.set-input input {
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
 }
 </style>
