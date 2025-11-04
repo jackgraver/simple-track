@@ -8,6 +8,7 @@ import DialogContainer from "./composables/dialog/DialogContainer.vue";
         <SideBar />
         <NuxtPage />
     </div>
+
     <ToastContainer />
     <DialogContainer />
 </template>
