@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/glebarez/sqlite"
@@ -18,8 +19,15 @@ import (
 
 func DefineRoutes(router *gin.Engine) {
 	router.POST("/db/dump", func(c *gin.Context) {
-		DumpSQLiteDB("st.db", "out_dump.sql")
-		c.String(http.StatusOK, "Dump Successful")
+		timestamp := time.Now().Format("2006-01-02_15-04-05")
+		filename := fmt.Sprintf("database/dumps/dbdump_%s.sql", timestamp)
+
+		if err := DumpSQLiteDB("st.db", filename); err != nil {
+			c.String(http.StatusInternalServerError, fmt.Sprintf("Dump failed: %v", err))
+			return
+		}
+
+		c.String(http.StatusOK, fmt.Sprintf("Dump successful: %s", filename))
 	})
 
 	router.POST("/db/restore", func(c *gin.Context) {
