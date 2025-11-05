@@ -21,6 +21,7 @@ const { data, pending, error } = useAPIGet<{
     previous_exercises: ExerciseGroup[];
 }>(`workout/previous?offset=${props.dateOffset}`);
 
+console.log(data.value?.previous_exercises);
 const day = computed(() => data.value?.day);
 </script>
 
