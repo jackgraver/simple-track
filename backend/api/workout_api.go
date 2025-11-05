@@ -3,6 +3,7 @@ package api
 import (
 	"be-simpletracker/database/models"
 	"be-simpletracker/database/services"
+	"fmt"
 	"net/http"
 	"strconv"
 	"time"
@@ -34,6 +35,7 @@ func (f *WorkoutFeature) SetEndpoints(router *gin.Engine) {
     group.GET("/all", f.getWorkoutAll)
     group.GET("/previous", f.getPreviousWorkout)
 	group.POST("/exercise/log", f.logExercise)
+    group.POST("/exercise/all-logged", f.checkAllLogged)
 }
 
 func (f *WorkoutFeature) getWorkoutToday(c *gin.Context) {
@@ -123,7 +125,7 @@ func (f *WorkoutFeature) getPreviousWorkout(c *gin.Context) {
     offsetStr := c.Query("offset")
     offset, _ := strconv.Atoi(offsetStr)
 
-    today, err := services.GetToday(f.db, offset+1)
+    today, err := services.GetToday(f.db, offset)
     if err != nil {
         c.JSON(http.StatusNotImplemented, gin.H{"error": err.Error()})
         return
@@ -191,8 +193,7 @@ func (f *WorkoutFeature) logExercise(c *gin.Context) {
 	if err := c.ShouldBindJSON(&request); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
-}
-
+    }
 
 	err := services.LogExercise(f.db, request.Exercise)
 	if err != nil {
@@ -201,4 +202,21 @@ func (f *WorkoutFeature) logExercise(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"exercise": request.Exercise})
+}
+
+func (f *WorkoutFeature) checkAllLogged(c *gin.Context) {
+    today, err := services.GetToday(f.db, 0)
+    if err != nil {
+        c.JSON(http.StatusNotImplemented, gin.H{"error": err.Error()})
+        return
+    }
+
+    if len(today.Exercises) == len(today.WorkoutPlan.Exercises) {
+        fmt.Println("All logged!")
+        c.JSON(http.StatusOK, gin.H{"all_logged": true})
+        return
+    }
+
+    fmt.Println("Not all logged!")
+    c.JSON(http.StatusOK, gin.H{"all_logged": false})
 }

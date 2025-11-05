@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import type { Exercise, LoggedExercise, WorkoutLog } from "~/types/workout";
 import { Check, Plus, Trash } from "lucide-vue-next";
+import { toast } from "~/composables/toast/useToast";
+
 type ExerciseGroup = {
     planned: Exercise;
     logged: LoggedExercise;
@@ -15,6 +17,7 @@ const { data, pending, error } = useAPIGet<{
 const log = ref<LoggedExercise[]>(
     data?.value?.previous_exercises.map((e) => e.previous) ?? [],
 );
+console.log(data.value?.previous_exercises);
 
 const addSet = (exercise: LoggedExercise) => {
     if (!exercise) return;
@@ -42,9 +45,46 @@ const removeSet = (
     exercise.sets.splice(index, 1);
 };
 
-const logExercise = async (exercise: LoggedExercise) => {};
+const logExercise = async (exercise: LoggedExercise) => {
+    const rawExercise = toRaw(exercise);
+    rawExercise.sets = toRaw(rawExercise.sets).filter(
+        (set) => !(set.reps === 0 && set.weight === 0),
+    );
+    rawExercise.ID = 0;
+    rawExercise.workout_log_id =
+        data.value?.day.ID ?? rawExercise.workout_log_id;
 
-const confirmLogs = async () => {};
+    const { response, error } = await useAPIPost<{
+        exercise: LoggedExercise;
+    }>(`workout/exercise/log`, "POST", {
+        exercise: rawExercise,
+    });
+
+    if (error) {
+        console.error(error);
+        toast.push(error.message, "error");
+        return;
+    }
+};
+
+const confirmLogs = async () => {
+    const { response, error } = await useAPIPost<{
+        all_logged: boolean;
+    }>(`workout/exercise/all-logged`, "POST", {});
+
+    if (error) {
+        console.error(error);
+        toast.push(error.message, "error");
+        return;
+    }
+    if (response) {
+        if (response.all_logged) {
+            toast.push("All logged!", "success");
+        } else {
+            toast.push("Not all logged!", "error");
+        }
+    }
+};
 </script>
 
 <template>
@@ -66,9 +106,9 @@ const confirmLogs = async () => {};
                         <label v-if="i === 0">Reps</label>
                         <input type="number" v-model="set.reps" />
                     </div>
-                    <button class="delete-button" @click="removeSet(log, set)">
+                    <!-- <button class="delete-button" @click="removeSet(log, set)">
                         <Trash />
-                    </button>
+                    </button> -->
                 </div>
             </template>
             <button @click="addSet(log)"><Plus /></button>
