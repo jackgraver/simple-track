@@ -22,7 +22,6 @@ const { data, pending, error } = useAPIGet<{
 }>(`workout/previous?offset=${props.dateOffset}`);
 
 const day = computed(() => data.value?.day);
-console.log(data.value?.previous_exercises);
 </script>
 
 <template>
@@ -71,42 +70,6 @@ console.log(data.value?.previous_exercises);
                     />
                 </template>
             </template>
-            <!-- <template
-                v-if="data?.exercises"
-                v-for="exercise in data.exercises"
-                :key="exercise.ID"
-            >
-                <TodayGymCard :exercise="exercise" :planned="false" />
-            </template>
-            <template
-                v-if="unloggedExercises.length"
-                v-for="exercise in unloggedExercises"
-                :key="exercise.ID"
-            >
-                <TodayGymCard
-                    :exercise="{
-                        ID: 0,
-                        created_at: '',
-                        updated_at: '',
-                        workout_log_id: day?.ID ?? 0,
-                        exercise_id: exercise.ID,
-                        sets: [
-                            {
-                                ID: 0,
-                                created_at: '',
-                                updated_at: '',
-                                logged_exercise_id: 0,
-                                reps: 0,
-                                weight: 0,
-                            },
-                        ] as LoggedSet[],
-                        exercise: exercise,
-                        weight_setup: '',
-                        percent_change: 0,
-                    }"
-                    :planned="true"
-                />
-            </template> -->
         </div>
     </div>
 </template>

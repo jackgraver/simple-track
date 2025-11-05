@@ -11,33 +11,35 @@ const datechange = (direction: "next" | "prev"): void => {
 </script>
 
 <template>
-    <main class="page">
-        <section class="home-section">
+    <main>
+        <section>
             <TodayMeal
                 @date-change="datechange"
                 :date-offset="dateOffset"
                 :key="dateOffset"
             />
         </section>
-        <section class="home-section">
+        <section>
             <TodayGym :date-offset="dateOffset" :key="dateOffset" />
         </section>
     </main>
 </template>
 
 <style scoped>
-.page {
-    display: grid;
-    row-gap: 1.25rem;
-}
-
-.home-section {
+main {
     display: flex;
-    justify-content: center;
+    flex-direction: column;
+    gap: 1rem;
+    align-items: center;
+    width: 100%;
+    height: 100%;
+    padding: 1rem;
+    padding-top: 0;
+    text-align: center;
 }
 
-.home-section > * {
-    width: 75%;
-    max-width: 1200px;
+main > section {
+    justify-self: start;
+    text-align: left;
 }
 </style>
