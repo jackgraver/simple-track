@@ -19,6 +19,7 @@ export async function useAPIPost<T>(
     method: "POST" | "DELETE" = "POST",
     body: Record<string, any>,
     options: any = {},
+    watch: boolean = true,
 ) {
     const config = useRuntimeConfig();
     const baseUrl = config.public.apiBase || "http://localhost:8080";
@@ -28,6 +29,7 @@ export async function useAPIPost<T>(
         {
             method: method,
             body,
+            watch: watch,
             ...options,
             onResponse({ response }) {
                 if (!response.ok) {

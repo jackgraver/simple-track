@@ -102,7 +102,7 @@ func RestoreSQLiteDB(dumpPath string) error {
 	inst, _ := conn.DB()
 	defer inst.Close()
 
-	sqlBytes, err := os.ReadFile("out.sql")
+	sqlBytes, err := os.ReadFile("out_dump.sql")
     if err != nil {
         log.Fatal(err)
     }

@@ -185,7 +185,8 @@ func (f *WorkoutFeature) getPreviousWorkout(c *gin.Context) {
 
 
 type LogExerciseRequest struct {
-	Exercise models.LoggedExercise `json:"exercise"`
+	Log models.LoggedExercise `json:"exercise"`
+    Type string `json:"type"`
 }
 
 func (f *WorkoutFeature) logExercise(c *gin.Context) {
@@ -195,13 +196,27 @@ func (f *WorkoutFeature) logExercise(c *gin.Context) {
 		return
     }
 
-	err := services.LogExercise(f.db, request.Exercise)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
+    switch request.Type {
+        case "previous":
+            request.Log.ID = 0
+            for i := range request.Log.Sets {
+                request.Log.Sets[i].LoggedExerciseID = 0
+                request.Log.Sets[i].ID = 0
+            }
+            err := services.LogExercise(f.db, request.Log)
+            if err != nil {
+                c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+                return
+            }
+        case "logged":
+            err := services.UpdateLoggedExercise(f.db, request.Log)
+            if err != nil {
+                c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+                return
+            }
+    }
 
-	c.JSON(http.StatusOK, gin.H{"exercise": request.Exercise})
+	c.JSON(http.StatusOK, gin.H{"exercise": request.Log})
 }
 
 func (f *WorkoutFeature) checkAllLogged(c *gin.Context) {

@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import type { Exercise, LoggedExercise, WorkoutLog } from "~/types/workout";
-import { Check, Plus, Trash } from "lucide-vue-next";
 import { toast } from "~/composables/toast/useToast";
 
 type ExerciseGroup = {
@@ -14,10 +13,10 @@ const { data, pending, error } = useAPIGet<{
     previous_exercises: ExerciseGroup[];
 }>(`workout/previous?offset=0`);
 
-const log = ref<LoggedExercise[]>(
-    data?.value?.previous_exercises.map((e) => e.previous) ?? [],
+const log = ref<ExerciseGroup[]>(
+    // data?.value?.previous_exercises.map((e) => e.previous) ?? [],
+    data.value?.previous_exercises ?? [],
 );
-console.log(data.value?.previous_exercises);
 
 const addSet = (exercise: LoggedExercise) => {
     if (!exercise) return;
@@ -45,26 +44,38 @@ const removeSet = (
     exercise.sets.splice(index, 1);
 };
 
-const logExercise = async (exercise: LoggedExercise) => {
+const logExercise = async (
+    exercise: LoggedExercise,
+    type: "logged" | "previous",
+): Promise<boolean> => {
+    console.log("logging", exercise, type);
     const rawExercise = toRaw(exercise);
     rawExercise.sets = toRaw(rawExercise.sets).filter(
         (set) => !(set.reps === 0 && set.weight === 0),
     );
-    rawExercise.ID = 0;
     rawExercise.workout_log_id =
         data.value?.day.ID ?? rawExercise.workout_log_id;
 
     const { response, error } = await useAPIPost<{
         exercise: LoggedExercise;
-    }>(`workout/exercise/log`, "POST", {
-        exercise: rawExercise,
-    });
+    }>(
+        `workout/exercise/log`,
+        "POST",
+        {
+            exercise: rawExercise,
+            type: type,
+        },
+        {},
+        false,
+    );
 
     if (error) {
         console.error(error);
         toast.push(error.message, "error");
-        return;
+        return false;
     }
+
+    return true;
 };
 
 const confirmLogs = async () => {
@@ -91,32 +102,13 @@ const confirmLogs = async () => {
     <div v-if="pending">Loading...</div>
     <div v-else-if="error">Error: {{ error.message }}</div>
     <div v-else class="container">
-        <article v-for="log in log">
-            <header>
-                <h1>{{ log.exercise.name }}</h1>
-                <span>{{ log.weight_setup }}</span>
-            </header>
-            <template v-for="(set, i) in log.sets">
-                <div class="set">
-                    <div class="set-input">
-                        <label v-if="i === 0">Weight</label>
-                        <input type="number" v-model="set.weight" />
-                    </div>
-                    <div class="set-input">
-                        <label v-if="i === 0">Reps</label>
-                        <input type="number" v-model="set.reps" />
-                    </div>
-                    <!-- <button class="delete-button" @click="removeSet(log, set)">
-                        <Trash />
-                    </button> -->
-                </div>
-            </template>
-            <button @click="addSet(log)"><Plus /></button>
-            <button class="confirm-button" @click="logExercise(log)">
-                <Check />
-            </button>
-        </article>
-        <button @click="confirmLogs"><NuxtLink to="/">Finish</NuxtLink></button>
+        <LiveExerciseCard
+            v-for="log in log"
+            :data="log"
+            :add-set="addSet"
+            :log-exercise="logExercise"
+        />
+        <button @click="confirmLogs"><span>Finish</span></button>
     </div>
 </template>
 
@@ -137,55 +129,5 @@ const confirmLogs = async () => {
 
 .container header h1 {
     flex: 1;
-}
-
-.container article {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-    max-width: 95%;
-    border: 1px solid rgb(56, 56, 56);
-    border-radius: 5px;
-    background: rgb(27, 27, 27);
-    padding: 1rem;
-}
-
-.container article header {
-    display: flex;
-    flex-direction: row;
-    gap: 0.5rem;
-    align-items: center;
-}
-
-.container article footer {
-    display: flex;
-    flex-direction: row;
-    gap: 0.5rem;
-    align-items: center;
-}
-
-.container article h1 {
-    margin: 0;
-}
-
-.set {
-    display: flex;
-    flex-direction: row;
-    gap: 0.5rem;
-}
-
-.set-input {
-    flex: 1;
-    min-width: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-    justify-content: center;
-}
-
-.set-input input {
-    width: 100%;
-    min-width: 0;
-    box-sizing: border-box;
 }
 </style>
