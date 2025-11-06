@@ -64,7 +64,7 @@ a,
 button {
     background: #2c2c2c;
     padding: 6px 12px;
-    margin: 4px;
+    margin: 4px 0px;
     border-radius: 4px;
     border: 2px solid #a7a7a7;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
