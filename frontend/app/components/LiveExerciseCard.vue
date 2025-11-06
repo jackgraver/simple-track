@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import type { Exercise, LoggedExercise, LoggedSet } from "~/types/workout";
 import { Plus, NotebookPen, Loader, Check, Logs } from "lucide-vue-next";
+import { dialogManager } from "~/composables/dialog/useDialog";
+import ConfirmWeightSetupDialog from "./ConfirmWeightSetupDialog.vue";
 
 type ExerciseGroup = {
     planned: Exercise;
@@ -27,6 +29,13 @@ const logStatus = ref<"pending" | "logged" | "not-logged">(
     type.value === "logged" ? "logged" : "not-logged",
 );
 
+const initialWeight = computed(() => {
+    if (exercise.value?.sets[0]?.weight) {
+        return exercise.value?.sets[0]?.weight;
+    }
+    return 0;
+});
+
 watch(exercise.value?.sets, () => {
     logStatus.value = "not-logged";
 });
@@ -37,8 +46,28 @@ const innerAddSet = (exercise: LoggedExercise) => {
 };
 
 const innerLogExercise = async (exercise: LoggedExercise) => {
-    console.log("logging", exercise);
     logStatus.value = "pending";
+
+    for (const set of exercise.sets) {
+        if (set.weight !== initialWeight.value) {
+            const res = await dialogManager.custom<string>({
+                title: "Update Weight Setup",
+                component: ConfirmWeightSetupDialog,
+                props: {
+                    weightSetup: exercise.weight_setup,
+                },
+            });
+
+            if (res === "cancel") {
+                logStatus.value = "not-logged";
+                return;
+            }
+
+            exercise.weight_setup = res;
+            break;
+        }
+    }
+
     props.logExercise(exercise, type.value).then((res) => {
         logStatus.value = res ? "logged" : "not-logged";
     });
@@ -104,8 +133,7 @@ article {
 
 article header {
     display: flex;
-    flex-direction: row;
-    gap: 0.5rem;
+    justify-content: space-between;
     align-items: center;
 }
 
