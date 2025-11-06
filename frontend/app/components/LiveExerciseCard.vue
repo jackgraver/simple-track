@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { Exercise, LoggedExercise } from "~/types/workout";
+import type { Exercise, LoggedExercise, LoggedSet } from "~/types/workout";
 import { Plus, NotebookPen, Loader, Check, Logs } from "lucide-vue-next";
 
 type ExerciseGroup = {
@@ -15,6 +15,7 @@ const props = defineProps<{
         exercise: LoggedExercise,
         type: "logged" | "previous",
     ) => Promise<boolean>;
+    removeSet: (exercise: LoggedExercise, set: LoggedSet) => void;
 }>();
 
 const exercise = ref<LoggedExercise>(props.data.logged || props.data.previous);
@@ -42,6 +43,11 @@ const innerLogExercise = async (exercise: LoggedExercise) => {
         logStatus.value = res ? "logged" : "not-logged";
     });
 };
+
+const checkIfZerod = (set: LoggedSet) => {
+    if (set.reps === 0 && set.weight === 0)
+        props.removeSet(exercise.value, set);
+};
 </script>
 <template>
     <article>
@@ -53,24 +59,34 @@ const innerLogExercise = async (exercise: LoggedExercise) => {
             <div class="set">
                 <div class="set-input">
                     <label v-if="i === 0">Weight</label>
-                    <input type="number" v-model="set.weight" />
+                    <input
+                        type="number"
+                        v-model="set.weight"
+                        @change="() => checkIfZerod(set)"
+                    />
                 </div>
                 <div class="set-input">
                     <label v-if="i === 0">Reps</label>
-                    <input type="number" v-model="set.reps" />
+                    <input
+                        type="number"
+                        v-model="set.reps"
+                        @change="() => checkIfZerod(set)"
+                    />
                 </div>
             </div>
         </template>
-        <button @click="innerAddSet(exercise)"><Plus /></button>
-        <button
-            class="confirm-button"
-            @click="innerLogExercise(exercise)"
-            :disabled="logStatus === 'logged'"
-        >
-            <NotebookPen v-if="logStatus === 'not-logged'" />
-            <Loader class="spinner" v-if="logStatus === 'pending'" />
-            <Check v-if="logStatus === 'logged'" />
-        </button>
+        <footer>
+            <button @click="innerAddSet(exercise)"><Plus /></button>
+            <button
+                class="confirm-button"
+                @click="innerLogExercise(exercise)"
+                :disabled="logStatus === 'logged'"
+            >
+                <NotebookPen v-if="logStatus === 'not-logged'" />
+                <Loader class="spinner" v-if="logStatus === 'pending'" />
+                <Check v-if="logStatus === 'logged'" />
+            </button>
+        </footer>
     </article>
 </template>
 
@@ -94,10 +110,15 @@ article header {
 }
 
 article footer {
+    margin-top: auto;
     display: flex;
-    flex-direction: row;
+    flex-direction: column;
     gap: 0.5rem;
     align-items: center;
+}
+
+article footer button {
+    width: 100%;
 }
 
 article h1 {

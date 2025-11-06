@@ -102,12 +102,16 @@ const confirmLogs = async () => {
     <div v-if="pending">Loading...</div>
     <div v-else-if="error">Error: {{ error.message }}</div>
     <div v-else class="container">
-        <LiveExerciseCard
-            v-for="log in log"
-            :data="log"
-            :add-set="addSet"
-            :log-exercise="logExercise"
-        />
+        <div class="card-container">
+            <LiveExerciseCard
+                v-for="log in log"
+                :data="log"
+                :add-set="addSet"
+                :log-exercise="logExercise"
+                :remove-set="removeSet"
+            />
+        </div>
+
         <button @click="confirmLogs"><span>Finish</span></button>
     </div>
 </template>
@@ -117,6 +121,24 @@ const confirmLogs = async () => {
     display: flex;
     flex-direction: column;
     gap: 1rem;
+}
+
+.card-container {
+    display: flex;
+    gap: 1rem;
+}
+
+@media (max-width: 767px) {
+    .card-container {
+        flex-direction: column;
+    }
+}
+
+@media (min-width: 768px) {
+    .card-container {
+        flex-direction: row;
+        flex-wrap: wrap;
+    }
 }
 
 .container header {
