@@ -25,7 +25,11 @@ export function useDialog() {
         });
     }
 
-    // General-purpose custom dialog
+    /**
+     *
+     * @param options title, component, props
+     * @returns T
+     */
     function custom<T>(options: CustomDialogOptions<T>): Promise<T | "cancel"> {
         dialog.value = options;
         return new Promise<T>((resolve) => {
