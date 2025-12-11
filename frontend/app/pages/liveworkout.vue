@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { Exercise, LoggedExercise, WorkoutLog } from "~/types/workout";
 import { toast } from "~/composables/toast/useToast";
+import { nextTick } from "vue";
 
 type ExerciseGroup = {
     planned: Exercise;
@@ -33,6 +34,12 @@ const currentWeight = ref<number>(0);
 const currentReps = ref<number>(0);
 const currentSetNumber = ref<number>(1);
 const loggedSets = ref<Array<{ weight: number; reps: number }>>([]);
+
+// Edit mode state
+const weightEditMode = ref<boolean>(false);
+const repsEditMode = ref<boolean>(false);
+const weightInputValue = ref<string>("");
+const repsInputValue = ref<string>("");
 
 // Get maximum weight from previous exercise
 const getMaxWeight = (exerciseGroup: ExerciseGroup): number | null => {
@@ -80,6 +87,8 @@ const startLoggingExercise = (index: number) => {
         currentWeight.value = 0;
     }
     currentReps.value = 0;
+    weightEditMode.value = false;
+    repsEditMode.value = false;
 };
 
 // Add next set
@@ -178,6 +187,70 @@ const finishLogging = async () => {
     currentReps.value = 0;
     currentSetNumber.value = 1;
     loggedSets.value = [];
+    weightEditMode.value = false;
+    repsEditMode.value = false;
+};
+
+// Weight increment/decrement functions
+const incrementWeight = () => {
+    currentWeight.value = (currentWeight.value || 0) + 2.5;
+};
+
+const decrementWeight = () => {
+    currentWeight.value = Math.max(0, (currentWeight.value || 0) - 2.5);
+};
+
+// Reps increment/decrement functions
+const incrementReps = () => {
+    currentReps.value = (currentReps.value || 0) + 1;
+};
+
+const decrementReps = () => {
+    currentReps.value = Math.max(0, (currentReps.value || 0) - 1);
+};
+
+// Enter edit mode for weight
+const enterWeightEditMode = () => {
+    weightEditMode.value = true;
+    weightInputValue.value = currentWeight.value.toString();
+    nextTick(() => {
+        const input = document.getElementById('weight-input') as HTMLInputElement;
+        if (input) {
+            input.focus();
+            input.select();
+        }
+    });
+};
+
+// Exit edit mode for weight
+const exitWeightEditMode = () => {
+    const numValue = parseFloat(weightInputValue.value);
+    if (!isNaN(numValue) && numValue >= 0) {
+        currentWeight.value = numValue;
+    }
+    weightEditMode.value = false;
+};
+
+// Enter edit mode for reps
+const enterRepsEditMode = () => {
+    repsEditMode.value = true;
+    repsInputValue.value = currentReps.value.toString();
+    nextTick(() => {
+        const input = document.getElementById('reps-input') as HTMLInputElement;
+        if (input) {
+            input.focus();
+            input.select();
+        }
+    });
+};
+
+// Exit edit mode for reps
+const exitRepsEditMode = () => {
+    const numValue = parseInt(repsInputValue.value);
+    if (!isNaN(numValue) && numValue >= 0) {
+        currentReps.value = numValue;
+    }
+    repsEditMode.value = false;
 };
 
 const logExercise = async (
@@ -276,25 +349,57 @@ const confirmLogs = async () => {
                 </ul>
             </div>
             <div class="input-group">
-                <label>
-                    Weight (kg)
-                    <input
-                        type="number"
-                        v-model.number="currentWeight"
-                        placeholder="0"
-                        min="0"
-                        step="0.5"
-                    />
-                </label>
-                <label>
-                    Reps
-                    <input
-                        type="number"
-                        v-model.number="currentReps"
-                        placeholder="0"
-                        min="0"
-                    />
-                </label>
+                <div class="stepper-container">
+                    <label>Weight (lbs)</label>
+                    <div class="stepper">
+                        <button @click="decrementWeight" class="stepper-button" type="button">−</button>
+                        <div 
+                            v-if="!weightEditMode" 
+                            @click="enterWeightEditMode" 
+                            class="stepper-display"
+                        >
+                            {{ currentWeight || 0 }}
+                        </div>
+                        <input
+                            v-else
+                            id="weight-input"
+                            type="number"
+                            v-model="weightInputValue"
+                            @blur="exitWeightEditMode"
+                            @keyup.enter="exitWeightEditMode"
+                            @keyup.escape="exitWeightEditMode"
+                            class="stepper-input"
+                            min="0"
+                            step="0.5"
+                        />
+                        <button @click="incrementWeight" class="stepper-button" type="button">+</button>
+                    </div>
+                </div>
+                <div class="stepper-container">
+                    <label>Reps</label>
+                    <div class="stepper">
+                        <button @click="decrementReps" class="stepper-button" type="button">−</button>
+                        <div 
+                            v-if="!repsEditMode" 
+                            @click="enterRepsEditMode" 
+                            class="stepper-display"
+                        >
+                            {{ currentReps || 0 }}
+                        </div>
+                        <input
+                            v-else
+                            id="reps-input"
+                            type="number"
+                            v-model="repsInputValue"
+                            @blur="exitRepsEditMode"
+                            @keyup.enter="exitRepsEditMode"
+                            @keyup.escape="exitRepsEditMode"
+                            class="stepper-input"
+                            min="0"
+                        />
+                        <button @click="incrementReps" class="stepper-button" type="button">+</button>
+                    </div>
+                </div>
             </div>
             <div class="button-group">
                 <button @click="addNextSet" class="next-set-button">
@@ -443,28 +548,90 @@ const confirmLogs = async () => {
 .input-group {
     display: flex;
     flex-direction: column;
+    gap: 2rem;
+}
+
+.stepper-container {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.stepper-container label {
+    font-weight: 500;
+    font-size: 0.9rem;
+    color: rgb(150, 150, 150);
+}
+
+.stepper {
+    display: flex;
+    align-items: center;
+    justify-content: center;
     gap: 1rem;
 }
 
-.input-group label {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-    font-weight: 500;
-}
-
-.input-group input {
-    padding: 0.75rem;
+.stepper-button {
+    width: 3rem;
+    height: 3rem;
     border: 1px solid rgb(56, 56, 56);
     border-radius: 5px;
     background: rgb(27, 27, 27);
     color: inherit;
-    font-size: 1rem;
+    font-size: 1.5rem;
+    font-weight: 300;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background-color 0.2s, border-color 0.2s;
+    user-select: none;
 }
 
-.input-group input:focus {
+.stepper-button:hover {
+    background: rgb(40, 40, 40);
+    border-color: rgb(100, 100, 100);
+}
+
+.stepper-button:active {
+    background: rgb(50, 50, 50);
+}
+
+.stepper-display {
+    min-width: 6rem;
+    height: 3rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2rem;
+    font-weight: 500;
+    cursor: pointer;
+    user-select: none;
+    padding: 0 1rem;
+    border-radius: 5px;
+    transition: background-color 0.2s;
+}
+
+.stepper-display:hover {
+    background: rgb(30, 30, 30);
+}
+
+.stepper-input {
+    min-width: 6rem;
+    height: 3rem;
+    padding: 0 1rem;
+    border: 1px solid rgb(56, 56, 56);
+    border-radius: 5px;
+    background: rgb(27, 27, 27);
+    color: inherit;
+    font-size: 2rem;
+    font-weight: 500;
+    text-align: center;
+}
+
+.stepper-input:focus {
     outline: none;
     border-color: rgb(100, 100, 100);
+    background: rgb(35, 35, 35);
 }
 
 .button-group {
