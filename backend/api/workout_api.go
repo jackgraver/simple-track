@@ -39,6 +39,7 @@ func (f *WorkoutFeature) SetEndpoints(router *gin.Engine) {
     group.GET("/exercises/all", f.getAllExercises)
     group.POST("/exercise/add", f.addExerciseToWorkout)
     group.DELETE("/exercise/remove", f.removeExerciseFromWorkout)
+    group.GET("/exercise/progression/:id", f.getExerciseProgression)
 }
 
 func (f *WorkoutFeature) getWorkoutToday(c *gin.Context) {
@@ -331,4 +332,21 @@ func (f *WorkoutFeature) removeExerciseFromWorkout(c *gin.Context) {
     }
 
     c.JSON(http.StatusOK, gin.H{"success": true})
+}
+
+func (f *WorkoutFeature) getExerciseProgression(c *gin.Context) {
+    exerciseIDStr := c.Param("id")
+    exerciseID, err := strconv.ParseUint(exerciseIDStr, 10, 32)
+    if err != nil {
+        c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid exercise ID"})
+        return
+    }
+
+    progression, err := services.GetExerciseProgression(f.db, uint(exerciseID))
+    if err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+        return
+    }
+
+    c.JSON(http.StatusOK, gin.H{"progression": progression})
 }

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Home, Dumbbell, Utensils, Settings } from "lucide-vue-next";
+import { Home, Dumbbell, Utensils, Settings, BarChart } from "lucide-vue-next";
 import { useRoute } from "vue-router";
 
 const route = useRoute();
@@ -9,6 +9,7 @@ const links = [
     { name: "Diet", path: "/diet", icon: Utensils },
     { name: "Gym", path: "/gym", icon: Dumbbell },
     { name: "Settings", path: "/settings", icon: Settings },
+    { name: "Progression", path: "/progression", icon: BarChart },
 ];
 </script>
 

@@ -104,3 +104,28 @@ func GetAllExercises(db *gorm.DB) ([]models.Exercise, error) {
     }
     return exercises, nil
 }
+
+type ExerciseProgressionEntry struct {
+    Date   time.Time `json:"date"`
+    Weight float32   `json:"weight"`
+    Reps   uint      `json:"reps"`
+}
+
+func GetExerciseProgression(db *gorm.DB, exerciseID uint) ([]ExerciseProgressionEntry, error) {
+    var entries []ExerciseProgressionEntry
+
+    err := db.
+        Table("logged_exercises").
+        Select("workout_logs.date, logged_sets.weight, logged_sets.reps").
+        Joins("JOIN workout_logs ON workout_logs.id = logged_exercises.workout_log_id").
+        Joins("JOIN logged_sets ON logged_sets.logged_exercise_id = logged_exercises.id").
+        Where("logged_exercises.exercise_id = ?", exerciseID).
+        Where("logged_sets.weight > 0 AND logged_sets.reps > 0").
+        Order("workout_logs.date ASC").
+        Scan(&entries).Error
+
+    if err != nil {
+        return []ExerciseProgressionEntry{}, err
+    }
+    return entries, nil
+}
