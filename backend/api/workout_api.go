@@ -36,6 +36,9 @@ func (f *WorkoutFeature) SetEndpoints(router *gin.Engine) {
     group.GET("/previous", f.getPreviousWorkout)
 	group.POST("/exercise/log", f.logExercise)
     group.POST("/exercise/all-logged", f.checkAllLogged)
+    group.GET("/exercises/all", f.getAllExercises)
+    group.POST("/exercise/add", f.addExerciseToWorkout)
+    group.DELETE("/exercise/remove", f.removeExerciseFromWorkout)
 }
 
 func (f *WorkoutFeature) getWorkoutToday(c *gin.Context) {
@@ -234,4 +237,98 @@ func (f *WorkoutFeature) checkAllLogged(c *gin.Context) {
 
     fmt.Println("Not all logged!")
     c.JSON(http.StatusOK, gin.H{"all_logged": false})
+}
+
+func (f *WorkoutFeature) getAllExercises(c *gin.Context) {
+    exercises, err := services.GetAllExercises(f.db)
+    if err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+        return
+    }
+    c.JSON(http.StatusOK, gin.H{"exercises": exercises})
+}
+
+type AddExerciseRequest struct {
+    ExerciseID uint `json:"exercise_id"`
+}
+
+func (f *WorkoutFeature) addExerciseToWorkout(c *gin.Context) {
+    var request AddExerciseRequest
+    if err := c.ShouldBindJSON(&request); err != nil {
+        c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+        return
+    }
+
+    today, err := services.GetToday(f.db, 0)
+    if err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+        return
+    }
+
+    // Check if exercise already exists in workout
+    for _, ex := range today.Exercises {
+        if ex.ExerciseID == request.ExerciseID {
+            c.JSON(http.StatusBadRequest, gin.H{"error": "Exercise already in workout"})
+            return
+        }
+    }
+
+    // Create a new logged exercise entry (empty, ready to be logged)
+    newExercise := models.LoggedExercise{
+        WorkoutLogID: today.ID,
+        ExerciseID:   request.ExerciseID,
+        Sets:         []models.LoggedSet{},
+        WeightSetup:  "",
+    }
+
+    err = services.LogExercise(f.db, newExercise)
+    if err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+        return
+    }
+
+    // Reload the exercise with Exercise relation using the ID that was set by Create
+    var createdExercise models.LoggedExercise
+    err = f.db.Preload("Exercise").Preload("Sets").Where("id = ?", newExercise.ID).First(&createdExercise).Error
+    if err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+        return
+    }
+
+    c.JSON(http.StatusOK, gin.H{"exercise": createdExercise})
+}
+
+type RemoveExerciseRequest struct {
+    ExerciseID uint `json:"exercise_id"`
+}
+
+func (f *WorkoutFeature) removeExerciseFromWorkout(c *gin.Context) {
+    var request RemoveExerciseRequest
+    if err := c.ShouldBindJSON(&request); err != nil {
+        c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+        return
+    }
+
+    today, err := services.GetToday(f.db, 0)
+    if err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+        return
+    }
+
+    // Find and delete the logged exercise
+    var loggedExercise models.LoggedExercise
+    err = f.db.Where("workout_log_id = ? AND exercise_id = ?", today.ID, request.ExerciseID).First(&loggedExercise).Error
+    if err != nil {
+        c.JSON(http.StatusNotFound, gin.H{"error": "Exercise not found in workout"})
+        return
+    }
+
+    // Delete the logged exercise (sets will be cascade deleted)
+    err = f.db.Delete(&loggedExercise).Error
+    if err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+        return
+    }
+
+    c.JSON(http.StatusOK, gin.H{"success": true})
 }

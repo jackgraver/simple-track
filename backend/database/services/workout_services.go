@@ -95,3 +95,12 @@ func UpdateLoggedExercise(db *gorm.DB, exercise models.LoggedExercise) error {
     }
     return nil
 }
+
+func GetAllExercises(db *gorm.DB) ([]models.Exercise, error) {
+    var exercises []models.Exercise
+    err := db.Find(&exercises).Error
+    if err != nil {
+        return []models.Exercise{}, err
+    }
+    return exercises, nil
+}

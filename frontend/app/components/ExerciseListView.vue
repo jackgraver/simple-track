@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import type { Exercise, LoggedExercise } from "~/types/workout";
+import { ref, computed, watch } from "vue";
+import { Trash2 } from "lucide-vue-next";
 
 type ExerciseGroup = {
     planned: Exercise;
@@ -14,7 +16,49 @@ const props = defineProps<{
 const emit = defineEmits<{
     (e: "select-exercise", index: number): void;
     (e: "finish-workout"): void;
+    (e: "add-exercise", exerciseId: number): void;
+    (e: "remove-exercise", index: number): void;
 }>();
+
+// Autocomplete state
+const searchQuery = ref("");
+const showSuggestions = ref(false);
+const allExercises = ref<Exercise[]>([]);
+const filteredExercises = computed(() => {
+    const query = searchQuery.value.toLowerCase();
+    return allExercises.value.filter(ex => 
+        ex.name.toLowerCase().includes(query) &&
+        !props.exercises.some(eg => eg.planned?.ID === ex.ID)
+    ).slice(0, 10);
+});
+
+// Load all exercises on mount
+const { data: exercisesData } = useAPIGet<{ exercises: Exercise[] }>("workout/exercises/all");
+watch(exercisesData, (newData) => {
+    if (newData?.exercises) {
+        allExercises.value = newData.exercises;
+    }
+}, { immediate: true });
+
+// Handle exercise selection
+const selectExercise = (exercise: Exercise) => {
+    emit("add-exercise", exercise.ID);
+    searchQuery.value = "";
+    showSuggestions.value = false;
+};
+
+// Handle blur with delay to allow clicking suggestions
+const handleBlur = () => {
+    setTimeout(() => {
+        showSuggestions.value = false;
+    }, 200);
+};
+
+// Handle remove exercise
+const removeExercise = (index: number, event: Event) => {
+    event.stopPropagation();
+    emit("remove-exercise", index);
+};
 
 // Get maximum weight from previous exercise
 const getMaxWeight = (exerciseGroup: ExerciseGroup): number | null => {
@@ -48,6 +92,28 @@ const isLogged = (exerciseGroup: ExerciseGroup): boolean => {
 <template>
     <div class="list-view">
         <h2>Exercises</h2>
+        <div class="add-exercise-container">
+            <div class="autocomplete-wrapper">
+                <input
+                    v-model="searchQuery"
+                    @focus="showSuggestions = true"
+                    @blur="handleBlur"
+                    type="text"
+                    placeholder="Add exercise..."
+                    class="exercise-search-input"
+                />
+                <ul v-if="showSuggestions && filteredExercises.length > 0" class="suggestions-list">
+                    <li
+                        v-for="exercise in filteredExercises"
+                        :key="exercise.ID"
+                        @mousedown.prevent="selectExercise(exercise)"
+                        class="suggestion-item"
+                    >
+                        {{ exercise.name }}
+                    </li>
+                </ul>
+            </div>
+        </div>
         <ul class="exercise-list">
             <li
                 v-for="(exerciseGroup, index) in exercises"
@@ -55,15 +121,25 @@ const isLogged = (exerciseGroup: ExerciseGroup): boolean => {
                 @click="emit('select-exercise', index)"
                 :class="['exercise-item', { 'logged': isLogged(exerciseGroup) }]"
             >
-                <span class="exercise-name">{{ exerciseGroup.planned.name }}</span>
-                <div class="exercise-info">
-                    <span v-if="isLogged(exerciseGroup) && getLastSet(exerciseGroup)" class="last-set">
-                        {{ getLastSet(exerciseGroup)!.weight }}lbs × {{ getLastSet(exerciseGroup)!.reps }}
-                    </span>
-                    <span v-else-if="!isLogged(exerciseGroup) && getMaxWeight(exerciseGroup) !== null" class="previous-weight">
-                        Prev {{ getMaxWeight(exerciseGroup) }}lbs
-                    </span>
+                <div class="exercise-content">
+                    <div class="exercise-title-section">
+                        <span class="exercise-name">{{ exerciseGroup.planned?.name || exerciseGroup.logged?.exercise?.name }}</span>
+                        <span v-if="isLogged(exerciseGroup) && getLastSet(exerciseGroup)" class="exercise-subtitle">
+                            <!-- {{ getLastSet(exerciseGroup)!.weight }}lbs × {{ getLastSet(exerciseGroup)!.reps }} -->
+                              <p v-for="set in exerciseGroup.logged?.sets">{{ set.weight }}lbs × {{ set.reps }}</p>
+                        </span>
+                        <span v-else-if="!isLogged(exerciseGroup) && getMaxWeight(exerciseGroup) !== null" class="exercise-subtitle">
+                            Prev {{ getMaxWeight(exerciseGroup) }}lbs
+                        </span>
+                    </div>
                 </div>
+                <button
+                    @click="removeExercise(index, $event)"
+                    class="remove-button"
+                    type="button"
+                >
+                    <Trash2 :size="18" />
+                </button>
             </li>
         </ul>
         <button @click="emit('finish-workout')" class="finish-button">
@@ -81,6 +157,58 @@ const isLogged = (exerciseGroup: ExerciseGroup): boolean => {
 
 .list-view h2 {
     margin: 0 0 1rem 0;
+}
+
+.add-exercise-container {
+    margin-bottom: 0.5rem;
+}
+
+.autocomplete-wrapper {
+    position: relative;
+    width: 100%;
+}
+
+.exercise-search-input {
+    width: 100%;
+    padding: 0.75rem;
+    border: 1px solid rgb(56, 56, 56);
+    border-radius: 5px;
+    background: rgb(27, 27, 27);
+    color: inherit;
+    font-size: 1rem;
+    box-sizing: border-box;
+}
+
+.exercise-search-input:focus {
+    outline: none;
+    border-color: rgb(100, 100, 100);
+    background: rgb(35, 35, 35);
+}
+
+.suggestions-list {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    margin-top: 0.25rem;
+    list-style: none;
+    padding: 0;
+    background: rgb(27, 27, 27);
+    border: 1px solid rgb(56, 56, 56);
+    border-radius: 5px;
+    max-height: 200px;
+    overflow-y: auto;
+    z-index: 1000;
+}
+
+.suggestion-item {
+    padding: 0.75rem;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.suggestion-item:hover {
+    background: rgb(40, 40, 40);
 }
 
 .exercise-list {
@@ -105,6 +233,7 @@ const isLogged = (exerciseGroup: ExerciseGroup): boolean => {
     transition: background-color 0.2s, opacity 0.2s;
     width: 100%;
     box-sizing: border-box;
+    gap: 1rem;
 }
 
 .exercise-item:hover {
@@ -114,6 +243,7 @@ const isLogged = (exerciseGroup: ExerciseGroup): boolean => {
 .exercise-item.logged {
     opacity: 0.6;
     background: rgb(20, 20, 20);
+    border: 1px solid rgb(19, 128, 42);
 }
 
 .exercise-item.logged:hover {
@@ -121,25 +251,66 @@ const isLogged = (exerciseGroup: ExerciseGroup): boolean => {
     opacity: 0.8;
 }
 
+.exercise-content {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    min-width: 0;
+}
+
+.exercise-title-section {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    min-width: 0;
+}
+
 .exercise-name {
     font-weight: 500;
     font-size: 1.1rem;
 }
 
-.exercise-info {
-    display: flex;
-    align-items: center;
-}
-
-.previous-weight {
+.exercise-subtitle {
     color: rgb(150, 150, 150);
     font-size: 0.9rem;
+    display: flex;
+    flex-direction: row;
 }
 
-.last-set {
+.exercise-subtitle p {
+    margin: 0;
+}
+
+.exercise-subtitle p:not(:last-child)::after {
+    content: "•";
+    margin: 0 0.5rem;
+    color: rgb(150, 150, 150);
+}
+
+.exercise-item.logged .exercise-subtitle {
     color: rgb(200, 200, 200);
-    font-size: 0.9rem;
     font-weight: 500;
+}
+
+.remove-button {
+    width: 2rem;
+    height: 2rem;
+    border: 1px solid rgb(80, 40, 40);
+    border-radius: 3px;
+    background: rgb(40, 20, 20);
+    color: rgb(200, 100, 100);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background-color 0.2s, border-color 0.2s;
+    padding: 0;
+    flex-shrink: 0;
+}
+
+.remove-button:hover {
+    background: rgb(60, 30, 30);
+    border-color: rgb(120, 60, 60);
 }
 
 .finish-button {

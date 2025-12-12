@@ -350,6 +350,61 @@ const confirmLogs = async () => {
         }
     }
 };
+
+// Add exercise to workout
+const addExerciseToWorkout = async (exerciseId: number) => {
+    const { response, error } = await useAPIPost<{
+        exercise: LoggedExercise;
+    }>(`workout/exercise/add`, "POST", {
+        exercise_id: exerciseId,
+    });
+
+    if (error) {
+        console.error(error);
+        toast.push(error.message, "error");
+        return;
+    }
+
+    if (response?.exercise) {
+        // Add the new exercise to the log
+        const newExerciseGroup: ExerciseGroup = {
+            planned: response.exercise.exercise!,
+            logged: response.exercise,
+            previous: {} as LoggedExercise,
+        };
+        log.value.push(newExerciseGroup);
+        toast.push(`Added ${response.exercise.exercise?.name}`, "success");
+    }
+};
+
+// Remove exercise from workout
+const removeExerciseFromWorkout = async (index: number) => {
+    const exerciseGroup = log.value[index];
+    if (!exerciseGroup) return;
+
+    // If exercise is logged, delete it from backend
+    if (exerciseGroup.logged && exerciseGroup.logged.ID > 0) {
+        const exerciseId = exerciseGroup.logged.exercise_id;
+        if (!exerciseId) {
+            toast.push("Cannot remove exercise: ID not found", "error");
+            return;
+        }
+
+        const { error } = await useAPIPost(`workout/exercise/remove`, "DELETE", {
+            exercise_id: exerciseId,
+        });
+
+        if (error) {
+            console.error(error);
+            toast.push(error.message, "error");
+            return;
+        }
+    }
+
+    // Remove from local list (works for both planned-only and logged exercises)
+    log.value.splice(index, 1);
+    toast.push("Exercise removed", "success");
+};
 </script>
 
 <template>
@@ -361,6 +416,8 @@ const confirmLogs = async () => {
             :exercises="log"
             @select-exercise="startLoggingExercise"
             @finish-workout="confirmLogs"
+            @add-exercise="addExerciseToWorkout"
+            @remove-exercise="removeExerciseFromWorkout"
         />
         <ExerciseLoggingView
             v-else-if="currentView === 'logging' && currentExerciseIndex !== null && log[currentExerciseIndex]"

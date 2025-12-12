@@ -72,6 +72,7 @@ func (m *WorkoutModel) seedDatabase() error {
 	hipExtensions := Exercise{Name: "Hip Extensions", RepRollover: 10}
 	outerThigh := Exercise{Name: "Outer Thigh", RepRollover: 10}
 	innerThigh := Exercise{Name: "Inner Thigh", RepRollover: 10}
+	hackSquat := Exercise{Name: "Hack Squat", RepRollover: 10}
 
 	exercises := []*Exercise{
 		&inclinePress,
@@ -138,7 +139,6 @@ func (m *WorkoutModel) seedDatabase() error {
 			squat,
 			deadlift,
 			calfRaise,
-			abCrunches,
 		},
 	}
 	upper_plan := WorkoutPlan{
@@ -150,7 +150,6 @@ func (m *WorkoutModel) seedDatabase() error {
 			latRaise,
 			shoulderPress,
 			barbellRows,
-			facePulls,
 			pulldowns,
 			JMPress,
 			extensions,
@@ -161,20 +160,15 @@ func (m *WorkoutModel) seedDatabase() error {
 	lower_plan := WorkoutPlan{
 		Name: "Lower",
 		Exercises: []Exercise{
-				outerThigh,
+			outerThigh,
 			innerThigh,
 			legExtensions,
 			hamstringCurls,
 			squat,
 			deadlift,
-			hipExtensions,
-			legPress,
+			hackSquat,
 			calfRaise,
-			abCrunches,
 		},
-	}
-	active_rest_plan := WorkoutPlan{
-		Name: "Active Rest",
 	}
 	rest_plan := WorkoutPlan{
 		Name: "Rest",
@@ -185,433 +179,12 @@ func (m *WorkoutModel) seedDatabase() error {
 	m.db.Create(&legs_plan)
 	m.db.Create(&upper_plan)
 	m.db.Create(&lower_plan)
-	m.db.Create(&active_rest_plan)
 	m.db.Create(&rest_plan)
 
 	now := time.Now()
-
-	// push_log := WorkoutLog{
-	// 	Date: time.Date(2025, time.October, 21, 0, 0, 0, 0, now.Location()),
-	// 	WorkoutPlan: &push_plan,
-	// 	Exercises: []LoggedExercise{
-	// 		{
-	// 			ExerciseID: inclinePress.ID,
-	// 			Sets: []LoggedSet{
-	// 				{Reps: 9, Weight: 40},
-	// 				{Reps: 8, Weight: 40},
-	// 			},
-	// 		},
-	// 		{
-	// 			ExerciseID: chestFly.ID,
-	// 			Sets: []LoggedSet{
-	// 				{Reps: 9, Weight: 75},
-	// 				{Reps: 8, Weight: 75},
-	// 			},
-	// 		},
-	// 		{
-	// 			ExerciseID: dips.ID,
-	// 			Sets: []LoggedSet{
-	// 				{Reps: 8, Weight: -110},
-	// 			},
-	// 		},
-	// 		{
-	// 			ExerciseID: latRaise.ID,
-	// 			Sets: []LoggedSet{
-	// 				{Reps: 15, Weight: 10},
-	// 				{Reps: 14, Weight: 10},
-	// 			},
-	// 		},
-	// 		{
-	// 			ExerciseID: shoulderPress.ID,
-	// 			Sets: []LoggedSet{
-	// 				{Reps: 8, Weight: 75},
-	// 				{Reps: 7, Weight: 75},
-	// 			},
-	// 		},
-	// 		{
-	// 			ExerciseID: JMPress.ID,
-	// 			Sets: []LoggedSet{
-	// 				{Reps: 7, Weight: 105},
-	// 				{Reps: 6, Weight: 105},
-	// 			},
-	// 			WeightSetup: "2 25lbs + 2 5lbs",
-	// 		},
-	// 		{
-	// 			ExerciseID: extensions.ID,
-	// 			Sets: []LoggedSet{
-	// 				{Reps: 6, Weight: 40},
-	// 				{Reps: 6, Weight: 40},
-	// 			},
-	// 		},
-	// 	},
-	// }
-	// push_log2 := WorkoutLog{
-	// 	Date: time.Date(2025, time.October, 28, 0, 0, 0, 0, now.Location()),
-	// 	WorkoutPlan: &push_plan,
-	// 	Exercises: []LoggedExercise{
-	// 		{
-	// 			ExerciseID: inclinePress.ID,
-	// 			Sets: []LoggedSet{
-	// 				{Reps: 9, Weight: 40},
-	// 				{Reps: 8, Weight: 40},
-	// 			},
-	// 		},
-	// 		{
-	// 			ExerciseID: chestFly.ID,
-	// 			Sets: []LoggedSet{
-	// 				{Reps: 9, Weight: 75},
-	// 				{Reps: 8, Weight: 75},
-	// 			},
-	// 		},
-	// 		{
-	// 			ExerciseID: dips.ID,
-	// 			Sets: []LoggedSet{
-	// 				{Reps: 8, Weight: -110},
-	// 			},
-	// 		},
-	// 		{
-	// 			ExerciseID: latRaise.ID,
-	// 			Sets: []LoggedSet{
-	// 				{Reps: 15, Weight: 10},
-	// 				{Reps: 14, Weight: 10},
-	// 			},
-	// 		},
-	// 		{
-	// 			ExerciseID: shoulderPress.ID,
-	// 			Sets: []LoggedSet{
-	// 				{Reps: 8, Weight: 75},
-	// 				{Reps: 7, Weight: 75},
-	// 			},
-	// 		},
-	// 		{
-	// 			ExerciseID: JMPress.ID,
-	// 			Sets: []LoggedSet{
-	// 				{Reps: 7, Weight: 105},
-	// 				{Reps: 6, Weight: 105},
-	// 			},
-	// 			WeightSetup: "2 25lbs + 2 5lbs",
-	// 		},
-	// 		{
-	// 			ExerciseID: extensions.ID,
-	// 			Sets: []LoggedSet{
-	// 				{Reps: 6, Weight: 40},
-	// 				{Reps: 6, Weight: 40},
-	// 			},
-	// 		},
-	// 	},
-	// }
-	// pull_log := WorkoutLog{
-	// 	Date: time.Date(2025, time.October, 22, 0, 0, 0, 0, now.Location()),
-	// 	WorkoutPlan: &pull_plan,
-	// 	Exercises: []LoggedExercise{
-	// 		{
-	// 			ExerciseID: barbellRows.ID,
-	// 			Sets: []LoggedSet{
-	// 				{Reps: 7, Weight: 95},
-	// 				{Reps: 6, Weight: 95},
-	// 			},
-	// 		},	
-	// 		{
-	// 			ExerciseID: facePulls.ID,
-	// 			Sets: []LoggedSet{
-	// 				{Reps: 10, Weight: 40},
-	// 				{Reps: 10, Weight: 40},
-	// 			},
-	// 		},
-	// 		{
-	// 			ExerciseID: pulldowns.ID,
-	// 			Sets: []LoggedSet{
-	// 				{Reps: 6, Weight: 100},
-	// 				{Reps: 6, Weight: 100},
-	// 			},
-	// 		},		
-	// 		{
-	// 			ExerciseID: cableRows.ID,
-	// 			Sets: []LoggedSet{
-	// 				{Reps: 9, Weight: 60},
-	// 				{Reps: 9, Weight: 60},
-	// 			},
-	// 		},	
-	// 		{
-	// 			ExerciseID: inclineCurls.ID,
-	// 			Sets: []LoggedSet{
-	// 				{Reps: 6, Weight: 20},
-	// 				{Reps: 6, Weight: 20},
-	// 			},
-	// 		},			
-	// 		{
-	// 			ExerciseID: hammerCurls.ID,
-	// 			Sets: []LoggedSet{
-	// 				{Reps: 6, Weight: 22.5},
-	// 				{Reps: 6, Weight: 22.5},
-	// 			},
-	// 		},
-	// 	},
-	// }
-	// legs_log := WorkoutLog{
-	// 	Date: time.Date(2025, time.October, 23, 0, 0, 0, 0, now.Location()),
-	// 	WorkoutPlan: &legs_plan,
-	// 	Exercises: []LoggedExercise{
-	// 		{
-	// 			ExerciseID: outerThigh.ID,
-	// 			Sets: []LoggedSet{
-	// 				{Reps: 11, Weight: 80},
-	// 			},
-	// 		},
-	// 		{
-	// 			ExerciseID: innerThigh.ID,
-	// 			Sets: []LoggedSet{
-	// 				{Reps: 12, Weight: 70},
-	// 			},
-	// 		},
-	// 		{
-	// 			ExerciseID: legExtensions.ID,
-	// 			Sets: []LoggedSet{
-	// 				{Reps: 7, Weight: 80},
-	// 				{Reps: 7, Weight: 80},
-	// 				{Reps: 7, Weight: 80},
-	// 			},
-	// 		},
-	// 		{
-	// 			ExerciseID: hamstringCurls.ID,
-	// 			Sets: []LoggedSet{
-	// 				{Reps: 7, Weight: 75},
-	// 				{Reps: 7, Weight: 75},
-	// 			},
-	// 		},
-	// 		{
-	// 			ExerciseID: squat.ID,
-	// 			Sets: []LoggedSet{
-	// 				{Reps: 7, Weight: 115},
-	// 				{Reps: 8, Weight: 115},
-	// 			},
-	// 		},
-	// 		{
-	// 			ExerciseID: deadlift.ID,
-	// 			Sets: []LoggedSet{
-	// 				{Reps: 7, Weight: 115},
-	// 				{Reps: 6, Weight: 115},
-	// 			},
-	// 		},
-	// 		{
-	// 			ExerciseID: calfRaise.ID,
-	// 			Sets: []LoggedSet{
-	// 				{Reps: 13, Weight: 90},
-	// 				{Reps: 13, Weight: 90},
-	// 			},
-	// 		},
-	// 		{
-	// 			ExerciseID: abCrunches.ID,
-	// 			Sets: []LoggedSet{
-	// 				{Reps: 8, Weight: 110},
-	// 				{Reps: 8, Weight: 110},
-	// 			},
-	// 		},
-	// 	},
-	// }
-	// upper_log := WorkoutLog{
-	// 	Date: time.Date(2025, time.October, 25, 0, 0, 0, 0, now.Location()),
-	// 	WorkoutPlan: &upper_plan,
-	// 	Exercises: []LoggedExercise{
-	// 		{
-	// 			ExerciseID: inclinePress.ID,
-	// 			Sets: []LoggedSet{
-	// 				{Reps: 5, Weight: 45},
-	// 				{Reps: 5, Weight: 45},
-	// 			},
-	// 		},
-	// 		{
-	// 			ExerciseID: chestFly.ID,
-	// 			Sets: []LoggedSet{
-	// 				{Reps: 7, Weight: 80},
-	// 				{Reps: 7, Weight: 80},
-	// 			},
-	// 		},
-	// 		{
-	// 			ExerciseID: dips.ID,
-	// 			Sets: []LoggedSet{
-	// 				{Reps: 9, Weight: -100},
-	// 			},
-	// 		},
-	// 		{
-	// 			ExerciseID: latRaise.ID,
-	// 			Sets: []LoggedSet{
-	// 				{Reps: 16, Weight: 10},
-	// 				{Reps: 14, Weight: 10},
-	// 			},
-	// 		},
-	// 		{
-	// 			ExerciseID: shoulderPress.ID,
-	// 			Sets: []LoggedSet{
-	// 				{Reps: 7, Weight: 80},
-	// 				{Reps: 6, Weight: 80},
-	// 			},
-	// 		},
-	// 		{
-	// 			ExerciseID: barbellRows.ID,
-	// 			Sets: []LoggedSet{
-	// 				{Reps: 7, Weight: 95},
-	// 				{Reps: 7, Weight: 95},
-	// 			},
-	// 		},	
-	// 		{
-	// 			ExerciseID: facePulls.ID,
-	// 			Sets: []LoggedSet{
-	// 				{Reps: 8, Weight: 40},
-	// 				{Reps: 8, Weight: 40},
-	// 			},
-	// 		},
-	// 		{
-	// 			ExerciseID: pulldowns.ID,
-	// 			Sets: []LoggedSet{
-	// 				{Reps: 6, Weight: 100},
-	// 				{Reps: 6, Weight: 100},
-	// 			},
-	// 		},
-	// 		{
-	// 			ExerciseID: JMPress.ID,
-	// 			Sets: []LoggedSet{
-	// 				{Reps: 7, Weight: 105},
-	// 				{Reps: 7, Weight: 105},
-	// 			},
-	// 		},
-	// 		{
-	// 			ExerciseID: extensions.ID,
-	// 			Sets: []LoggedSet{
-	// 				{Reps: 7, Weight: 80},
-	// 				{Reps: 6, Weight: 80},
-	// 			},
-	// 		},		
-	// 		{
-	// 			ExerciseID: inclineCurls.ID,
-	// 			Sets: []LoggedSet{
-	// 				{Reps: 9, Weight: 20},
-	// 				{Reps: 7, Weight: 20},
-	// 			},
-	// 		},			
-	// 		{
-	// 			ExerciseID: hammerCurls.ID,
-	// 			Sets: []LoggedSet{
-	// 				{Reps: 5, Weight: 22.5},
-	// 				{Reps: 6, Weight: 22.5},
-	// 			},
-	// 		},
-	// 	},
-	// }
-	// lower_log := WorkoutLog{
-	// 	Date: time.Date(2025, time.October, 26, 0, 0, 0, 0, now.Location()),
-	// 	WorkoutPlan: &lower_plan,
-	// 	Exercises: []LoggedExercise{
-	// 		{
-	// 			ExerciseID: outerThigh.ID,
-	// 			Sets: []LoggedSet{
-	// 				{Reps: 7, Weight: 80},
-	// 			},
-	// 		},
-	// 		{
-	// 			ExerciseID: innerThigh.ID,
-	// 			Sets: []LoggedSet{
-	// 				{Reps: 7, Weight: 80},
-	// 			},
-	// 		},
-	// 		{
-	// 			ExerciseID: legExtensions.ID,
-	// 			Sets: []LoggedSet{
-	// 				{Reps: 7, Weight: 80},
-	// 				{Reps: 7, Weight: 80},
-	// 			},
-	// 		},
-	// 		{
-	// 			ExerciseID: hamstringCurls.ID,
-	// 			Sets: []LoggedSet{
-	// 				{Reps: 7, Weight: 80},
-	// 				{Reps: 7, Weight: 80},
-	// 				{Reps: 7, Weight: 80},
-	// 			},
-	// 		},
-	// 		{
-	// 			ExerciseID: squat.ID,
-	// 			Sets: []LoggedSet{
-	// 				{Reps: 7, Weight: 80},
-	// 				{Reps: 7, Weight: 80},
-	// 			},
-	// 			WeightSetup: "2 35lbs",
-	// 		},
-	// 		{
-	// 			ExerciseID: deadlift.ID,
-	// 			Sets: []LoggedSet{
-	// 				{Reps: 7, Weight: 80},
-	// 				{Reps: 7, Weight: 80},
-	// 			},
-	// 			WeightSetup: "35 x 2",
-	// 		},
-	// 		{
-	// 			ExerciseID: hipExtensions.ID,
-	// 			Sets: []LoggedSet{
-	// 				{Reps: 7, Weight: 80},
-	// 			},
-	// 		},
-	// 		{
-	// 			ExerciseID: legPress.ID,
-	// 			Sets: []LoggedSet{
-	// 				{Reps: 7, Weight: 80},
-	// 			},
-	// 			WeightSetup: "2x45",
-	// 		},
-	// 		{
-	// 			ExerciseID: calfRaise.ID,
-	// 			Sets: []LoggedSet{
-	// 				{Reps: 7, Weight: 80},
-	// 			},
-	// 			WeightSetup: "2 45 plates",
-	// 		},
-	// 		{
-	// 			ExerciseID: abCrunches.ID,
-	// 			Sets: []LoggedSet{
-	// 				{Reps: 7, Weight: 80},
-	// 				{Reps: 7, Weight: 80},
-	// 			},
-	// 		},
-	// 	},
-	// }
-	// active_rest_log := WorkoutLog{
-	// 	Date: time.Date(2025, time.October, 20, 0, 0, 0, 0, now.Location()),
-	// 	WorkoutPlan: &active_rest_plan,
-	// 	Exercises: []LoggedExercise{
-	// 	},
-	// }
-	// rest_log := WorkoutLog{
-	// 	Date: time.Date(2025, time.October, 24, 0, 0, 0, 0, now.Location()),
-	// 	WorkoutPlan: &rest_plan,
-	// 	Exercises: []LoggedExercise{},
-	// }
-
-	// m.db.Create(&push_log)
-	// m.db.Create(&push_log2)
-	// m.db.Create(&pull_log)
-	// m.db.Create(&legs_log)
-	// m.db.Create(&upper_log)
-	// m.db.Create(&lower_log)
-	// m.db.Create(&active_rest_log)
-	// m.db.Create(&rest_log)
-
 	year := 2025
 	start := time.Date(year, time.September, 1, 0, 0, 0, 0, now.Location())
 	end := time.Date(year, time.December, 31, 0, 0, 0, 0, now.Location())
-
-	skip_dates := []time.Time{
-		time.Date(2025, time.October, 20, 0, 0, 0, 0, now.Location()),
-		time.Date(2025, time.October, 21, 0, 0, 0, 0, now.Location()),
-		time.Date(2025, time.October, 22, 0, 0, 0, 0, now.Location()),
-		time.Date(2025, time.October, 23, 0, 0, 0, 0, now.Location()),
-		time.Date(2025, time.October, 24, 0, 0, 0, 0, now.Location()),
-		time.Date(2025, time.October, 25, 0, 0, 0, 0, now.Location()),
-		time.Date(2025, time.October, 26, 0, 0, 0, 0, now.Location()),
-	}
-	skipMap := make(map[time.Time]struct{})
-	for _, d := range skip_dates {
-		skipMap[d] = struct{}{}
-	}
 
 	weekdayPlans := map[time.Weekday]WorkoutPlan{
 		time.Sunday:    lower_plan,
@@ -619,15 +192,11 @@ func (m *WorkoutModel) seedDatabase() error {
 		time.Tuesday:   push_plan,
 		time.Wednesday: pull_plan,
 		time.Thursday:  legs_plan,
-		time.Friday:    active_rest_plan,
+		time.Friday:    rest_plan,
 		time.Saturday:  upper_plan,	
 	}
 
 	for date := start; !date.After(end); date = date.AddDate(0, 0, 1) {
-		// if _, skip := skipMap[date]; skip {
-		// 	continue
-		// }
-
 		plan := weekdayPlans[date.Weekday()]
 		wl := WorkoutLog{
 			Date: date,
