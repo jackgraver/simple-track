@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Plus } from "lucide-vue-next";
+import { Plus, Loader } from "lucide-vue-next";
 
 const props = defineProps<{
     route: string;
@@ -41,15 +41,31 @@ const handleFunctionCall = async <T extends (arg: any) => Promise<boolean>>(
     const success = await fn(args);
     if (success) search.value = "";
 };
+
+const refresh = () => {
+    console.log("refresh");
+};
 </script>
 
 <template>
-    <div v-if="pending">Loading...</div>
-    <div v-else-if="error">Error: {{ error.message }}</div>
+    <div v-if="error" class="search-container">
+        <span class="error-message">Failed to Load Saved Meals</span>
+        <button @click="refresh">Try again</button>
+    </div>
     <div v-else class="search-container">
-        <input type="text" v-model="search" placeholder="Search" />
+        <div class="search-input-wrapper">
+            <input
+                type="text"
+                v-model="search"
+                placeholder="Search"
+                :disabled="pending"
+            />
+        </div>
         <div class="items-container">
-            <template v-if="filteredList?.length">
+            <template v-if="pending">
+                <Loader v-if="pending" class="spinner" :size="32" />
+            </template>
+            <template v-else-if="filteredList?.length">
                 <button
                     v-for="(item, index) in filteredList"
                     :key="item.id ?? item.ID ?? index"
@@ -68,7 +84,7 @@ const handleFunctionCall = async <T extends (arg: any) => Promise<boolean>>(
                     <Plus :size="18" />
                 </button>
             </template>
-            <div v-else class="item empty-option">
+            <div v-else-if="!pending && search" class="item empty-option">
                 <template v-if="onCreate">
                     <button
                         type="button"
@@ -76,8 +92,11 @@ const handleFunctionCall = async <T extends (arg: any) => Promise<boolean>>(
                         @click="handleFunctionCall(onCreate, search)"
                     >
                         <Plus :size="18" />
-                        <span>Create “{{ search }}”</span>
+                        <span>Create "{{ search }}"</span>
                     </button>
+                </template>
+                <template v-else-if="pending">
+                    <Loader class="spinner" :size="18" />
                 </template>
                 <template v-else>
                     <span class="no-hover-empty-option"
@@ -97,6 +116,48 @@ const handleFunctionCall = async <T extends (arg: any) => Promise<boolean>>(
     min-height: 0;
     gap: 1rem;
     overflow: hidden;
+}
+
+.search-input-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+    width: 100%;
+}
+
+.search-input-wrapper input {
+    width: 100%;
+}
+
+.search-input-wrapper input:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.spinner {
+    position: absolute;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.error-message {
+    color: #ff6b6b;
+    padding: 1rem;
+    text-align: center;
+}
+
+.loading-state {
+    justify-content: center;
+    opacity: 0.6;
+    cursor: default;
 }
 
 .items-container {
