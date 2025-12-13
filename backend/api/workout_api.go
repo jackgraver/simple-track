@@ -40,6 +40,10 @@ func (f *WorkoutFeature) SetEndpoints(router *gin.Engine) {
     group.POST("/exercise/add", f.addExerciseToWorkout)
     group.DELETE("/exercise/remove", f.removeExerciseFromWorkout)
     group.GET("/exercise/progression/:id", f.getExerciseProgression)
+    group.GET("/plans/all", f.getAllWorkoutPlans)
+    group.POST("/plans/:id/exercises/add", f.addExerciseToPlan)
+    group.DELETE("/plans/:id/exercises/remove", f.removeExerciseFromPlan)
+    group.POST("/exercises/create", f.createExercise)
 }
 
 func (f *WorkoutFeature) getWorkoutToday(c *gin.Context) {
@@ -241,7 +245,15 @@ func (f *WorkoutFeature) checkAllLogged(c *gin.Context) {
 }
 
 func (f *WorkoutFeature) getAllExercises(c *gin.Context) {
-    exercises, err := services.GetAllExercises(f.db)
+    excludeParam := c.QueryArray("exclude")
+    var excludeIDs []uint
+    for _, idStr := range excludeParam {
+        if id, err := strconv.ParseUint(idStr, 10, 32); err == nil {
+            excludeIDs = append(excludeIDs, uint(id))
+        }
+    }
+
+    exercises, err := services.GetAllExercises(f.db, excludeIDs)
     if err != nil {
         c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
         return
@@ -349,4 +361,97 @@ func (f *WorkoutFeature) getExerciseProgression(c *gin.Context) {
     }
 
     c.JSON(http.StatusOK, gin.H{"progression": progression})
+}
+
+func (f *WorkoutFeature) getAllWorkoutPlans(c *gin.Context) {
+    plans, err := services.GetAllWorkoutPlans(f.db)
+    if err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+        return
+    }
+    c.JSON(http.StatusOK, gin.H{"plans": plans})
+}
+
+type AddExerciseToPlanRequest struct {
+    ExerciseID uint `json:"exercise_id"`
+}
+
+func (f *WorkoutFeature) addExerciseToPlan(c *gin.Context) {
+    planIDStr := c.Param("id")
+    planID, err := strconv.ParseUint(planIDStr, 10, 32)
+    if err != nil {
+        c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid plan ID"})
+        return
+    }
+
+    var request AddExerciseToPlanRequest
+    if err := c.ShouldBindJSON(&request); err != nil {
+        c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+        return
+    }
+
+    err = services.AddExerciseToPlan(f.db, uint(planID), request.ExerciseID)
+    if err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+        return
+    }
+
+    c.JSON(http.StatusOK, gin.H{"success": true})
+}
+
+type RemoveExerciseFromPlanRequest struct {
+    ExerciseID uint `json:"exercise_id"`
+}
+
+func (f *WorkoutFeature) removeExerciseFromPlan(c *gin.Context) {
+    planIDStr := c.Param("id")
+    planID, err := strconv.ParseUint(planIDStr, 10, 32)
+    if err != nil {
+        c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid plan ID"})
+        return
+    }
+
+    var request RemoveExerciseFromPlanRequest
+    if err := c.ShouldBindJSON(&request); err != nil {
+        c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+        return
+    }
+
+    err = services.RemoveExerciseFromPlan(f.db, uint(planID), request.ExerciseID)
+    if err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+        return
+    }
+
+    c.JSON(http.StatusOK, gin.H{"success": true})
+}
+
+type CreateExerciseRequest struct {
+    Name        string `json:"name"`
+    RepRollover uint   `json:"rep_rollover"`
+}
+
+func (f *WorkoutFeature) createExercise(c *gin.Context) {
+    var request CreateExerciseRequest
+    if err := c.ShouldBindJSON(&request); err != nil {
+        c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+        return
+    }
+
+    if request.Name == "" {
+        c.JSON(http.StatusBadRequest, gin.H{"error": "Exercise name is required"})
+        return
+    }
+
+    if request.RepRollover == 0 {
+        request.RepRollover = 10
+    }
+
+    exercise, err := services.CreateExercise(f.db, request.Name, request.RepRollover)
+    if err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+        return
+    }
+
+    c.JSON(http.StatusOK, gin.H{"exercise": exercise})
 }

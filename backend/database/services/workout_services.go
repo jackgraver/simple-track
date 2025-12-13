@@ -96,9 +96,13 @@ func UpdateLoggedExercise(db *gorm.DB, exercise models.LoggedExercise) error {
     return nil
 }
 
-func GetAllExercises(db *gorm.DB) ([]models.Exercise, error) {
+func GetAllExercises(db *gorm.DB, excludeIDs []uint) ([]models.Exercise, error) {
     var exercises []models.Exercise
-    err := db.Find(&exercises).Error
+    query := db.Model(&models.Exercise{})
+    if len(excludeIDs) > 0 {
+        query = query.Where("id NOT IN ?", excludeIDs)
+    }
+    err := query.Find(&exercises).Error
     if err != nil {
         return []models.Exercise{}, err
     }
@@ -128,4 +132,54 @@ func GetExerciseProgression(db *gorm.DB, exerciseID uint) ([]ExerciseProgression
         return []ExerciseProgressionEntry{}, err
     }
     return entries, nil
+}
+
+func GetAllWorkoutPlans(db *gorm.DB) ([]models.WorkoutPlan, error) {
+    var plans []models.WorkoutPlan
+    err := db.Preload("Exercises").Find(&plans).Error
+    if err != nil {
+        return []models.WorkoutPlan{}, err
+    }
+    return plans, nil
+}
+
+func AddExerciseToPlan(db *gorm.DB, planID uint, exerciseID uint) error {
+    var plan models.WorkoutPlan
+    if err := db.First(&plan, planID).Error; err != nil {
+        return err
+    }
+
+    var exercise models.Exercise
+    if err := db.First(&exercise, exerciseID).Error; err != nil {
+        return err
+    }
+
+    return db.Model(&plan).Association("Exercises").Append(&exercise)
+}
+
+func RemoveExerciseFromPlan(db *gorm.DB, planID uint, exerciseID uint) error {
+    var plan models.WorkoutPlan
+    if err := db.First(&plan, planID).Error; err != nil {
+        return err
+    }
+
+    var exercise models.Exercise
+    if err := db.First(&exercise, exerciseID).Error; err != nil {
+        return err
+    }
+
+    return db.Model(&plan).Association("Exercises").Delete(&exercise)
+}
+
+func CreateExercise(db *gorm.DB, name string, repRollover uint) (*models.Exercise, error) {
+    exercise := models.Exercise{
+        Name:        name,
+        RepRollover: repRollover,
+    }
+    
+    if err := db.Create(&exercise).Error; err != nil {
+        return nil, err
+    }
+    
+    return &exercise, nil
 }

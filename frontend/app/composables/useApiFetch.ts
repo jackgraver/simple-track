@@ -24,25 +24,23 @@ export async function useAPIPost<T>(
     const config = useRuntimeConfig();
     const baseUrl = config.public.apiBase || "http://localhost:8080";
 
-    const { data, error, status } = await useFetch<T>(
-        `${baseUrl}/${endpoint}`,
-        {
-            method: method,
-            body,
-            watch: watch,
-            ...options,
-            onResponse({ response }) {
-                if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}`);
-                }
+    try {
+        const data = await $fetch<T>(
+            `${baseUrl}/${endpoint}`,
+            {
+                method: method,
+                body,
+                ...options,
             },
-        },
-    );
+        );
 
-    if (error.value) {
-        console.error("Network error:", error.value);
-        return { data: null, error: error.value, status: status.value };
+        return { response: data, error: null, status: 200 };
+    } catch (error: any) {
+        console.error("Network error:", error);
+        return { 
+            response: null, 
+            error: error, 
+            status: error.status || 500 
+        };
     }
-
-    return { response: data.value, error: null, status: status.value };
 }
