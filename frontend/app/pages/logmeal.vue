@@ -225,81 +225,87 @@ const updateLoggedMeal = async () => {
 <template>
     <div class="page-wrapper">
         <div v-if="meal" class="container">
-            <div class="cell left">
-                <div class="title-row">
-                    <h1 v-if="type === 'edit'">Log Meal</h1>
-                    <h1 v-if="type === 'editlogged'">Log Meal</h1>
-                    <h1 v-if="type === 'create'">Create Meal</h1>
-                </div>
-                <div class="meal-info-row">
-                    <div class="meal-name">
-                        <label for="name">Meal Name</label>
-                        <input type="text" id="name" v-model="meal.name" />
+            <article class="cell left">
+                <header class="title-bar">
+                    <div class="title-row">
+                        <h1 v-if="type === 'edit'">Log Meal</h1>
+                        <h1 v-if="type === 'editlogged'">Log Meal</h1>
+                        <h1 v-if="type === 'create'">Create Meal</h1>
                     </div>
-                    <SimpleMacros
-                        :calories="totalMacros.calories"
-                        :protein="totalMacros.protein"
-                        :fiber="totalMacros.fiber"
-                        font-size="1.3rem"
+                    <div class="meal-header">
+                        <div class="meal-name">
+                            <label for="name">Meal Name</label>
+                            <input type="text" id="name" v-model="meal.name" />
+                        </div>
+                        <SimpleMacros
+                            :calories="totalMacros.calories"
+                            :protein="totalMacros.protein"
+                            :fiber="totalMacros.fiber"
+                            font-size="1.3rem"
+                        />
+                    </div>
+                </header>
+                <section class="meal-items-section">
+                    <h3>Meal Items</h3>
+                    <div class="meal-items">
+                        <div
+                            v-for="(item, i) in meal.items"
+                            :key="item.ID"
+                            class="items-rows"
+                        >
+                            <button @click="amountPlusMinus(item, 'minus')">
+                                <Minus />
+                            </button>
+                            <span style="font-size: large"
+                                >{{ formatFoodLabel(item) }}
+                            </span>
+                            <span v-if="item.food!.serving_type === 'g'">g</span
+                            ><button @click="amountPlusMinus(item, 'plus')">
+                                <Plus />
+                            </button>
+                            <span>
+                                {{ formatNum(item.amount * item.food!.calories) }}C
+                                / {{ formatNum(item.amount * item.food!.protein) }}P
+                                / {{ formatNum(item.amount * item.food!.fiber) }}F
+                            </span>
+                            <button class="delete-button" @click="removeFood(i)">
+                                <Trash2 :size="20" />
+                            </button>
+                        </div>
+                    </div>
+                </section>
+                <footer class="footer">
+                    <div class="action-buttons">
+                        <button v-if="type === 'edit'" @click="updateLoggedMeal">
+                            Update
+                        </button>
+                        <button v-if="type === 'editlogged'" @click="logEditedMeal">
+                            Log
+                        </button>
+                        <button v-if="type === 'create'" @click="createMeal(false)">
+                            Create
+                        </button>
+                        <button v-if="type === 'create'" @click="createMeal(true)">
+                            Create and Log
+                        </button>
+                    </div>
+                    <TodayBars
+                        :totalCalories="
+                            totalMacros.calories + (today?.totalCalories ?? 0)
+                        "
+                        :totalProtein="
+                            totalMacros.protein + (today?.totalProtein ?? 0)
+                        "
+                        :totalFiber="totalMacros.fiber + (today?.totalFiber ?? 0)"
+                        :totalCarbs="totalMacros.carbs + (today?.totalCarbs ?? 0)"
+                        :planned-calories="today?.day.plan.calories ?? 0"
+                        :planned-protein="today?.day.plan.protein ?? 0"
+                        :planned-fiber="today?.day.plan.fiber ?? 0"
+                        :planned-carbs="today?.day.plan.carbs ?? 0"
                     />
-                </div>
-
-                <h3>Meal Items</h3>
-                <div class="meal-items">
-                    <div
-                        v-for="(item, i) in meal.items"
-                        :key="item.ID"
-                        class="items-rows"
-                    >
-                        <button @click="amountPlusMinus(item, 'minus')">
-                            <Minus />
-                        </button>
-                        <span style="font-size: large"
-                            >{{ formatFoodLabel(item) }}
-                        </span>
-                        <span v-if="item.food!.serving_type === 'g'">g</span
-                        ><button @click="amountPlusMinus(item, 'plus')">
-                            <Plus />
-                        </button>
-                        <span>
-                            {{ formatNum(item.amount * item.food!.calories) }}C
-                            / {{ formatNum(item.amount * item.food!.protein) }}P
-                            / {{ formatNum(item.amount * item.food!.fiber) }}F
-                        </span>
-                        <button class="delete-button" @click="removeFood(i)">
-                            <Trash2 :size="20" />
-                        </button>
-                    </div>
-                </div>
-                <button v-if="type === 'edit'" @click="updateLoggedMeal">
-                    Update
-                </button>
-                <button v-if="type === 'editlogged'" @click="logEditedMeal">
-                    Log
-                </button>
-                <button v-if="type === 'create'" @click="createMeal(false)">
-                    Create
-                </button>
-                <button v-if="type === 'create'" @click="createMeal(true)">
-                    Create and Log
-                </button>
-                <!-- TODO: Removed 0'd items on submit  -->
-                <TodayBars
-                    :totalCalories="
-                        totalMacros.calories + (today?.totalCalories ?? 0)
-                    "
-                    :totalProtein="
-                        totalMacros.protein + (today?.totalProtein ?? 0)
-                    "
-                    :totalFiber="totalMacros.fiber + (today?.totalFiber ?? 0)"
-                    :totalCarbs="totalMacros.carbs + (today?.totalCarbs ?? 0)"
-                    :planned-calories="today?.day.plan.calories ?? 0"
-                    :planned-protein="today?.day.plan.protein ?? 0"
-                    :planned-fiber="today?.day.plan.fiber ?? 0"
-                    :planned-carbs="today?.day.plan.carbs ?? 0"
-                />
-            </div>
-            <div class="cell right-top">
+                </footer>
+            </article>
+            <aside class="cell right-top">
                 <h2>Add Foods</h2>
                 <SearchList
                     :route="'mealplan/food/all'"
@@ -307,15 +313,15 @@ const updateLoggedMeal = async () => {
                     :onCreate="createFood"
                     :displayComponent="FoodDisplay"
                 />
-            </div>
-            <div class="cell right-bottom">
+            </aside>
+            <aside class="cell right-bottom">
                 <h2>Select Saved Meal</h2>
                 <SearchList
                     :key="meal.ID"
                     :route="'mealplan/meal/all'"
                     :on-select="setMeal"
                 />
-            </div>
+            </aside>
         </div>
     </div>
 </template>
@@ -341,29 +347,6 @@ const updateLoggedMeal = async () => {
     max-height: 100%;
 }
 
-.title-row h1 {
-    margin: 0 0 1.5rem 0;
-}
-
-.meal-info-row {
-    display: flex;
-    flex-direction: row;
-    gap: 1rem;
-    align-items: center;
-    padding-bottom: 0.5rem;
-}
-
-.meal-name {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-}
-
-.meal-macros {
-    display: flex;
-    flex-direction: row;
-    gap: 0.5rem;
-}
 
 .cell {
     display: flex;
@@ -382,7 +365,10 @@ h2 {
 
 .left {
     grid-row: 1 / span 2;
-    padding: 1rem;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
 }
 
 .right-top,
@@ -390,18 +376,96 @@ h2 {
     padding: 1rem;
 }
 
+header.title-bar {
+    padding: 1rem;
+    border-bottom: 1px solid rgb(56, 56, 56);
+    flex-shrink: 0;
+}
+
+.title-row h1 {
+    margin: 0 0 1rem 0;
+}
+
+.meal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    gap: 1.5rem;
+}
+
+.meal-name {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    flex: 1;
+}
+
+.meal-name label {
+    font-size: 0.9rem;
+    color: #ccc;
+}
+
+.meal-name input {
+    background-color: rgb(50, 50, 50);
+    color: white;
+    border: 1px solid #3d3d3d;
+    border-radius: 4px;
+    padding: 0.5rem;
+    font-size: 1rem;
+}
+
+section.meal-items-section {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.meal-items-section h3 {
+    margin: 0;
+    padding: 1rem 1rem 0.75rem 1rem;
+    flex-shrink: 0;
+}
+
 .meal-items {
     display: flex;
     flex-direction: column;
     gap: 0.6rem;
-    width: 100%;
+    padding: 0 1rem;
+    overflow-y: auto;
+    flex: 1;
 }
 
-.items-row {
+.items-rows {
     display: flex;
     justify-content: space-between;
     align-items: center;
     width: 100%;
+    gap: 0.5rem;
+}
+
+footer.footer {
+    padding: 1rem;
+    border-top: 1px solid rgb(56, 56, 56);
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.action-buttons {
+    display: flex;
+    flex-direction: row;
+    gap: 0.75rem;
+    width: 100%;
+}
+
+.action-buttons button {
+    flex: 1;
+    padding: 0.625rem 1.25rem;
+    cursor: pointer;
+    font-size: 0.9rem;
 }
 
 .small-input {
