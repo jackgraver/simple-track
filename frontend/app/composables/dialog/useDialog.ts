@@ -1,4 +1,4 @@
-import { ref, type VNode } from "vue";
+import { ref } from "vue";
 
 export type DialogOptions = {
     title: string;
@@ -13,38 +13,45 @@ export type CustomDialogOptions<T = any> = {
     props?: Record<string, any>;
 };
 
-const dialog = ref<DialogOptions | CustomDialogOptions | null>(null);
+type DialogState<T = any> = 
+    | { type: "confirm"; options: DialogOptions }
+    | { type: "custom"; options: CustomDialogOptions<T> };
+
+const dialog = ref<DialogState | null>(null);
 let resolver: ((value: any) => void) | null = null;
 
 export function useDialog() {
-    // Confirm Dialog (predefined template)
-    function confirm(options: DialogOptions): Promise<boolean> {
-        dialog.value = options;
-        return new Promise((resolve) => {
+    function confirm(options: DialogOptions): Promise<boolean | null> {
+        dialog.value = { type: "confirm", options };
+        return new Promise<boolean | null>((resolve) => {
             resolver = resolve;
         });
     }
 
-    /**
-     *
-     * @param options title, component, props
-     * @returns T
-     */
-    function custom<T>(options: CustomDialogOptions<T>): Promise<T | "cancel"> {
-        dialog.value = options;
-        return new Promise<T>((resolve) => {
-            resolver = resolve as (value: T) => void;
+    function custom<T>(options: CustomDialogOptions<T>): Promise<T | null> {
+        dialog.value = { type: "custom", options };
+        return new Promise<T | null>((resolve) => {
+            resolver = resolve;
         });
     }
 
-    function resolve(result?: boolean | "cancel") {
-        if (resolver) resolver(result as any);
-        resolver = null;
-        dialog.value = null;
+    function resolve<T>(value: T) {
+        if (resolver) {
+            resolver(value);
+            resolver = null;
+            dialog.value = null;
+        }
     }
 
-    return { dialog, confirm, custom, resolve };
+    function cancel() {
+        if (resolver) {
+            resolver(null);
+            resolver = null;
+            dialog.value = null;
+        }
+    }
+
+    return { dialog, confirm, custom, resolve, cancel };
 }
 
-// Singleton
 export const dialogManager = useDialog();

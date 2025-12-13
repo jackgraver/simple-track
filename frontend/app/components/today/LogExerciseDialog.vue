@@ -5,7 +5,8 @@ import { Check, Plus } from "lucide-vue-next";
 const props = defineProps<{
     exercise: LoggedExercise;
     previousWeight: number;
-    onResolve?: (loggedExercise: LoggedExercise | null) => void;
+    onResolve?: (loggedExercise: LoggedExercise) => void;
+    onCancel?: () => void;
 }>();
 
 props.exercise.ID = 0;
@@ -66,7 +67,7 @@ const logExercise = async () => {
     });
 
     if (error) {
-        props.onResolve?.(null);
+        props.onCancel?.();
     } else if (response) {
         props.onResolve?.(response.exercise);
     }

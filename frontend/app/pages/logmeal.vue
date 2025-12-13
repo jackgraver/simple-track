@@ -123,7 +123,7 @@ const createFood = async (name: string): Promise<boolean> => {
             props: { foodName: name },
         });
 
-        if (food === "cancel") return false;
+        if (food === null) return false;
 
         if (food) {
             await addFood(food);

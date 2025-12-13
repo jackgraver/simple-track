@@ -5,7 +5,8 @@ import { toast } from "~/composables/toast/useToast";
 
 const props = defineProps<{
     plan: WorkoutPlan;
-    onResolve?: (result?: any) => void;
+    onResolve?: (result: boolean) => void;
+    onCancel?: () => void;
 }>();
 
 const { refresh: refreshExercises } = useAPIGet<{ exercises: Exercise[] }>("workout/exercises/all");
@@ -25,7 +26,7 @@ const addExerciseToPlan = async (exercise: Exercise): Promise<boolean> => {
     }
 
     toast.push(`Added ${exercise.name} to ${props.plan.name}`, "success");
-    props.onResolve?.(null);
+    props.onResolve?.(true);
     return true;
 };
 

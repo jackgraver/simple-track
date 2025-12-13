@@ -3,7 +3,8 @@ import type { Food } from "~/types/diet";
 
 const props = defineProps<{
     foodName?: string;
-    onResolve: (food: Food | null) => void;
+    onResolve: (food: Food) => void;
+    onCancel?: () => void;
 }>();
 
 const meal = ref<Food>({
@@ -31,7 +32,9 @@ const createFood = async () => {
             food: meal.value,
         },
     );
-    props.onResolve(response?.food ?? null);
+    if (response?.food) {
+        props.onResolve(response.food);
+    }
 };
 </script>
 

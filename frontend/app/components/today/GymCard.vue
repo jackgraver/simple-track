@@ -34,7 +34,7 @@ const logExercise = async () => {
             },
         })
         .then((loggedExercise) => {
-            if (loggedExercise === "cancel") {
+            if (loggedExercise === null) {
                 return;
             }
             if (loggedExercise) {

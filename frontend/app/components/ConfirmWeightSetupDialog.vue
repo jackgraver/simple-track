@@ -1,13 +1,14 @@
 <script setup lang="ts">
 const props = defineProps<{
     weightSetup: string;
-    onResolve?: (value: string | null) => void;
+    onResolve?: (value: string) => void;
+    onCancel?: () => void;
 }>();
 
 const value = ref(props.weightSetup);
 
 const confirm = () => props.onResolve?.(value.value);
-const cancel = () => props.onResolve?.("cancel");
+const cancel = () => props.onCancel?.();
 </script>
 
 <template>

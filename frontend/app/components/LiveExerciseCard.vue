@@ -58,7 +58,7 @@ const innerLogExercise = async (exercise: LoggedExercise) => {
                 },
             });
 
-            if (res === "cancel") {
+            if (res === null) {
                 logStatus.value = "not-logged";
                 return;
             }

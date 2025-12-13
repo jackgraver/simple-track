@@ -27,15 +27,17 @@ const removeExerciseFromPlan = async (plan: WorkoutPlan, exercise: Exercise) => 
 
 const openAddDialog = (plan: WorkoutPlan) => {
     dialogManager
-        .custom({
+        .custom<boolean>({
             title: `Add Exercise to ${plan.name}`,
             component: AddExerciseDialog,
             props: {
                 plan: plan,
             },
         })
-        .then(() => {
-            refresh();
+        .then((result) => {
+            if (result !== null) {
+                refresh();
+            }
         });
 };
 </script>
