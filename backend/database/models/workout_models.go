@@ -236,7 +236,7 @@ type LoggedExercise struct {
     ExerciseID   uint         `json:"exercise_id"`
 	Exercise     *Exercise    `json:"exercise"`
     Sets         []LoggedSet  `json:"sets" gorm:"constraint:OnDelete:CASCADE;"`
-	WeightSetup  string  	  `json:"weight_setup"`
+	Notes        string  	  `json:"notes"`
 	PercentChange float32     `json:"percent_change" gorm:"-"`
 }
 
@@ -245,6 +245,7 @@ type LoggedSet struct {
     LoggedExerciseID uint    `json:"logged_exercise_id"`
     Reps             uint     `json:"reps"`
     Weight           float32 `json:"weight"`
+    WeightSetup      string  `json:"weight_setup"`
 }
 
 type Exercise struct {

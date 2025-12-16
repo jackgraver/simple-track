@@ -11,22 +11,26 @@ type ExerciseGroup = {
 const props = defineProps<{
     exerciseGroup: ExerciseGroup;
     currentSetNumber: number;
-    loggedSets: Array<{ weight: number; reps: number }>;
+    loggedSets: Array<{ weight: number; reps: number; weight_setup: string }>;
     currentWeight: number;
     currentReps: number;
+    currentWeightSetup: string;
     weightEditMode: boolean;
     repsEditMode: boolean;
     weightInputValue: string;
     repsInputValue: string;
+    notes: string;
 }>();
 
 const emit = defineEmits<{
     (e: "update:currentWeight", value: number): void;
     (e: "update:currentReps", value: number): void;
+    (e: "update:currentWeightSetup", value: string): void;
     (e: "update:weightEditMode", value: boolean): void;
     (e: "update:repsEditMode", value: boolean): void;
     (e: "update:weightInputValue", value: string): void;
     (e: "update:repsInputValue", value: string): void;
+    (e: "update:notes", value: string): void;
     (e: "increment-weight"): void;
     (e: "decrement-weight"): void;
     (e: "increment-reps"): void;
@@ -103,7 +107,10 @@ const exitRepsEditMode = () => {
             <h3>Logged Sets:</h3>
             <ul class="sets-list">
                 <li v-for="(set, index) in loggedSets" :key="index">
-                    Set {{ index + 1 }}: {{ set.weight }}lbs × {{ set.reps }} reps
+                    <div class="set-info">
+                        <span>Set {{ index + 1 }}: {{ set.weight }}lbs × {{ set.reps }} reps</span>
+                        <span v-if="set.weight_setup" class="weight-setup-badge">{{ set.weight_setup }}</span>
+                    </div>
                 </li>
             </ul>
         </div>
@@ -161,6 +168,26 @@ const exitRepsEditMode = () => {
                     <button @click="incrementReps" class="stepper-button" type="button">+</button>
                 </div>
             </div>
+            <div class="input-container">
+                <label>Weight Setup</label>
+                <input
+                    type="text"
+                    :value="currentWeightSetup"
+                    @input="emit('update:currentWeightSetup', ($event.target as HTMLInputElement).value)"
+                    class="weight-setup-input"
+                    placeholder="e.g., Barbell, Dumbbells, Machine"
+                />
+            </div>
+        </div>
+        <div class="input-container">
+            <label>Notes</label>
+            <textarea
+                :value="notes"
+                @input="emit('update:notes', ($event.target as HTMLTextAreaElement).value)"
+                class="notes-input"
+                placeholder="Add any notes about this exercise..."
+                rows="3"
+            ></textarea>
         </div>
         <div class="button-group">
             <button @click="emit('add-next-set')" class="next-set-button">
@@ -221,6 +248,22 @@ const exitRepsEditMode = () => {
 .sets-list li {
     padding: 0.5rem;
     background: rgb(27, 27, 27);
+    border-radius: 3px;
+    border: 1px solid rgb(56, 56, 56);
+}
+
+.set-info {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.weight-setup-badge {
+    font-size: 0.85rem;
+    color: rgb(150, 150, 150);
+    padding: 0.25rem 0.5rem;
+    background: rgb(35, 35, 35);
     border-radius: 3px;
     border: 1px solid rgb(56, 56, 56);
 }
@@ -312,6 +355,63 @@ const exitRepsEditMode = () => {
     outline: none;
     border-color: rgb(100, 100, 100);
     background: rgb(35, 35, 35);
+}
+
+.input-container {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.input-container label {
+    font-weight: 500;
+    font-size: 0.9rem;
+    color: rgb(150, 150, 150);
+}
+
+.weight-setup-input {
+    width: 100%;
+    height: 3rem;
+    padding: 0 1rem;
+    border: 1px solid rgb(56, 56, 56);
+    border-radius: 5px;
+    background: rgb(27, 27, 27);
+    color: inherit;
+    font-size: 1rem;
+    transition: border-color 0.2s, background-color 0.2s;
+}
+
+.weight-setup-input:focus {
+    outline: none;
+    border-color: rgb(100, 100, 100);
+    background: rgb(35, 35, 35);
+}
+
+.weight-setup-input::placeholder {
+    color: rgb(100, 100, 100);
+}
+
+.notes-input {
+    width: 100%;
+    padding: 0.75rem 1rem;
+    border: 1px solid rgb(56, 56, 56);
+    border-radius: 5px;
+    background: rgb(27, 27, 27);
+    color: inherit;
+    font-size: 1rem;
+    font-family: inherit;
+    resize: vertical;
+    transition: border-color 0.2s, background-color 0.2s;
+}
+
+.notes-input:focus {
+    outline: none;
+    border-color: rgb(100, 100, 100);
+    background: rgb(35, 35, 35);
+}
+
+.notes-input::placeholder {
+    color: rgb(100, 100, 100);
 }
 
 .button-group {

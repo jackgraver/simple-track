@@ -32,14 +32,16 @@ const currentExerciseIndex = ref<number | null>(null);
 // Set logging state
 const currentWeight = ref<number>(0);
 const currentReps = ref<number>(0);
+const currentWeightSetup = ref<string>("");
 const currentSetNumber = ref<number>(1);
-const loggedSets = ref<Array<{ weight: number; reps: number }>>([]);
+const loggedSets = ref<Array<{ weight: number; reps: number; weight_setup: string }>>([]);
 
 // Edit mode state
 const weightEditMode = ref<boolean>(false);
 const repsEditMode = ref<boolean>(false);
 const weightInputValue = ref<string>("");
 const repsInputValue = ref<string>("");
+const notes = ref<string>("");
 
 // Save state for debouncing
 const saveTimeout = ref<number | null>(null);
@@ -59,30 +61,41 @@ const startLoggingExercise = (index: number) => {
         loggedSets.value = exerciseGroup.logged.sets.map(set => ({
             weight: set.weight,
             reps: set.reps,
+            weight_setup: set.weight_setup || "",
         }));
         currentSetNumber.value = loggedSets.value.length + 1;
         
-        // Initialize weight/reps from last logged set
+        // Initialize weight/reps/weight_setup from last logged set
         const lastSet = exerciseGroup.logged.sets[exerciseGroup.logged.sets.length - 1];
         if (lastSet) {
             currentWeight.value = lastSet.weight;
             currentReps.value = 0; // Reset reps for new set
+            currentWeightSetup.value = lastSet.weight_setup || "";
         } else {
             currentWeight.value = 0;
             currentReps.value = 0;
+            currentWeightSetup.value = "";
         }
+        
+        // Initialize notes from logged exercise
+        notes.value = exerciseGroup.logged.notes || "";
     } else {
         loggedSets.value = [];
         currentSetNumber.value = 1;
         
-        // Initialize weight from previous exercise if available
+        // Initialize weight/weight_setup from previous exercise if available
         if (exerciseGroup.previous && exerciseGroup.previous.sets.length > 0) {
             const firstSet = exerciseGroup.previous.sets[0];
             currentWeight.value = firstSet ? firstSet.weight : 0;
+            currentWeightSetup.value = firstSet ? (firstSet.weight_setup || "") : "";
         } else {
             currentWeight.value = 0;
+            currentWeightSetup.value = "";
         }
         currentReps.value = 0;
+        
+        // Initialize notes from previous exercise if available
+        notes.value = exerciseGroup.previous?.notes || "";
     }
     
     weightEditMode.value = false;
@@ -102,6 +115,7 @@ const saveCurrentExercise = async (): Promise<boolean> => {
         allSets.push({
             weight: currentWeight.value,
             reps: currentReps.value,
+            weight_setup: currentWeightSetup.value,
         });
     }
 
@@ -128,7 +142,7 @@ const saveCurrentExercise = async (): Promise<boolean> => {
             exercise_id: exerciseGroup.planned.ID,
             exercise: exerciseGroup.planned,
             sets: [],
-            weight_setup: "",
+            notes: "",
             created_at: "",
             updated_at: "",
         };
@@ -139,10 +153,14 @@ const saveCurrentExercise = async (): Promise<boolean> => {
         logged_exercise_id: exerciseToLog.ID,
         reps: set.reps,
         weight: set.weight,
+        weight_setup: set.weight_setup || "",
         ID: 0,
         created_at: "",
         updated_at: "",
     }));
+
+    // Update notes
+    exerciseToLog.notes = notes.value;
 
     exerciseToLog.workout_log_id = data.value?.day.ID ?? exerciseToLog.workout_log_id;
 
@@ -194,10 +212,11 @@ const addNextSet = async () => {
     loggedSets.value.push({
         weight: currentWeight.value,
         reps: currentReps.value,
+        weight_setup: currentWeightSetup.value,
     });
 
     currentSetNumber.value++;
-    currentReps.value = 0; // Reset reps, keep weight
+    currentReps.value = 0; // Reset reps, keep weight and weight setup
 
     // Save immediately after adding set
     debouncedSave();
@@ -228,6 +247,7 @@ const finishLogging = async () => {
         loggedSets.value.push({
             weight: currentWeight.value,
             reps: currentReps.value,
+            weight_setup: currentWeightSetup.value,
         });
         const retrySuccess = await saveCurrentExercise();
         if (!retrySuccess) {
@@ -244,8 +264,10 @@ const finishLogging = async () => {
     currentExerciseIndex.value = null;
     currentWeight.value = 0;
     currentReps.value = 0;
+    currentWeightSetup.value = "";
     currentSetNumber.value = 1;
     loggedSets.value = [];
+    notes.value = "";
     weightEditMode.value = false;
     repsEditMode.value = false;
     isSaving.value = false;
@@ -430,12 +452,16 @@ const removeExerciseFromWorkout = async (index: number) => {
             :reps-edit-mode="repsEditMode"
             :weight-input-value="weightInputValue"
             :reps-input-value="repsInputValue"
+            :current-weight-setup="currentWeightSetup"
+            :notes="notes"
             @update:current-weight="currentWeight = $event"
             @update:current-reps="currentReps = $event"
             @update:weight-edit-mode="weightEditMode = $event"
             @update:reps-edit-mode="repsEditMode = $event"
             @update:weight-input-value="weightInputValue = $event"
             @update:reps-input-value="repsInputValue = $event"
+            @update:current-weight-setup="currentWeightSetup = $event"
+            @update:notes="notes = $event"
             @increment-weight="incrementWeight"
             @decrement-weight="decrementWeight"
             @increment-reps="incrementReps"
