@@ -217,6 +217,10 @@ type WorkoutPlan struct {
     Exercises []Exercise  `gorm:"many2many:workout_plan_exercises;" json:"exercises"`
 }
 
+func (w WorkoutPlan) GetID() uint       { return w.ID }
+func (w WorkoutPlan) TableName() string { return "workout_plans" }
+func (w WorkoutPlan) Preloads() []string { return []string{"Exercises"} }
+
 type WorkoutLog struct {
     gorm.Model
     Date          time.Time    `json:"date"`
@@ -226,8 +230,11 @@ type WorkoutLog struct {
     Cardio    *Cardio          `json:"cardio" gorm:"constraint:OnDelete:CASCADE;"`
 }
 
-func (w *WorkoutLog) Preloads() []string {
-    return []string{"Cardio", "Exercises.Sets"}
+func (w WorkoutLog) GetID() uint        { return w.ID }
+func (w WorkoutLog) TableName() string  { return "workout_logs" }
+func (w WorkoutLog) GetDate() time.Time { return w.Date }
+func (w WorkoutLog) Preloads() []string {
+    return []string{"WorkoutPlan.Exercises", "Cardio", "Exercises.Sets", "Exercises.Exercise"}
 }
 
 type LoggedExercise struct {
@@ -240,6 +247,10 @@ type LoggedExercise struct {
 	PercentChange float32     `json:"percent_change" gorm:"-"`
 }
 
+func (l LoggedExercise) GetID() uint       { return l.ID }
+func (l LoggedExercise) TableName() string { return "logged_exercises" }
+func (l LoggedExercise) Preloads() []string { return []string{"Exercise", "Sets"} }
+
 type LoggedSet struct {
     gorm.Model
     LoggedExerciseID uint    `json:"logged_exercise_id"`
@@ -248,6 +259,9 @@ type LoggedSet struct {
     WeightSetup      string  `json:"weight_setup"`
 }
 
+func (l LoggedSet) GetID() uint       { return l.ID }
+func (l LoggedSet) TableName() string { return "logged_sets" }
+
 type Exercise struct {
 	gorm.Model
 	Name string `gorm:"uniqueIndex;not null" json:"name"`
@@ -255,9 +269,16 @@ type Exercise struct {
 	WorkoutPlans []WorkoutPlan `gorm:"many2many:workout_plan_exercises;" json:"workout_plans"`
 }
 
+func (e Exercise) GetID() uint       { return e.ID }
+func (e Exercise) TableName() string { return "exercises" }
+func (e Exercise) Preloads() []string { return []string{} }
+
 type Cardio struct {
     gorm.Model
     WorkoutLogID uint   `json:"workout_log_id" gorm:"uniqueIndex;not null"`
     Minutes      int    `json:"minutes"`
     Type         string `json:"type"`
 }
+
+func (c Cardio) GetID() uint       { return c.ID }
+func (c Cardio) TableName() string { return "cardios" }

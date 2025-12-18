@@ -9,4 +9,9 @@ export default defineNuxtConfig({
             link: [{ rel: "icon", type: "image/x-icon", href: "/favicon.ico" }],
         },
     },
+    runtimeConfig: {
+        public: {
+            apiBase: import.meta.env.NUXT_PUBLIC_API_BASE || "http://localhost:8080",
+        },
+    },
 });

@@ -375,6 +375,7 @@ const confirmLogs = async () => {
 
 // Add exercise to workout
 const addExerciseToWorkout = async (exerciseId: number) => {
+    console.log("addExerciseToWorkout", exerciseId);
     const { response, error } = await useAPIPost<{
         exercise: LoggedExercise;
     }>(`workout/exercise/add`, "POST", {
@@ -438,7 +439,7 @@ const removeExerciseFromWorkout = async (index: number) => {
             :exercises="log"
             @select-exercise="startLoggingExercise"
             @finish-workout="confirmLogs"
-            @add-exercise="addExerciseToWorkout"
+            @add-exercise="addExerciseToWorkout($event)"
             @remove-exercise="removeExerciseFromWorkout"
         />
         <ExerciseLoggingView
