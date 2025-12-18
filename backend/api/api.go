@@ -4,11 +4,19 @@ import (
 	"be-simpletracker/database"
 	"io"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 )
+
+func getEnv(key, fallback string) string {
+	if value, ok := os.LookupEnv(key); ok {
+		return value
+	}
+	return fallback
+}
 
 func InitAPI() {
 	f, _ := os.Create("api/gin.log")
@@ -17,25 +25,16 @@ func InitAPI() {
 
 	router := gin.Default()
 
-	// router.Use(gin.LoggerWithFormatter(func(param gin.LogFormatterParams) string {
-	// 	// Custom format
-	// 	return fmt.Sprintf("[GIN] %s - [%s] \"%s %s %s %d %s \"%s\" %s\"\n",
-	// 	param.TimeStamp.Format(time.RFC1123),
-	// 	param.ClientIP,
-	// 	param.Method,
-	// 	param.Path,
-	// 	param.Request.Proto,
-	// 	param.StatusCode,
-	// 	param.Latency,
-	// 	param.Request.UserAgent(),
-	// 	param.ErrorMessage,
-	// 	)
-	// }))
-
 	router.Use(BenchmarkMiddleware(router))
 
+	corsOrigins := getEnv("CORS_ORIGINS", "http://localhost:5173,http://localhost:3000")
+	origins := []string{}
+	for _, origin := range splitString(corsOrigins, ",") {
+		origins = append(origins, origin)
+	}
+
 	router.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{"http://localhost:5173", "http://localhost:3000"},
+		AllowOrigins:     origins,
 		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE"},
 		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization"},
 		AllowCredentials: true,
@@ -57,5 +56,17 @@ func InitAPI() {
 	workout.SetEndpoints(router)
 
 
-	router.Run("127.0.0.1:8080")
+	addr := getEnv("LISTEN_ADDR", "0.0.0.0:8080")
+	router.Run(addr)
+}
+
+func splitString(s, sep string) []string {
+	var result []string
+	for _, part := range strings.Split(s, sep) {
+		trimmed := strings.TrimSpace(part)
+		if trimmed != "" {
+			result = append(result, trimmed)
+		}
+	}
+	return result
 }

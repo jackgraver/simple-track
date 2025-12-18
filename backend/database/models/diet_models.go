@@ -155,13 +155,16 @@ func (m *MealPlanModel) Preloads() []string {
 type Day struct {
     gorm.Model
     Date   time.Time `json:"date"`
-    PlanID uint `json:"plan_id"`            // FK to Plan
-    Plan   Plan `gorm:"foreignKey:PlanID" json:"plan"`   // the Plan object
+    PlanID uint `json:"plan_id"`
+    Plan   Plan `gorm:"foreignKey:PlanID" json:"plan"`
     PlannedMeals []PlannedMeal `json:"plannedMeals"`
     Logs         []DayLog `json:"loggedMeals"`
 }
 
-func (d *Day) Preloads() []string {
+func (d Day) GetID() uint        { return d.ID }
+func (d Day) TableName() string  { return "days" }
+func (d Day) GetDate() time.Time { return d.Date }
+func (d Day) Preloads() []string {
     return []string{"PlannedMeals.Meal.Items.Food", "Plan", "Logs.Meal.Items.Food"}
 }
 
@@ -174,6 +177,9 @@ type Plan struct {
 	Carbs    float32 `json:"carbs"`
 }
 
+func (p Plan) GetID() uint       { return p.ID }
+func (p Plan) TableName() string { return "plans" }
+
 type PlannedMeal struct {
     gorm.Model
     DayID  uint `json:"day_id" gorm:"not null"`
@@ -183,6 +189,10 @@ type PlannedMeal struct {
 	Logged bool `json:"logged"`
 }
 
+func (p PlannedMeal) GetID() uint       { return p.ID }
+func (p PlannedMeal) TableName() string { return "planned_meals" }
+func (p PlannedMeal) Preloads() []string { return []string{"Meal.Items.Food"} }
+
 type DayLog struct {
     gorm.Model
     DayID uint `json:"day_id" gorm:"not null"`
@@ -190,21 +200,32 @@ type DayLog struct {
     Meal   Meal `json:"meal"`
 }
 
+func (d DayLog) GetID() uint       { return d.ID }
+func (d DayLog) TableName() string { return "day_logs" }
+func (d DayLog) Preloads() []string { return []string{"Meal.Items.Food"} }
+
 type Meal struct {
     gorm.Model
     Name  string     `json:"name" gorm:"not null"`
     Items []MealItem `json:"items" gorm:"constraint:OnDelete:CASCADE;"`
 }
 
+func (m Meal) GetID() uint       { return m.ID }
+func (m Meal) TableName() string { return "meals" }
+func (m Meal) Preloads() []string { return []string{"Items.Food"} }
+
 type MealItem struct {
     gorm.Model
     MealID uint `json:"meal_id" gorm:"not null;index"`
     FoodID uint `json:"food_id" gorm:"not null;index"`
     Amount float32 `json:"amount"`
-
     Meal Meal `json:"meal"`
     Food Food `json:"food"`
 }
+
+func (m MealItem) GetID() uint       { return m.ID }
+func (m MealItem) TableName() string { return "meal_items" }
+func (m MealItem) Preloads() []string { return []string{"Food"} }
 
 type SavedMeal struct {
 	gorm.Model
@@ -212,15 +233,21 @@ type SavedMeal struct {
 	Items []SavedMealItem `json:"items" gorm:"constraint:OnDelete:CASCADE;"`
 }
 
+func (s SavedMeal) GetID() uint       { return s.ID }
+func (s SavedMeal) TableName() string { return "saved_meals" }
+func (s SavedMeal) Preloads() []string { return []string{"Items.Food"} }
+
 type SavedMealItem struct {
     gorm.Model
     SavedMealID uint `json:"saved_meal_id" gorm:"not null;index"`
     FoodID      uint `json:"food_id" gorm:"not null;index"`
     Amount      float64 `json:"amount"`
-
     SavedMeal SavedMeal
     Food      Food
 }
+
+func (s SavedMealItem) GetID() uint       { return s.ID }
+func (s SavedMealItem) TableName() string { return "saved_meal_items" }
 
 type Food struct {
     gorm.Model
@@ -232,3 +259,6 @@ type Food struct {
     Fiber    float32 `json:"fiber"`
 	Carbs    float32 `json:"carbs"`
 }
+
+func (f Food) GetID() uint       { return f.ID }
+func (f Food) TableName() string { return "foods" }

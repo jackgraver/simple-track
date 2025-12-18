@@ -18,8 +18,8 @@ type WorkoutFeature struct {
 
 func NewWorkoutFeature(db *gorm.DB) *WorkoutFeature {
     models.NewWorkoutModel(db)
-    // var feature = models.NewWorkoutModel(db)
-    // feature.MigrateDatabase()
+    var feature = models.NewWorkoutModel(db)
+    feature.MigrateDatabase()
 
 	return &WorkoutFeature{
 		BaseFeature[models.WorkoutModel]{
@@ -211,7 +211,7 @@ func (f *WorkoutFeature) logExercise(c *gin.Context) {
                 request.Log.Sets[i].LoggedExerciseID = 0
                 request.Log.Sets[i].ID = 0
             }
-            err := services.LogExercise(f.db, request.Log)
+            err := services.LogExercise(f.db, &request.Log)
             if err != nil {
                 c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
                 return
@@ -291,10 +291,10 @@ func (f *WorkoutFeature) addExerciseToWorkout(c *gin.Context) {
         WorkoutLogID: today.ID,
         ExerciseID:   request.ExerciseID,
         Sets:         []models.LoggedSet{},
-        WeightSetup:  "",
+        Notes:        "",
     }
 
-    err = services.LogExercise(f.db, newExercise)
+    err = services.LogExercise(f.db, &newExercise)
     if err != nil {
         c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
         return

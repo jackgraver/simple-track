@@ -1,0 +1,4 @@
+*.db
+*.sql
+database/dumps/
+api/gin.log

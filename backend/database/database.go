@@ -21,8 +21,9 @@ func DefineRoutes(router *gin.Engine) {
 	router.POST("/db/dump", func(c *gin.Context) {
 		timestamp := time.Now().Format("2006-01-02_15-04-05")
 		filename := fmt.Sprintf("database/dumps/dbdump_%s.sql", timestamp)
+		dbPath := getEnv("DB_PATH", "st.db")
 
-		if err := DumpSQLiteDB("st.db", filename); err != nil {
+		if err := DumpSQLiteDB(dbPath, filename); err != nil {
 			c.String(http.StatusInternalServerError, fmt.Sprintf("Dump failed: %v", err))
 			return
 		}
@@ -47,14 +48,22 @@ func ConnectToPostgres() (*gorm.DB, error) {
 	return db, nil
 }
 
+func getEnv(key, fallback string) string {
+	if value, ok := os.LookupEnv(key); ok {
+		return value
+	}
+	return fallback
+}
+
 // Initializes a new database connection to a SQLite database
 func ConnectToSqlite() (*gorm.DB, error) {
-    db, err := gorm.Open(sqlite.Open("st.db"), &gorm.Config{})
-    if err != nil {
+	dbPath := getEnv("DB_PATH", "st.db")
+	db, err := gorm.Open(sqlite.Open(dbPath), &gorm.Config{})
+	if err != nil {
 		return nil, err
 	}
 
-    return db, nil
+	return db, nil
 }
 
 func DumpSQLiteDB(dbPath string, dumpPath string) error {

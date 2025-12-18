@@ -80,8 +80,8 @@ func GetPreviousExerciseLog(db *gorm.DB, day time.Time, exercise string, offset 
     return exerciseLog, nil
 }
 
-func LogExercise(db *gorm.DB, exercise models.LoggedExercise) error {
-    err := db.Omit("Exercise").Create(&exercise).Error
+func LogExercise(db *gorm.DB, exercise *models.LoggedExercise) error {
+    err := db.Omit("Exercise").Create(exercise).Error
     if err != nil {
         return err
     }
