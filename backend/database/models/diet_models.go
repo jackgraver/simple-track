@@ -168,17 +168,6 @@ func (d Day) Preloads() []string {
     return []string{"PlannedMeals.Meal.Items.Food", "Plan", "Logs.Meal.Items.Food"}
 }
 
-type Plan struct {
-    gorm.Model
-    Name string `json:"name"`
-	Calories float32 `json:"calories"`
-    Protein  float32 `json:"protein"`
-    Fiber    float32 `json:"fiber"`
-	Carbs    float32 `json:"carbs"`
-}
-
-func (p Plan) GetID() uint       { return p.ID }
-func (p Plan) TableName() string { return "plans" }
 
 type PlannedMeal struct {
     gorm.Model
