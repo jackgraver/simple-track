@@ -3,6 +3,7 @@ package services
 import (
 	"be-simpletracker/database/models"
 	"be-simpletracker/utils"
+	workoutmodels "be-simpletracker/workout/models"
 	"time"
 
 	"gorm.io/gorm"
@@ -134,17 +135,17 @@ func GetExerciseProgression(db *gorm.DB, exerciseID uint) ([]ExerciseProgression
     return entries, nil
 }
 
-func GetAllWorkoutPlans(db *gorm.DB) ([]models.WorkoutPlan, error) {
-    var plans []models.WorkoutPlan
-    err := db.Preload("Exercises").Find(&plans).Error
+func GetAllWorkoutPlans(db *gorm.DB) ([]workoutmodels.WorkoutPlan, error) {
+    var workoutPlans []workoutmodels.WorkoutPlan
+    err := db.Preload("Exercises").Find(&workoutPlans).Error
     if err != nil {
-        return []models.WorkoutPlan{}, err
+        return []workoutmodels.WorkoutPlan{}, err
     }
-    return plans, nil
+    return workoutPlans, nil
 }
 
 func AddExerciseToPlan(db *gorm.DB, planID uint, exerciseID uint) error {
-    var plan models.WorkoutPlan
+    var plan workoutmodels.WorkoutPlan
     if err := db.First(&plan, planID).Error; err != nil {
         return err
     }
@@ -158,7 +159,7 @@ func AddExerciseToPlan(db *gorm.DB, planID uint, exerciseID uint) error {
 }
 
 func RemoveExerciseFromPlan(db *gorm.DB, planID uint, exerciseID uint) error {
-    var plan models.WorkoutPlan
+    var plan workoutmodels.WorkoutPlan
     if err := db.First(&plan, planID).Error; err != nil {
         return err
     }

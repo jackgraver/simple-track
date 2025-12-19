@@ -1,16 +1,16 @@
 package repository
 
-import "time"
+import (
+	"time"
+)
 
 // Entity is the base interface all database models must implement
 type Entity interface {
 	GetID() uint
 	TableName() string
 }
-
 // Preloadable defines models that have eager-loading relationships
 type Preloadable interface {
-	// Preloads returns the default preload paths for this entity
 	Preloads() []string
 }
 

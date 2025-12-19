@@ -178,13 +178,7 @@ func DeleteLoggedMeal(db *gorm.DB, dayID uint, mealID uint) error {
     return db.Delete(&meal).Error
 }
 
-func GetAllPlans(db *gorm.DB) ([]models.Plan, error) {
-    var plans []models.Plan
-    if err := db.Find(&plans).Error; err != nil {
-        return nil, err
-    }
-    return plans, nil
-}
+// GetAllPlans is now in plan_service.go using the repository pattern
 
 func UpdateDayLogMeal(db *gorm.DB, dayID uint, oldMealID uint, newMealID uint) error {
     var meal models.DayLog
