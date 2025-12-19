@@ -2,6 +2,7 @@ package routes
 
 import (
 	"be-simpletracker/database/services"
+	generics "be-simpletracker/generics"
 	"be-simpletracker/workout/models"
 	"fmt"
 	"net/http"
@@ -23,15 +24,21 @@ func NewExercisesHandler(db *gorm.DB) *ExercisesHandler {
 func RegisterExercisesRoutes(group *gin.RouterGroup, db *gorm.DB) {
 	h := NewExercisesHandler(db)
 
+    config := generics.DefaultCRUDConfig[models.Exercise]("/exercises", "exercise")
+    config.EnableGetByID = false
+	config.EnableUpdate = false
+	config.EnableDelete = false
+    generics.RegisterBasicCRUD(group, db, config)
+
 	exercises := group.Group("/exercises")
 	{
-		exercises.POST("/exercise/log", h.logExercise)
-		exercises.POST("/exercise/all-logged", h.checkAllLogged)
-		exercises.GET("/exercises/all", h.getAllExercises)
-		exercises.POST("/exercise/add", h.addExerciseToWorkout)
-		exercises.DELETE("/exercise/remove", h.removeExerciseFromWorkout)
-		exercises.GET("/exercise/progression/:id", h.getExerciseProgression)
-		exercises.POST("/exercises/create", h.createExercise)
+		exercises.POST("/log", h.logExercise)
+		exercises.POST("/all-logged", h.checkAllLogged)
+		// exercises.GET("/all", h.getAllExercises)
+		exercises.POST("/add", h.addExerciseToWorkout)
+		exercises.DELETE("/remove", h.removeExerciseFromWorkout)
+		exercises.GET("/progression/:id", h.getExerciseProgression)
+		// exercises.POST("/create", h.createExercise)
 	}
 }
 

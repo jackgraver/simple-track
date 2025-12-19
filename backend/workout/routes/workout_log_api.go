@@ -24,11 +24,18 @@ func NewWorkoutLogHandler(db *gorm.DB) *WorkoutLogHandler {
 func RegisterWorkoutLogRoutes(group *gin.RouterGroup, db *gorm.DB) {
 	h := NewWorkoutLogHandler(db)
 
+	// Only enable GET /all route, disable other CRUD routes
+	config := generics.DefaultCRUDConfig[models.WorkoutLog]("/logs", "log")
+	config.EnableGetByID = false
+	config.EnableCreate = false
+	config.EnableUpdate = false
+	config.EnableDelete = false
+	generics.RegisterBasicCRUD(group, db, config)
+
 	logs := group.Group("/logs")
 	{
 		logs.GET("/today", h.getWorkoutToday)
 		logs.GET("/month", h.getWorkoutMonth)
-		logs.GET("/all", h.getWorkoutAll)
 		logs.GET("/previous", h.getPreviousWorkout)
 	}
 }	
