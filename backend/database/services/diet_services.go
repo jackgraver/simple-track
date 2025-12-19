@@ -2,6 +2,7 @@ package services
 
 import (
 	"be-simpletracker/database/models"
+	"be-simpletracker/diet/models"
 	"be-simpletracker/utils"
 	"time"
 
