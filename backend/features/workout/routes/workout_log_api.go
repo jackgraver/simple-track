@@ -1,9 +1,9 @@
 package routes
 
 import (
-	"be-simpletracker/database/services"
+	"be-simpletracker/features/workout/models"
+	"be-simpletracker/features/workout/services"
 	generics "be-simpletracker/generics"
-	"be-simpletracker/workout/models"
 	"net/http"
 	"strconv"
 	"time"
@@ -79,16 +79,7 @@ func (h *WorkoutLogHandler) getWorkoutMonth(c *gin.Context) {
         "month": target.Month(),
         "offset": offset,
     })
-}
-
-func (f *WorkoutLogHandler) getWorkoutAll(c *gin.Context) {
-    days, err := services.GetAll(f.db)
-    if err != nil {
-        c.JSON(http.StatusNotImplemented, gin.H{"error": err.Error()})
-        return
-    }
-    c.JSON(http.StatusOK, days)
-}   
+} 
 
 type ExerciseGroup struct {
     Planned         *models.Exercise       `json:"planned,omitempty"`

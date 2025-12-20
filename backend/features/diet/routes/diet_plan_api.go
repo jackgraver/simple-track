@@ -1,8 +1,9 @@
 package routes
 
 import (
-	"be-simpletracker/database/services"
-	"be-simpletracker/diet/models"
+	"be-simpletracker/features/diet/models"
+	"be-simpletracker/generics"
+	"be-simpletracker/utils"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -21,6 +22,9 @@ func NewDietPlanHandler(db *gorm.DB) *DietPlanHandler {
 func RegisterDietPlanRoutes(group *gin.RouterGroup, db *gorm.DB) {
 	h := NewDietPlanHandler(db)
 
+	config := generics.DefaultCRUDConfig[models.Plan]("/plans", "plan")
+	generics.RegisterBasicCRUD(group, db, config)
+
 	plans := group.Group("/plans")
 	{
 		plans.GET("/plan/all", h.getAllPlans)
@@ -32,7 +36,7 @@ func (h *DietPlanHandler) getAllPlans(c *gin.Context) {
 	
 	// Use the service function - encapsulates all repository logic
 	// result, err := services.GetAllPlans(ctx, f.db, c)
-    result, err := services.GetAllWithOptions[*models.Plan](ctx, h.db, c, "id", true)
+    result, err := utils.GetAllWithOptions[*models.Plan](ctx, h.db, c, "id", true)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

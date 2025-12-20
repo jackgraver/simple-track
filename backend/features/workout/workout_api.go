@@ -1,7 +1,7 @@
 package workout
 
 import (
-	"be-simpletracker/workout/routes"
+	"be-simpletracker/features/workout/routes"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -17,11 +17,11 @@ func NewHandler(db *gorm.DB) *Handler {
 }
 
 // RegisterRoutes registers all workout feature routes
-func RegisterRoutes(router *gin.Engine, db *gorm.DB) {
+func (h *Handler) RegisterRoutes(router *gin.Engine) {
 	group := router.Group("/workout")
 	
 	// Register plan sub-domain routes
-	routes.RegisterWorkoutPlanRoutes(group, db)
-	routes.RegisterExercisesRoutes(group, db)	
-	routes.RegisterWorkoutLogRoutes(group, db)
+	routes.RegisterWorkoutPlanRoutes(group, h.db)
+	routes.RegisterExercisesRoutes(group, h.db)	
+	routes.RegisterWorkoutLogRoutes(group, h.db)
 }

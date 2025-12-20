@@ -1,8 +1,8 @@
 package routes
 
 import (
-	"be-simpletracker/database/services"
-	"be-simpletracker/diet/models"
+	"be-simpletracker/features/diet/models"
+	"be-simpletracker/features/diet/services"
 	"be-simpletracker/generics"
 	"net/http"
 	"strconv"
@@ -23,6 +23,9 @@ func NewDietLogHandler(db *gorm.DB) *DietLogHandler {
 
 func RegisterDietLogRoutes(group *gin.RouterGroup, db *gorm.DB) {
 	h := NewDietLogHandler(db)
+
+    config := generics.DefaultCRUDConfig[models.DayLog]("/logs", "log")
+    generics.RegisterBasicCRUD(group, db, config)
 
 	logs := group.Group("/logs")
 	{
