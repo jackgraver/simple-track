@@ -13,8 +13,7 @@ type WorkoutLog struct {
 	gorm.Model
 	Date          time.Time `json:"date"`
 	WorkoutPlanID *uint     `json:"workout_plan_id"`
-	// WorkoutPlan is now in workout/plans package - use ID reference only
-	// For preloading, use: Preload("WorkoutPlan") where WorkoutPlan is from workout/plans
+	WorkoutPlan   *WorkoutPlan `json:"workout_plan" gorm:"foreignKey:WorkoutPlanID"`
 	Exercises []LoggedExercise `json:"exercises" gorm:"constraint:OnDelete:CASCADE;"`
 	Cardio    *Cardio          `json:"cardio" gorm:"constraint:OnDelete:CASCADE;"`
 }

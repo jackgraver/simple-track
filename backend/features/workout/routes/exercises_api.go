@@ -1,9 +1,9 @@
 package routes
 
 import (
-	"be-simpletracker/database/services"
+	"be-simpletracker/features/workout/models"
+	"be-simpletracker/features/workout/services"
 	generics "be-simpletracker/generics"
-	"be-simpletracker/workout/models"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -61,7 +61,7 @@ func (h *ExercisesHandler) logExercise(c *gin.Context) {
                 request.Log.Sets[i].LoggedExerciseID = 0
                 request.Log.Sets[i].ID = 0
             }
-            err := services.LogExercise(h.db, request.Log)
+            err := services.LogExercise(h.db, &request.Log)
             if err != nil {
                 c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
                 return
@@ -92,23 +92,6 @@ func (h *ExercisesHandler) checkAllLogged(c *gin.Context) {
 
     fmt.Println("Not all logged!")
     c.JSON(http.StatusOK, gin.H{"all_logged": false})
-}
-
-func (h *ExercisesHandler) getAllExercises(c *gin.Context) {
-    excludeParam := c.QueryArray("exclude")
-    var excludeIDs []uint
-    for _, idStr := range excludeParam {
-        if id, err := strconv.ParseUint(idStr, 10, 32); err == nil {
-            excludeIDs = append(excludeIDs, uint(id))
-        }
-    }
-
-    exercises, err := services.GetAllExercises(h.db, excludeIDs)
-    if err != nil {
-        c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-        return
-    }
-    c.JSON(http.StatusOK, gin.H{"exercises": exercises})
 }
 
 type AddExerciseRequest struct {
@@ -144,7 +127,7 @@ func (h *ExercisesHandler) addExerciseToWorkout(c *gin.Context) {
         Notes:        "",
     }
 
-    err = services.LogExercise(h.db, newExercise)
+    err = services.LogExercise(h.db, &newExercise)
     if err != nil {
         c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
         return

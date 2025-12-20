@@ -1,8 +1,8 @@
 package routes
 
 import (
+	"be-simpletracker/features/workout/models"
 	generics "be-simpletracker/generics"
-	"be-simpletracker/workout/models"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"

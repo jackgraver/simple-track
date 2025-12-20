@@ -1,8 +1,9 @@
 package routes
 
 import (
-	"be-simpletracker/database/services"
-	"be-simpletracker/diet/models"
+	"be-simpletracker/features/diet/models"
+	"be-simpletracker/features/diet/services"
+	"be-simpletracker/generics"
 	"be-simpletracker/utils"
 	"fmt"
 	"net/http"
@@ -23,6 +24,12 @@ func NewMealHandler(db *gorm.DB) *MealHandler {
 
 func RegisterMealRoutes(group *gin.RouterGroup, db *gorm.DB) {
 	h := NewMealHandler(db)
+
+    food_config := generics.DefaultCRUDConfig[models.Food]("/foods", "food")
+	generics.RegisterBasicCRUD(group, db, food_config)
+    meal_config := generics.DefaultCRUDConfig[models.Meal]("/meals", "meal")
+	generics.RegisterBasicCRUD(group, db, meal_config)
+
 
 	meals := group.Group("/meals")
 	{
