@@ -13,7 +13,7 @@ type ExerciseGroup = {
 const { data, pending, error } = useAPIGet<{
     day: WorkoutLog;
     previous_exercises: ExerciseGroup[];
-}>(`workout/logs/previous`);
+}>(`workout/logs/previous?offset=-1`);
 
 const log = ref<ExerciseGroup[]>(
     data.value?.previous_exercises ?? [],
@@ -553,6 +553,12 @@ const editSet = (setIndex: number) => {
     currentSetNumber.value = loggedSets.value.length + 1;
 };
 
+// Go back to list view
+const goBackToList = () => {
+    currentView.value = "list";
+    currentExerciseIndex.value = null;
+};
+
 // Remove exercise from workout
 const removeExerciseFromWorkout = async (index: number) => {
     const exerciseGroup = log.value[index];
@@ -629,6 +635,7 @@ const removeExerciseFromWorkout = async (index: number) => {
             @retry-set="retrySet"
             @delete-set="deleteSet"
             @edit-set="editSet"
+            @go-back="goBackToList"
         />
     </div>
 </template>

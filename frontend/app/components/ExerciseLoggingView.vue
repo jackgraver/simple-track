@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { Exercise, LoggedExercise } from "~/types/workout";
-import { Loader, Check, X, RotateCcw } from "lucide-vue-next";
+import { Loader, Check, X, RotateCcw, ArrowLeft } from "lucide-vue-next";
 import { nextTick } from "vue";
 
 type ExerciseGroup = {
@@ -55,6 +55,7 @@ const emit = defineEmits<{
     (e: "retry-set", index: number): void;
     (e: "delete-set", index: number): void;
     (e: "edit-set", index: number): void;
+    (e: "go-back"): void;
 }>();
 
 // Weight increment/decrement functions
@@ -113,10 +114,12 @@ const exitRepsEditMode = () => {
 <template>
     <div class="logging-view">
         <div class="logging-header">
+            <button @click="emit('go-back')" class="back-button" type="button">
+                <ArrowLeft :size="20" />
+            </button>
             <h2>{{ exerciseGroup.planned.name }}</h2>
             <span class="set-indicator">Set {{ currentSetNumber }}</span>
         </div>
-
         <div class="sets-logged" v-if="loggedSets.length > 0">
             <h3>Logged Sets:</h3>
             <ul class="sets-list">
@@ -221,7 +224,7 @@ const exitRepsEditMode = () => {
                     :value="currentWeightSetup"
                     @input="emit('update:currentWeightSetup', ($event.target as HTMLInputElement).value)"
                     class="weight-setup-input"
-                    placeholder="e.g., Barbell, Dumbbells, Machine"
+                    placeholder="2x45 + 10"
                 />
             </div>
         </div>
@@ -231,7 +234,7 @@ const exitRepsEditMode = () => {
                 :value="notes"
                 @input="emit('update:notes', ($event.target as HTMLTextAreaElement).value)"
                 class="notes-input"
-                placeholder="Add any notes about this exercise..."
+                placeholder="Add any notes about this set..."
                 rows="3"
             ></textarea>
         </div>
@@ -253,23 +256,58 @@ const exitRepsEditMode = () => {
     gap: 1.5rem;
     width: 100%;
     max-width: 100%;
+    padding: 0 0.75rem 0 0.375rem;
+    box-sizing: border-box;
 }
 
 .logging-header {
-    display: flex;
-    justify-content: space-between;
+    display: grid;
+    grid-template-columns: auto 1fr auto;
     align-items: center;
+    gap: 0.5rem;
     padding-bottom: 1rem;
     border-bottom: 1px solid rgb(56, 56, 56);
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.back-button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.5rem;
+    height: 2.5rem;
+    background: transparent;
+    border: 1px solid rgb(56, 56, 56);
+    border-radius: 0.25rem;
+    color: inherit;
+    cursor: pointer;
+    transition: background-color 0.2s, border-color 0.2s;
+    padding: 0;
+}
+
+.back-button:hover {
+    background: rgb(40, 40, 40);
+    border-color: rgb(100, 100, 100);
 }
 
 .logging-header h2 {
     margin: 0;
+    text-align: center;
+    grid-column: 2;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
 }
 
 .set-indicator {
     color: rgb(150, 150, 150);
     font-size: 0.9rem;
+    text-align: right;
+    grid-column: 3;
+    white-space: nowrap;
+    flex-shrink: 0;
 }
 
 .sets-logged {
@@ -494,7 +532,6 @@ const exitRepsEditMode = () => {
 }
 
 .weight-setup-input {
-    width: 100%;
     height: 3rem;
     padding: 0 1rem;
     border: 1px solid rgb(56, 56, 56);
@@ -516,7 +553,6 @@ const exitRepsEditMode = () => {
 }
 
 .notes-input {
-    width: 100%;
     padding: 0.75rem 1rem;
     border: 1px solid rgb(56, 56, 56);
     border-radius: 5px;
@@ -578,6 +614,27 @@ const exitRepsEditMode = () => {
 }
 
 @media (max-width: 767px) {
+    .logging-view {
+        padding: 0 1rem 0 0.5rem;
+    }
+
+    .logging-header {
+        gap: 0.75rem;
+    }
+
+    .logging-header h2 {
+        font-size: 1.25rem;
+    }
+
+    .set-indicator {
+        font-size: 0.85rem;
+    }
+
+    .back-button {
+        width: 2.25rem;
+        height: 2.25rem;
+    }
+
     .button-group {
         flex-direction: column;
     }

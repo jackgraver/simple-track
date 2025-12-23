@@ -125,7 +125,6 @@ const isLogged = (exerciseGroup: ExerciseGroup): boolean => {
                     <div class="exercise-title-section">
                         <span class="exercise-name">{{ exerciseGroup.planned?.name || exerciseGroup.logged?.exercise?.name }}</span>
                         <span v-if="isLogged(exerciseGroup) && getLastSet(exerciseGroup)" class="exercise-subtitle">
-                            <!-- {{ getLastSet(exerciseGroup)!.weight }}lbs × {{ getLastSet(exerciseGroup)!.reps }} -->
                               <p v-for="set in exerciseGroup.logged?.sets">{{ set.weight }}lbs × {{ set.reps }}</p>
                         </span>
                         <span v-else-if="!isLogged(exerciseGroup) && getMaxWeight(exerciseGroup) !== null" class="exercise-subtitle">

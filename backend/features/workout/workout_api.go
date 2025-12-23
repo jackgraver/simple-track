@@ -23,7 +23,7 @@ func NewHandler(db *gorm.DB) *Handler {
 func (h *Handler) RegisterRoutes(router *gin.Engine) {
 	group := router.Group("/workout")
 	
-	seedDatabase(h.db)
+	// seedDatabase(h.db)
 
 	// Register plan sub-domain routes
 	routes.RegisterWorkoutPlanRoutes(group, h.db)

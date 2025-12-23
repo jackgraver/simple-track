@@ -84,8 +84,7 @@ func (h *ExercisesHandler) logExercise(c *gin.Context) {
     }
 
     time.Sleep(3 * time.Second)
-	// c.JSON(http.StatusOK, gin.H{"exercise": savedExercise})
-    c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+	c.JSON(http.StatusOK, gin.H{"exercise": savedExercise})
 }
 
 func (h *ExercisesHandler) checkAllLogged(c *gin.Context) {
