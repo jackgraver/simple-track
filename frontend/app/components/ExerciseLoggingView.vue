@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { Exercise, LoggedExercise } from "~/types/workout";
+import { Loader, Check, X, RotateCcw } from "lucide-vue-next";
 import { nextTick } from "vue";
 
 type ExerciseGroup = {
@@ -8,10 +9,20 @@ type ExerciseGroup = {
     previous: LoggedExercise;
 };
 
+type LoggedSetWithStatus = {
+    weight: number;
+    reps: number;
+    weight_setup: string;
+    status: 'pending' | 'success' | 'error';
+    id: number | null;
+    error: string | null;
+    tempId: string;
+};
+
 const props = defineProps<{
     exerciseGroup: ExerciseGroup;
     currentSetNumber: number;
-    loggedSets: Array<{ weight: number; reps: number; weight_setup: string }>;
+    loggedSets: LoggedSetWithStatus[];
     currentWeight: number;
     currentReps: number;
     currentWeightSetup: string;
@@ -41,6 +52,9 @@ const emit = defineEmits<{
     (e: "exit-reps-edit"): void;
     (e: "add-next-set"): void;
     (e: "finish-logging"): void;
+    (e: "retry-set", index: number): void;
+    (e: "delete-set", index: number): void;
+    (e: "edit-set", index: number): void;
 }>();
 
 // Weight increment/decrement functions
@@ -106,10 +120,42 @@ const exitRepsEditMode = () => {
         <div class="sets-logged" v-if="loggedSets.length > 0">
             <h3>Logged Sets:</h3>
             <ul class="sets-list">
-                <li v-for="(set, index) in loggedSets" :key="index">
+                <li 
+                    v-for="(set, index) in loggedSets" 
+                    :key="set.tempId || index"
+                    :class="['set-item', { 'clickable': set.status === 'success' }]"
+                    @click="set.status === 'success' && emit('edit-set', index)"
+                >
                     <div class="set-info">
                         <span>Set {{ index + 1 }}: {{ set.weight }}lbs × {{ set.reps }} reps</span>
-                        <span v-if="set.weight_setup" class="weight-setup-badge">{{ set.weight_setup }}</span>
+                        <div class="set-actions">
+                            <span v-if="set.weight_setup" class="weight-setup-badge">{{ set.weight_setup }}</span>
+                            <div v-if="set.status === 'pending'" class="set-status">
+                                <Loader class="spinner" :size="16" />
+                            </div>
+                            <div v-else-if="set.status === 'success'" class="set-status">
+                                <Check class="check-icon" :size="16" />
+                            </div>
+                            <div v-else-if="set.status === 'error'" class="set-status">
+                                <button 
+                                    @click.stop="emit('retry-set', index)"
+                                    class="retry-button"
+                                    type="button"
+                                    title="Retry"
+                                >
+                                    <RotateCcw :size="16" />
+                                </button>
+                            </div>
+                            <button
+                                v-if="set.status === 'success'"
+                                @click.stop="emit('delete-set', index)"
+                                class="delete-button"
+                                type="button"
+                                title="Delete set"
+                            >
+                                <X :size="16" />
+                            </button>
+                        </div>
                     </div>
                 </li>
             </ul>
@@ -205,6 +251,8 @@ const exitRepsEditMode = () => {
     display: flex;
     flex-direction: column;
     gap: 1.5rem;
+    width: 100%;
+    max-width: 100%;
 }
 
 .logging-header {
@@ -250,6 +298,16 @@ const exitRepsEditMode = () => {
     background: rgb(27, 27, 27);
     border-radius: 3px;
     border: 1px solid rgb(56, 56, 56);
+    transition: background-color 0.2s, border-color 0.2s;
+}
+
+.sets-list li.set-item.clickable {
+    cursor: pointer;
+}
+
+.sets-list li.set-item.clickable:hover {
+    background: rgb(35, 35, 35);
+    border-color: rgb(100, 100, 100);
 }
 
 .set-info {
@@ -257,6 +315,72 @@ const exitRepsEditMode = () => {
     justify-content: space-between;
     align-items: center;
     gap: 0.5rem;
+    width: 100%;
+}
+
+.set-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.set-status {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.spinner {
+    animation: spin 1s linear infinite;
+    color: rgb(150, 150, 150);
+}
+
+@keyframes spin {
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.check-icon {
+    color: rgb(63, 197, 46);
+}
+
+.retry-button {
+    background: transparent;
+    border: none;
+    color: rgb(255, 100, 100);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.25rem;
+    border-radius: 3px;
+    transition: background-color 0.2s;
+}
+
+.retry-button:hover {
+    background: rgb(40, 20, 20);
+}
+
+.delete-button {
+    background: transparent;
+    border: none;
+    color: rgb(200, 100, 100);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.25rem;
+    border-radius: 3px;
+    transition: background-color 0.2s, color 0.2s;
+}
+
+.delete-button:hover {
+    background: rgb(40, 20, 20);
+    color: rgb(255, 100, 100);
 }
 
 .weight-setup-badge {

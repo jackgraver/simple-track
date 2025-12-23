@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -74,7 +75,17 @@ func (h *ExercisesHandler) logExercise(c *gin.Context) {
             }
     }
 
-	c.JSON(http.StatusOK, gin.H{"exercise": request.Log})
+    // Reload the exercise with all relations to get updated IDs
+    var savedExercise models.LoggedExercise
+    err := h.db.Preload("Exercise").Preload("Sets").Where("id = ?", request.Log.ID).First(&savedExercise).Error
+    if err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to reload exercise: " + err.Error()})
+        return
+    }
+
+    time.Sleep(3 * time.Second)
+	// c.JSON(http.StatusOK, gin.H{"exercise": savedExercise})
+    c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 }
 
 func (h *ExercisesHandler) checkAllLogged(c *gin.Context) {
@@ -191,6 +202,10 @@ func (h *ExercisesHandler) getExerciseProgression(c *gin.Context) {
     if err != nil {
         c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
         return
+    }
+
+    if progression == nil {
+        progression = []services.ExerciseProgressionEntry{}
     }
 
     c.JSON(http.StatusOK, gin.H{"progression": progression})

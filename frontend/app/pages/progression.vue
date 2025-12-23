@@ -9,8 +9,33 @@ type ProgressionEntry = {
 };
 
 const selectedExercise = ref<Exercise | null>(null);
-const progressionEndpoint = ref<string>("");
+const exerciseId = ref<number | null>(null);
 
+const {
+    data: exercisesData,
+    pending: exercisesLoading,
+} = useAPIGet<Exercise[]>("workout/exercises/all");
+
+const exercises = computed(() => {
+    const value = exercisesData.value;
+    if (!value) return [];
+    if (Array.isArray(value)) return value;
+    const firstArray = Object.values(value).find((v) => Array.isArray(v));
+    return (firstArray as Exercise[]) ?? [];
+});
+
+watch(exercises, (newExercises) => {
+    if (newExercises.length > 0 && exerciseId.value === null && newExercises[0]) {
+        selectExercise(newExercises[0]);
+    }
+}, { immediate: true });
+
+const progressionEndpoint = computed(() => {
+    if (exerciseId.value === null) {
+        return "";
+    }
+    return `workout/exercises/progression/${exerciseId.value}`;
+});
 
 const {
     data: progressionData,
@@ -28,7 +53,7 @@ const error = computed(() => {
 
 const selectExercise = async (exercise: Exercise): Promise<boolean> => {
     selectedExercise.value = exercise;
-    progressionEndpoint.value = `workout/exercise/progression/${exercise.ID}`;
+    exerciseId.value = exercise.ID;
     return true;
 };
 
@@ -47,7 +72,7 @@ const formatProgressionDate = (dateStr: string): string => {
             <div class="exercise-selector">
                 <h2>Select Exercise</h2>
                 <SearchList
-                    route="workout/exercises/all"
+                    :route="'workout/exercises/all'"
                     :on-select="selectExercise"
                 />
             </div>

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { Exercise, LoggedExercise, WorkoutLog } from "~/types/workout";
 import { toast } from "~/composables/toast/useToast";
+import { dialogManager } from "~/composables/dialog/useDialog";
 import { nextTick } from "vue";
 
 type ExerciseGroup = {
@@ -12,7 +13,7 @@ type ExerciseGroup = {
 const { data, pending, error } = useAPIGet<{
     day: WorkoutLog;
     previous_exercises: ExerciseGroup[];
-}>(`workout/previous?offset=-1`);
+}>(`workout/logs/previous?offset=-1`);
 
 const log = ref<ExerciseGroup[]>(
     data.value?.previous_exercises ?? [],
@@ -34,7 +35,19 @@ const currentWeight = ref<number>(0);
 const currentReps = ref<number>(0);
 const currentWeightSetup = ref<string>("");
 const currentSetNumber = ref<number>(1);
-const loggedSets = ref<Array<{ weight: number; reps: number; weight_setup: string }>>([]);
+
+type LoggedSetWithStatus = {
+    weight: number;
+    reps: number;
+    weight_setup: string;
+    status: 'pending' | 'success' | 'error';
+    id: number | null;
+    error: string | null;
+    tempId: string; // Temporary ID for tracking during save
+};
+
+const loggedSets = ref<LoggedSetWithStatus[]>([]);
+let tempIdCounter = 0;
 
 // Edit mode state
 const weightEditMode = ref<boolean>(false);
@@ -62,6 +75,10 @@ const startLoggingExercise = (index: number) => {
             weight: set.weight,
             reps: set.reps,
             weight_setup: set.weight_setup || "",
+            status: 'success' as const,
+            id: set.ID,
+            error: null,
+            tempId: `existing-${set.ID}`,
         }));
         currentSetNumber.value = loggedSets.value.length + 1;
         
@@ -112,10 +129,15 @@ const saveCurrentExercise = async (): Promise<boolean> => {
     // Build all sets including current input if valid
     const allSets = [...loggedSets.value];
     if (currentWeight.value !== 0 || currentReps.value !== 0) {
+        const tempId = `temp-current-${Date.now()}`;
         allSets.push({
             weight: currentWeight.value,
             reps: currentReps.value,
             weight_setup: currentWeightSetup.value,
+            status: 'pending' as const,
+            id: null,
+            error: null,
+            tempId,
         });
     }
 
@@ -148,13 +170,13 @@ const saveCurrentExercise = async (): Promise<boolean> => {
         };
     }
 
-    // Update sets
+    // Update sets - map from LoggedSetWithStatus
     exerciseToLog.sets = allSets.map((set) => ({
         logged_exercise_id: exerciseToLog.ID,
         reps: set.reps,
         weight: set.weight,
         weight_setup: set.weight_setup || "",
-        ID: 0,
+        ID: set.id || 0, // Use existing ID if available
         created_at: "",
         updated_at: "",
     }));
@@ -168,12 +190,69 @@ const saveCurrentExercise = async (): Promise<boolean> => {
     const type: "logged" | "previous" = (exerciseGroup.logged && exerciseGroup.logged.ID > 0) ? "logged" : "previous";
 
     // Save to backend
-    const success = await logExercise(exerciseToLog, type);
+    const savedExercise = await logExercise(exerciseToLog, type);
 
-    if (success) {
+    if (savedExercise && savedExercise.sets) {
+        // Match returned sets with loggedSets by comparing weight/reps/weight_setup
+        // and update their status and IDs
+        const pendingSets = loggedSets.value.filter(s => s.status === 'pending');
+        
+        savedExercise.sets.forEach((savedSet) => {
+            if (!savedSet) return;
+            
+            // Try to match pending sets by weight/reps/weight_setup
+            const pendingSet = pendingSets.find(ps => 
+                Math.abs(ps.weight - savedSet.weight) < 0.01 &&
+                ps.reps === savedSet.reps &&
+                ps.weight_setup === (savedSet.weight_setup || "")
+            );
+            
+            if (pendingSet) {
+                // Update the set in loggedSets
+                const setIndex = loggedSets.value.findIndex(s => s.tempId === pendingSet.tempId);
+                if (setIndex !== -1 && savedSet.ID) {
+                    const setToUpdate = loggedSets.value[setIndex];
+                    if (setToUpdate) {
+                        setToUpdate.status = 'success';
+                        setToUpdate.id = savedSet.ID;
+                        setToUpdate.error = null;
+                    }
+                }
+            } else if (savedSet.ID) {
+                // Match existing sets by ID (for sets that were already saved)
+                const existingSet = loggedSets.value.find(s => s.id === savedSet.ID);
+                if (existingSet) {
+                    existingSet.status = 'success';
+                    existingSet.error = null;
+                }
+            }
+        });
+
+        // Mark any remaining pending sets as error if they weren't matched
+        pendingSets.forEach(ps => {
+            const wasMatched = savedExercise.sets!.some(savedSet => 
+                savedSet &&
+                Math.abs(ps.weight - savedSet.weight) < 0.01 &&
+                ps.reps === savedSet.reps &&
+                ps.weight_setup === (savedSet.weight_setup || "")
+            );
+            if (!wasMatched && ps.status === 'pending') {
+                ps.status = 'error';
+                ps.error = 'Failed to save set';
+            }
+        });
+
         // Update the log entry with saved exercise
-        exerciseGroup.logged = exerciseToLog;
+        exerciseGroup.logged = savedExercise;
         return true;
+    } else {
+        // Mark all pending sets as error
+        loggedSets.value.forEach(set => {
+            if (set.status === 'pending') {
+                set.status = 'error';
+                set.error = 'Failed to save exercise';
+            }
+        });
     }
 
     return false;
@@ -209,17 +288,37 @@ const addNextSet = async () => {
         return;
     }
 
-    loggedSets.value.push({
+    // Confirm if reps = 0
+    if (currentReps.value === 0) {
+        const confirmed = await dialogManager.confirm({
+            title: "Confirm Zero Reps",
+            message: "You're about to log a set with 0 reps. Continue?",
+            confirmText: "Yes",
+            cancelText: "Cancel",
+        });
+        if (!confirmed) {
+            return;
+        }
+    }
+
+    // Create new set with pending status
+    const tempId = `temp-${Date.now()}-${tempIdCounter++}`;
+    const newSet: LoggedSetWithStatus = {
         weight: currentWeight.value,
         reps: currentReps.value,
         weight_setup: currentWeightSetup.value,
-    });
+        status: 'pending',
+        id: null,
+        error: null,
+        tempId,
+    };
 
+    loggedSets.value.push(newSet);
     currentSetNumber.value++;
     currentReps.value = 0; // Reset reps, keep weight and weight setup
 
     // Save immediately after adding set
-    debouncedSave();
+    await saveCurrentExercise();
 };
 
 // Finish logging and save
@@ -244,10 +343,15 @@ const finishLogging = async () => {
 
     if (!success && hasCurrentSet) {
         // If save failed and we have a current set, add it to loggedSets and try again
+        const tempId = `temp-finish-${Date.now()}`;
         loggedSets.value.push({
             weight: currentWeight.value,
             reps: currentReps.value,
             weight_setup: currentWeightSetup.value,
+            status: 'pending' as const,
+            id: null,
+            error: null,
+            tempId,
         });
         const retrySuccess = await saveCurrentExercise();
         if (!retrySuccess) {
@@ -324,7 +428,7 @@ const exitRepsEditMode = () => {
 const logExercise = async (
     exercise: LoggedExercise,
     type: "logged" | "previous",
-): Promise<boolean> => {
+): Promise<LoggedExercise | null> => {
     const rawExercise = toRaw(exercise);
     rawExercise.sets = toRaw(rawExercise.sets).filter(
         (set) => !(set.reps === 0 && set.weight === 0),
@@ -335,7 +439,7 @@ const logExercise = async (
     const { response, error } = await useAPIPost<{
         exercise: LoggedExercise;
     }>(
-        `workout/exercise/log`,
+        `workout/exercises/log`,
         "POST",
         {
             exercise: rawExercise,
@@ -348,16 +452,16 @@ const logExercise = async (
     if (error) {
         console.error(error);
         toast.push(error.message, "error");
-        return false;
+        return null;
     }
 
-    return true;
+    return response?.exercise || null;
 };
 
 const confirmLogs = async () => {
     const { response, error } = await useAPIPost<{
         all_logged: boolean;
-    }>(`workout/exercise/all-logged`, "POST", {});
+    }>(`workout/exercises/all-logged`, "POST", {});
 
     if (error) {
         console.error(error);
@@ -378,7 +482,7 @@ const addExerciseToWorkout = async (exerciseId: number) => {
     console.log("addExerciseToWorkout", exerciseId);
     const { response, error } = await useAPIPost<{
         exercise: LoggedExercise;
-    }>(`workout/exercise/add`, "POST", {
+    }>(`workout/exercises/add`, "POST", {
         exercise_id: exerciseId,
     });
 
@@ -400,6 +504,55 @@ const addExerciseToWorkout = async (exerciseId: number) => {
     }
 };
 
+// Retry saving a failed set
+const retrySet = async (setIndex: number) => {
+    const set = loggedSets.value[setIndex];
+    if (!set || set.status !== 'error') return;
+
+    set.status = 'pending';
+    set.error = null;
+    await saveCurrentExercise();
+};
+
+// Delete a set
+const deleteSet = async (setIndex: number) => {
+    const set = loggedSets.value[setIndex];
+    if (!set) return;
+
+    // Only allow deletion of sets that have been confirmed by backend
+    if (set.status !== 'success') {
+        toast.push("Can only delete sets that have been saved", "error");
+        return;
+    }
+
+    loggedSets.value.splice(setIndex, 1);
+    currentSetNumber.value = loggedSets.value.length + 1;
+    
+    // Save to update backend
+    await saveCurrentExercise();
+};
+
+// Edit a set (load it into current inputs and remove from logged sets)
+const editSet = (setIndex: number) => {
+    const set = loggedSets.value[setIndex];
+    if (!set) return;
+
+    // Only allow editing of sets that have been confirmed by backend
+    if (set.status !== 'success') {
+        toast.push("Can only edit sets that have been saved", "error");
+        return;
+    }
+
+    // Load set values into current inputs
+    currentWeight.value = set.weight;
+    currentReps.value = set.reps;
+    currentWeightSetup.value = set.weight_setup;
+
+    // Remove from logged sets
+    loggedSets.value.splice(setIndex, 1);
+    currentSetNumber.value = loggedSets.value.length + 1;
+};
+
 // Remove exercise from workout
 const removeExerciseFromWorkout = async (index: number) => {
     const exerciseGroup = log.value[index];
@@ -413,7 +566,7 @@ const removeExerciseFromWorkout = async (index: number) => {
             return;
         }
 
-        const { error } = await useAPIPost(`workout/exercise/remove`, "DELETE", {
+        const { error } = await useAPIPost(`workout/exercises/remove`, "DELETE", {
             exercise_id: exerciseId,
         });
 
@@ -473,6 +626,9 @@ const removeExerciseFromWorkout = async (index: number) => {
             @exit-reps-edit="exitRepsEditMode"
             @add-next-set="addNextSet"
             @finish-logging="finishLogging"
+            @retry-set="retrySet"
+            @delete-set="deleteSet"
+            @edit-set="editSet"
         />
     </div>
 </template>
@@ -482,11 +638,15 @@ const removeExerciseFromWorkout = async (index: number) => {
     display: flex;
     flex-direction: column;
     gap: 1rem;
+    width: 100%;
+    max-width: 800px;
+    margin: 0 auto;
 }
 
 @media (max-width: 767px) {
     .container {
         padding: 0.5rem;
+        max-width: 100%;
     }
 }
 </style>

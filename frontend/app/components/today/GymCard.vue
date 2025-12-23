@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import type { Exercise, LoggedExercise } from "~/types/workout";
-import { Check } from "lucide-vue-next";
-import { dialogManager } from "~/composables/dialog/useDialog";
-import TodayLogExerciseDialog from "./LogExerciseDialog.vue";
-import { toast } from "~/composables/toast/useToast";
 
 const weightString = (log: LoggedExercise): string => {
-    if (log.sets[0]?.weight) {
-        return log.sets[0]?.weight + " lbs";
+    if (!log.sets || log.sets.length === 0) {
+        return "";
+    }
+    const maxWeight = Math.max(...log.sets.map(set => set.weight || 0));
+    if (maxWeight > 0) {
+        return maxWeight + " lbs";
     }
     return "";
 };
@@ -22,76 +22,16 @@ const localExercise = ref<LoggedExercise>(props.exercise);
 const localPlanned = ref<boolean>(props.planned);
 
 const actualExercise = computed<Exercise>(() => localExercise.value.exercise);
-
-const logExercise = async () => {
-    dialogManager
-        .custom<LoggedExercise>({
-            title: "Log " + actualExercise.value.name,
-            component: TodayLogExerciseDialog,
-            props: {
-                exercise: localExercise,
-                previousWeight: props.previous?.sets[0]?.weight,
-            },
-        })
-        .then((loggedExercise) => {
-            if (loggedExercise === null) {
-                return;
-            }
-            if (loggedExercise) {
-                localExercise.value = loggedExercise;
-                localPlanned.value = false;
-                toast.push("Log Exercise Successfully!", "success");
-            } else {
-                toast.push("Log Exercise Failed!", "error");
-            }
-        });
-};
+const isUsingLocalExercise = computed(() => props.previous === null);
 </script>
 
 <template>
     <article class="workout-card">
         <header class="card-header">
             <h2>{{ actualExercise?.name }}</h2>
-            <template v-if="previous">
-                <h3>{{ weightString(previous) }}</h3>
-            </template>
+            <h3 :class="{ 'local-exercise': isUsingLocalExercise }">{{ weightString(previous ?? localExercise) }}</h3>
         </header>
-        <div class="sets">
-            <template v-if="localExercise.sets.length > 0">
-                <span v-for="set in localExercise.sets" :key="set.ID">
-                    {{ set.reps }} x {{ set.weight }}
-                </span>
-            </template>
-            <template v-else-if="previous">
-                <span v-for="set in previous.sets" :key="set.ID">
-                    {{ set.reps }} x {{ set.weight }}
-                </span>
-            </template>
-        </div>
-        <template v-if="!localPlanned">
-            <span v-if="localExercise.weight_setup">
-                {{ localExercise.weight_setup }}
-            </span>
-            <span
-                v-if="
-                    (localExercise.sets[localExercise.sets.length - 1]?.reps ??
-                        0) > localExercise.exercise?.rep_rollover
-                "
-                class="info"
-            >
-                Up weight next session
-            </span>
-            <span v-if="localExercise.percent_change" class="fact">
-                {{ localExercise.percent_change < 0 ? "Down" : "Up" }}
-                {{ localExercise.percent_change.toFixed(2) }}% since last
-                workout
-            </span>
-        </template>
-        <footer v-if="localPlanned">
-            <button @click="logExercise" class="check">
-                <Check />
-            </button>
-        </footer>
+        <span>{{ localExercise.notes }}</span>
     </article>
 </template>
 
@@ -146,6 +86,10 @@ const logExercise = async () => {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+}
+
+.card-header h3.local-exercise {
+    color: rgb(63, 197, 46);
 }
 
 .workout-card .info {

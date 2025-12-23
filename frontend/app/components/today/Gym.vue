@@ -19,9 +19,8 @@ const props = defineProps<{
 const { data, pending, error } = useAPIGet<{
     day: WorkoutLog;
     previous_exercises: ExerciseGroup[];
-}>(`workout/previous?offset=${props.dateOffset}`);
+}>(`workout/logs/previous?offset=${props.dateOffset}`);
 
-console.log(data.value?.previous_exercises);
 const day = computed(() => data.value?.day);
 </script>
 
@@ -63,7 +62,7 @@ const day = computed(() => data.value?.day);
                             exercise_id: exercise.planned.ID,
                             sets: [] as LoggedSet[],
                             exercise: exercise.planned,
-                            weight_setup: '',
+                            notes: '',
                             percent_change: 0,
                         }"
                         :previous="
