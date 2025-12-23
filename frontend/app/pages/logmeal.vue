@@ -49,7 +49,7 @@ const meal = ref<Meal>({
 
 if (id !== 0) {
     const { data, pending, error } = await useAPIGet<{ meal: Meal }>(
-        `mealplan/meal/${id}`,
+        `diet/meals/meal/${id}`,
     );
     if (data.value) {
         meal.value = data.value.meal; // replace default with fetched
@@ -68,7 +68,7 @@ const {
     totalProtein: number;
     totalFiber: number;
     totalCarbs: number;
-}>(`mealplan/today`);
+}>(`diet/logs/today`);
 
 const totalMacros = computed(() => {
     return {
@@ -155,7 +155,7 @@ const createMeal = async (log: boolean) => {
     meal.value.ID = 0;
     const { response, error } = await useAPIPost<{
         meal_id: number;
-    }>(`mealplan/meal/new`, "POST", {
+    }>(`diet/meals/meal/new`, "POST", {
         meal: meal.value,
         log: log,
     });
@@ -184,7 +184,7 @@ const logEditedMeal = async () => {
         totalCalories: number;
         totalProtein: number;
         totalFiber: number;
-    }>(`mealplan/meal/logedited`, "POST", {
+    }>(`diet/meals/meal/logedited`, "POST", {
         meal: meal.value,
     });
 
@@ -207,7 +207,7 @@ const updateLoggedMeal = async () => {
         totalCalories: number;
         totalProtein: number;
         totalFiber: number;
-    }>(`mealplan/meal/editlogged`, "POST", {
+    }>(`diet/meals/meal/editlogged`, "POST", {
         meal: meal.value,
         oldMealID: oldMealID,
     });
@@ -308,7 +308,7 @@ const updateLoggedMeal = async () => {
             <aside class="cell right-top">
                 <h2>Add Foods</h2>
                 <SearchList
-                    :route="'mealplan/food/all'"
+                    :route="'diet/meals/food/all'"
                     :onSelect="addFood"
                     :onCreate="createFood"
                     :displayComponent="FoodDisplay"
@@ -318,7 +318,7 @@ const updateLoggedMeal = async () => {
                 <h2>Select Saved Meal</h2>
                 <SearchList
                     :key="meal.ID"
-                    :route="'mealplan/meal/all'"
+                    :route="'diet/meals/meal/all'"
                     :on-select="setMeal"
                 />
             </aside>

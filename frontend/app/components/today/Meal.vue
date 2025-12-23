@@ -26,7 +26,7 @@ const { data, pending, error } = useAPIGet<{
     totalProtein: number;
     totalFiber: number;
     totalCarbs: number;
-}>(`mealplan/today?offset=${props.dateOffset}`);
+}>(`diet/logs/today?offset=${props.dateOffset}`);
 
 const logPlannedMeal = async (meal: Meal) => {
     const { response, error } = await useAPIPost<{
@@ -35,7 +35,7 @@ const logPlannedMeal = async (meal: Meal) => {
         totalProtein: number;
         totalFiber: number;
         totalCarbs: number;
-    }>(`mealplan/meal/log-planned`, "POST", {
+    }>(`diet/meals/meal/log-planned`, "POST", {
         meal_id: meal.ID,
     });
 
@@ -82,7 +82,7 @@ const deleteLoggedMeal = async (meal: Meal) => {
                 totalProtein: number;
                 totalFiber: number;
                 totalCarbs: number;
-            }>(`mealplan/meal/logged`, "DELETE", {
+            }>(`diet/meals/meal/logged`, "DELETE", {
                 meal_id: meal.ID,
                 day_id: data.value?.day.ID,
             });
@@ -120,7 +120,7 @@ const editLogMeal = (meal: Meal) => {
                 totalProtein: number;
                 totalFiber: number;
                 totalCarbs: number;
-            }>("mealplan/meal/editlogged", "POST", {
+            }>("diet/logs/meal/editlogged", "POST", {
                 meal: editedMeal,
                 oldMealID: oldMealID,
             });
