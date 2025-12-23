@@ -35,11 +35,8 @@ func main() {
 
 	router.Use(utils.BenchmarkMiddleware(router))
 
-	corsOrigins := getEnv("CORS_ORIGINS", "http://localhost:5173,http://localhost:3000")
-	origins := []string{}
-	for _, origin := range splitString(corsOrigins, ",") {
-		origins = append(origins, origin)
-	}
+	corsOrigins := getEnv("CORS_ORIGINS", "http://localhost:5173,http://localhost:3000,http://192.168.4.78:3000,http://192.168.4.64:3000")
+	origins := splitString(corsOrigins, ",")
 
 	router.Use(cors.New(cors.Config{
 		AllowOrigins:     origins,

@@ -13,7 +13,7 @@ type ExerciseGroup = {
 const { data, pending, error } = useAPIGet<{
     day: WorkoutLog;
     previous_exercises: ExerciseGroup[];
-}>(`workout/logs/previous?offset=-1`);
+}>(`workout/logs/previous`);
 
 const log = ref<ExerciseGroup[]>(
     data.value?.previous_exercises ?? [],

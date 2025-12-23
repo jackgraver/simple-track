@@ -117,8 +117,17 @@ func seedDatabase(db *gorm.DB) error {
 		db.Create(exercise)
 	}
 
+	tuesday := 2
+	wednesday := 3
+	thursday := 4
+	saturday := 6
+	sunday := 0
+	monday := 1
+	friday := 5
+
 	push_plan := models.WorkoutPlan{
-		Name: "Push",
+		Name:      "Push",
+		DayOfWeek: &tuesday,
 		Exercises: []models.Exercise{
 			inclinePress,
 			chestFly,
@@ -130,7 +139,8 @@ func seedDatabase(db *gorm.DB) error {
 		},
 	}
 	pull_plan := models.WorkoutPlan{
-		Name: "Pull",
+		Name:      "Pull",
+		DayOfWeek: &wednesday,
 		Exercises: []models.Exercise{
 			barbellRows,
 			facePulls,
@@ -141,7 +151,8 @@ func seedDatabase(db *gorm.DB) error {
 		},
 	}
 	legs_plan := models.WorkoutPlan{
-		Name: "Legs",
+		Name:      "Legs",
+		DayOfWeek: &thursday,
 		Exercises: []models.Exercise{
 			outerThigh,
 			innerThigh,
@@ -153,7 +164,8 @@ func seedDatabase(db *gorm.DB) error {
 		},
 	}
 	upper_plan := models.WorkoutPlan{
-		Name: "Upper",
+		Name:      "Upper",
+		DayOfWeek: &saturday,
 		Exercises: []models.Exercise{
 			inclinePress,
 			chestFly,
@@ -169,7 +181,8 @@ func seedDatabase(db *gorm.DB) error {
 		},
 	}
 	lower_plan := models.WorkoutPlan{
-		Name: "Lower",
+		Name:      "Lower",
+		DayOfWeek: &sunday,
 		Exercises: []models.Exercise{
 			outerThigh,
 			innerThigh,
@@ -181,8 +194,13 @@ func seedDatabase(db *gorm.DB) error {
 			calfRaise,
 		},
 	}
-	rest_plan := models.WorkoutPlan{
-		Name: "Rest",
+	rest_plan_monday := models.WorkoutPlan{
+		Name:      "Rest",
+		DayOfWeek: &monday,
+	}
+	rest_plan_friday := models.WorkoutPlan{
+		Name:      "Rest",
+		DayOfWeek: &friday,
 	}
 	
 	db.Create(&push_plan)
@@ -190,28 +208,29 @@ func seedDatabase(db *gorm.DB) error {
 	db.Create(&legs_plan)
 	db.Create(&upper_plan)
 	db.Create(&lower_plan)
-	db.Create(&rest_plan)
+	db.Create(&rest_plan_monday)
+	db.Create(&rest_plan_friday)
 
 	now := time.Now()
 	year := 2025
 	start := time.Date(year, time.September, 1, 0, 0, 0, 0, now.Location())
 	end := time.Date(year, time.December, 31, 0, 0, 0, 0, now.Location())
 
-	weekdayPlans := map[time.Weekday]models.WorkoutPlan{
-		time.Sunday:    lower_plan,
-		time.Monday:    rest_plan,
-		time.Tuesday:   push_plan,
-		time.Wednesday: pull_plan,
-		time.Thursday:  legs_plan,
-		time.Friday:    rest_plan,
-		time.Saturday:  upper_plan,	
+	weekdayPlans := map[time.Weekday]*models.WorkoutPlan{
+		time.Sunday:    &lower_plan,
+		time.Monday:    &rest_plan_monday,
+		time.Tuesday:   &push_plan,
+		time.Wednesday: &pull_plan,
+		time.Thursday:  &legs_plan,
+		time.Friday:    &rest_plan_friday,
+		time.Saturday:  &upper_plan,	
 	}
 
 	for date := start; !date.After(end); date = date.AddDate(0, 0, 1) {
 		plan := weekdayPlans[date.Weekday()]
 		wl := models.WorkoutLog{
 			Date: date,
-			WorkoutPlan: &plan,
+			WorkoutPlan: plan,
 		}
 		db.Create(&wl)
 	}

@@ -10,7 +10,8 @@ import (
 // that can be assigned to workout logs for tracking training sessions
 type WorkoutPlan struct {
 	gorm.Model
-	Name string `json:"name"`
+	Name      string  `json:"name"`
+	DayOfWeek *int    `json:"day_of_week" gorm:"uniqueIndex:idx_day_of_week"` // 0=Sunday, 1=Monday, ..., 6=Saturday, null=unassigned
 	Exercises []Exercise  `gorm:"many2many:workout_plan_exercises;" json:"exercises"`
 }	
 

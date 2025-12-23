@@ -11,7 +11,7 @@ export default defineNuxtConfig({
     },
     runtimeConfig: {
         public: {
-            apiBase: import.meta.env.NUXT_PUBLIC_API_BASE || "http://localhost:8080",
+            apiBase: import.meta.env.NUXT_PUBLIC_API_BASE || "http://192.168.4.64:8080",
         },
     },
 });
