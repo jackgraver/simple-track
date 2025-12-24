@@ -43,14 +43,14 @@ func FindOne[T repository.Entity](ctx context.Context, db *gorm.DB, opts ...repo
 
 // Create creates a new entity
 // Usage: err := generics.Create(ctx, db, entity)
-func Create[T repository.Entity](ctx context.Context, db *gorm.DB, entity T) error {
+func Create[T repository.Entity](ctx context.Context, db *gorm.DB, entity *T) error {
 	repo := repository.NewGormRepository[T](db)
 	return repo.Create(ctx, entity)
 }
 
 // Update updates an existing entity
 // Usage: err := generics.Update(ctx, db, entity)
-func Update[T repository.Entity](ctx context.Context, db *gorm.DB, entity T) error {
+func Update[T repository.Entity](ctx context.Context, db *gorm.DB, entity *T) error {
 	repo := repository.NewGormRepository[T](db)
 	return repo.Update(ctx, entity)
 }
@@ -65,12 +65,12 @@ func Delete[T repository.Entity](ctx context.Context, db *gorm.DB, id uint) erro
 // ========== Additional Helper Functions ==========
 
 // CreateEntity is an alias for Create (for backward compatibility)
-func CreateEntity[T repository.Entity](ctx context.Context, db *gorm.DB, entity T) error {
+func CreateEntity[T repository.Entity](ctx context.Context, db *gorm.DB, entity *T) error {
 	return Create(ctx, db, entity)
 }
 
 // UpdateEntity is an alias for Update (for backward compatibility)
-func UpdateEntity[T repository.Entity](ctx context.Context, db *gorm.DB, entity T) error {
+func UpdateEntity[T repository.Entity](ctx context.Context, db *gorm.DB, entity *T) error {
 	return Update(ctx, db, entity)
 }
 

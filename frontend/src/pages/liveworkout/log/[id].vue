@@ -1,80 +1,57 @@
 <script setup lang="ts">
-import type { Exercise, LoggedExercise, WorkoutLog } from "~/types/workout";
+import type { LoggedSetWithStatus, ExerciseGroup } from "../store/useWorkoutStore";
+import { useWorkoutStore } from "../store/useWorkoutStore";
 import { toast } from "~/composables/toast/useToast";
 import { dialogManager } from "~/composables/dialog/useDialog";
-import { useAPIGet, useAPIPost } from "~/composables/useApiFetch";
-import { ref, toRaw, watch } from "vue";
-import ExerciseListView from "./components/ExerciseListView.vue";
-import ExerciseLoggingView from "./components/ExerciseLoggingView.vue";
+import { ref, computed, watch } from "vue";
+import { useRouter, useRoute } from "vue-router";
+import ExerciseLoggingView from "../components/ExerciseLoggingView.vue";
 
-type ExerciseGroup = {
-    planned: Exercise;
-    logged: LoggedExercise;
-    previous: LoggedExercise;
-};
+const router = useRouter();
+const route = useRoute();
+const { log, data, logExercise, pending } = useWorkoutStore();
 
-const { data, pending, error } = useAPIGet<{
-    day: WorkoutLog;
-    previous_exercises: ExerciseGroup[];
-}>(`workout/logs/previous?offset=-1`);
+const exerciseId = computed(() => {
+    const id = route.params.id;
+    return typeof id === 'string' ? parseInt(id, 10) : Array.isArray(id) ? parseInt(id[0], 10) : id;
+});
 
-const log = ref<ExerciseGroup[]>(
-    data.value?.previous_exercises ?? [],
-);
+const exerciseGroup = computed<ExerciseGroup | null>(() => {
+    if (!exerciseId.value || pending.value) return null;
+    const index = log.value.findIndex(
+        (eg) => eg.planned?.ID === exerciseId.value || eg.logged?.exercise_id === exerciseId.value
+    );
+    return index >= 0 ? log.value[index] : null;
+});
 
-// Watch for data changes
-watch(() => data.value, (newData) => {
-    if (newData) {
-        log.value = newData.previous_exercises ?? [];
-    }
-}, { immediate: true });
-
-// View state: 'list' or 'logging'
-const currentView = ref<"list" | "logging">("list");
-const currentExerciseIndex = ref<number | null>(null);
-
-// Set logging state
 const currentWeight = ref<number>(0);
 const currentReps = ref<number>(0);
 const currentWeightSetup = ref<string>("");
 const currentSetNumber = ref<number>(1);
 
-type LoggedSetWithStatus = {
-    weight: number;
-    reps: number;
-    weight_setup: string;
-    status: 'pending' | 'success' | 'error';
-    id: number | null;
-    error: string | null;
-    tempId: string; // Temporary ID for tracking during save
-};
-
 const loggedSets = ref<LoggedSetWithStatus[]>([]);
 let tempIdCounter = 0;
 
-// Edit mode state
 const weightEditMode = ref<boolean>(false);
 const repsEditMode = ref<boolean>(false);
 const weightInputValue = ref<string>("");
 const repsInputValue = ref<string>("");
 const notes = ref<string>("");
 
-// Save state for debouncing
 const saveTimeout = ref<number | null>(null);
 const isSaving = ref<boolean>(false);
 
-
-// Initialize exercise for logging
-const startLoggingExercise = (index: number) => {
-    const exerciseGroup = log.value[index];
-    if (!exerciseGroup) return;
-
-    currentExerciseIndex.value = index;
-    currentView.value = "logging";
+const initializeExercise = () => {
+    if (pending.value) return;
     
-    // Load existing sets if exercise was partially logged
-    if (exerciseGroup.logged && exerciseGroup.logged.sets && exerciseGroup.logged.sets.length > 0) {
-        loggedSets.value = exerciseGroup.logged.sets.map(set => ({
+    const group = exerciseGroup.value;
+    if (!group) {
+        router.push('/liveworkout');
+        return;
+    }
+
+    if (group.logged && group.logged.sets && Array.isArray(group.logged.sets) && group.logged.sets.length > 0) {
+        loggedSets.value = group.logged.sets.map(set => ({
             weight: set.weight,
             reps: set.reps,
             weight_setup: set.weight_setup || "",
@@ -85,11 +62,10 @@ const startLoggingExercise = (index: number) => {
         }));
         currentSetNumber.value = loggedSets.value.length + 1;
         
-        // Initialize weight/reps/weight_setup from last logged set
-        const lastSet = exerciseGroup.logged.sets[exerciseGroup.logged.sets.length - 1];
+        const lastSet = group.logged.sets[group.logged.sets.length - 1];
         if (lastSet) {
             currentWeight.value = lastSet.weight;
-            currentReps.value = 0; // Reset reps for new set
+            currentReps.value = 0;
             currentWeightSetup.value = lastSet.weight_setup || "";
         } else {
             currentWeight.value = 0;
@@ -97,15 +73,13 @@ const startLoggingExercise = (index: number) => {
             currentWeightSetup.value = "";
         }
         
-        // Initialize notes from logged exercise
-        notes.value = exerciseGroup.logged.notes || "";
+        notes.value = group.logged.notes || "";
     } else {
         loggedSets.value = [];
         currentSetNumber.value = 1;
         
-        // Initialize weight/weight_setup from previous exercise if available
-        if (exerciseGroup.previous && exerciseGroup.previous.sets.length > 0) {
-            const firstSet = exerciseGroup.previous.sets[0];
+        if (group.previous && group.previous.sets && Array.isArray(group.previous.sets) && group.previous.sets.length > 0) {
+            const firstSet = group.previous.sets[0];
             currentWeight.value = firstSet ? firstSet.weight : 0;
             currentWeightSetup.value = firstSet ? (firstSet.weight_setup || "") : "";
         } else {
@@ -114,22 +88,25 @@ const startLoggingExercise = (index: number) => {
         }
         currentReps.value = 0;
         
-        // Initialize notes from previous exercise if available
-        notes.value = exerciseGroup.previous?.notes || "";
+        notes.value = group.previous?.notes || "";
     }
     
     weightEditMode.value = false;
     repsEditMode.value = false;
 };
 
-// Save current exercise state to backend
+watch([() => exerciseGroup.value, () => pending.value], ([group, isPending]) => {
+    if (!isPending && group) {
+        initializeExercise();
+    } else if (!isPending && !group) {
+        router.push('/liveworkout');
+    }
+}, { immediate: true });
+
 const saveCurrentExercise = async (): Promise<boolean> => {
-    if (currentExerciseIndex.value === null) return false;
+    const group = exerciseGroup.value;
+    if (!group) return false;
 
-    const exerciseGroup = log.value[currentExerciseIndex.value];
-    if (!exerciseGroup) return false;
-
-    // Build all sets including current input if valid (must have both weight and reps > 0)
     const allSets = [...loggedSets.value];
     if (currentWeight.value !== 0 && currentReps.value !== 0) {
         const tempId = `temp-current-${Date.now()}`;
@@ -144,28 +121,24 @@ const saveCurrentExercise = async (): Promise<boolean> => {
         });
     }
 
-    // Skip save if no sets
     if (allSets.length === 0) return false;
 
-    // Get or create the logged exercise
-    let exerciseToLog: LoggedExercise;
-    if (exerciseGroup.logged && exerciseGroup.logged.ID > 0) {
-        exerciseToLog = { ...exerciseGroup.logged };
-    } else if (exerciseGroup.previous) {
-        // Copy from previous but reset ID for new log entry
+    let exerciseToLog: any;
+    if (group.logged && group.logged.ID > 0) {
+        exerciseToLog = { ...group.logged };
+    } else if (group.previous) {
         exerciseToLog = {
-            ...exerciseGroup.previous,
+            ...group.previous,
             ID: 0,
             workout_log_id: data.value?.day.ID ?? 0,
             sets: [],
         };
     } else {
-        // Create new logged exercise
         exerciseToLog = {
             ID: 0,
             workout_log_id: data.value?.day.ID ?? 0,
-            exercise_id: exerciseGroup.planned.ID,
-            exercise: exerciseGroup.planned,
+            exercise_id: group.planned.ID,
+            exercise: group.planned,
             sets: [],
             notes: "",
             created_at: "",
@@ -173,37 +146,28 @@ const saveCurrentExercise = async (): Promise<boolean> => {
         };
     }
 
-    // Update sets - map from LoggedSetWithStatus
     exerciseToLog.sets = allSets.map((set) => ({
         logged_exercise_id: exerciseToLog.ID,
         reps: set.reps,
         weight: set.weight,
         weight_setup: set.weight_setup || "",
-        ID: set.id || 0, // Use existing ID if available
+        ID: set.id || 0,
         created_at: "",
         updated_at: "",
     }));
 
-    // Update notes
     exerciseToLog.notes = notes.value;
-
     exerciseToLog.workout_log_id = data.value?.day.ID ?? exerciseToLog.workout_log_id;
 
-    // Determine type
-    const type: "logged" | "previous" = (exerciseGroup.logged && exerciseGroup.logged.ID > 0) ? "logged" : "previous";
-
-    // Save to backend
+    const type: "logged" | "previous" = (group.logged && group.logged.ID > 0) ? "logged" : "previous";
     const savedExercise = await logExercise(exerciseToLog, type);
 
-    if (savedExercise && savedExercise.sets) {
-        // Match returned sets with loggedSets by comparing weight/reps/weight_setup
-        // and update their status and IDs
+    if (savedExercise && savedExercise.sets && Array.isArray(savedExercise.sets)) {
         const pendingSets = loggedSets.value.filter(s => s.status === 'pending');
         
         savedExercise.sets.forEach((savedSet) => {
             if (!savedSet) return;
             
-            // Try to match pending sets by weight/reps/weight_setup
             const pendingSet = pendingSets.find(ps => 
                 Math.abs(ps.weight - savedSet.weight) < 0.01 &&
                 ps.reps === savedSet.reps &&
@@ -211,7 +175,6 @@ const saveCurrentExercise = async (): Promise<boolean> => {
             );
             
             if (pendingSet) {
-                // Update the set in loggedSets
                 const setIndex = loggedSets.value.findIndex(s => s.tempId === pendingSet.tempId);
                 if (setIndex !== -1 && savedSet.ID) {
                     const setToUpdate = loggedSets.value[setIndex];
@@ -222,7 +185,6 @@ const saveCurrentExercise = async (): Promise<boolean> => {
                     }
                 }
             } else if (savedSet.ID) {
-                // Match existing sets by ID (for sets that were already saved)
                 const existingSet = loggedSets.value.find(s => s.id === savedSet.ID);
                 if (existingSet) {
                     existingSet.status = 'success';
@@ -231,9 +193,8 @@ const saveCurrentExercise = async (): Promise<boolean> => {
             }
         });
 
-        // Mark any remaining pending sets as error if they weren't matched
         pendingSets.forEach(ps => {
-            const wasMatched = savedExercise.sets!.some(savedSet => 
+            const wasMatched = savedExercise.sets.some(savedSet => 
                 savedSet &&
                 Math.abs(ps.weight - savedSet.weight) < 0.01 &&
                 ps.reps === savedSet.reps &&
@@ -245,11 +206,9 @@ const saveCurrentExercise = async (): Promise<boolean> => {
             }
         });
 
-        // Update the log entry with saved exercise
-        exerciseGroup.logged = savedExercise;
+        group.logged = savedExercise;
         return true;
     } else {
-        // Mark all pending sets as error
         loggedSets.value.forEach(set => {
             if (set.status === 'pending') {
                 set.status = 'error';
@@ -261,16 +220,13 @@ const saveCurrentExercise = async (): Promise<boolean> => {
     return false;
 };
 
-// Debounced save function
 const debouncedSave = () => {
-    // Clear existing timeout
     if (saveTimeout.value) {
         clearTimeout(saveTimeout.value);
     }
 
-    // Set new timeout
     saveTimeout.value = setTimeout(async () => {
-        if (isSaving.value) return; // Prevent concurrent saves
+        if (isSaving.value) return;
         
         isSaving.value = true;
         try {
@@ -281,17 +237,15 @@ const debouncedSave = () => {
         } finally {
             isSaving.value = false;
         }
-    }, 400); // 400ms debounce
+    }, 400);
 };
 
-// Add next set
 const addNextSet = async () => {
     if (currentWeight.value === 0 && currentReps.value === 0) {
         toast.push("Please enter weight and reps", "error");
         return;
     }
 
-    // Confirm if reps = 0
     if (currentReps.value === 0) {
         const confirmed = await dialogManager.confirm({
             title: "Confirm Zero Reps",
@@ -304,7 +258,6 @@ const addNextSet = async () => {
         }
     }
 
-    // Create new set with pending status
     const tempId = `temp-${Date.now()}-${tempIdCounter++}`;
     const newSet: LoggedSetWithStatus = {
         weight: currentWeight.value,
@@ -318,13 +271,11 @@ const addNextSet = async () => {
 
     loggedSets.value.push(newSet);
     currentSetNumber.value++;
-    currentReps.value = 0; // Reset reps, keep weight and weight setup
+    currentReps.value = 0;
 
-    // Save immediately after adding set
     await saveCurrentExercise();
 };
 
-// Finish logging and save
 const finishLogging = async () => {
     if (currentReps.value === 0) {
         const confirmed = await dialogManager.confirm({
@@ -334,43 +285,33 @@ const finishLogging = async () => {
             cancelText: "Stay here",
         });
         if (confirmed) {
-            // Clear any pending debounced save
             if (saveTimeout.value) {
                 clearTimeout(saveTimeout.value);
                 saveTimeout.value = null;
             }
-            // Clear current set values to prevent it from being saved
             currentWeight.value = 0;
             currentReps.value = 0;
             currentWeightSetup.value = "";
-            // Go back to list view
-            currentView.value = "list";
-            currentExerciseIndex.value = null;
+            router.push('/liveworkout');
             return;
         }
         return;
     }
 
-    if ( loggedSets.value.length === 0) {
+    if (loggedSets.value.length === 0) {
         toast.push("Please log at least one set", "error");
         return;
     }
 
-    // Clear any pending debounced save
     if (saveTimeout.value) {
         clearTimeout(saveTimeout.value);
         saveTimeout.value = null;
     }
 
-    // Add the current set if it has values (but don't add to loggedSets yet)
-    // saveCurrentExercise will include it in the save
     const hasCurrentSet = currentWeight.value !== 0 && currentReps.value !== 0;
-
-    // Ensure final state is saved (may already be saved, but ensure current set is included)
     const success = await saveCurrentExercise();
 
     if (!success && hasCurrentSet) {
-        // If save failed and we have a current set, add it to loggedSets and try again
         const tempId = `temp-finish-${Date.now()}`;
         loggedSets.value.push({
             weight: currentWeight.value,
@@ -391,21 +332,9 @@ const finishLogging = async () => {
         return;
     }
 
-    // Reset and go back to list
-    currentView.value = "list";
-    currentExerciseIndex.value = null;
-    currentWeight.value = 0;
-    currentReps.value = 0;
-    currentWeightSetup.value = "";
-    currentSetNumber.value = 1;
-    loggedSets.value = [];
-    notes.value = "";
-    weightEditMode.value = false;
-    repsEditMode.value = false;
-    isSaving.value = false;
+    router.push('/liveworkout');
 };
 
-// Weight increment/decrement functions
 const incrementWeight = () => {
     currentWeight.value = (currentWeight.value || 0) + 2.5;
 };
@@ -414,7 +343,6 @@ const decrementWeight = () => {
     currentWeight.value = Math.max(0, (currentWeight.value || 0) - 2.5);
 };
 
-// Reps increment/decrement functions
 const incrementReps = () => {
     currentReps.value = (currentReps.value || 0) + 1;
 };
@@ -423,13 +351,11 @@ const decrementReps = () => {
     currentReps.value = Math.max(0, (currentReps.value || 0) - 1);
 };
 
-// Enter edit mode for weight
 const enterWeightEditMode = () => {
     weightEditMode.value = true;
     weightInputValue.value = currentWeight.value.toString();
 };
 
-// Exit edit mode for weight
 const exitWeightEditMode = () => {
     const numValue = parseFloat(weightInputValue.value);
     if (!isNaN(numValue) && numValue >= 0) {
@@ -438,13 +364,11 @@ const exitWeightEditMode = () => {
     weightEditMode.value = false;
 };
 
-// Enter edit mode for reps
 const enterRepsEditMode = () => {
     repsEditMode.value = true;
     repsInputValue.value = currentReps.value.toString();
 };
 
-// Exit edit mode for reps
 const exitRepsEditMode = () => {
     const numValue = parseInt(repsInputValue.value);
     if (!isNaN(numValue) && numValue >= 0) {
@@ -453,67 +377,6 @@ const exitRepsEditMode = () => {
     repsEditMode.value = false;
 };
 
-const logExercise = async (
-    exercise: LoggedExercise,
-    type: "logged" | "previous",
-): Promise<LoggedExercise | null> => {
-    const rawExercise = toRaw(exercise);
-    rawExercise.sets = toRaw(rawExercise.sets).filter(
-        (set) => !(set.reps === 0 && set.weight === 0),
-    );
-    rawExercise.workout_log_id =
-        data.value?.day.ID ?? rawExercise.workout_log_id;
-
-    const { response, error } = await useAPIPost<{
-        exercise: LoggedExercise;
-    }>(
-        `workout/exercises/log`,
-        "POST",
-        {
-            exercise: rawExercise,
-            type: type,
-        },
-        {},
-        false,
-    );
-
-    if (error) {
-        console.error(error);
-        toast.push(error.message, "error");
-        return null;
-    }
-
-    return response?.exercise || null;
-};
-
-// Add exercise to workout
-const addExerciseToWorkout = async (exerciseId: number) => {
-    console.log("addExerciseToWorkout", exerciseId);
-    const { response, error } = await useAPIPost<{
-        exercise: LoggedExercise;
-    }>(`workout/exercises/add`, "POST", {
-        exercise_id: exerciseId,
-    });
-
-    if (error) {
-        console.error(error);
-        toast.push(error.message, "error");
-        return;
-    }
-
-    if (response?.exercise) {
-        // Add the new exercise to the log
-        const newExerciseGroup: ExerciseGroup = {
-            planned: response.exercise.exercise!,
-            logged: response.exercise,
-            previous: {} as LoggedExercise,
-        };
-        log.value.push(newExerciseGroup);
-        toast.push(`Added ${response.exercise.exercise?.name}`, "success");
-    }
-};
-
-// Retry saving a failed set
 const retrySet = async (setIndex: number) => {
     const set = loggedSets.value[setIndex];
     if (!set || set.status !== 'error') return;
@@ -523,12 +386,10 @@ const retrySet = async (setIndex: number) => {
     await saveCurrentExercise();
 };
 
-// Delete a set
 const deleteSet = async (setIndex: number) => {
     const set = loggedSets.value[setIndex];
     if (!set) return;
 
-    // Only allow deletion of sets that have been confirmed by backend
     if (set.status !== 'success') {
         toast.push("Can only delete sets that have been saved", "error");
         return;
@@ -537,81 +398,41 @@ const deleteSet = async (setIndex: number) => {
     loggedSets.value.splice(setIndex, 1);
     currentSetNumber.value = loggedSets.value.length + 1;
     
-    // Save to update backend
     await saveCurrentExercise();
 };
 
-// Edit a set (load it into current inputs and remove from logged sets)
 const editSet = (setIndex: number) => {
     const set = loggedSets.value[setIndex];
     if (!set) return;
 
-    // Only allow editing of sets that have been confirmed by backend
     if (set.status !== 'success') {
         toast.push("Can only edit sets that have been saved", "error");
         return;
     }
 
-    // Load set values into current inputs
     currentWeight.value = set.weight;
     currentReps.value = set.reps;
     currentWeightSetup.value = set.weight_setup;
 
-    // Remove from logged sets
     loggedSets.value.splice(setIndex, 1);
     currentSetNumber.value = loggedSets.value.length + 1;
 };
 
-// Go back to list view
 const goBackToList = () => {
-    currentView.value = "list";
-    currentExerciseIndex.value = null;
-};
-
-// Remove exercise from workout
-const removeExerciseFromWorkout = async (index: number) => {
-    const exerciseGroup = log.value[index];
-    if (!exerciseGroup) return;
-
-    // If exercise is logged, delete it from backend
-    if (exerciseGroup.logged && exerciseGroup.logged.ID > 0) {
-        const exerciseId = exerciseGroup.logged.exercise_id;
-        if (!exerciseId) {
-            toast.push("Cannot remove exercise: ID not found", "error");
-            return;
-        }
-
-        const { error } = await useAPIPost(`workout/exercises/remove`, "DELETE", {
-            exercise_id: exerciseId,
-        });
-
-        if (error) {
-            console.error(error);
-            toast.push(error.message, "error");
-            return;
-        }
-    }
-
-    // Remove from local list (works for both planned-only and logged exercises)
-    log.value.splice(index, 1);
-    toast.push("Exercise removed", "success");
+    router.push('/liveworkout');
 };
 </script>
 
 <template>
-    <div v-if="pending">Loading...</div>
-    <div v-else-if="error">Error: {{ error.message }}</div>
+    <div v-if="pending" class="container">
+        <div>Loading...</div>
+    </div>
+    <div v-else-if="!exerciseGroup" class="container">
+        <div>Exercise not found</div>
+    </div>
     <div v-else class="container">
-        <ExerciseListView
-            v-if="currentView === 'list'"
-            :exercises="log"
-            @select-exercise="startLoggingExercise"
-            @add-exercise="addExerciseToWorkout($event)"
-            @remove-exercise="removeExerciseFromWorkout"
-        />
         <ExerciseLoggingView
-            v-else-if="currentView === 'logging' && currentExerciseIndex !== null && log[currentExerciseIndex]"
-            :exercise-group="log[currentExerciseIndex]!"
+            :exercise-group="exerciseGroup"
             :current-set-number="currentSetNumber"
             :logged-sets="loggedSets"
             :current-weight="currentWeight"
@@ -665,3 +486,4 @@ const removeExerciseFromWorkout = async (index: number) => {
     }
 }
 </style>
+

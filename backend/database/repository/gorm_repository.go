@@ -203,12 +203,12 @@ func (r *GormRepository[T]) Count(ctx context.Context, opts ...QueryOption) (int
 }
 
 // Create inserts a new entity
-func (r *GormRepository[T]) Create(ctx context.Context, entity T) error {
+func (r *GormRepository[T]) Create(ctx context.Context, entity *T) error {
 	return r.db.WithContext(ctx).Create(entity).Error
 }
 
 // Update updates an existing entity
-func (r *GormRepository[T]) Update(ctx context.Context, entity T) error {
+func (r *GormRepository[T]) Update(ctx context.Context, entity *T) error {
 	return r.db.WithContext(ctx).Save(entity).Error
 }
 

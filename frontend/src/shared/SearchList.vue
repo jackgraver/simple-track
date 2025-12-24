@@ -87,16 +87,14 @@ const refresh = () => {
                     <Plus :size="18" />
                 </button>
             </template>
-            <div v-else-if="!pending && search" class="item empty-option">
+            <div 
+                v-else-if="!pending && search" 
+                class="item empty-option"
+                @click="onCreate && handleFunctionCall(onCreate, search)"
+            >
                 <template v-if="onCreate">
-                    <button
-                        type="button"
-                        class="create-button"
-                        @click="handleFunctionCall(onCreate, search)"
-                    >
-                        <Plus :size="18" />
-                        <span>Create "{{ search }}"</span>
-                    </button>
+                    <Plus :size="18" />
+                    <span>Create "{{ search }}"</span>
                 </template>
                 <template v-else-if="pending">
                     <Loader class="spinner" :size="18" />
@@ -199,19 +197,5 @@ const refresh = () => {
 
 .no-hover-empty-option {
     cursor: default;
-}
-
-.create-button {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    justify-content: center;
-    padding: 0.6rem 0.8rem;
-    cursor: pointer;
-    background-color: transparent;
-    box-shadow: none;
-}
-.create-button:hover {
-    background-color: transparent;
 }
 </style>

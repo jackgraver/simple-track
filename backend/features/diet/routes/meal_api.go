@@ -34,7 +34,7 @@ func RegisterMealRoutes(group *gin.RouterGroup, db *gorm.DB) {
 	meals := group.Group("/meals")
 	{
 		meals.GET("/food/all", h.getAllFoods)
-        meals.POST("/food/add", h.postAddFood)
+        // meals.POST("/food/add", h.postAddFood)
         meals.GET("/meal/all", h.getAllMeals)
         meals.GET("/meal/:id", h.getMeal)
         meals.POST("/meal/new", h.postNewMeal)

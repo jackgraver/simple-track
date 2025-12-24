@@ -45,7 +45,12 @@ const routes: RouteRecordRaw[] = [
   {
     path: '/liveworkout',
     name: 'liveworkout',
-    component: () => import('~/pages/liveworkout/liveworkout.vue'),
+    component: () => import('~/pages/liveworkout/index.vue'),
+  },
+  {
+    path: '/liveworkout/log/:id(\\d+)',
+    name: 'liveworkout-log',
+    component: () => import('~/pages/liveworkout/log/[id].vue'),
   },
 ]
 

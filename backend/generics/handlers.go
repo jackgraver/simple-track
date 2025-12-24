@@ -231,7 +231,7 @@ func (h *GenericCRUDHandler[T]) Create(c *gin.Context) {
 	}
 
 	// Use generic Create
-	if err := Create(ctx, h.db, entity); err != nil {
+	if err := Create(ctx, h.db, &entity); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -306,7 +306,7 @@ func (h *GenericCRUDHandler[T]) Update(c *gin.Context) {
 	}
 
 	// Use generic Update
-	if err := Update(ctx, h.db, entity); err != nil {
+	if err := Update(ctx, h.db, &entity); err != nil {
 		if err == repository.ErrNotFound {
 			c.JSON(http.StatusNotFound, gin.H{"error": fmt.Sprintf("%s not found", h.config.ResourceName)})
 			return

@@ -21,10 +21,10 @@ type Repository[T Entity] interface {
 	Count(ctx context.Context, opts ...QueryOption) (int64, error)
 
 	// Create inserts a new entity
-	Create(ctx context.Context, entity T) error
+	Create(ctx context.Context, entity *T) error
 
 	// Update updates an existing entity
-	Update(ctx context.Context, entity T) error
+	Update(ctx context.Context, entity *T) error
 
 	// Delete removes an entity by ID (soft delete if supported)
 	Delete(ctx context.Context, id uint) error

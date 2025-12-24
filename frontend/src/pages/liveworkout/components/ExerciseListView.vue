@@ -3,6 +3,7 @@ import type { Exercise, LoggedExercise } from "~/types/workout";
 import { ref, computed, watch } from "vue";
 import { Trash2 } from "lucide-vue-next";
 import { useAPIGet } from "~/composables/useApiFetch";
+import { useRouter } from "vue-router";
 
 type ExerciseGroup = {
     planned: Exercise;
@@ -16,10 +17,11 @@ const props = defineProps<{
 
 const emit = defineEmits<{
     (e: "select-exercise", index: number): void;
-    (e: "finish-workout"): void;
     (e: "add-exercise", exerciseId: number): void;
     (e: "remove-exercise", index: number): void;
 }>();
+
+const router = useRouter();
 
 // Autocomplete state
 const searchQuery = ref("");
@@ -142,7 +144,7 @@ const isLogged = (exerciseGroup: ExerciseGroup): boolean => {
                 </button>
             </li>
         </ul>
-        <button @click="emit('finish-workout')" class="finish-button">
+        <button @click="router.push('/')" type="button" class="finish-button">
             <span>Finish Workout</span>
         </button>
     </div>

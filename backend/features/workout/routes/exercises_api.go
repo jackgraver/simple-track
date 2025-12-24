@@ -4,7 +4,6 @@ import (
 	"be-simpletracker/features/workout/models"
 	"be-simpletracker/features/workout/services"
 	generics "be-simpletracker/generics"
-	"fmt"
 	"net/http"
 	"strconv"
 	"time"
@@ -34,7 +33,6 @@ func RegisterExercisesRoutes(group *gin.RouterGroup, db *gorm.DB) {
 	exercises := group.Group("/exercises")
 	{
 		exercises.POST("/log", h.logExercise)
-		exercises.POST("/all-logged", h.checkAllLogged)
 		// exercises.GET("/all", h.getAllExercises)
 		exercises.POST("/add", h.addExerciseToWorkout)
 		exercises.DELETE("/remove", h.removeExerciseFromWorkout)
@@ -85,23 +83,6 @@ func (h *ExercisesHandler) logExercise(c *gin.Context) {
 
     time.Sleep(3 * time.Second)
 	c.JSON(http.StatusOK, gin.H{"exercise": savedExercise})
-}
-
-func (h *ExercisesHandler) checkAllLogged(c *gin.Context) {
-    today, err := services.GetToday(h.db, 0)
-    if err != nil {
-        c.JSON(http.StatusNotImplemented, gin.H{"error": err.Error()})
-        return
-    }
-
-    if len(today.Exercises) == len(today.WorkoutPlan.Exercises) {
-        fmt.Println("All logged!")
-        c.JSON(http.StatusOK, gin.H{"all_logged": true})
-        return
-    }
-
-    fmt.Println("Not all logged!")
-    c.JSON(http.StatusOK, gin.H{"all_logged": false})
 }
 
 type AddExerciseRequest struct {
