@@ -52,6 +52,11 @@ const routes: RouteRecordRaw[] = [
     name: 'liveworkout-log',
     component: () => import('~/pages/liveworkout/log/[id].vue'),
   },
+  {
+    path: '/signin',
+    name: 'signin',
+    component: () => import('~/pages/signin.vue'),
+  },
 ]
 
 export const router = createRouter({

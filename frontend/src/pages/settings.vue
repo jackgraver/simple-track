@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { toast } from "~/composables/toast/useToast";
+import { useAPIPost } from "~/composables/useApiFetch";
 
 const dump = async () => {
     const { response, error } = await useAPIPost<{ dump: string }>(

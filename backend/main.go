@@ -1,6 +1,7 @@
 package main
 
 import (
+	"be-simpletracker/auth"
 	"be-simpletracker/database"
 	diet "be-simpletracker/features/diet"
 	workout "be-simpletracker/features/workout"
@@ -14,6 +15,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
+
 
 func getEnv(key, fallback string) string {
 	if value, ok := os.LookupEnv(key); ok {
@@ -43,6 +45,7 @@ func main() {
 		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE"},
 		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization"},
 		AllowCredentials: true,
+		ExposeHeaders:    []string{"Set-Cookie"},
 		MaxAge:           12 * time.Hour,
 	}))
 
@@ -61,6 +64,9 @@ func main() {
 }
 
 func CreateFeatures(db *gorm.DB, router *gin.Engine) {
+	authHandler := auth.NewHandler(db)
+	authHandler.RegisterRoutes(router)
+
 	diet := diet.NewHandler(db)
 	diet.RegisterRoutes(router)
 

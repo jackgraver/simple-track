@@ -265,7 +265,7 @@ const exitRepsEditMode = () => {
     grid-template-columns: auto 1fr auto;
     align-items: center;
     gap: 0.5rem;
-    padding-bottom: 1rem;
+    padding-bottom: 0.5rem;
     border-bottom: 1px solid rgb(56, 56, 56);
     width: 100%;
     box-sizing: border-box;
