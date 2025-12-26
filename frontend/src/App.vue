@@ -1,12 +1,16 @@
 <script setup lang="ts">
+import { onMounted } from 'vue';
 import ToastContainer from "./composables/toast/ToastContainer.vue";
 import DialogContainer from "./composables/dialog/DialogContainer.vue";
 import SideBar from "./shared/SideBar.vue";
 
+onMounted(() => {
+    document.documentElement.classList.add('dark-mode');
+});
 </script>
 
 <template>
-    <div class="page">
+    <div class="page dark-mode">
         <SideBar />
         <RouterView />
     </div>

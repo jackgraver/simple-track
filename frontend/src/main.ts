@@ -3,6 +3,8 @@ import { VueQueryPlugin, QueryClient } from '@tanstack/vue-query'
 import { router } from './router'
 import App from './App.vue'
 import './style.css'
+import PrimeVue from 'primevue/config'
+import Aura from '@primeuix/themes/aura'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -19,6 +21,15 @@ const app = createApp(App)
 
 app.use(router)
 app.use(VueQueryPlugin, { queryClient })
+app.use(PrimeVue, {
+  theme: {
+    preset: Aura,
+    options: {
+      darkModeSelector: '.dark-mode',
+      cssLayer: false,
+    },
+  },
+})
 
 app.mount('#app')
 
