@@ -9,7 +9,7 @@ import ExerciseLoggingView from "../components/ExerciseLoggingView.vue";
 
 const router = useRouter();
 const route = useRoute();
-const { log, data, logExercise, pending } = useWorkoutStore();
+const { log, data, logExercise, pending } = useWorkoutStore(0);
 
 const exerciseId = computed(() => {
     const id = route.params.id;
@@ -37,9 +37,6 @@ const repsEditMode = ref<boolean>(false);
 const weightInputValue = ref<string>("");
 const repsInputValue = ref<string>("");
 const notes = ref<string>("");
-
-const saveTimeout = ref<number | null>(null);
-const isSaving = ref<boolean>(false);
 
 const initializeExercise = () => {
     if (pending.value) return;
@@ -146,15 +143,17 @@ const saveCurrentExercise = async (): Promise<boolean> => {
         };
     }
 
-    exerciseToLog.sets = allSets.map((set) => ({
-        logged_exercise_id: exerciseToLog.ID,
-        reps: set.reps,
-        weight: set.weight,
-        weight_setup: set.weight_setup || "",
-        ID: set.id || 0,
-        created_at: "",
-        updated_at: "",
-    }));
+    exerciseToLog.sets = allSets
+        .filter((set) => !(set.reps === 0 && set.weight === 0))
+        .map((set) => ({
+            logged_exercise_id: exerciseToLog.ID,
+            reps: set.reps,
+            weight: set.weight,
+            weight_setup: set.weight_setup || "",
+            ID: set.id || 0,
+            created_at: "",
+            updated_at: "",
+        }));
 
     exerciseToLog.notes = notes.value;
     exerciseToLog.workout_log_id = data.value?.day.ID ?? exerciseToLog.workout_log_id;
@@ -220,26 +219,6 @@ const saveCurrentExercise = async (): Promise<boolean> => {
     return false;
 };
 
-const debouncedSave = () => {
-    if (saveTimeout.value) {
-        clearTimeout(saveTimeout.value);
-    }
-
-    saveTimeout.value = setTimeout(async () => {
-        if (isSaving.value) return;
-        
-        isSaving.value = true;
-        try {
-            await saveCurrentExercise();
-        } catch (error) {
-            console.error("Error saving exercise:", error);
-            toast.push("Failed to save. Will retry on next action.", "error");
-        } finally {
-            isSaving.value = false;
-        }
-    }, 400);
-};
-
 const addNextSet = async () => {
     if (currentWeight.value === 0 && currentReps.value === 0) {
         toast.push("Please enter weight and reps", "error");
@@ -285,10 +264,6 @@ const finishLogging = async () => {
             cancelText: "Stay here",
         });
         if (confirmed) {
-            if (saveTimeout.value) {
-                clearTimeout(saveTimeout.value);
-                saveTimeout.value = null;
-            }
             currentWeight.value = 0;
             currentReps.value = 0;
             currentWeightSetup.value = "";
@@ -301,11 +276,6 @@ const finishLogging = async () => {
     if (loggedSets.value.length === 0) {
         toast.push("Please log at least one set", "error");
         return;
-    }
-
-    if (saveTimeout.value) {
-        clearTimeout(saveTimeout.value);
-        saveTimeout.value = null;
     }
 
     const hasCurrentSet = currentWeight.value !== 0 && currentReps.value !== 0;

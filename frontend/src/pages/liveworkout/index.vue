@@ -2,9 +2,13 @@
 import { useWorkoutStore } from "./store/useWorkoutStore";
 import ExerciseListView from "./components/ExerciseListView.vue";
 import { useRouter } from "vue-router";
+import { computed } from "vue";
+import { toast } from "~/composables/toast/useToast";
 
 const router = useRouter();
-const { log, pending, error, addExerciseToWorkout, removeExerciseFromWorkout } = useWorkoutStore();
+const { log, pending, error, data, addExerciseToWorkout, removeExerciseFromWorkout } = useWorkoutStore(0);
+
+const workoutName = computed(() => data.value?.day.workout_plan?.name || "");
 
 const selectExercise = (index: number) => {
     const exerciseGroup = log.value[index];
@@ -15,17 +19,49 @@ const selectExercise = (index: number) => {
     
     router.push(`/liveworkout/log/${exerciseId}`);
 };
+
+const handleAddExercise = async (exerciseId: number) => {
+    try {
+        await addExerciseToWorkout(exerciseId);
+        toast.push("Exercise added", "success");
+    } catch (err: any) {
+        toast.push(err.message || "Failed to add exercise", "error");
+    }
+};
+
+const handleRemoveExercise = async (index: number) => {
+    const exerciseGroup = log.value[index];
+    if (!exerciseGroup) return;
+
+    const exerciseId = exerciseGroup.logged?.exercise_id || exerciseGroup.planned?.ID;
+    if (!exerciseId) {
+        toast.push("Cannot remove exercise: ID not found", "error");
+        return;
+    }
+
+    try {
+        await removeExerciseFromWorkout(exerciseId);
+        toast.push("Exercise removed", "success");
+    } catch (err: any) {
+        toast.push(err.message || "Failed to remove exercise", "error");
+    }
+};
 </script>
 
 <template>
-    <div v-if="pending">Loading...</div>
-    <div v-else-if="error">Error: {{ error.message }}</div>
+    <div v-if="pending" class="container">
+        <div>Loading...</div>
+    </div>
+    <div v-else-if="error" class="container">
+        <div>Error: {{ error.message }}</div>
+    </div>
     <div v-else class="container">
         <ExerciseListView
             :exercises="log"
+            :workoutName="workoutName"
             @select-exercise="selectExercise"
-            @add-exercise="addExerciseToWorkout($event)"
-            @remove-exercise="removeExerciseFromWorkout"
+            @add-exercise="handleAddExercise"
+            @remove-exercise="handleRemoveExercise"
         />
     </div>
 </template>
@@ -47,4 +83,3 @@ const selectExercise = (index: number) => {
     }
 }
 </style>
-

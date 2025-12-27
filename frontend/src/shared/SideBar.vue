@@ -50,6 +50,7 @@ const menuItems: MenuItem[] = [
 <style scoped>
 .sidebar {
     background: transparent;
+    padding: 0.5rem;
 }
 
 :deep(.sidebar-menu) {

@@ -1,7 +1,7 @@
-import type { Exercise, LoggedExercise, WorkoutLog } from "~/types/workout";
-import { useAPIGet, useAPIPost } from "~/composables/useApiFetch";
-import { ref, watch, toRaw } from "vue";
-import { toast } from "~/composables/toast/useToast";
+import type { Exercise, LoggedExercise } from "~/types/workout";
+import { useWorkoutLogsPrevious } from "../queries/useWorkoutLogs";
+import { useLogExercise, useAddExerciseToWorkout, useRemoveExerciseFromWorkout } from "../queries/useWorkoutMutations";
+import { computed } from "vue";
 
 export type ExerciseGroup = {
     planned: Exercise;
@@ -19,106 +19,52 @@ export type LoggedSetWithStatus = {
     tempId: string;
 };
 
-// Singleton store instance
-let storeInstance: ReturnType<typeof createWorkoutStore> | null = null;
+export function useWorkoutStore(offset: number = 0) {
+    const workoutLogsQuery = useWorkoutLogsPrevious(offset);
+    const logExerciseMutation = useLogExercise(offset);
+    const addExerciseMutation = useAddExerciseToWorkout(offset);
+    const removeExerciseMutation = useRemoveExerciseFromWorkout(offset);
 
-const createWorkoutStore = () => {
-    const { data, pending, error } = useAPIGet<{
-        day: WorkoutLog;
-        previous_exercises: ExerciseGroup[];
-    }>(`workout/logs/previous?offset=-1`);
+    const log = computed<ExerciseGroup[]>(() => {
+        return workoutLogsQuery.data.value?.previous_exercises ?? [];
+    });
 
-    const log = ref<ExerciseGroup[]>(
-        data.value?.previous_exercises ?? [],
-    );
-
-    watch(() => data.value, (newData) => {
-        if (newData) {
-            log.value = newData.previous_exercises ?? [];
-        }
-    }, { immediate: true });
+    const data = computed(() => workoutLogsQuery.data.value);
+    const pending = computed(() => workoutLogsQuery.isPending.value);
+    const error = computed(() => workoutLogsQuery.error.value);
 
     const logExercise = async (
         exercise: LoggedExercise,
         type: "logged" | "previous",
     ): Promise<LoggedExercise | null> => {
-        const rawExercise = toRaw(exercise);
-        rawExercise.sets = toRaw(rawExercise.sets).filter(
-            (set) => !(set.reps === 0 && set.weight === 0),
-        );
-        rawExercise.workout_log_id =
-            data.value?.day.ID ?? rawExercise.workout_log_id;
-
-        const { response, error: apiError } = await useAPIPost<{
-            exercise: LoggedExercise;
-        }>(
-            `workout/exercises/log`,
-            "POST",
-            {
-                exercise: rawExercise,
-                type: type,
-            },
-            {},
-            false,
-        );
-
-        if (apiError) {
-            console.error(apiError);
-            toast.push(apiError.message, "error");
+        try {
+            const result = await logExerciseMutation.mutateAsync({
+                exercise,
+                type,
+            });
+            return result;
+        } catch (error) {
+            console.error("Error logging exercise:", error);
             return null;
         }
-
-        return response?.exercise || null;
     };
 
-    const addExerciseToWorkout = async (exerciseId: number) => {
-        const { response, error: apiError } = await useAPIPost<{
-            exercise: LoggedExercise;
-        }>(`workout/exercises/add`, "POST", {
-            exercise_id: exerciseId,
-        });
-
-        if (apiError) {
-            console.error(apiError);
-            toast.push(apiError.message, "error");
-            return;
-        }
-
-        if (response?.exercise) {
-            const newExerciseGroup: ExerciseGroup = {
-                planned: response.exercise.exercise!,
-                logged: response.exercise,
-                previous: {} as LoggedExercise,
-            };
-            log.value.push(newExerciseGroup);
-            toast.push(`Added ${response.exercise.exercise?.name}`, "success");
+    const addExerciseToWorkout = async (exerciseId: number): Promise<void> => {
+        try {
+            await addExerciseMutation.mutateAsync(exerciseId);
+        } catch (error) {
+            console.error("Error adding exercise:", error);
+            throw error;
         }
     };
 
-    const removeExerciseFromWorkout = async (index: number) => {
-        const exerciseGroup = log.value[index];
-        if (!exerciseGroup) return;
-
-        if (exerciseGroup.logged && exerciseGroup.logged.ID > 0) {
-            const exerciseId = exerciseGroup.logged.exercise_id;
-            if (!exerciseId) {
-                toast.push("Cannot remove exercise: ID not found", "error");
-                return;
-            }
-
-            const { error: apiError } = await useAPIPost(`workout/exercises/remove`, "DELETE", {
-                exercise_id: exerciseId,
-            });
-
-            if (apiError) {
-                console.error(apiError);
-                toast.push(apiError.message, "error");
-                return;
-            }
+    const removeExerciseFromWorkout = async (exerciseId: number): Promise<void> => {
+        try {
+            await removeExerciseMutation.mutateAsync(exerciseId);
+        } catch (error) {
+            console.error("Error removing exercise:", error);
+            throw error;
         }
-
-        log.value.splice(index, 1);
-        toast.push("Exercise removed", "success");
     };
 
     const getExerciseByIndex = (index: number): ExerciseGroup | null => {
@@ -143,12 +89,4 @@ const createWorkoutStore = () => {
         getExerciseByIndex,
         getExerciseIndexById,
     };
-};
-
-export const useWorkoutStore = () => {
-    if (!storeInstance) {
-        storeInstance = createWorkoutStore();
-    }
-    return storeInstance;
-};
-
+}

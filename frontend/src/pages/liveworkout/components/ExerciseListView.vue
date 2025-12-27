@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import type { Exercise, LoggedExercise } from "~/types/workout";
-import { ref, computed, watch } from "vue";
+import { ref, computed } from "vue";
 import { Trash2 } from "lucide-vue-next";
-import { useAPIGet } from "~/composables/useApiFetch";
 import { useRouter } from "vue-router";
+import { useAllExercises } from "../queries/useExercises";
 
 type ExerciseGroup = {
     planned: Exercise;
@@ -12,9 +12,11 @@ type ExerciseGroup = {
 };
 
 const props = defineProps<{
+    workoutName: string;
     exercises: ExerciseGroup[];
 }>();
 
+const workoutName = computed(() => props.workoutName);
 const emit = defineEmits<{
     (e: "select-exercise", index: number): void;
     (e: "add-exercise", exerciseId: number): void;
@@ -26,7 +28,8 @@ const router = useRouter();
 // Autocomplete state
 const searchQuery = ref("");
 const showSuggestions = ref(false);
-const allExercises = ref<Exercise[]>([]);
+const { data: allExercisesData } = useAllExercises();
+const allExercises = computed(() => allExercisesData.value ?? []);
 const filteredExercises = computed(() => {
     const query = searchQuery.value.toLowerCase();
     return allExercises.value.filter(ex => 
@@ -34,14 +37,6 @@ const filteredExercises = computed(() => {
         !props.exercises.some(eg => eg.planned?.ID === ex.ID)
     ).slice(0, 10);
 });
-
-// Load all exercises on mount
-const { data: exercisesData } = useAPIGet<{ exercises: Exercise[] }>("workout/exercises/all");
-watch(exercisesData, (newData) => {
-    if (newData?.exercises) {
-        allExercises.value = newData.exercises;
-    }
-}, { immediate: true });
 
 // Handle exercise selection
 const selectExercise = (exercise: Exercise) => {
@@ -94,7 +89,9 @@ const isLogged = (exerciseGroup: ExerciseGroup): boolean => {
 
 <template>
     <div class="list-view">
-        <h2>Exercises</h2>
+        <header>
+            <h1 v-if="workoutName">{{ workoutName }} Day</h1>
+        </header>
         <div class="add-exercise-container">
             <div class="autocomplete-wrapper">
                 <input
@@ -157,10 +154,6 @@ const isLogged = (exerciseGroup: ExerciseGroup): boolean => {
     gap: 1rem;
     width: 100%;
     max-width: 100%;
-}
-
-.list-view h2 {
-    margin: 0 0 1rem 0;
 }
 
 .add-exercise-container {

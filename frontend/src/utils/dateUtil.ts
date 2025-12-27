@@ -11,6 +11,21 @@ export function formatDate(isoDate: string): string {
     return `${month} ${day}${suffix}`;
 }
 
+export function formatDateLong(isoDate: string): string {
+    const date = new Date(isoDate);
+    const day = date.getDate(); // local day
+    const month = date.toLocaleString("en-US", { month: "long" });
+    const year = date.getFullYear();
+    const dayOfWeek = date.toLocaleDateString("en-US", { weekday: "long" });
+
+    let suffix = "th";
+    if (day % 10 === 1 && day !== 11) suffix = "st";
+    else if (day % 10 === 2 && day !== 12) suffix = "nd";
+    else if (day % 10 === 3 && day !== 13) suffix = "rd";
+
+    return `${dayOfWeek} ${month} ${day}${suffix}, ${year}`;
+}
+
 export function formatDateShort(isoDate: string): string {
     const date = new Date(isoDate);
     const day = date.getDate(); // local day
