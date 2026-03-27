@@ -117,7 +117,7 @@ const isLogged = (exerciseGroup: ExerciseGroup): boolean => {
         <ul class="exercise-list">
             <li
                 v-for="(exerciseGroup, index) in exercises"
-                :key="index"
+                :key="exerciseGroup.planned?.ID ?? exerciseGroup.logged?.exercise_id ?? exerciseGroup.logged?.ID ?? index"
                 @click="emit('select-exercise', index)"
                 :class="['exercise-item', { 'logged': isLogged(exerciseGroup) }]"
             >

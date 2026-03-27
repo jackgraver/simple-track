@@ -1,6 +1,7 @@
 import type { Exercise, LoggedExercise } from "~/types/workout";
 import { useWorkoutLogsPrevious } from "../queries/useWorkoutLogs";
 import { useLogExercise, useAddExerciseToWorkout, useRemoveExerciseFromWorkout } from "../queries/useWorkoutMutations";
+import { sortExerciseGroupsByLogOrder } from "../utils/sortExerciseGroupsByLogOrder";
 import { computed } from "vue";
 
 export type ExerciseGroup = {
@@ -26,7 +27,8 @@ export function useWorkoutStore(offset: number = 0) {
     const removeExerciseMutation = useRemoveExerciseFromWorkout(offset);
 
     const log = computed<ExerciseGroup[]>(() => {
-        return workoutLogsQuery.data.value?.previous_exercises ?? [];
+        const raw = workoutLogsQuery.data.value?.previous_exercises ?? [];
+        return sortExerciseGroupsByLogOrder(raw);
     });
 
     const data = computed(() => workoutLogsQuery.data.value);

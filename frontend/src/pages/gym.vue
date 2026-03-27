@@ -26,6 +26,14 @@ const planExercises = computed(() => data.value?.workout_plan?.exercises ?? []);
         <template v-else>
             <p class="date">{{ dateLabel }}</p>
             <h1 class="split">{{ splitLabel }}</h1>
+            <section v-if="planExercises.length" class="plan-block">
+                <h2 class="plan-heading">Exercises</h2>
+                <ul class="plan-list">
+                    <li v-for="ex in planExercises" :key="ex.ID" class="plan-item">
+                        {{ ex.name }}
+                    </li>
+                </ul>
+            </section>
             <p v-else-if="data?.workout_plan" class="plan-empty">
                 No exercises in this plan yet.
             </p>
