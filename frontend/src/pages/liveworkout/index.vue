@@ -6,17 +6,25 @@ import { computed } from "vue";
 import { toast } from "~/composables/toast/useToast";
 
 const router = useRouter();
-const { log, pending, error, data, addExerciseToWorkout, removeExerciseFromWorkout } = useWorkoutStore(0);
+const {
+    log,
+    pending,
+    error,
+    data,
+    addExerciseToWorkout,
+    removeExerciseFromWorkout,
+} = useWorkoutStore(0);
 
 const workoutName = computed(() => data.value?.day.workout_plan?.name || "");
 
 const selectExercise = (index: number) => {
     const exerciseGroup = log.value[index];
     if (!exerciseGroup) return;
-    
-    const exerciseId = exerciseGroup.planned?.ID || exerciseGroup.logged?.exercise_id;
+
+    const exerciseId =
+        exerciseGroup.planned?.ID || exerciseGroup.logged?.exercise_id;
     if (!exerciseId) return;
-    
+
     router.push(`/liveworkout/log/${exerciseId}`);
 };
 
@@ -33,7 +41,8 @@ const handleRemoveExercise = async (index: number) => {
     const exerciseGroup = log.value[index];
     if (!exerciseGroup) return;
 
-    const exerciseId = exerciseGroup.logged?.exercise_id || exerciseGroup.planned?.ID;
+    const exerciseId =
+        exerciseGroup.logged?.exercise_id || exerciseGroup.planned?.ID;
     if (!exerciseId) {
         toast.push("Cannot remove exercise: ID not found", "error");
         return;
@@ -55,7 +64,7 @@ const handleRemoveExercise = async (index: number) => {
     <div v-else-if="error" class="container">
         <div>Error: {{ error.message }}</div>
     </div>
-    <div v-else class="container">
+    <div class="container">
         <ExerciseListView
             :exercises="log"
             :workoutName="workoutName"

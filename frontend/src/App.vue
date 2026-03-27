@@ -1,14 +1,14 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue';
+import { onMounted, ref } from "vue";
 import ToastContainer from "./composables/toast/ToastContainer.vue";
 import DialogContainer from "./composables/dialog/DialogContainer.vue";
 import SideBar from "./shared/SideBar.vue";
-import { formatDateLong } from './utils/dateUtil';
+import { formatDateLong } from "./utils/dateUtil";
 
 const currentDate = ref(new Date());
 
 onMounted(() => {
-    document.documentElement.classList.add('dark-mode');
+    document.documentElement.classList.add("dark-mode");
 });
 </script>
 
@@ -17,7 +17,9 @@ onMounted(() => {
         <div class="grid-container">
             <div class="grid-top-left"></div>
             <div class="grid-top-right">
-                <h1 class="current-date-label">{{ formatDateLong(currentDate.toISOString()) }}</h1>
+                <h1 class="current-date-label">
+                    {{ formatDateLong(currentDate.toISOString()) }}
+                </h1>
                 <!-- <DatePicker v-model="currentDate" disabled /> -->
             </div>
             <div class="grid-bottom-left">
@@ -209,4 +211,3 @@ input:focus {
     outline: none;
 }
 </style>
-

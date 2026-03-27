@@ -13,7 +13,7 @@ type LoggedSetWithStatus = {
     weight: number;
     reps: number;
     weight_setup: string;
-    status: 'pending' | 'success' | 'error';
+    status: "pending" | "success" | "error";
     id: number | null;
     error: string | null;
     tempId: string;
@@ -80,7 +80,9 @@ const decrementReps = () => {
 const enterWeightEditMode = () => {
     emit("enter-weight-edit");
     nextTick(() => {
-        const input = document.getElementById('weight-input') as HTMLInputElement;
+        const input = document.getElementById(
+            "weight-input",
+        ) as HTMLInputElement;
         if (input) {
             input.focus();
             input.select();
@@ -97,7 +99,7 @@ const exitWeightEditMode = () => {
 const enterRepsEditMode = () => {
     emit("enter-reps-edit");
     nextTick(() => {
-        const input = document.getElementById('reps-input') as HTMLInputElement;
+        const input = document.getElementById("reps-input") as HTMLInputElement;
         if (input) {
             input.focus();
             input.select();
@@ -117,30 +119,54 @@ const exitRepsEditMode = () => {
             <button @click="emit('go-back')" class="back-button" type="button">
                 <ArrowLeft :size="20" />
             </button>
-            <h2>{{ exerciseGroup.planned.name }}</h2>
+            <h2>
+                {{
+                    exerciseGroup?.planned?.name ||
+                    exerciseGroup?.logged?.exercise?.name
+                }}
+            </h2>
             <span class="set-indicator">Set {{ currentSetNumber }}</span>
         </div>
         <div class="sets-logged" v-if="loggedSets.length > 0">
             <h3>Logged Sets:</h3>
             <ul class="sets-list">
-                <li 
-                    v-for="(set, index) in loggedSets" 
+                <li
+                    v-for="(set, index) in loggedSets"
                     :key="set.tempId || index"
-                    :class="['set-item', { 'clickable': set.status === 'success' }]"
+                    :class="[
+                        'set-item',
+                        { clickable: set.status === 'success' },
+                    ]"
                     @click="set.status === 'success' && emit('edit-set', index)"
                 >
                     <div class="set-info">
-                        <span>Set {{ index + 1 }}: {{ set.weight }}lbs × {{ set.reps }} reps</span>
+                        <span
+                            >Set {{ index + 1 }}: {{ set.weight }}lbs ×
+                            {{ set.reps }} reps</span
+                        >
                         <div class="set-actions">
-                            <span v-if="set.weight_setup" class="weight-setup-badge">{{ set.weight_setup }}</span>
-                            <div v-if="set.status === 'pending'" class="set-status">
+                            <span
+                                v-if="set.weight_setup"
+                                class="weight-setup-badge"
+                                >{{ set.weight_setup }}</span
+                            >
+                            <div
+                                v-if="set.status === 'pending'"
+                                class="set-status"
+                            >
                                 <Loader class="spinner" :size="16" />
                             </div>
-                            <div v-else-if="set.status === 'success'" class="set-status">
+                            <div
+                                v-else-if="set.status === 'success'"
+                                class="set-status"
+                            >
                                 <Check class="check-icon" :size="16" />
                             </div>
-                            <div v-else-if="set.status === 'error'" class="set-status">
-                                <button 
+                            <div
+                                v-else-if="set.status === 'error'"
+                                class="set-status"
+                            >
+                                <button
                                     @click.stop="emit('retry-set', index)"
                                     class="retry-button"
                                     type="button"
@@ -167,10 +193,16 @@ const exitRepsEditMode = () => {
             <div class="stepper-container">
                 <label>Weight (lbs)</label>
                 <div class="stepper">
-                    <button @click="decrementWeight" class="stepper-button" type="button">−</button>
-                    <div 
-                        v-if="!weightEditMode" 
-                        @click="enterWeightEditMode" 
+                    <button
+                        @click="decrementWeight"
+                        class="stepper-button"
+                        type="button"
+                    >
+                        −
+                    </button>
+                    <div
+                        v-if="!weightEditMode"
+                        @click="enterWeightEditMode"
                         class="stepper-display"
                     >
                         {{ currentWeight || 0 }}
@@ -180,7 +212,12 @@ const exitRepsEditMode = () => {
                         id="weight-input"
                         type="number"
                         :value="weightInputValue"
-                        @input="emit('update:weightInputValue', ($event.target as HTMLInputElement).value)"
+                        @input="
+                            emit(
+                                'update:weightInputValue',
+                                ($event.target as HTMLInputElement).value,
+                            )
+                        "
                         @blur="exitWeightEditMode"
                         @keyup.enter="exitWeightEditMode"
                         @keyup.escape="exitWeightEditMode"
@@ -188,16 +225,28 @@ const exitRepsEditMode = () => {
                         min="0"
                         step="0.5"
                     />
-                    <button @click="incrementWeight" class="stepper-button" type="button">+</button>
+                    <button
+                        @click="incrementWeight"
+                        class="stepper-button"
+                        type="button"
+                    >
+                        +
+                    </button>
                 </div>
             </div>
             <div class="stepper-container">
                 <label>Reps</label>
                 <div class="stepper">
-                    <button @click="decrementReps" class="stepper-button" type="button">−</button>
-                    <div 
-                        v-if="!repsEditMode" 
-                        @click="enterRepsEditMode" 
+                    <button
+                        @click="decrementReps"
+                        class="stepper-button"
+                        type="button"
+                    >
+                        −
+                    </button>
+                    <div
+                        v-if="!repsEditMode"
+                        @click="enterRepsEditMode"
                         class="stepper-display"
                     >
                         {{ currentReps || 0 }}
@@ -207,14 +256,25 @@ const exitRepsEditMode = () => {
                         id="reps-input"
                         type="number"
                         :value="repsInputValue"
-                        @input="emit('update:repsInputValue', ($event.target as HTMLInputElement).value)"
+                        @input="
+                            emit(
+                                'update:repsInputValue',
+                                ($event.target as HTMLInputElement).value,
+                            )
+                        "
                         @blur="exitRepsEditMode"
                         @keyup.enter="exitRepsEditMode"
                         @keyup.escape="exitRepsEditMode"
                         class="stepper-input"
                         min="0"
                     />
-                    <button @click="incrementReps" class="stepper-button" type="button">+</button>
+                    <button
+                        @click="incrementReps"
+                        class="stepper-button"
+                        type="button"
+                    >
+                        +
+                    </button>
                 </div>
             </div>
             <div class="input-container">
@@ -222,7 +282,12 @@ const exitRepsEditMode = () => {
                 <input
                     type="text"
                     :value="currentWeightSetup"
-                    @input="emit('update:currentWeightSetup', ($event.target as HTMLInputElement).value)"
+                    @input="
+                        emit(
+                            'update:currentWeightSetup',
+                            ($event.target as HTMLInputElement).value,
+                        )
+                    "
                     class="weight-setup-input"
                     placeholder="2x45 + 10"
                 />
@@ -232,7 +297,12 @@ const exitRepsEditMode = () => {
             <label>Notes</label>
             <textarea
                 :value="notes"
-                @input="emit('update:notes', ($event.target as HTMLTextAreaElement).value)"
+                @input="
+                    emit(
+                        'update:notes',
+                        ($event.target as HTMLTextAreaElement).value,
+                    )
+                "
                 class="notes-input"
                 placeholder="Add any notes about this set..."
                 rows="3"
@@ -282,7 +352,9 @@ const exitRepsEditMode = () => {
     border-radius: 0.25rem;
     color: inherit;
     cursor: pointer;
-    transition: background-color 0.2s, border-color 0.2s;
+    transition:
+        background-color 0.2s,
+        border-color 0.2s;
     padding: 0;
 }
 
@@ -336,7 +408,9 @@ const exitRepsEditMode = () => {
     background: rgb(27, 27, 27);
     border-radius: 3px;
     border: 1px solid rgb(56, 56, 56);
-    transition: background-color 0.2s, border-color 0.2s;
+    transition:
+        background-color 0.2s,
+        border-color 0.2s;
 }
 
 .sets-list li.set-item.clickable {
@@ -413,7 +487,9 @@ const exitRepsEditMode = () => {
     justify-content: center;
     padding: 0.25rem;
     border-radius: 3px;
-    transition: background-color 0.2s, color 0.2s;
+    transition:
+        background-color 0.2s,
+        color 0.2s;
 }
 
 .delete-button:hover {
@@ -468,7 +544,9 @@ const exitRepsEditMode = () => {
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: background-color 0.2s, border-color 0.2s;
+    transition:
+        background-color 0.2s,
+        border-color 0.2s;
     user-select: none;
 }
 
@@ -539,7 +617,9 @@ const exitRepsEditMode = () => {
     background: rgb(27, 27, 27);
     color: inherit;
     font-size: 1rem;
-    transition: border-color 0.2s, background-color 0.2s;
+    transition:
+        border-color 0.2s,
+        background-color 0.2s;
 }
 
 .weight-setup-input:focus {
@@ -561,7 +641,9 @@ const exitRepsEditMode = () => {
     font-size: 1rem;
     font-family: inherit;
     resize: vertical;
-    transition: border-color 0.2s, background-color 0.2s;
+    transition:
+        border-color 0.2s,
+        background-color 0.2s;
 }
 
 .notes-input:focus {
@@ -640,4 +722,3 @@ const exitRepsEditMode = () => {
     }
 }
 </style>
-
