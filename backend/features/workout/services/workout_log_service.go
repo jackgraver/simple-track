@@ -3,28 +3,60 @@ package services
 import (
 	"be-simpletracker/features/workout/models"
 	"be-simpletracker/utils"
+	"errors"
 	"fmt"
 	"time"
 
 	"gorm.io/gorm"
 )
 
-func GetToday(database *gorm.DB, offset int) (models.WorkoutLog, error) {
-	today := utils.ZerodTime(offset)
-
+func loadWorkoutLogForDate(database *gorm.DB, date time.Time) (models.WorkoutLog, error) {
 	var workoutDay models.WorkoutLog
 	err := database.
 		Preload("Cardio").
 		Preload("Exercises.Sets").
 		Preload("Exercises.Exercise").
 		Preload("WorkoutPlan.Exercises").
-		Where("date = ?", today).
+		Where("date = ?", date).
 		First(&workoutDay).Error
-
 	if err != nil {
 		return models.WorkoutLog{}, err
 	}
 	return workoutDay, nil
+}
+
+func GetToday(database *gorm.DB, offset int) (models.WorkoutLog, error) {
+	return loadWorkoutLogForDate(database, utils.ZerodTime(offset))
+}
+
+// GetOrCreateToday returns the workout log for the calendar day (with offset from today),
+// creating a row if missing and attaching the plan for that weekday when one exists.
+func GetOrCreateToday(database *gorm.DB, offset int) (models.WorkoutLog, error) {
+	day := utils.ZerodTime(offset)
+	workoutDay, err := loadWorkoutLogForDate(database, day)
+	if err == nil {
+		return workoutDay, nil
+	}
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return models.WorkoutLog{}, err
+	}
+	plan, err := GetPlanByDay(database, int(day.Weekday()))
+	if err != nil {
+		return models.WorkoutLog{}, err
+	}
+	var planID *uint
+	if plan != nil {
+		id := plan.ID
+		planID = &id
+	}
+	newLog := models.WorkoutLog{
+		Date:          day,
+		WorkoutPlanID: planID,
+	}
+	if err := database.Omit("WorkoutPlan", "Exercises", "Cardio").Create(&newLog).Error; err != nil {
+		return models.WorkoutLog{}, err
+	}
+	return loadWorkoutLogForDate(database, day)
 }
 
 func GetAll(database *gorm.DB) ([]models.WorkoutLog, error) {

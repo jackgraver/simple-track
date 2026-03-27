@@ -22,6 +22,11 @@ export async function getWorkoutLogsPrevious(offset: number = 0): Promise<Workou
     return response.data;
 }
 
+export async function getWorkoutLogsToday(): Promise<WorkoutLog> {
+    const response = await apiClient.get<WorkoutLog>('/workout/logs/today');
+    return response.data;
+}
+
 export async function logExercise(
     exercise: LoggedExercise,
     type: "logged" | "previous"

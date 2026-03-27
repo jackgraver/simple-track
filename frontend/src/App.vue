@@ -14,13 +14,12 @@ onMounted(() => {
 
 <template>
     <div class="page dark-mode">
-        <div class="grid-container">
+        <!-- <div class="grid-container">
             <div class="grid-top-left"></div>
             <div class="grid-top-right">
                 <h1 class="current-date-label">
                     {{ formatDateLong(currentDate.toISOString()) }}
                 </h1>
-                <!-- <DatePicker v-model="currentDate" disabled /> -->
             </div>
             <div class="grid-bottom-left">
                 <SideBar />
@@ -28,9 +27,14 @@ onMounted(() => {
             <div class="grid-bottom-right">
                 <RouterView />
             </div>
+        </div> -->
+        <div class="flex items-center">
+            <router-link :to="{ name: 'gym' }">
+                <p class="bg-gray-500 rounded-md p-2">Gym</p>
+            </router-link>
         </div>
+        <RouterView />
     </div>
-
     <ToastContainer />
     <DialogContainer />
 </template>
@@ -58,7 +62,7 @@ body {
 .page {
     height: 100vh;
     width: 100vw;
-    overflow: hidden;
+    overflow-x: hidden;
     margin: 0;
 }
 

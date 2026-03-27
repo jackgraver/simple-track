@@ -4,6 +4,10 @@ import type { RouteRecordRaw } from 'vue-router'
 const routes: RouteRecordRaw[] = [
   {
     path: '/',
+    redirect: { name: 'gym' },
+  },
+  {
+    path: '/home',
     name: 'home',
     component: () => import('~/pages/home/home.vue'),
   },
