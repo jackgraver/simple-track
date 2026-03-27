@@ -2,7 +2,8 @@
 import { Plus, Loader } from "lucide-vue-next";
 import { computed, ref } from "vue";
 import type { Component } from "vue";
-import { useAPIGet } from "~/composables/useApiFetch";
+import { useQuery } from "@tanstack/vue-query";
+import { apiClient } from "~/utils/axios";
 
 const props = defineProps<{
     route: string;
@@ -14,10 +15,23 @@ const props = defineProps<{
 
 const search = ref("");
 
-const query = props.prefilter
-    ? "?" + props.prefilter.map((id) => `exclude=${id}`).join("&")
-    : "";
-const { data, pending, error } = useAPIGet<any[]>(props.route + query);
+const querySuffix = computed(() =>
+    props.prefilter?.length ? "?" + props.prefilter.map((id) => `exclude=${id}`).join("&") : ""
+);
+
+const requestPath = computed(() => {
+    const base = props.route.startsWith("/") ? props.route : `/${props.route}`;
+    return `${base}${querySuffix.value}`;
+});
+
+const { data, isPending, error, refetch } = useQuery({
+    queryKey: computed(() => ["searchList", requestPath.value]),
+    queryFn: async () => {
+        const res = await apiClient.get<unknown>(requestPath.value);
+        return res.data;
+    },
+    enabled: computed(() => !!props.route),
+});
 
 const list = computed(() => {
     const value = data.value;
@@ -25,7 +39,7 @@ const list = computed(() => {
 
     if (Array.isArray(value)) return value;
 
-    const firstArray = Object.values(value).find((v) => Array.isArray(v));
+    const firstArray = Object.values(value as object).find((v) => Array.isArray(v));
     return firstArray ?? [];
 });
 
@@ -38,7 +52,7 @@ const filteredList = computed(() => {
 
 const handleFunctionCall = async <T extends (arg: any) => Promise<boolean>>(
     fn?: T,
-    args?: any,
+    args?: any
 ) => {
     if (!fn) return;
     const success = await fn(args);
@@ -46,7 +60,7 @@ const handleFunctionCall = async <T extends (arg: any) => Promise<boolean>>(
 };
 
 const refresh = () => {
-    console.log("refresh");
+    refetch();
 };
 </script>
 
@@ -61,12 +75,12 @@ const refresh = () => {
                 type="text"
                 v-model="search"
                 placeholder="Search"
-                :disabled="pending"
+                :disabled="isPending"
             />
         </div>
         <div class="items-container">
-            <template v-if="pending">
-                <Loader v-if="pending" class="spinner" :size="32" />
+            <template v-if="isPending">
+                <Loader v-if="isPending" class="spinner" :size="32" />
             </template>
             <template v-else-if="filteredList?.length">
                 <button
@@ -87,8 +101,8 @@ const refresh = () => {
                     <Plus :size="18" />
                 </button>
             </template>
-            <div 
-                v-else-if="!pending && search" 
+            <div
+                v-else-if="!isPending && search"
                 class="item empty-option"
                 @click="onCreate && handleFunctionCall(onCreate, search)"
             >
@@ -96,13 +110,11 @@ const refresh = () => {
                     <Plus :size="18" />
                     <span>Create "{{ search }}"</span>
                 </template>
-                <template v-else-if="pending">
+                <template v-else-if="isPending">
                     <Loader class="spinner" :size="18" />
                 </template>
                 <template v-else>
-                    <span class="no-hover-empty-option"
-                        >{{ search }} does not exist</span
-                    >
+                    <span class="no-hover-empty-option">{{ search }} does not exist</span>
                 </template>
             </div>
         </div>

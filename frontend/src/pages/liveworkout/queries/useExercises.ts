@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/vue-query';
-import { getAllExercises } from '../api/workouts';
+import { getAllExercises } from '~/api/workout/api';
 import { liveworkoutKeys } from './keys';
 
 export function useAllExercises() {

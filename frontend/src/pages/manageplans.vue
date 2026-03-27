@@ -4,12 +4,21 @@ import { toast } from "~/composables/toast/useToast";
 import { dialogManager } from "~/composables/dialog/useDialog";
 import AddExerciseDialog from "~/shared/AddExerciseDialog.vue";
 import { X, Plus } from "lucide-vue-next";
-import { useAPIGet, useAPIPost } from "~/composables/useApiFetch";
 import { computed } from "vue";
+import { useQuery } from "@tanstack/vue-query";
+import { apiClient } from "~/utils/axios";
 
-const { data, refresh } = useAPIGet<{ plans: WorkoutPlan[] }>("workout/plans/all");
+const { data, isPending, refetch } = useQuery({
+    queryKey: ["workout", "plans", "all"],
+    queryFn: async () => {
+        const res = await apiClient.get<{ plans: WorkoutPlan[] }>("/workout/plans/all");
+        return res.data;
+    },
+});
 
 const plans = computed(() => data.value?.plans || []);
+
+const refresh = () => refetch();
 
 const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
@@ -20,7 +29,7 @@ const getDayName = (dayOfWeek: number | null): string | undefined => {
 
 const getAssignedDays = computed(() => {
     const assigned: number[] = [];
-    plans.value.forEach(plan => {
+    plans.value.forEach((plan) => {
         if (plan.day_of_week !== null) {
             assigned.push(plan.day_of_week);
         }
@@ -29,29 +38,30 @@ const getAssignedDays = computed(() => {
 });
 
 const isDayAssigned = (dayOfWeek: number, currentPlan: WorkoutPlan): boolean => {
-    return getAssignedDays.value.includes(dayOfWeek) && 
-           plans.value.find(p => p.day_of_week === dayOfWeek)?.ID !== currentPlan.ID;
+    return (
+        getAssignedDays.value.includes(dayOfWeek) &&
+        plans.value.find((p) => p.day_of_week === dayOfWeek)?.ID !== currentPlan.ID
+    );
 };
 
 const getAssignedPlanName = (dayOfWeek: number, currentPlan: WorkoutPlan): string => {
-    const assignedPlan = plans.value.find(p => p.day_of_week === dayOfWeek && p.ID !== currentPlan.ID);
-    return assignedPlan?.name || 'Assigned';
+    const assignedPlan = plans.value.find(
+        (p) => p.day_of_week === dayOfWeek && p.ID !== currentPlan.ID
+    );
+    return assignedPlan?.name || "Assigned";
 };
 
 const removeExerciseFromPlan = async (plan: WorkoutPlan, exercise: Exercise) => {
-    const { response, error } = await useAPIPost(
-        `workout/plans/${plan.ID}/exercises/remove`,
-        "DELETE",
-        { exercise_id: exercise.ID },
-    );
-
-    if (error) {
-        toast.push("Failed to remove exercise: " + error.message, "error");
-        return;
+    try {
+        await apiClient.delete(`workout/plans/${plan.ID}/exercises/remove`, {
+            data: { exercise_id: exercise.ID },
+        });
+        toast.push(`Removed ${exercise.name} from ${plan.name}`, "success");
+        await refresh();
+    } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : String(err);
+        toast.push("Failed to remove exercise: " + message, "error");
     }
-
-    toast.push(`Removed ${exercise.name} from ${plan.name}`, "success");
-    await refresh();
 };
 
 const openAddDialog = (plan: WorkoutPlan) => {
@@ -73,69 +83,69 @@ const openAddDialog = (plan: WorkoutPlan) => {
 const handleDayChange = async (plan: WorkoutPlan, event: Event) => {
     const select = event.target as HTMLSelectElement;
     const day = parseInt(select.value);
-    const previousValue = plan.day_of_week !== null ? plan.day_of_week.toString() : '';
-    
+    const previousValue = plan.day_of_week !== null ? plan.day_of_week.toString() : "";
+
     if (isNaN(day)) {
         select.value = previousValue;
         return;
     }
 
-    const currentlyAssignedPlan = plans.value.find(p => p.day_of_week === day && p.ID !== plan.ID);
-    
+    const currentlyAssignedPlan = plans.value.find((p) => p.day_of_week === day && p.ID !== plan.ID);
+
     if (currentlyAssignedPlan) {
         const confirmed = await dialogManager.confirm({
-            title: 'Day Already Assigned',
-            message: dayNames[day] + ' is currently assigned to "' + currentlyAssignedPlan.name + '". Assigning "' + plan.name + '" will unassign "' + currentlyAssignedPlan.name + '". Continue?',
-            confirmText: 'Yes, Reassign',
-            cancelText: 'Cancel',
+            title: "Day Already Assigned",
+            message:
+                dayNames[day] +
+                ' is currently assigned to "' +
+                currentlyAssignedPlan.name +
+                '". Assigning "' +
+                plan.name +
+                '" will unassign "' +
+                currentlyAssignedPlan.name +
+                '". Continue?',
+            confirmText: "Yes, Reassign",
+            cancelText: "Cancel",
         });
-        
+
         if (!confirmed) {
             select.value = previousValue;
             return;
         }
     }
-    
+
     await assignPlanToDay(plan, day);
 };
 
 const assignPlanToDay = async (plan: WorkoutPlan, dayOfWeek: number) => {
-    const { response, error } = await useAPIPost<{ plan: WorkoutPlan }>(
-        `workout/plans/${plan.ID}/assign-day`,
-        "POST",
-        { day_of_week: dayOfWeek },
-    );
-
-    if (error) {
-        toast.push("Failed to assign day: " + error.message, "error");
-        return;
+    try {
+        await apiClient.post<{ plan: WorkoutPlan }>(`workout/plans/${plan.ID}/assign-day`, {
+            day_of_week: dayOfWeek,
+        });
+        toast.push(`Assigned ${plan.name} to ${dayNames[dayOfWeek]}`, "success");
+        await refresh();
+    } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : String(err);
+        toast.push("Failed to assign day: " + message, "error");
     }
-
-    toast.push(`Assigned ${plan.name} to ${dayNames[dayOfWeek]}`, "success");
-    await refresh();
 };
 
 const unassignPlanFromDay = async (plan: WorkoutPlan) => {
-    const { response, error } = await useAPIPost<{ plan: WorkoutPlan }>(
-        `workout/plans/${plan.ID}/assign-day`,
-        "DELETE",
-        {},
-    );
-
-    if (error) {
-        toast.push("Failed to unassign day: " + error.message, "error");
-        return;
+    try {
+        await apiClient.delete<{ plan: WorkoutPlan }>(`workout/plans/${plan.ID}/assign-day`);
+        toast.push(`Unassigned ${plan.name} from ${getDayName(plan.day_of_week)}`, "success");
+        await refresh();
+    } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : String(err);
+        toast.push("Failed to unassign day: " + message, "error");
     }
-
-    toast.push(`Unassigned ${plan.name} from ${getDayName(plan.day_of_week)}`, "success");
-    await refresh();
 };
 </script>
 
 <template>
     <div class="manage-plans-container">
         <h1>Manage Workout Plans</h1>
-        <div v-if="!data" class="loading">Loading...</div>
+        <div v-if="isPending" class="loading">Loading...</div>
         <div v-else class="plans-list">
             <div v-for="plan in plans" :key="plan.ID" class="plan-card">
                 <div class="plan-header">
@@ -156,21 +166,18 @@ const unassignPlanFromDay = async (plan: WorkoutPlan) => {
                 <div class="day-selector-section">
                     <label>Assign to Day:</label>
                     <div class="day-selector">
-                        <select 
+                        <select
                             :value="plan.day_of_week !== null ? plan.day_of_week : ''"
                             @change="handleDayChange(plan, $event)"
                             class="day-select"
                         >
                             <option value="">-- Select Day --</option>
-                            <option 
-                                v-for="(dayName, index) in dayNames" 
-                                :key="index"
-                                :value="index"
-                            >
-                                {{ dayName }}{{ isDayAssigned(index, plan) ? ` (${getAssignedPlanName(index, plan)})` : '' }}
+                            <option v-for="(dayName, index) in dayNames" :key="index" :value="index">
+                                {{ dayName
+                                }}{{ isDayAssigned(index, plan) ? ` (${getAssignedPlanName(index, plan)})` : "" }}
                             </option>
                         </select>
-                        <button 
+                        <button
                             v-if="plan.day_of_week !== null"
                             @click="unassignPlanFromDay(plan)"
                             class="unassign-button"
@@ -384,4 +391,3 @@ h1 {
     font-style: italic;
 }
 </style>
-

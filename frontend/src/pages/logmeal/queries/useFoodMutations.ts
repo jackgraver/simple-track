@@ -1,5 +1,5 @@
 import { useMutation } from '@tanstack/vue-query';
-import { createFood } from '../api/food';
+import { createFood } from '~/api/diet/food';
 import type { Food } from '~/types/diet';
 import { toast } from '~/composables/toast/useToast';
 

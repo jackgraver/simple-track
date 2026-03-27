@@ -1,0 +1,13 @@
+package utils
+
+import (
+	"log"
+
+	"github.com/joho/godotenv"
+)
+
+func LoadEnvIfNeeded() {
+	if err := godotenv.Load(); err != nil {
+		log.Println("No .env file found, using environment variables")
+	}
+}

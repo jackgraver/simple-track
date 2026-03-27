@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/vue-query';
-import { createMeal, logEditedMeal, updateLoggedMeal } from '../api/meals';
+import { createMeal, logEditedMeal, updateLoggedMeal } from '~/api/diet/api';
 import { logmealKeys } from './keys';
 import { homeKeys } from '~/pages/home/queries/keys';
 import type { Meal } from '~/types/diet';
@@ -16,7 +16,7 @@ export function useCreateMeal() {
             // Invalidate today's diet logs
             queryClient.invalidateQueries({ queryKey: logmealKeys.diet.today() });
             queryClient.invalidateQueries({ queryKey: homeKeys.diet.today(0) });
-            
+
             if (variables.log) {
                 router.push('/');
             }

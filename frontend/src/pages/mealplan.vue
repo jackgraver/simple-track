@@ -1,19 +1,23 @@
 <script setup lang="ts">
-import { useAPIGet } from "~/composables/useApiFetch";
+import { useQuery } from "@tanstack/vue-query";
+import { apiClient } from "~/utils/axios";
 import type { Plan } from "~/types/diet";
 
-const { data, pending, error } = useAPIGet<{ plans: Plan[] }>(
-    "mealplan/plan/all",
-);
-console.log(data);
+const { data, isPending, error } = useQuery({
+    queryKey: ["diet", "plans", "plan", "all"],
+    queryFn: async () => {
+        const res = await apiClient.get<{ plans: Plan[] }>("/diet/plans/plan/all");
+        return res.data;
+    },
+});
 </script>
 
 <template>
     <div class="container">
         <div class="section">
             <h1>Manage plans (macros and planned meals)</h1>
-            <div v-if="pending">Loading...</div>
-            <div v-else-if="error">Error: {{ error.message }}</div>
+            <div v-if="isPending">Loading...</div>
+            <div v-else-if="error">Error: {{ (error as Error).message }}</div>
             <div v-else>
                 <h1>Todays Plan</h1>
                 <p>...</p>
@@ -56,67 +60,3 @@ console.log(data);
     padding: 1rem;
 }
 </style>
-
-<!-- <script lang="ts" setup>
-import type { Day } from "~/types/diet";
-import MacrosDate from "~/shared/MacrosDate.vue";
-
-const monthOffset = ref(0);
-
-const data = ref<{ today: string; days: Day[] } | null>(null);
-const pending = ref(false);
-const error = ref<Error | null>(null);
-
-async function fetchMealPlan() {
-    pending.value = true;
-    error.value = null;
-    try {
-        const res = await useAPIGet<{ today: string; days: Day[] }>(
-            "mealplan/month",
-            {
-                query: {
-                    monthoffset: monthOffset.value,
-                },
-            },
-        );
-        console.log(data.value);
-        data.value = res.data.value ?? null;
-        console.log(data.value);
-    } catch (err) {
-        error.value = err as Error;
-    } finally {
-        pending.value = false;
-    }
-}
-
-function setCurrentMonth() {
-    console.log("?");
-    monthOffset.value = 0;
-    fetchMealPlan();
-}
-
-function nextMonth() {
-    monthOffset.value += 1;
-    fetchMealPlan();
-}
-
-function prevMonth() {
-    monthOffset.value -= 1;
-    fetchMealPlan();
-}
-
-onMounted(() => {
-    setCurrentMonth();
-});
-</script>
-
-<template>
-    <h1>Meal Plan</h1>
-    <div v-if="pending">Loading...</div>
-    <div v-else-if="error">Error: {{ error.message }}</div>
-    <Calendar
-        v-else
-        :fetchURL="'mealplan/month'"
-        :display-component="MacrosDate"
-    />
-</template> -->

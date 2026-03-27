@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/vue-query';
-import { getWorkoutLogsPrevious } from '../api/workouts';
+import { getWorkoutLogsPrevious } from '~/api/workout/api';
 import { liveworkoutKeys } from './keys';
 
 export function useWorkoutLogsPrevious(offset: number = 0) {

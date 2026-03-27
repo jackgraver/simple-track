@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/vue-query';
-import { getDietLogsToday } from '../api/diet';
+import { getDietLogsToday } from '~/api/diet/api';
 import { homeKeys } from './keys';
 
 export function useDietLogsToday(offset: number) {

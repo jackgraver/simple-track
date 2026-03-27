@@ -1,29 +1,23 @@
 <script setup lang="ts">
 import { toast } from "~/composables/toast/useToast";
-import { useAPIPost } from "~/composables/useApiFetch";
+import { apiClient } from "~/utils/axios";
 
 const dump = async () => {
-    const { response, error } = await useAPIPost<{ dump: string }>(
-        "db/dump",
-        "POST",
-        {},
-    );
-    if (error) {
-        toast.push("Dump Failed!" + error.message, "error");
-    } else if (response) {
+    try {
+        await apiClient.post("db/dump", {});
         toast.push("Dump Successfully!", "success");
+    } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : String(err);
+        toast.push("Dump Failed!" + message, "error");
     }
 };
 const restore = async () => {
-    const { response, error } = await useAPIPost<{ restore: string }>(
-        "db/restore",
-        "POST",
-        {},
-    );
-    if (error) {
-        toast.push("Restore Failed!" + error.message, "error");
-    } else if (response) {
+    try {
+        await apiClient.post("db/restore", {});
         toast.push("Restore Successfully!", "success");
+    } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : String(err);
+        toast.push("Restore Failed!" + message, "error");
     }
 };
 </script>
@@ -38,18 +32,11 @@ const restore = async () => {
 <style scoped>
 .settings-container {
     position: fixed;
-    top: 15%;
-    left: 50%;
-    transform: translate(-50%, -50%);
+    bottom: 0;
+    right: 0;
+    padding: 1rem;
     display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 1rem;
-    padding: 2rem;
-    max-width: 75%;
-    width: 100%;
-    background: #1a1a1a;
-    border: 1px solid #333;
-    border-radius: 0.5rem;
+    gap: 0.5rem;
+    z-index: 1000;
 }
 </style>

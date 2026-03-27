@@ -1,62 +1,40 @@
-z
 <script setup lang="ts">
-import { ref } from "vue";
-import { useAPIGet } from "~/composables/useApiFetch";
+import { computed, ref } from "vue";
+import { useQuery } from "@tanstack/vue-query";
+import { apiClient } from "~/utils/axios";
+import { formatDateShort, isSameDay, isSameMonth, monthName } from "~/utils/dateUtil";
 
 const props = defineProps<{
-    // days: any[];
     fetchURL: string;
     displayComponent: any;
 }>();
 
 const monthOffset = ref(0);
+const today = ref(new Date());
 
-const data = ref<{ today: string; days: any[]; month: number } | null>(null);
-const pending = ref(false);
-const error = ref<Error | null>(null);
-
-async function fetchMealPlan() {
-    pending.value = true;
-    error.value = null;
-    try {
-        const res = await useAPIGet<{
-            today: string;
-            days: any[];
-            month: number;
-        }>(props.fetchURL, {
-            query: {
-                monthoffset: monthOffset.value,
-            },
+const { data, isPending, error, refetch } = useQuery({
+    queryKey: computed(() => ["calendar", props.fetchURL, monthOffset.value]),
+    queryFn: async () => {
+        const path = props.fetchURL.startsWith("/") ? props.fetchURL : `/${props.fetchURL}`;
+        const res = await apiClient.get<{ today: string; days: any[]; month: number }>(path, {
+            params: { monthoffset: monthOffset.value },
         });
-        data.value = res.data.value ?? null;
-        console.log(data.value);
-    } catch (err) {
-        error.value = err as Error;
-    } finally {
-        pending.value = false;
-    }
-}
+        return res.data;
+    },
+    enabled: computed(() => !!props.fetchURL),
+});
 
 function setCurrentMonth() {
     monthOffset.value = 0;
-    fetchMealPlan();
 }
 
 function nextMonth() {
     monthOffset.value += 1;
-    fetchMealPlan();
 }
 
 function prevMonth() {
     monthOffset.value -= 1;
-    fetchMealPlan();
 }
-
-onMounted(() => {
-    setCurrentMonth();
-});
-
-const today = ref(new Date());
 
 const weekdays = [
     "Sunday",
@@ -67,44 +45,47 @@ const weekdays = [
     "Friday",
     "Saturday",
 ];
+
+const headerMonthLabel = computed(() => {
+    const days = data.value?.days;
+    if (!days?.length) return "";
+    const mid = days[Math.floor(days.length / 2)];
+    return mid?.date ? monthName(mid.date) : "";
+});
 </script>
 
 <template>
     <div class="page">
-        <h1>
-            {{ monthName(data?.days[Math.floor(data?.days.length / 2)]?.date) }}
-        </h1>
-        <div class="flex gap-2">
-            <button @click="prevMonth"><-</button>
-            <button @click="setCurrentMonth" :disabled="monthOffset === 0">
-                Today
-            </button>
-            <button @click="nextMonth">-></button>
-        </div>
-        <div class="grid-container">
-            <div
-                v-for="weekday in weekdays"
-                :key="weekday"
-                class="weekday-header"
-            >
-                {{ weekday }}
+        <h1>{{ headerMonthLabel }}</h1>
+        <div v-if="error" class="cal-error">Failed to load calendar</div>
+        <div v-else-if="isPending" class="cal-loading">Loading...</div>
+        <template v-else>
+            <div class="flex gap-2">
+                <button type="button" @click="prevMonth">&lt;-</button>
+                <button type="button" @click="setCurrentMonth" :disabled="monthOffset === 0">
+                    Today
+                </button>
+                <button type="button" @click="nextMonth">-&gt;</button>
             </div>
-            <div
-                v-for="day in data?.days"
-                :key="day.ID"
-                :class="[
-                    'grid-item',
-                    today && isSameDay(today, day.date) ? 'today' : '',
-                    today && !isSameMonth(data?.month ?? 0, day.date)
-                        ? 'faded'
-                        : '',
-                ]"
-                @click="() => {}"
-            >
-                <span>{{ formatDateShort(day.date) }}</span>
-                <props.displayComponent :day="day" />
+            <div class="grid-container">
+                <div v-for="weekday in weekdays" :key="weekday" class="weekday-header">
+                    {{ weekday }}
+                </div>
+                <div
+                    v-for="day in data?.days"
+                    :key="day.ID"
+                    :class="[
+                        'grid-item',
+                        today && isSameDay(today, day.date) ? 'today' : '',
+                        today && !isSameMonth(data?.month ?? 0, day.date) ? 'faded' : '',
+                    ]"
+                    @click="() => {}"
+                >
+                    <span>{{ formatDateShort(day.date) }}</span>
+                    <component :is="displayComponent" :day="day" />
+                </div>
             </div>
-        </div>
+        </template>
     </div>
 </template>
 
@@ -119,6 +100,18 @@ const weekdays = [
     max-width: 1200px;
     margin: 0 auto;
     min-height: 100vh;
+}
+
+.flex {
+    display: flex;
+}
+.gap-2 {
+    gap: 0.5rem;
+}
+
+.cal-error,
+.cal-loading {
+    padding: 1rem;
 }
 
 .grid-container {

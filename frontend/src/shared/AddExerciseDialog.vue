@@ -2,7 +2,8 @@
 import type { WorkoutPlan, Exercise } from "~/types/workout";
 import SearchList from "~/shared/SearchList.vue";
 import { toast } from "~/composables/toast/useToast";
-import { useAPIGet, useAPIPost } from "~/composables/useApiFetch";
+import { useQueryClient } from "@tanstack/vue-query";
+import { apiClient } from "~/utils/axios";
 
 const props = defineProps<{
     plan: WorkoutPlan;
@@ -10,44 +11,39 @@ const props = defineProps<{
     onCancel?: () => void;
 }>();
 
-const { refresh: refreshExercises } = useAPIGet<{ exercises: Exercise[] }>("workout/exercises/all");
+const queryClient = useQueryClient();
 
 const addExerciseToPlan = async (exercise: Exercise): Promise<boolean> => {
-    console.log("addExerciseToPlan", exercise);
-    const { response, error } = await useAPIPost(
-        `workout/plans/${props.plan.ID}/exercises/add`,
-        "POST",
-        { exercise_id: exercise.ID },
-    );
-    console.log(response);
-
-    if (error) {
-        toast.push("Failed to add exercise: " + error.message, "error");
+    try {
+        await apiClient.post(`workout/plans/${props.plan.ID}/exercises/add`, {
+            exercise_id: exercise.ID,
+        });
+        toast.push(`Added ${exercise.name} to ${props.plan.name}`, "success");
+        props.onResolve?.(true);
+        return true;
+    } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : String(err);
+        toast.push("Failed to add exercise: " + message, "error");
         return false;
     }
-
-    toast.push(`Added ${exercise.name} to ${props.plan.name}`, "success");
-    props.onResolve?.(true);
-    return true;
 };
 
 const createExercise = async (name: string) => {
     if (!name.trim()) return false;
 
-    const { response, error } = await useAPIPost<{ exercise: Exercise }>(
-        "workout/exercises/create",
-        "POST",
-        { name: name.trim(), rep_rollover: 10 },
-    );
-
-    if (error) {
-        toast.push("Failed to create exercise: " + error.message, "error");
+    try {
+        await apiClient.post<{ exercise: Exercise }>("/workout/exercises", {
+            name: name.trim(),
+            rep_rollover: 10,
+        });
+        toast.push(`Created exercise: ${name}`, "success");
+        await queryClient.invalidateQueries({ queryKey: ["searchList"] });
+        return true;
+    } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : String(err);
+        toast.push("Failed to create exercise: " + message, "error");
         return false;
     }
-
-    toast.push(`Created exercise: ${name}`, "success");
-    await refreshExercises();
-    return true;
 };
 </script>
 
@@ -70,4 +66,3 @@ const createExercise = async (name: string) => {
     max-height: 60vh;
 }
 </style>
-

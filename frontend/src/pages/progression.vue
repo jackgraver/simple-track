@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import type { Exercise } from "~/types/workout";
 import SearchList from "~/shared/SearchList.vue";
-import { useAPIGet } from "~/composables/useApiFetch";
 import { computed, ref, watch } from "vue";
+import { useQuery } from "@tanstack/vue-query";
+import { apiClient } from "~/utils/axios";
 
 type ProgressionEntry = {
     date: string;
@@ -13,40 +14,52 @@ type ProgressionEntry = {
 const selectedExercise = ref<Exercise | null>(null);
 const exerciseId = ref<number | null>(null);
 
-const {
-    data: exercisesData,
-    pending: exercisesLoading,
-} = useAPIGet<Exercise[]>("workout/exercises/all");
+const { data: exercisesPayload } = useQuery({
+    queryKey: ["workout", "exercises", "all", "progression"],
+    queryFn: async () => {
+        const res = await apiClient.get<{ exercises: Exercise[] } | Exercise[]>(
+            "/workout/exercises/all"
+        );
+        return res.data;
+    },
+});
 
 const exercises = computed(() => {
-    const value = exercisesData.value;
+    const value = exercisesPayload.value;
     if (!value) return [];
     if (Array.isArray(value)) return value;
-    const firstArray = Object.values(value).find((v) => Array.isArray(v));
+    if (typeof value === "object" && "exercises" in value && Array.isArray(value.exercises)) {
+        return value.exercises;
+    }
+    const firstArray = Object.values(value as object).find((v) => Array.isArray(v));
     return (firstArray as Exercise[]) ?? [];
 });
 
-watch(exercises, (newExercises) => {
-    if (newExercises.length > 0 && exerciseId.value === null && newExercises[0]) {
-        selectExercise(newExercises[0]);
-    }
-}, { immediate: true });
+watch(
+    exercises,
+    (newExercises) => {
+        if (newExercises.length > 0 && exerciseId.value === null && newExercises[0]) {
+            selectExercise(newExercises[0]);
+        }
+    },
+    { immediate: true }
+);
 
-const progressionEndpoint = computed(() => {
-    if (exerciseId.value === null) {
-        return "";
-    }
-    return `workout/exercises/progression/${exerciseId.value}`;
+const { data: progressionPayload, isPending: loading, error: fetchError } = useQuery({
+    queryKey: computed(() => ["workout", "exercises", "progression", exerciseId.value]),
+    queryFn: async () => {
+        const id = exerciseId.value;
+        if (id == null) throw new Error("No exercise");
+        const res = await apiClient.get<{ progression: ProgressionEntry[] }>(
+            `/workout/exercises/progression/${id}`
+        );
+        return res.data;
+    },
+    enabled: computed(() => exerciseId.value != null),
 });
 
-const {
-    data: progressionData,
-    pending: loading,
-    error: fetchError,
-} = useAPIGet<{ progression: ProgressionEntry[] }>(progressionEndpoint);
-
 const progression = computed(() => {
-    return progressionData.value?.progression ?? [];
+    return progressionPayload.value?.progression ?? [];
 });
 
 const error = computed(() => {
@@ -93,7 +106,8 @@ const formatProgressionDate = (dateStr: string): string => {
                         :key="index"
                         class="progression-entry"
                     >
-                        {{ formatProgressionDate(entry.date) }} - {{ entry.weight }} lbs for {{ entry.reps }} reps
+                        {{ formatProgressionDate(entry.date) }} - {{ entry.weight }} lbs for
+                        {{ entry.reps }} reps
                     </div>
                 </div>
             </div>
@@ -156,4 +170,3 @@ const formatProgressionDate = (dateStr: string): string => {
     }
 }
 </style>
-

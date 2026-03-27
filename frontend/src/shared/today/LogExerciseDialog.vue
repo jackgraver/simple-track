@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { LoggedExercise, LoggedSet } from "~/types/workout";
 import { Check, Plus } from "lucide-vue-next";
+import { apiClient } from "~/utils/axios";
 
 const props = defineProps<{
     exercise: LoggedExercise;
@@ -59,17 +60,14 @@ const addSet = () => {
 
 const logExercise = async () => {
     props.exercise.sets = log.value;
-    console.log("log", props.exercise);
-    const { response, error } = await useAPIPost<{
-        exercise: LoggedExercise;
-    }>(`workout/exercise/log`, "POST", {
-        exercise: props.exercise,
-    });
-
-    if (error) {
+    try {
+        const res = await apiClient.post<{ exercise: LoggedExercise }>("/workout/exercises/log", {
+            exercise: props.exercise,
+            type: "previous",
+        });
+        props.onResolve?.(res.data.exercise);
+    } catch {
         props.onCancel?.();
-    } else if (response) {
-        props.onResolve?.(response.exercise);
     }
 };
 </script>
