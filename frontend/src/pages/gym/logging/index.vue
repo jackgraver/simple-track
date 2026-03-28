@@ -84,14 +84,12 @@ const handleRemoveExercise = async (index: number) => {
     flex-direction: column;
     gap: 1rem;
     width: 100%;
-    max-width: 800px;
-    margin: 0 auto;
+    align-self: stretch;
 }
 
 @media (max-width: 767px) {
     .container {
-        padding: 0.5rem;
-        max-width: 100%;
+        padding: 0.5rem 0;
     }
 }
 </style>

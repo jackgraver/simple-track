@@ -9,8 +9,10 @@ onMounted(() => {
 </script>
 
 <template>
-    <main class="page dark-mode flex justify-center max-w-8/12">
-        <div class="flex flex-col gap-4">
+    <main
+        class="dark-mode mx-auto box-border w-full max-w-full min-h-dvh overflow-x-clip lg:max-w-8/12"
+    >
+        <div class="flex w-full flex-col items-stretch gap-4">
             <div class="flex items-center">
                 <router-link :to="{ name: 'gym' }">
                     <p class="bg-gray-500 rounded-md p-2">Gym</p>
@@ -40,13 +42,6 @@ html {
 }
 
 body {
-    margin: 0;
-}
-
-.page {
-    height: 100vh;
-    width: 100vw;
-    overflow-x: hidden;
     margin: 0;
 }
 
