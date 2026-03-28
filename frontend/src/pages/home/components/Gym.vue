@@ -1,9 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import type {
-    LoggedExercise,
-    LoggedSet,
-} from "~/types/workout";
+import type { LoggedSet } from "~/types/workout";
 import { useWorkoutLogsPrevious } from "../queries/useWorkoutLogsPrevious";
 import GymCard from "./GymCard.vue";
 
@@ -11,7 +8,11 @@ const props = defineProps<{
     dateOffset: number;
 }>();
 
-const { data, isPending: pending, error } = useWorkoutLogsPrevious(props.dateOffset);
+const {
+    data,
+    isPending: pending,
+    error,
+} = useWorkoutLogsPrevious(props.dateOffset);
 
 const day = computed(() => data.value?.day);
 </script>
@@ -23,7 +24,7 @@ const day = computed(() => data.value?.day);
         <div class="title-row">
             <h2>{{ day?.workout_plan?.name }} Day</h2>
             <button>
-                <RouterLink :to="'/liveworkout'">
+                <RouterLink :to="{ name: 'logging' }">
                     Live Workout
                 </RouterLink>
             </button>

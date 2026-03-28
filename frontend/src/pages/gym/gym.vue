@@ -1,6 +1,10 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import { useWorkoutLogToday } from "~/pages/liveworkout/queries/useWorkoutLogToday";
+import { useRoute } from "vue-router";
+import { useWorkoutLogToday } from "~/pages/gym/logging/queries/useWorkoutLogToday";
+
+const route = useRoute();
+const isGymHome = computed(() => route.name === "gym");
 import { formatDateLong } from "~/utils/dateUtil";
 
 const { data, isPending, isError, error } = useWorkoutLogToday();
@@ -19,28 +23,35 @@ const planExercises = computed(() => data.value?.workout_plan?.exercises ?? []);
 
 <template>
     <div class="gym">
-        <div v-if="isPending" class="state">Loading...</div>
-        <div v-else-if="isError" class="state">
-            Error: {{ error?.message ?? "Failed to load" }}
-        </div>
-        <template v-else>
-            <p class="date">{{ dateLabel }}</p>
-            <h1 class="split">{{ splitLabel }}</h1>
-            <section v-if="planExercises.length" class="plan-block">
-                <h2 class="plan-heading">Exercises</h2>
-                <ul class="plan-list">
-                    <li v-for="ex in planExercises" :key="ex.ID" class="plan-item">
-                        {{ ex.name }}
-                    </li>
-                </ul>
-            </section>
-            <p v-else-if="data?.workout_plan" class="plan-empty">
-                No exercises in this plan yet.
-            </p>
-            <router-link :to="{ name: 'liveworkout' }" class="gym-cta"
-                >Log workout</router-link
-            >
+        <template v-if="isGymHome">
+            <div v-if="isPending" class="state">Loading...</div>
+            <div v-else-if="isError" class="state">
+                Error: {{ error?.message ?? "Failed to load" }}
+            </div>
+            <template v-else>
+                <p class="date">{{ dateLabel }}</p>
+                <h1 class="split">{{ splitLabel }}</h1>
+                <section v-if="planExercises.length" class="plan-block">
+                    <h2 class="plan-heading">Exercises</h2>
+                    <ul class="plan-list">
+                        <li
+                            v-for="ex in planExercises"
+                            :key="ex.ID"
+                            class="plan-item"
+                        >
+                            {{ ex.name }}
+                        </li>
+                    </ul>
+                </section>
+                <p v-else-if="data?.workout_plan" class="plan-empty">
+                    No exercises in this plan yet.
+                </p>
+                <router-link :to="{ name: 'logging' }" class="gym-cta"
+                    >Log workout</router-link
+                >
+            </template>
         </template>
+        <router-view v-else />
     </div>
 </template>
 

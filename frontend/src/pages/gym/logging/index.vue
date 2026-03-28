@@ -25,7 +25,10 @@ const selectExercise = (index: number) => {
         exerciseGroup.planned?.ID || exerciseGroup.logged?.exercise_id;
     if (!exerciseId) return;
 
-    router.push(`/liveworkout/log/${exerciseId}`);
+    router.push({
+        name: "logging-exercise",
+        params: { id: String(exerciseId) },
+    });
 };
 
 const handleAddExercise = async (exerciseId: number) => {

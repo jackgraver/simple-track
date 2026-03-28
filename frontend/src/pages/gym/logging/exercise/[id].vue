@@ -1,5 +1,8 @@
 <script setup lang="ts">
-import type { LoggedSetWithStatus, ExerciseGroup } from "../store/useWorkoutStore";
+import type {
+    LoggedSetWithStatus,
+    ExerciseGroup,
+} from "../store/useWorkoutStore";
 import { useWorkoutStore } from "../store/useWorkoutStore";
 import { toast } from "~/composables/toast/useToast";
 import { dialogManager } from "~/composables/dialog/useDialog";
@@ -13,13 +16,19 @@ const { log, data, logExercise, pending } = useWorkoutStore(0);
 
 const exerciseId = computed(() => {
     const id = route.params.id;
-    return typeof id === 'string' ? parseInt(id, 10) : Array.isArray(id) ? parseInt(id[0], 10) : id;
+    return typeof id === "string"
+        ? parseInt(id, 10)
+        : Array.isArray(id)
+          ? parseInt(id[0], 10)
+          : id;
 });
 
 const exerciseGroup = computed<ExerciseGroup | null>(() => {
     if (!exerciseId.value || pending.value) return null;
     const index = log.value.findIndex(
-        (eg) => eg.planned?.ID === exerciseId.value || eg.logged?.exercise_id === exerciseId.value
+        (eg) =>
+            eg.planned?.ID === exerciseId.value ||
+            eg.logged?.exercise_id === exerciseId.value,
     );
     return index >= 0 ? log.value[index] : null;
 });
@@ -40,25 +49,30 @@ const notes = ref<string>("");
 
 const initializeExercise = () => {
     if (pending.value) return;
-    
+
     const group = exerciseGroup.value;
     if (!group) {
-        router.push('/liveworkout');
+        router.push({ name: "logging" });
         return;
     }
 
-    if (group.logged && group.logged.sets && Array.isArray(group.logged.sets) && group.logged.sets.length > 0) {
-        loggedSets.value = group.logged.sets.map(set => ({
+    if (
+        group.logged &&
+        group.logged.sets &&
+        Array.isArray(group.logged.sets) &&
+        group.logged.sets.length > 0
+    ) {
+        loggedSets.value = group.logged.sets.map((set) => ({
             weight: set.weight,
             reps: set.reps,
             weight_setup: set.weight_setup || "",
-            status: 'success' as const,
+            status: "success" as const,
             id: set.ID,
             error: null,
             tempId: `existing-${set.ID}`,
         }));
         currentSetNumber.value = loggedSets.value.length + 1;
-        
+
         const lastSet = group.logged.sets[group.logged.sets.length - 1];
         if (lastSet) {
             currentWeight.value = lastSet.weight;
@@ -69,36 +83,47 @@ const initializeExercise = () => {
             currentReps.value = 0;
             currentWeightSetup.value = "";
         }
-        
+
         notes.value = group.logged.notes || "";
     } else {
         loggedSets.value = [];
         currentSetNumber.value = 1;
-        
-        if (group.previous && group.previous.sets && Array.isArray(group.previous.sets) && group.previous.sets.length > 0) {
+
+        if (
+            group.previous &&
+            group.previous.sets &&
+            Array.isArray(group.previous.sets) &&
+            group.previous.sets.length > 0
+        ) {
             const firstSet = group.previous.sets[0];
             currentWeight.value = firstSet ? firstSet.weight : 0;
-            currentWeightSetup.value = firstSet ? (firstSet.weight_setup || "") : "";
+            currentWeightSetup.value = firstSet
+                ? firstSet.weight_setup || ""
+                : "";
         } else {
             currentWeight.value = 0;
             currentWeightSetup.value = "";
         }
         currentReps.value = 0;
-        
+
         notes.value = group.previous?.notes || "";
     }
-    
+
     weightEditMode.value = false;
     repsEditMode.value = false;
 };
 
-watch([() => exerciseGroup.value, () => pending.value], ([group, isPending]) => {
-    if (!isPending && group) {
-        initializeExercise();
-    } else if (!isPending && !group) {
-        router.push('/liveworkout');
-    }
-}, { immediate: true });
+watch(
+    [() => exerciseGroup.value, () => pending.value],
+    ([group, isPending]) => {
+        if (!isPending && group) {
+            initializeExercise();
+        } else if (!isPending && !group) {
+            router.push({ name: "logging" });
+        }
+    },
+    { immediate: true },
+);
 
 const saveCurrentExercise = async (): Promise<boolean> => {
     const group = exerciseGroup.value;
@@ -111,7 +136,7 @@ const saveCurrentExercise = async (): Promise<boolean> => {
             weight: currentWeight.value,
             reps: currentReps.value,
             weight_setup: currentWeightSetup.value,
-            status: 'pending' as const,
+            status: "pending" as const,
             id: null,
             error: null,
             tempId,
@@ -156,62 +181,76 @@ const saveCurrentExercise = async (): Promise<boolean> => {
         }));
 
     exerciseToLog.notes = notes.value;
-    exerciseToLog.workout_log_id = data.value?.day.ID ?? exerciseToLog.workout_log_id;
+    exerciseToLog.workout_log_id =
+        data.value?.day.ID ?? exerciseToLog.workout_log_id;
 
-    const type: "logged" | "previous" = (group.logged && group.logged.ID > 0) ? "logged" : "previous";
+    const type: "logged" | "previous" =
+        group.logged && group.logged.ID > 0 ? "logged" : "previous";
     const savedExercise = await logExercise(exerciseToLog, type);
 
-    if (savedExercise && savedExercise.sets && Array.isArray(savedExercise.sets)) {
-        const pendingSets = loggedSets.value.filter(s => s.status === 'pending');
-        
+    if (
+        savedExercise &&
+        savedExercise.sets &&
+        Array.isArray(savedExercise.sets)
+    ) {
+        const pendingSets = loggedSets.value.filter(
+            (s) => s.status === "pending",
+        );
+
         savedExercise.sets.forEach((savedSet) => {
             if (!savedSet) return;
-            
-            const pendingSet = pendingSets.find(ps => 
-                Math.abs(ps.weight - savedSet.weight) < 0.01 &&
-                ps.reps === savedSet.reps &&
-                ps.weight_setup === (savedSet.weight_setup || "")
+
+            const pendingSet = pendingSets.find(
+                (ps) =>
+                    Math.abs(ps.weight - savedSet.weight) < 0.01 &&
+                    ps.reps === savedSet.reps &&
+                    ps.weight_setup === (savedSet.weight_setup || ""),
             );
-            
+
             if (pendingSet) {
-                const setIndex = loggedSets.value.findIndex(s => s.tempId === pendingSet.tempId);
+                const setIndex = loggedSets.value.findIndex(
+                    (s) => s.tempId === pendingSet.tempId,
+                );
                 if (setIndex !== -1 && savedSet.ID) {
                     const setToUpdate = loggedSets.value[setIndex];
                     if (setToUpdate) {
-                        setToUpdate.status = 'success';
+                        setToUpdate.status = "success";
                         setToUpdate.id = savedSet.ID;
                         setToUpdate.error = null;
                     }
                 }
             } else if (savedSet.ID) {
-                const existingSet = loggedSets.value.find(s => s.id === savedSet.ID);
+                const existingSet = loggedSets.value.find(
+                    (s) => s.id === savedSet.ID,
+                );
                 if (existingSet) {
-                    existingSet.status = 'success';
+                    existingSet.status = "success";
                     existingSet.error = null;
                 }
             }
         });
 
-        pendingSets.forEach(ps => {
-            const wasMatched = savedExercise.sets.some(savedSet => 
-                savedSet &&
-                Math.abs(ps.weight - savedSet.weight) < 0.01 &&
-                ps.reps === savedSet.reps &&
-                ps.weight_setup === (savedSet.weight_setup || "")
+        pendingSets.forEach((ps) => {
+            const wasMatched = savedExercise.sets.some(
+                (savedSet) =>
+                    savedSet &&
+                    Math.abs(ps.weight - savedSet.weight) < 0.01 &&
+                    ps.reps === savedSet.reps &&
+                    ps.weight_setup === (savedSet.weight_setup || ""),
             );
-            if (!wasMatched && ps.status === 'pending') {
-                ps.status = 'error';
-                ps.error = 'Failed to save set';
+            if (!wasMatched && ps.status === "pending") {
+                ps.status = "error";
+                ps.error = "Failed to save set";
             }
         });
 
         group.logged = savedExercise;
         return true;
     } else {
-        loggedSets.value.forEach(set => {
-            if (set.status === 'pending') {
-                set.status = 'error';
-                set.error = 'Failed to save exercise';
+        loggedSets.value.forEach((set) => {
+            if (set.status === "pending") {
+                set.status = "error";
+                set.error = "Failed to save exercise";
             }
         });
     }
@@ -242,7 +281,7 @@ const addNextSet = async () => {
         weight: currentWeight.value,
         reps: currentReps.value,
         weight_setup: currentWeightSetup.value,
-        status: 'pending',
+        status: "pending",
         id: null,
         error: null,
         tempId,
@@ -259,7 +298,8 @@ const finishLogging = async () => {
     if (currentReps.value === 0) {
         const confirmed = await dialogManager.confirm({
             title: "No Rep Set",
-            message: "You're about to log a set with 0 reps. Go back to list view without logging this set?",
+            message:
+                "You're about to log a set with 0 reps. Go back to list view without logging this set?",
             confirmText: "Go back",
             cancelText: "Stay here",
         });
@@ -267,7 +307,7 @@ const finishLogging = async () => {
             currentWeight.value = 0;
             currentReps.value = 0;
             currentWeightSetup.value = "";
-            router.push('/liveworkout');
+            router.push({ name: "logging" });
             return;
         }
         return;
@@ -287,7 +327,7 @@ const finishLogging = async () => {
             weight: currentWeight.value,
             reps: currentReps.value,
             weight_setup: currentWeightSetup.value,
-            status: 'pending' as const,
+            status: "pending" as const,
             id: null,
             error: null,
             tempId,
@@ -302,7 +342,7 @@ const finishLogging = async () => {
         return;
     }
 
-    router.push('/liveworkout');
+    router.push({ name: "logging" });
 };
 
 const incrementWeight = () => {
@@ -349,9 +389,9 @@ const exitRepsEditMode = () => {
 
 const retrySet = async (setIndex: number) => {
     const set = loggedSets.value[setIndex];
-    if (!set || set.status !== 'error') return;
+    if (!set || set.status !== "error") return;
 
-    set.status = 'pending';
+    set.status = "pending";
     set.error = null;
     await saveCurrentExercise();
 };
@@ -360,14 +400,14 @@ const deleteSet = async (setIndex: number) => {
     const set = loggedSets.value[setIndex];
     if (!set) return;
 
-    if (set.status !== 'success') {
+    if (set.status !== "success") {
         toast.push("Can only delete sets that have been saved", "error");
         return;
     }
 
     loggedSets.value.splice(setIndex, 1);
     currentSetNumber.value = loggedSets.value.length + 1;
-    
+
     await saveCurrentExercise();
 };
 
@@ -375,7 +415,7 @@ const editSet = (setIndex: number) => {
     const set = loggedSets.value[setIndex];
     if (!set) return;
 
-    if (set.status !== 'success') {
+    if (set.status !== "success") {
         toast.push("Can only edit sets that have been saved", "error");
         return;
     }
@@ -389,7 +429,7 @@ const editSet = (setIndex: number) => {
 };
 
 const goBackToList = () => {
-    router.push('/liveworkout');
+    router.push({ name: "logging" });
 };
 </script>
 
@@ -456,4 +496,3 @@ const goBackToList = () => {
     }
 }
 </style>
-

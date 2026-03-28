@@ -1,11 +1,7 @@
 <script setup lang="ts">
-import { onMounted, ref } from "vue";
+import { onMounted } from "vue";
 import ToastContainer from "./composables/toast/ToastContainer.vue";
 import DialogContainer from "./composables/dialog/DialogContainer.vue";
-import SideBar from "./shared/SideBar.vue";
-import { formatDateLong } from "./utils/dateUtil";
-
-const currentDate = ref(new Date());
 
 onMounted(() => {
     document.documentElement.classList.add("dark-mode");
@@ -13,28 +9,16 @@ onMounted(() => {
 </script>
 
 <template>
-    <div class="page dark-mode">
-        <!-- <div class="grid-container">
-            <div class="grid-top-left"></div>
-            <div class="grid-top-right">
-                <h1 class="current-date-label">
-                    {{ formatDateLong(currentDate.toISOString()) }}
-                </h1>
+    <main class="page dark-mode flex justify-center max-w-8/12">
+        <div class="flex flex-col gap-4">
+            <div class="flex items-center">
+                <router-link :to="{ name: 'gym' }">
+                    <p class="bg-gray-500 rounded-md p-2">Gym</p>
+                </router-link>
             </div>
-            <div class="grid-bottom-left">
-                <SideBar />
-            </div>
-            <div class="grid-bottom-right">
-                <RouterView />
-            </div>
-        </div> -->
-        <div class="flex items-center">
-            <router-link :to="{ name: 'gym' }">
-                <p class="bg-gray-500 rounded-md p-2">Gym</p>
-            </router-link>
+            <RouterView />
         </div>
-        <RouterView />
-    </div>
+    </main>
     <ToastContainer />
     <DialogContainer />
 </template>
