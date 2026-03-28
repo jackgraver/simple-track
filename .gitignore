@@ -15,6 +15,9 @@ $RECYCLE.BIN/
 # ---------------------
 # Go
 # ---------------------
+# Air live-reload
+backend/tmp/
+
 # Binaries
 *.exe
 *.exe~
