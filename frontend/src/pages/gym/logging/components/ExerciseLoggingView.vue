@@ -9,11 +9,6 @@ const props = defineProps<{
     session: ExerciseLoggingSessionViewModel;
 }>();
 
-const formatValue = (value: number) =>
-    Number.isInteger(value)
-        ? String(value)
-        : String(value.toFixed(1)).replace(/\.0$/, "");
-
 const cuesText = computed(() => {
     const g = props.session.exerciseGroup;
     if (!g) return "";
@@ -25,16 +20,7 @@ const previousPerformanceText = computed(() => {
     const sets = props.session.exerciseGroup?.previous?.sets ?? [];
     if (sets.length === 0) return "";
 
-    const firstWeight = sets[0]?.weight ?? 0;
-    const allSameWeight = sets.every((set) => set.weight === firstWeight);
-    if (allSameWeight) {
-        return `${formatValue(firstWeight)}lbs x ${sets.map((set) => set.reps).join("-")}`;
-    }
-
-    return sets
-        .slice(0, 4)
-        .map((set) => `${formatValue(set.weight)}x${set.reps}`)
-        .join(" • ");
+    return sets.map((set) => `${set.weight}x${set.reps}`).join(", ");
 });
 </script>
 
@@ -57,10 +43,6 @@ const previousPerformanceText = computed(() => {
             <span class="set-indicator"
                 >Set {{ session.currentSetNumber }}</span
             >
-        </div>
-        <div v-if="previousPerformanceText" class="previous-performance">
-            <span class="previous-performance-label">Last time</span>
-            <span class="previous-performance-value">{{ previousPerformanceText }}</span>
         </div>
         <div class="input-group">
             <NumericStepper
@@ -103,6 +85,22 @@ const previousPerformanceText = computed(() => {
                 />
             </div>
         </div>
+        <div class="flex flex-row gap-2">
+            <button
+                class="bg-[#2c2c2c] hover:bg-[#525252] flex-1"
+                type="button"
+                @click="session.addNextSet()"
+            >
+                <span>Log Set</span>
+            </button>
+            <button
+                class="bg-green-500 hover:bg-green-600 flex-1"
+                type="button"
+                @click="session.finishLogging()"
+            >
+                <span>Finish Exercise</span>
+            </button>
+        </div>
         <div v-if="cuesText" class="exercise-cues-wrap">
             <span class="exercise-cues-label">Cues</span>
             <p class="exercise-cues">{{ cuesText }}</p>
@@ -121,21 +119,11 @@ const previousPerformanceText = computed(() => {
                 "
             ></textarea>
         </div>
-        <div class="button-group">
-            <button
-                class="next-set-button"
-                type="button"
-                @click="session.addNextSet()"
-            >
-                <span>Next Set</span>
-            </button>
-            <button
-                class="finish-button"
-                type="button"
-                @click="session.finishLogging()"
-            >
-                <span>Finish</span>
-            </button>
+        <div v-if="previousPerformanceText" class="previous-performance">
+            <span class="previous-performance-label">Last time</span>
+            <span class="previous-performance-value">{{
+                previousPerformanceText
+            }}</span>
         </div>
         <LoggedSetsList
             :logged-sets="session.loggedSets"
@@ -324,6 +312,7 @@ const previousPerformanceText = computed(() => {
 
 .button-group {
     display: flex;
+    flex-direction: row;
     gap: 1rem;
 }
 

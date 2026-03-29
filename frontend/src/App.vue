@@ -12,9 +12,11 @@ onMounted(() => {
     <main
         class="dark-mode mx-auto box-border w-full max-w-full min-h-dvh overflow-x-clip lg:max-w-8/12"
     >
-        <div class="flex w-full flex-col items-stretch gap-4 px-4 lg:px-0">
+        <div
+            class="flex w-full flex-col items-stretch lg:items-center gap-4 px-4 lg:px-0"
+        >
             <div class="flex items-center">
-                <div class="flex items-center gap-2 pt-8">
+                <div class="flex items-center gap-2 pt-2">
                     <router-link :to="{ name: 'gym' }">
                         <p class="bg-gray-500 rounded-md p-2">Gym</p>
                     </router-link>
@@ -141,13 +143,13 @@ a,
 }
 
 button {
-    background: #2c2c2c;
+    /* background: #2c2c2c; */
     padding: 6px 12px;
     margin: 4px 0px;
     border-radius: 4px;
     border: 2px solid #a7a7a7;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-    color: white;
+    /* color: white; */
     border: none;
     cursor: pointer;
 }
@@ -160,9 +162,9 @@ button:disabled:hover {
     cursor: not-allowed;
 }
 
-button:hover:not(:disabled) {
+/* button:hover:not(:disabled) {
     background: #525252;
-}
+} */
 
 button svg {
     vertical-align: middle;

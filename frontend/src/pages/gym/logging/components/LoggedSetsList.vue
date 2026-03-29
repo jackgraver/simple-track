@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { LoggedSetWithStatus } from "../store/useWorkoutStore";
-import { Loader, Check, X, RotateCcw } from "lucide-vue-next";
+import { Loader, X, RotateCcw } from "lucide-vue-next";
 
 defineProps<{
     loggedSets: LoggedSetWithStatus[];
@@ -20,27 +20,23 @@ const emit = defineEmits<{
             <li
                 v-for="(set, index) in loggedSets"
                 :key="set.tempId || index"
-                :class="['set-item', { clickable: set.status === 'success' }]"
+                :class="[
+                    'set-item',
+                    {
+                        clickable: set.status === 'success',
+                        'set-item-error': set.status === 'error',
+                    },
+                ]"
                 @click="set.status === 'success' && emit('edit', index)"
             >
                 <div class="set-info">
                     <span class="set-summary">
-                        Set {{ index + 1 }}: {{ set.weight }}lbs × {{ set.reps }}
+                        Set {{ index + 1 }}: {{ set.weight }}lbs ×
+                        {{ set.reps }}
                     </span>
                     <div class="set-actions">
-                        <span
-                            v-if="set.weight_setup"
-                            class="weight-setup-badge"
-                            >{{ set.weight_setup }}</span
-                        >
                         <div v-if="set.status === 'pending'" class="set-status">
                             <Loader class="spinner" :size="16" />
-                        </div>
-                        <div
-                            v-else-if="set.status === 'success'"
-                            class="set-status"
-                        >
-                            <Check class="check-icon" :size="16" />
                         </div>
                         <div
                             v-else-if="set.status === 'error'"
@@ -112,6 +108,11 @@ const emit = defineEmits<{
     border-color: rgb(100, 100, 100);
 }
 
+.sets-list li.set-item-error {
+    border-color: rgb(132, 49, 49);
+    background: rgb(37, 22, 22);
+}
+
 .set-info {
     display: flex;
     justify-content: space-between;
@@ -122,12 +123,14 @@ const emit = defineEmits<{
 
 .set-summary {
     min-width: 0;
+    white-space: nowrap;
 }
 
 .set-actions {
     display: flex;
     align-items: center;
     gap: 0.5rem;
+    flex-shrink: 0;
 }
 
 .set-status {
@@ -150,10 +153,6 @@ const emit = defineEmits<{
     }
 }
 
-.check-icon {
-    color: rgb(63, 197, 46);
-}
-
 .retry-button {
     background: transparent;
     border: none;
@@ -174,6 +173,7 @@ const emit = defineEmits<{
 .delete-button {
     background: transparent;
     border: none;
+    box-shadow: none;
     color: rgb(200, 100, 100);
     cursor: pointer;
     display: flex;
@@ -189,26 +189,5 @@ const emit = defineEmits<{
 .delete-button:hover {
     background: rgb(40, 20, 20);
     color: rgb(255, 100, 100);
-}
-
-.weight-setup-badge {
-    font-size: 0.85rem;
-    color: rgb(150, 150, 150);
-    padding: 0.25rem 0.5rem;
-    background: rgb(35, 35, 35);
-    border-radius: 3px;
-    border: 1px solid rgb(56, 56, 56);
-}
-
-@media (max-width: 767px) {
-    .set-info {
-        flex-direction: column;
-        align-items: flex-start;
-    }
-
-    .set-actions {
-        width: 100%;
-        flex-wrap: wrap;
-    }
 }
 </style>
