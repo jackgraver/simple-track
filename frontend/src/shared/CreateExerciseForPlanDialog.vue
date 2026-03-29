@@ -1,12 +1,11 @@
 <script setup lang="ts">
-import type { WorkoutPlan, Exercise } from "~/types/workout";
+import type { Exercise } from "~/types/workout";
 import { toast } from "~/composables/toast/useToast";
 import { useQueryClient } from "@tanstack/vue-query";
 import { apiClient } from "~/utils/axios";
 import { ref } from "vue";
 
 const props = defineProps<{
-    plan: WorkoutPlan;
     onResolve?: (ok: boolean) => void;
 }>();
 
@@ -30,11 +29,7 @@ const submit = async () => {
             cues: cues.value.trim(),
         });
         const exercise = createRes.data.exercise;
-        await apiClient.post(`workout/plans/${props.plan.ID}/exercises/add`, {
-            exercise_id: exercise.ID,
-        });
-        toast.push(`Added ${exercise.name} to ${props.plan.name}`, "success");
-        await queryClient.invalidateQueries({ queryKey: ["workout", "plans", "all"] });
+        toast.push(`Created ${exercise.name}`, "success");
         await queryClient.invalidateQueries({ queryKey: ["searchList"] });
         props.onResolve?.(true);
     } catch (err: unknown) {
@@ -62,7 +57,7 @@ const submit = async () => {
         </label>
         <div class="actions">
             <button type="button" class="btn primary" :disabled="submitting" @click="submit">
-                {{ submitting ? "Saving…" : "Add to plan" }}
+                {{ submitting ? "Saving…" : "Create exercise" }}
             </button>
         </div>
     </div>

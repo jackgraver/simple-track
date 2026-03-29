@@ -2,6 +2,7 @@
 import type { WorkoutPlan, Exercise } from "~/types/workout";
 import { toast } from "~/composables/toast/useToast";
 import { dialogManager } from "~/composables/dialog/useDialog";
+import AddExerciseDialog from "~/shared/AddExerciseDialog.vue";
 import CreateExerciseForPlanDialog from "~/shared/CreateExerciseForPlanDialog.vue";
 import { X, Plus } from "lucide-vue-next";
 import { computed, ref, watch } from "vue";
@@ -120,16 +121,31 @@ const removeExerciseFromPlan = async (
     }
 };
 
-const openAddDialog = () => {
+const openAddExerciseToPlanDialog = () => {
     const plan = selectedPlan.value;
     if (!plan) return;
     dialogManager
         .custom<boolean>({
             title: `Add exercise to ${plan.name}`,
-            component: CreateExerciseForPlanDialog,
+            component: AddExerciseDialog,
             props: {
                 plan,
             },
+        })
+        .then((result) => {
+            if (result !== null) {
+                refresh();
+            }
+        });
+};
+
+const openCreateExerciseDialog = () => {
+    const plan = selectedPlan.value;
+    if (!plan) return;
+    dialogManager
+        .custom<boolean>({
+            title: "Create exercise",
+            component: CreateExerciseForPlanDialog,
         })
         .then((result) => {
             if (result !== null) {
@@ -235,10 +251,19 @@ const unassignPlanFromDay = async (plan: WorkoutPlan) => {
                     type="button"
                     class="add-button"
                     :disabled="!selectedPlan"
-                    @click="openAddDialog"
+                    @click="openAddExerciseToPlanDialog"
                 >
                     <Plus :size="18" />
-                    Add Exercise
+                    Add To Plan
+                </button>
+                <button
+                    type="button"
+                    class="add-button secondary"
+                    :disabled="!selectedPlan"
+                    @click="openCreateExerciseDialog"
+                >
+                    <Plus :size="18" />
+                    Create Exercise
                 </button>
             </div>
         </div>
@@ -478,6 +503,13 @@ const unassignPlanFromDay = async (plan: WorkoutPlan) => {
 }
 .add-button:hover:not(:disabled) {
     background: #3a8eef;
+}
+.add-button.secondary {
+    background: #2f2f2f;
+    border: 1px solid #444;
+}
+.add-button.secondary:hover:not(:disabled) {
+    background: #3a3a3a;
 }
 .add-button:disabled {
     opacity: 0.5;

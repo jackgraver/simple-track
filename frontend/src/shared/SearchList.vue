@@ -15,6 +15,8 @@ const props = defineProps<{
 
 const search = ref("");
 
+const excludedIds = computed(() => new Set(props.prefilter ?? []));
+
 const querySuffix = computed(() =>
     props.prefilter?.length ? "?" + props.prefilter.map((id) => `exclude=${id}`).join("&") : ""
 );
@@ -37,10 +39,16 @@ const list = computed(() => {
     const value = data.value;
     if (!value) return [];
 
-    if (Array.isArray(value)) return value;
+    if (Array.isArray(value)) {
+        return value.filter(
+            (item) => !excludedIds.value.has(item.id ?? item.ID),
+        );
+    }
 
     const firstArray = Object.values(value as object).find((v) => Array.isArray(v));
-    return firstArray ?? [];
+    return (firstArray ?? []).filter(
+        (item) => !excludedIds.value.has(item.id ?? item.ID),
+    );
 });
 
 const filteredList = computed(() => {
