@@ -41,6 +41,7 @@ type Exercise struct {
 	gorm.Model
 	Name         string        `gorm:"uniqueIndex;not null" json:"name"`
 	RepRollover  uint          `json:"rep_rollover"`
+	Cues         string        `json:"cues"`
 	WorkoutPlans []WorkoutPlan `gorm:"many2many:workout_plan_exercises;" json:"workout_plans"`
 }
 

@@ -12,9 +12,9 @@ onMounted(() => {
     <main
         class="dark-mode mx-auto box-border w-full max-w-full min-h-dvh overflow-x-clip lg:max-w-8/12"
     >
-        <div class="flex w-full flex-col items-stretch gap-4">
+        <div class="flex w-full flex-col items-stretch gap-4 px-4 lg:px-0">
             <div class="flex items-center">
-                <div class="flex items-center gap-2">
+                <div class="flex items-center gap-2 pt-8">
                     <router-link :to="{ name: 'gym' }">
                         <p class="bg-gray-500 rounded-md p-2">Gym</p>
                     </router-link>

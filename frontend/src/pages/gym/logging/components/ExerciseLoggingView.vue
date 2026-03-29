@@ -3,10 +3,18 @@ import type { ExerciseLoggingSessionViewModel } from "../composables/useExercise
 import { ArrowLeft } from "lucide-vue-next";
 import LoggedSetsList from "./LoggedSetsList.vue";
 import NumericStepper from "./NumericStepper.vue";
+import { computed } from "vue";
 
-defineProps<{
+const props = defineProps<{
     session: ExerciseLoggingSessionViewModel;
 }>();
+
+const cuesText = computed(() => {
+    const g = props.session.exerciseGroup;
+    if (!g) return "";
+    const raw = g.planned?.cues ?? g.logged?.exercise?.cues ?? "";
+    return typeof raw === "string" ? raw.trim() : "";
+});
 </script>
 
 <template>
@@ -25,7 +33,9 @@ defineProps<{
                     session.exerciseGroup?.logged?.exercise?.name
                 }}
             </h2>
-            <span class="set-indicator">Set {{ session.currentSetNumber }}</span>
+            <span class="set-indicator"
+                >Set {{ session.currentSetNumber }}</span
+            >
         </div>
         <LoggedSetsList
             :logged-sets="session.loggedSets"
@@ -72,6 +82,10 @@ defineProps<{
                 />
             </div>
         </div>
+        <div v-if="cuesText" class="exercise-cues-wrap">
+            <span class="exercise-cues-label">Cues</span>
+            <p class="exercise-cues">{{ cuesText }}</p>
+        </div>
         <div class="input-container">
             <label>Notes</label>
             <textarea
@@ -87,10 +101,18 @@ defineProps<{
             ></textarea>
         </div>
         <div class="button-group">
-            <button class="next-set-button" type="button" @click="session.addNextSet()">
+            <button
+                class="next-set-button"
+                type="button"
+                @click="session.addNextSet()"
+            >
                 <span>Next Set</span>
             </button>
-            <button class="finish-button" type="button" @click="session.finishLogging()">
+            <button
+                class="finish-button"
+                type="button"
+                @click="session.finishLogging()"
+            >
                 <span>Finish</span>
             </button>
         </div>
@@ -158,6 +180,31 @@ defineProps<{
     grid-column: 3;
     white-space: nowrap;
     flex-shrink: 0;
+}
+
+.exercise-cues-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    padding: 0.75rem 0.25rem 0;
+    border-bottom: 1px solid rgb(56, 56, 56);
+    margin-bottom: -0.25rem;
+}
+
+.exercise-cues-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: rgb(130, 130, 130);
+}
+
+.exercise-cues {
+    margin: 0;
+    font-size: 0.95rem;
+    line-height: 1.45;
+    color: rgb(210, 210, 210);
+    white-space: pre-wrap;
 }
 
 .input-group {

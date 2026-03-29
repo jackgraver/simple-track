@@ -13,6 +13,7 @@ const props = defineProps<{
 const queryClient = useQueryClient();
 const name = ref("");
 const repRollover = ref(10);
+const cues = ref("");
 const submitting = ref(false);
 
 const submit = async () => {
@@ -26,6 +27,7 @@ const submit = async () => {
         const createRes = await apiClient.post<{ exercise: Exercise }>("/workout/exercises", {
             name: n,
             rep_rollover: repRollover.value || 10,
+            cues: cues.value.trim(),
         });
         const exercise = createRes.data.exercise;
         await apiClient.post(`workout/plans/${props.plan.ID}/exercises/add`, {
@@ -53,6 +55,10 @@ const submit = async () => {
         <label class="field">
             <span>Rep rollover</span>
             <input v-model.number="repRollover" type="number" min="1" class="input" />
+        </label>
+        <label class="field">
+            <span>Cues</span>
+            <textarea v-model="cues" class="input textarea" rows="4" placeholder="Optional cues (e.g. bullet points)"></textarea>
         </label>
         <div class="actions">
             <button type="button" class="btn primary" :disabled="submitting" @click="submit">
@@ -87,6 +93,10 @@ const submit = async () => {
 .input:focus {
     outline: none;
     border-color: #4a9eff;
+}
+.textarea {
+    resize: vertical;
+    font-family: inherit;
 }
 .actions {
     display: flex;

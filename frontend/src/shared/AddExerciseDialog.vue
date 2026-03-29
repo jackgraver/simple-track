@@ -35,6 +35,7 @@ const createExercise = async (name: string) => {
         await apiClient.post<{ exercise: Exercise }>("/workout/exercises", {
             name: name.trim(),
             rep_rollover: 10,
+            cues: "",
         });
         toast.push(`Created exercise: ${name}`, "success");
         await queryClient.invalidateQueries({ queryKey: ["searchList"] });

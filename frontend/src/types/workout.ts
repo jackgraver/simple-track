@@ -38,6 +38,7 @@ export interface LoggedExercise extends BaseModel {
 export interface Exercise extends BaseModel {
     name: string;
     rep_rollover: number;
+    cues: string;
 }
 
 export interface Cardio extends BaseModel {
