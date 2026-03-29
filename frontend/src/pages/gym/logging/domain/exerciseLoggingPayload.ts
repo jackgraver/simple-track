@@ -25,8 +25,7 @@ export function buildAllSetsForSave(
     const all = [...loggedSets];
     if (
         draft &&
-        draft.weight !== 0 &&
-        draft.reps !== 0
+        draft.reps > 0
     ) {
         all.push({
             weight: draft.weight,
@@ -52,21 +51,36 @@ export function buildExerciseToLog(
     );
     if (filtered.length === 0) return null;
 
+    const exerciseId =
+        group.logged?.exercise_id ||
+        group.logged?.exercise?.ID ||
+        group.previous?.exercise_id ||
+        group.previous?.exercise?.ID ||
+        group.planned?.ID ||
+        0;
+
+    if (!exerciseId) return null;
+
     let exerciseToLog: LoggedExercise;
     if (group.logged && group.logged.ID > 0) {
-        exerciseToLog = { ...group.logged };
+        exerciseToLog = {
+            ...group.logged,
+            exercise_id: exerciseId,
+        };
     } else if (group.previous) {
         exerciseToLog = {
             ...group.previous,
             ID: 0,
             workout_log_id: dayId,
+            exercise_id: exerciseId,
+            exercise: group.previous.exercise || group.planned,
             sets: [],
         };
     } else {
         exerciseToLog = {
             ID: 0,
             workout_log_id: dayId,
-            exercise_id: group.planned.ID,
+            exercise_id: exerciseId,
             exercise: group.planned,
             sets: [],
             notes: "",

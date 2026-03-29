@@ -6,6 +6,7 @@ defineProps<{
     modelValue: number;
     editMode: boolean;
     inputValue: string;
+    error?: string;
     inputStep?: string;
 }>();
 
@@ -38,7 +39,7 @@ const onInput = (e: Event) => {
 <template>
     <div class="stepper-container">
         <label :for="inputId">{{ label }}</label>
-        <div class="stepper">
+        <div :class="['stepper', { 'stepper-error': error }]">
             <button
                 class="stepper-button"
                 type="button"
@@ -74,6 +75,7 @@ const onInput = (e: Event) => {
                 +
             </button>
         </div>
+        <p v-if="error" class="stepper-error-text">{{ error }}</p>
     </div>
 </template>
 
@@ -95,6 +97,12 @@ const onInput = (e: Event) => {
     align-items: center;
     justify-content: center;
     gap: 1rem;
+}
+
+.stepper-error .stepper-display,
+.stepper-error .stepper-input,
+.stepper-error .stepper-button {
+    border-color: rgb(150, 60, 60);
 }
 
 .stepper-button {
@@ -161,5 +169,11 @@ const onInput = (e: Event) => {
     outline: none;
     border-color: rgb(100, 100, 100);
     background: rgb(35, 35, 35);
+}
+
+.stepper-error-text {
+    margin: 0;
+    color: rgb(220, 110, 110);
+    font-size: 0.85rem;
 }
 </style>

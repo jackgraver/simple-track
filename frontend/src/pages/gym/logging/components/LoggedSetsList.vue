@@ -15,7 +15,7 @@ const emit = defineEmits<{
 
 <template>
     <div v-if="loggedSets.length > 0" class="sets-logged">
-        <h3>Logged Sets:</h3>
+        <h3>Logged Today</h3>
         <ul class="sets-list">
             <li
                 v-for="(set, index) in loggedSets"
@@ -24,10 +24,9 @@ const emit = defineEmits<{
                 @click="set.status === 'success' && emit('edit', index)"
             >
                 <div class="set-info">
-                    <span
-                        >Set {{ index + 1 }}: {{ set.weight }}lbs ×
-                        {{ set.reps }} reps</span
-                    >
+                    <span class="set-summary">
+                        Set {{ index + 1 }}: {{ set.weight }}lbs × {{ set.reps }}
+                    </span>
                     <div class="set-actions">
                         <span
                             v-if="set.weight_setup"
@@ -121,6 +120,10 @@ const emit = defineEmits<{
     width: 100%;
 }
 
+.set-summary {
+    min-width: 0;
+}
+
 .set-actions {
     display: flex;
     align-items: center;
@@ -195,5 +198,17 @@ const emit = defineEmits<{
     background: rgb(35, 35, 35);
     border-radius: 3px;
     border: 1px solid rgb(56, 56, 56);
+}
+
+@media (max-width: 767px) {
+    .set-info {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .set-actions {
+        width: 100%;
+        flex-wrap: wrap;
+    }
 }
 </style>

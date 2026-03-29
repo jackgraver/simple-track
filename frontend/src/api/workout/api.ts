@@ -43,20 +43,32 @@ export async function logExercise(
     return response.data.exercise;
 }
 
-export async function addExerciseToWorkout(exerciseId: number): Promise<LoggedExercise> {
+export async function addExerciseToWorkout(
+    exerciseId: number,
+    offset: number = 0
+): Promise<LoggedExercise> {
     const response = await apiClient.post<{ exercise: LoggedExercise }>(
         '/workout/exercises/add',
         {
             exercise_id: exerciseId,
+        },
+        {
+            params: { offset },
         }
     );
     return response.data.exercise;
 }
 
-export async function removeExerciseFromWorkout(exerciseId: number): Promise<void> {
+export async function removeExerciseFromWorkout(
+    exerciseId: number,
+    offset: number = 0
+): Promise<void> {
     await apiClient.delete('/workout/exercises/remove', {
         data: {
             exercise_id: exerciseId,
+        },
+        params: {
+            offset,
         },
     });
 }

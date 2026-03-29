@@ -1,11 +1,17 @@
 <script setup lang="ts">
 import { useWorkoutStore } from "./store/useWorkoutStore";
 import ExerciseListView from "./components/ExerciseListView.vue";
-import { useRouter } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 import { computed } from "vue";
 import { toast } from "~/composables/toast/useToast";
 
 const router = useRouter();
+const route = useRoute();
+const offset = computed(() => {
+    const raw = route.query.offset;
+    const value = typeof raw === "string" ? Number.parseInt(raw, 10) : 0;
+    return Number.isNaN(value) ? 0 : value;
+});
 const {
     log,
     pending,
@@ -13,9 +19,9 @@ const {
     data,
     addExerciseToWorkout,
     removeExerciseFromWorkout,
-} = useWorkoutStore(0);
+} = useWorkoutStore(offset);
 
-const workoutName = computed(() => data.value?.day.workout_plan?.name || "");
+const workoutName = computed(() => data.value?.day?.workout_plan?.name || "");
 
 const selectExercise = (index: number) => {
     const exerciseGroup = log.value[index];
@@ -28,6 +34,7 @@ const selectExercise = (index: number) => {
     router.push({
         name: "logging-exercise",
         params: { id: String(exerciseId) },
+        query: route.query,
     });
 };
 
@@ -67,7 +74,7 @@ const handleRemoveExercise = async (index: number) => {
     <div v-else-if="error" class="container">
         <div>Error: {{ error.message }}</div>
     </div>
-    <div class="container">
+    <div v-else class="container">
         <ExerciseListView
             :exercises="log"
             :workoutName="workoutName"

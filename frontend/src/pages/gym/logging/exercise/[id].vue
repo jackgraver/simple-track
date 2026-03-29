@@ -8,7 +8,12 @@ import { useExerciseLoggingSession } from "../composables/useExerciseLoggingSess
 
 const router = useRouter();
 const route = useRoute();
-const { log, data, logExercise, pending } = useWorkoutStore(0);
+const offset = computed(() => {
+    const raw = route.query.offset;
+    const value = typeof raw === "string" ? Number.parseInt(raw, 10) : 0;
+    return Number.isNaN(value) ? 0 : value;
+});
+const { log, data, logExercise, pending } = useWorkoutStore(offset);
 
 const exerciseId = computed(() => {
     const id = route.params.id;
@@ -35,6 +40,7 @@ const session = useExerciseLoggingSession({
     exerciseGroup,
     pending,
     dayId,
+    offset,
     logExercise,
     router,
 });

@@ -9,11 +9,32 @@ const props = defineProps<{
     session: ExerciseLoggingSessionViewModel;
 }>();
 
+const formatValue = (value: number) =>
+    Number.isInteger(value)
+        ? String(value)
+        : String(value.toFixed(1)).replace(/\.0$/, "");
+
 const cuesText = computed(() => {
     const g = props.session.exerciseGroup;
     if (!g) return "";
     const raw = g.planned?.cues ?? g.logged?.exercise?.cues ?? "";
     return typeof raw === "string" ? raw.trim() : "";
+});
+
+const previousPerformanceText = computed(() => {
+    const sets = props.session.exerciseGroup?.previous?.sets ?? [];
+    if (sets.length === 0) return "";
+
+    const firstWeight = sets[0]?.weight ?? 0;
+    const allSameWeight = sets.every((set) => set.weight === firstWeight);
+    if (allSameWeight) {
+        return `${formatValue(firstWeight)}lbs x ${sets.map((set) => set.reps).join("-")}`;
+    }
+
+    return sets
+        .slice(0, 4)
+        .map((set) => `${formatValue(set.weight)}x${set.reps}`)
+        .join(" • ");
 });
 </script>
 
@@ -37,18 +58,17 @@ const cuesText = computed(() => {
                 >Set {{ session.currentSetNumber }}</span
             >
         </div>
-        <LoggedSetsList
-            :logged-sets="session.loggedSets"
-            @retry="session.retrySet"
-            @delete="session.deleteSet"
-            @edit="session.editSet"
-        />
+        <div v-if="previousPerformanceText" class="previous-performance">
+            <span class="previous-performance-label">Last time</span>
+            <span class="previous-performance-value">{{ previousPerformanceText }}</span>
+        </div>
         <div class="input-group">
             <NumericStepper
                 label="Weight (lbs)"
                 :model-value="session.currentWeight"
                 :edit-mode="session.weightEditMode"
                 :input-value="session.weightInputValue"
+                :error="session.weightError"
                 input-step="0.5"
                 @increment="session.incrementWeight"
                 @decrement="session.decrementWeight"
@@ -61,6 +81,7 @@ const cuesText = computed(() => {
                 :model-value="session.currentReps"
                 :edit-mode="session.repsEditMode"
                 :input-value="session.repsInputValue"
+                :error="session.repsError"
                 @increment="session.incrementReps"
                 @decrement="session.decrementReps"
                 @update:input-value="session.updateRepsInputValue"
@@ -116,6 +137,12 @@ const cuesText = computed(() => {
                 <span>Finish</span>
             </button>
         </div>
+        <LoggedSetsList
+            :logged-sets="session.loggedSets"
+            @retry="session.retrySet"
+            @delete="session.deleteSet"
+            @edit="session.editSet"
+        />
     </div>
 </template>
 
@@ -180,6 +207,29 @@ const cuesText = computed(() => {
     grid-column: 3;
     white-space: nowrap;
     flex-shrink: 0;
+}
+
+.previous-performance {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    padding: 0.875rem 1rem;
+    border: 1px solid rgb(56, 56, 56);
+    border-radius: 0.5rem;
+    background: rgb(24, 24, 24);
+}
+
+.previous-performance-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: rgb(130, 130, 130);
+}
+
+.previous-performance-value {
+    font-size: 1rem;
+    color: rgb(220, 220, 220);
 }
 
 .exercise-cues-wrap {
@@ -331,6 +381,10 @@ const cuesText = computed(() => {
     .back-button {
         width: 2.25rem;
         height: 2.25rem;
+    }
+
+    .previous-performance {
+        padding: 0.75rem 0.875rem;
     }
 
     .button-group {

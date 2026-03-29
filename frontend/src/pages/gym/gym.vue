@@ -1,13 +1,40 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import { useRoute } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 import { useWorkoutLogToday } from "~/pages/gym/logging/queries/useWorkoutLogToday";
-
-const route = useRoute();
-const isGymHome = computed(() => route.name === "gym");
 import { formatDateLong } from "~/utils/dateUtil";
 
-const { data, isPending, isError, error } = useWorkoutLogToday();
+const route = useRoute();
+const router = useRouter();
+const isGymHome = computed(() => route.name === "gym");
+const dayOffset = computed(() => {
+    const raw = route.query.offset;
+    const value = typeof raw === "string" ? Number.parseInt(raw, 10) : 0;
+    return Number.isNaN(value) ? 0 : value;
+});
+const { data, isPending, isError, error } = useWorkoutLogToday(dayOffset);
+
+const updateOffset = (nextOffset: number) => {
+    const nextQuery = { ...route.query };
+    if (nextOffset === 0) {
+        delete nextQuery.offset;
+    } else {
+        nextQuery.offset = String(nextOffset);
+    }
+
+    router.push({
+        name: "gym",
+        query: nextQuery,
+    });
+};
+
+const goToPreviousDay = () => {
+    updateOffset(dayOffset.value + 1);
+};
+
+const goToNextDay = () => {
+    updateOffset(dayOffset.value - 1);
+};
 
 const dateLabel = computed(() => {
     const d = data.value?.date;
@@ -17,6 +44,11 @@ const dateLabel = computed(() => {
 const splitLabel = computed(
     () => data.value?.workout_plan?.name ?? "No split assigned",
 );
+
+const loggingRoute = computed(() => ({
+    name: "logging",
+    query: dayOffset.value === 0 ? {} : { offset: String(dayOffset.value) },
+}));
 </script>
 
 <template>
@@ -27,9 +59,25 @@ const splitLabel = computed(
                 Error: {{ error?.message ?? "Failed to load" }}
             </div>
             <template v-else>
-                <p class="date">{{ dateLabel }}</p>
+                <div class="date-nav">
+                    <button
+                        type="button"
+                        class="date-nav-button"
+                        @click="goToPreviousDay"
+                    >
+                        Prev
+                    </button>
+                    <p class="date">{{ dateLabel }}</p>
+                    <button
+                        type="button"
+                        class="date-nav-button"
+                        @click="goToNextDay"
+                    >
+                        Next
+                    </button>
+                </div>
                 <h1 class="split">{{ splitLabel }}</h1>
-                <router-link :to="{ name: 'logging' }" class="gym-cta"
+                <router-link :to="loggingRoute" class="gym-cta"
                     >Log workout</router-link
                 >
             </template>
@@ -48,10 +96,27 @@ const splitLabel = computed(
 .state {
     color: #aaa;
 }
+.date-nav {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
 .date {
     margin: 0;
     font-size: 0.95rem;
     color: #b0b0b0;
+}
+.date-nav-button {
+    padding: 0.35rem 0.7rem;
+    border: 1px solid #666;
+    border-radius: 6px;
+    background: #2d2d2d;
+    color: #fff;
+    font: inherit;
+    cursor: pointer;
+}
+.date-nav-button:hover {
+    background: #3a3a3a;
 }
 .split {
     margin: 0;

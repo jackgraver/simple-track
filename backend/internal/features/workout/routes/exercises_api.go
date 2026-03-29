@@ -6,7 +6,6 @@ import (
 	generics "be-simpletracker/internal/generics"
 	"net/http"
 	"strconv"
-	"time"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -81,7 +80,6 @@ func (h *ExercisesHandler) logExercise(c *gin.Context) {
 		return
 	}
 
-	time.Sleep(3 * time.Second)
 	c.JSON(http.StatusOK, gin.H{"exercise": savedExercise})
 }
 
@@ -96,7 +94,10 @@ func (h *ExercisesHandler) addExerciseToWorkout(c *gin.Context) {
 		return
 	}
 
-	today, err := services.GetOrCreateToday(h.db, 0)
+	offsetStr := c.Query("offset")
+	offset, _ := strconv.Atoi(offsetStr)
+
+	today, err := services.GetOrCreateToday(h.db, offset)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -146,7 +147,10 @@ func (h *ExercisesHandler) removeExerciseFromWorkout(c *gin.Context) {
 		return
 	}
 
-	today, err := services.GetOrCreateToday(h.db, 0)
+	offsetStr := c.Query("offset")
+	offset, _ := strconv.Atoi(offsetStr)
+
+	today, err := services.GetOrCreateToday(h.db, offset)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

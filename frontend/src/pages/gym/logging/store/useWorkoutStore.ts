@@ -2,7 +2,7 @@ import type { Exercise, LoggedExercise } from "~/types/workout";
 import { useWorkoutLogsPrevious } from "../queries/useWorkoutLogs";
 import { useLogExercise, useAddExerciseToWorkout, useRemoveExerciseFromWorkout } from "../queries/useWorkoutMutations";
 import { sortExerciseGroupsByLogOrder } from "../utils/sortExerciseGroupsByLogOrder";
-import { computed } from "vue";
+import { computed, type MaybeRefOrGetter } from "vue";
 
 export type ExerciseGroup = {
     planned: Exercise;
@@ -20,7 +20,7 @@ export type LoggedSetWithStatus = {
     tempId: string;
 };
 
-export function useWorkoutStore(offset: number = 0) {
+export function useWorkoutStore(offset: MaybeRefOrGetter<number> = 0) {
     const workoutLogsQuery = useWorkoutLogsPrevious(offset);
     const logExerciseMutation = useLogExercise(offset);
     const addExerciseMutation = useAddExerciseToWorkout(offset);

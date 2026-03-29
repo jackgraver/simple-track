@@ -6,6 +6,8 @@ export const liveworkoutKeys = {
     all: liveworkoutKeysBase.all,
     workouts: {
         all: [...liveworkoutKeysBase.all, 'workouts'] as const,
+        day: (offset: number) =>
+            [...liveworkoutKeysBase.all, 'workouts', 'day', offset] as const,
         previous: (offset: number) =>
             [...liveworkoutKeysBase.all, 'workouts', 'previous', offset] as const,
         today: () => [...liveworkoutKeysBase.all, 'workouts', 'today'] as const,
