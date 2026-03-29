@@ -12,11 +12,9 @@ COPY . .
 
 RUN CGO_ENABLED=1 GOOS=linux go build -o server ./cmd/server
 
-FROM alpine:latest
+FROM alpine:3.22
 
 WORKDIR /app
-
-RUN apk add --no-cache sqlite
 
 COPY --from=builder /app/server .
 

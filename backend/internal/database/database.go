@@ -37,9 +37,9 @@ func DefineRoutes(router *gin.Engine) {
 	})
 }
 
-// Initializes a new database connection to a PostgreSQL database
+// Initializes a new database connection to a PostgreSQL database.
 func ConnectToPostgres() (*gorm.DB, error) {
-	dsn := "host=localhost user=postgres password=pass123 dbname=postgres port=5432 sslmode=disable"
+	dsn := getEnv("DATABASE_URL", "postgres://postgres:postgres@localhost:5432/simpletracker?sslmode=disable")
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
 	if err != nil {
 		return nil, err
@@ -56,8 +56,7 @@ func getEnv(key, fallback string) string {
 }
 
 // Initializes a new database connection to a SQLite database
-func ConnectToSqlite() (*gorm.DB, error) {
-	dbPath := getEnv("DB_PATH", "st.db")
+func ConnectToSqlite(dbPath string) (*gorm.DB, error) {
 	db, err := gorm.Open(sqlite.Open(dbPath), &gorm.Config{})
 	if err != nil {
 		return nil, err
@@ -104,7 +103,7 @@ func DumpSQLiteDB(dbPath string, dumpPath string) error {
 }
 
 func RestoreSQLiteDB(dumpPath string) error {
-	conn, err := ConnectToSqlite()
+	conn, err := ConnectToSqlite("st.db")
 	if err != nil {
 		return err
 	}

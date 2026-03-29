@@ -48,8 +48,11 @@ func main() {
 	}))
 
 	router.SetTrustedProxies(nil)
+	router.GET("/health", func(c *gin.Context) {
+		c.JSON(200, gin.H{"status": "ok"})
+	})
 
-	db, err := database.ConnectToSqlite()
+	db, err := database.ConnectToPostgres()
 	if err != nil {
 		panic(err)
 	}

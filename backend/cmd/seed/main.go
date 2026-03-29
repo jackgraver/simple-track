@@ -1,6 +1,6 @@
-// Standalone command: seeds the workout database (drops workout tables first — destructive).
+// Standalone command: seeds the workout database (drops workout tables first - destructive).
 // Usage: go run ./cmd/seed   (from backend/)
-// Set DB_PATH to match the API server if not using default st.db.
+// Set DATABASE_URL to match the API server if not using defaults.
 package main
 
 import (
@@ -11,7 +11,7 @@ import (
 )
 
 func main() {
-	db, err := database.ConnectToSqlite()
+	db, err := database.ConnectToPostgres()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "database: %v\n", err)
 		os.Exit(1)
