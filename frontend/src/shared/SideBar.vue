@@ -1,8 +1,15 @@
 <script setup lang="ts">
-import Menu from 'primevue/menu';
-import { Home, Dumbbell, Utensils, Settings, BarChart, List } from "lucide-vue-next";
+import Menu from "primevue/menu";
+import {
+    Home,
+    Dumbbell,
+    Utensils,
+    Settings,
+    BarChart,
+    List,
+} from "lucide-vue-next";
 import { useRoute } from "vue-router";
-import type { MenuItem } from 'primevue/menuitem';
+import type { MenuItem } from "primevue/menuitem";
 
 const route = useRoute();
 
@@ -29,16 +36,26 @@ const menuItems: MenuItem[] = [
     <nav class="sidebar">
         <Menu :model="menuItems" class="sidebar-menu">
             <template #item="{ item, props }">
-                <router-link v-if="(item as any).route" v-slot="{ href, navigate }" :to="(item as any).route" custom>
+                <router-link
+                    v-if="(item as any).route"
+                    v-slot="{ href, navigate }"
+                    :to="(item as any).route"
+                    custom
+                >
                     <a
                         v-ripple
                         :href="href"
                         v-bind="props.action"
                         @click="navigate"
                         class="menu-item-link"
-                        :class="{ 'p-highlight': route.path === (item as any).route }"
+                        :class="{
+                            'p-highlight': route.path === (item as any).route,
+                        }"
                     >
-                        <component :is="iconMap[(item as any).iconName]" class="menu-icon" />
+                        <component
+                            :is="iconMap[(item as any).iconName]"
+                            class="menu-icon"
+                        />
                         <span class="menu-label">{{ item.label }}</span>
                     </a>
                 </router-link>

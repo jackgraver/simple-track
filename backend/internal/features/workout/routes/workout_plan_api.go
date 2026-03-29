@@ -30,16 +30,84 @@ func RegisterWorkoutPlanRoutes(group *gin.RouterGroup, db *gorm.DB) {
 
 	h := NewWorkoutPlanHandler(db)
 
-	// TODO: Add custom routes for exercise management:
-	// group.POST("/plans/:id/exercises/add", f.addExerciseToPlan)
-	// group.DELETE("/plans/:id/exercises/remove", f.removeExerciseFromPlan)
-
-	// Day assignment routes
 	plans := group.Group("/plans")
 	{
+		plans.POST("/:id/exercises/add", h.addExerciseToPlan)
+		plans.DELETE("/:id/exercises/remove", h.removeExerciseFromPlan)
 		plans.POST("/:id/assign-day", h.assignPlanToDay)
 		plans.DELETE("/:id/assign-day", h.unassignPlanFromDay)
 	}
+}
+
+type PlanExerciseRequest struct {
+	ExerciseID uint `json:"exercise_id" binding:"required"`
+}
+
+func (h *WorkoutPlanHandler) addExerciseToPlan(c *gin.Context) {
+	planIDStr := c.Param("id")
+	planID, err := strconv.ParseUint(planIDStr, 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid plan ID"})
+		return
+	}
+
+	var request PlanExerciseRequest
+	if err := c.ShouldBindJSON(&request); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	var plan models.WorkoutPlan
+	if err := h.db.Preload("Exercises").First(&plan, planID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Plan not found"})
+		return
+	}
+	for _, ex := range plan.Exercises {
+		if ex.ID == request.ExerciseID {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Exercise already in plan"})
+			return
+		}
+	}
+
+	if err := services.AddExerciseToPlan(h.db, uint(planID), request.ExerciseID); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	if err := h.db.Preload("Exercises").First(&plan, planID).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"plan": plan})
+}
+
+func (h *WorkoutPlanHandler) removeExerciseFromPlan(c *gin.Context) {
+	planIDStr := c.Param("id")
+	planID, err := strconv.ParseUint(planIDStr, 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid plan ID"})
+		return
+	}
+
+	var request PlanExerciseRequest
+	if err := c.ShouldBindJSON(&request); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if err := services.RemoveExerciseFromPlan(h.db, uint(planID), request.ExerciseID); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	var plan models.WorkoutPlan
+	if err := h.db.Preload("Exercises").First(&plan, uint(planID)).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"plan": plan})
 }
 
 type AssignDayRequest struct {

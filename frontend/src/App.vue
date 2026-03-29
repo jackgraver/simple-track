@@ -14,9 +14,14 @@ onMounted(() => {
     >
         <div class="flex w-full flex-col items-stretch gap-4">
             <div class="flex items-center">
-                <router-link :to="{ name: 'gym' }">
-                    <p class="bg-gray-500 rounded-md p-2">Gym</p>
-                </router-link>
+                <div class="flex items-center gap-2">
+                    <router-link :to="{ name: 'gym' }">
+                        <p class="bg-gray-500 rounded-md p-2">Gym</p>
+                    </router-link>
+                    <router-link :to="{ name: 'gym-plans' }">
+                        <p class="bg-gray-500 rounded-md p-2">Manage Plans</p>
+                    </router-link>
+                </div>
             </div>
             <RouterView />
         </div>

@@ -22,6 +22,11 @@ const routes: RouteRecordRaw[] = [
     component: () => import('~/pages/gym/gym.vue'),
     children: [
       {
+        path: 'plans',
+        name: 'gym-plans',
+        component: () => import('~/pages/gym/plans/index.vue'),
+      },
+      {
         path: 'logging',
         name: 'logging',
         component: () => import('~/pages/gym/logging/index.vue'),
@@ -45,8 +50,7 @@ const routes: RouteRecordRaw[] = [
   },
   {
     path: '/manageplans',
-    name: 'manageplans',
-    component: () => import('~/pages/manageplans.vue'),
+    redirect: { name: 'gym-plans' },
   },
   {
     path: '/logmeal',
