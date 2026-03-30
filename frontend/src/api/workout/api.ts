@@ -73,6 +73,10 @@ export async function removeExerciseFromWorkout(
     });
 }
 
+export async function deleteLoggedSet(setId: number): Promise<void> {
+    await apiClient.delete(`/workout/exercises/sets/${setId}`);
+}
+
 export async function getAllExercises(): Promise<Exercise[]> {
     const response = await apiClient.get<{ exercises: Exercise[] }>(
         '/workout/exercises/all'

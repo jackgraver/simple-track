@@ -13,7 +13,8 @@ const offset = computed(() => {
     const value = typeof raw === "string" ? Number.parseInt(raw, 10) : 0;
     return Number.isNaN(value) ? 0 : value;
 });
-const { log, data, logExercise, pending } = useWorkoutStore(offset);
+const { log, data, logExercise, deleteLoggedSet, pending } =
+    useWorkoutStore(offset);
 
 const exerciseId = computed(() => {
     const id = route.params.id;
@@ -42,6 +43,7 @@ const session = useExerciseLoggingSession({
     dayId,
     offset,
     logExercise,
+    deleteLoggedSet,
     router,
 });
 </script>

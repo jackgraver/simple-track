@@ -54,6 +54,7 @@ type LogExerciseFn = (
     exercise: LoggedExercise,
     type: "logged" | "previous",
 ) => Promise<LoggedExercise | null>;
+type DeleteLoggedSetFn = (setId: number) => Promise<void>;
 
 export function useExerciseLoggingSession(options: {
     exerciseGroup: ComputedRef<ExerciseGroup | null>;
@@ -61,9 +62,18 @@ export function useExerciseLoggingSession(options: {
     dayId: ComputedRef<number>;
     offset: ComputedRef<number>;
     logExercise: LogExerciseFn;
+    deleteLoggedSet: DeleteLoggedSetFn;
     router: Router;
 }): ExerciseLoggingSessionViewModel {
-    const { exerciseGroup, pending, dayId, offset, logExercise, router } = options;
+    const {
+        exerciseGroup,
+        pending,
+        dayId,
+        offset,
+        logExercise,
+        deleteLoggedSet,
+        router,
+    } = options;
     const loggingRoute = () => ({
         name: "logging" as const,
         query: offset.value === 0 ? {} : { offset: String(offset.value) },
@@ -201,11 +211,11 @@ export function useExerciseLoggingSession(options: {
         const draft =
             includeDraft && currentReps.value > 0
                 ? {
-                      weight: currentWeight.value,
-                      reps: currentReps.value,
-                      weight_setup: currentWeightSetup.value,
-                      tempId: draftTempId,
-                  }
+                    weight: currentWeight.value,
+                    reps: currentReps.value,
+                    weight_setup: currentWeightSetup.value,
+                    tempId: draftTempId,
+                }
                 : null;
 
         const allSets = buildAllSetsForSave(loggedSets.value, draft);
@@ -371,15 +381,32 @@ export function useExerciseLoggingSession(options: {
         const set = loggedSets.value[setIndex];
         if (!set) return;
 
-        if (set.status !== "success") {
+        if (set.status !== "success" || !set.id) {
             toast.push("Can only delete sets that have been saved", "error");
             return;
         }
 
-        loggedSets.value.splice(setIndex, 1);
-        currentSetNumber.value = loggedSets.value.length + 1;
+        const setId = set.id;
+        set.status = "pending";
 
-        await saveCurrentExercise(false);
+        try {
+            await deleteLoggedSet(setId);
+            const updatedIndex = loggedSets.value.findIndex(
+                (loggedSet) => loggedSet.id === setId,
+            );
+            if (updatedIndex !== -1) {
+                loggedSets.value.splice(updatedIndex, 1);
+            }
+            currentSetNumber.value = loggedSets.value.length + 1;
+        } catch {
+            const currentSet = loggedSets.value.find(
+                (loggedSet) => loggedSet.id === setId,
+            );
+            if (currentSet) {
+                currentSet.status = "success";
+            }
+            toast.push("Failed to delete set. Please try again.", "error");
+        }
     };
 
     const editSet = (setIndex: number) => {

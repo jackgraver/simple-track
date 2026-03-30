@@ -4,6 +4,7 @@ import (
 	"be-simpletracker/internal/features/workout/models"
 	"be-simpletracker/internal/features/workout/services"
 	generics "be-simpletracker/internal/generics"
+	"errors"
 	"net/http"
 	"strconv"
 
@@ -35,6 +36,7 @@ func RegisterExercisesRoutes(group *gin.RouterGroup, db *gorm.DB) {
 		// exercises.GET("/all", h.getAllExercises)
 		exercises.POST("/add", h.addExerciseToWorkout)
 		exercises.DELETE("/remove", h.removeExerciseFromWorkout)
+		exercises.DELETE("/sets/:id", h.deleteLoggedSet)
 		exercises.GET("/progression/:id", h.getExerciseProgression)
 		// exercises.POST("/create", h.createExercise)
 	}
@@ -164,9 +166,29 @@ func (h *ExercisesHandler) removeExerciseFromWorkout(c *gin.Context) {
 		return
 	}
 
-	// Delete the logged exercise (sets will be cascade deleted)
-	err = h.db.Delete(&loggedExercise).Error
+	// Hard delete so removing an exercise clears its sets instead of only soft deleting the parent row.
+	err = h.db.Unscoped().Delete(&loggedExercise).Error
 	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"success": true})
+}
+
+func (h *ExercisesHandler) deleteLoggedSet(c *gin.Context) {
+	setID, err := strconv.ParseUint(c.Param("id"), 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid set ID"})
+		return
+	}
+
+	err = services.DeleteLoggedSet(h.db, uint(setID))
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Set not found"})
+			return
+		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}

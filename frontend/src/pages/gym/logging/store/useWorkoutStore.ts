@@ -1,6 +1,11 @@
 import type { Exercise, LoggedExercise } from "~/types/workout";
 import { useWorkoutLogsPrevious } from "../queries/useWorkoutLogs";
-import { useLogExercise, useAddExerciseToWorkout, useRemoveExerciseFromWorkout } from "../queries/useWorkoutMutations";
+import {
+    useLogExercise,
+    useAddExerciseToWorkout,
+    useRemoveExerciseFromWorkout,
+    useDeleteLoggedSet,
+} from "../queries/useWorkoutMutations";
 import { sortExerciseGroupsByLogOrder } from "../utils/sortExerciseGroupsByLogOrder";
 import { computed, type MaybeRefOrGetter } from "vue";
 
@@ -25,6 +30,7 @@ export function useWorkoutStore(offset: MaybeRefOrGetter<number> = 0) {
     const logExerciseMutation = useLogExercise(offset);
     const addExerciseMutation = useAddExerciseToWorkout(offset);
     const removeExerciseMutation = useRemoveExerciseFromWorkout(offset);
+    const deleteLoggedSetMutation = useDeleteLoggedSet(offset);
 
     const log = computed<ExerciseGroup[]>(() => {
         const raw = workoutLogsQuery.data.value?.previous_exercises ?? [];
@@ -69,6 +75,15 @@ export function useWorkoutStore(offset: MaybeRefOrGetter<number> = 0) {
         }
     };
 
+    const deleteLoggedSet = async (setId: number): Promise<void> => {
+        try {
+            await deleteLoggedSetMutation.mutateAsync(setId);
+        } catch (error) {
+            console.error("Error deleting logged set:", error);
+            throw error;
+        }
+    };
+
     const getExerciseByIndex = (index: number): ExerciseGroup | null => {
         return log.value[index] || null;
     };
@@ -88,6 +103,7 @@ export function useWorkoutStore(offset: MaybeRefOrGetter<number> = 0) {
         logExercise,
         addExerciseToWorkout,
         removeExerciseFromWorkout,
+        deleteLoggedSet,
         getExerciseByIndex,
         getExerciseIndexById,
     };
