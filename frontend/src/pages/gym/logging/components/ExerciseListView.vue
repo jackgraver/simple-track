@@ -3,7 +3,7 @@ import type { Exercise, LoggedExercise } from "~/types/workout";
 import { ref, computed } from "vue";
 import { Trash2 } from "lucide-vue-next";
 import { useRouter } from "vue-router";
-import { useAllExercises } from "../queries/useExercises";
+import { useAllExercises } from "~/api/workout/queries";
 
 type ExerciseGroup = {
     planned: Exercise;

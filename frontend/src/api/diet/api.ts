@@ -1,4 +1,4 @@
-import { apiClient } from '~/utils/axios';
+import { apiClient } from '~/api/client';
 import type { Day, Meal } from '~/types/diet';
 
 export type DietLogsTodayResponse = {

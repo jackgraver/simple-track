@@ -2,7 +2,7 @@
 import type { Exercise } from "~/types/workout";
 import { toast } from "~/composables/toast/useToast";
 import { useQueryClient } from "@tanstack/vue-query";
-import { apiClient } from "~/utils/axios";
+import { apiClient } from "~/api/client";
 import { ref } from "vue";
 
 const props = defineProps<{
@@ -23,11 +23,14 @@ const submit = async () => {
     }
     submitting.value = true;
     try {
-        const createRes = await apiClient.post<{ exercise: Exercise }>("/workout/exercises", {
-            name: n,
-            rep_rollover: repRollover.value || 10,
-            cues: cues.value.trim(),
-        });
+        const createRes = await apiClient.post<{ exercise: Exercise }>(
+            "/workout/exercises",
+            {
+                name: n,
+                rep_rollover: repRollover.value || 10,
+                cues: cues.value.trim(),
+            },
+        );
         const exercise = createRes.data.exercise;
         toast.push(`Created ${exercise.name}`, "success");
         await queryClient.invalidateQueries({ queryKey: ["searchList"] });
@@ -45,18 +48,38 @@ const submit = async () => {
     <div class="create-ex-form">
         <label class="field">
             <span>Name</span>
-            <input v-model="name" type="text" autocomplete="off" class="input" />
+            <input
+                v-model="name"
+                type="text"
+                autocomplete="off"
+                class="input"
+            />
         </label>
         <label class="field">
             <span>Rep rollover</span>
-            <input v-model.number="repRollover" type="number" min="1" class="input" />
+            <input
+                v-model.number="repRollover"
+                type="number"
+                min="1"
+                class="input"
+            />
         </label>
         <label class="field">
             <span>Cues</span>
-            <textarea v-model="cues" class="input textarea" rows="4" placeholder="Optional cues (e.g. bullet points)"></textarea>
+            <textarea
+                v-model="cues"
+                class="input textarea"
+                rows="4"
+                placeholder="Optional cues (e.g. bullet points)"
+            ></textarea>
         </label>
         <div class="actions">
-            <button type="button" class="btn primary" :disabled="submitting" @click="submit">
+            <button
+                type="button"
+                class="btn primary"
+                :disabled="submitting"
+                @click="submit"
+            >
                 {{ submitting ? "Saving…" : "Create exercise" }}
             </button>
         </div>

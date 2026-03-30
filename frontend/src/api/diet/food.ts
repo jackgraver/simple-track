@@ -1,4 +1,4 @@
-import { apiClient } from '~/utils/axios';
+import { apiClient } from '~/api/client';
 import type { Food } from '~/types/diet';
 
 export type CreateFoodResponse = {

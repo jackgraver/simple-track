@@ -1,11 +1,11 @@
 import type { Exercise, LoggedExercise } from "~/types/workout";
-import { useWorkoutLogsPrevious } from "../queries/useWorkoutLogs";
 import {
+    useWorkoutLogsPrevious,
     useLogExercise,
     useAddExerciseToWorkout,
     useRemoveExerciseFromWorkout,
     useDeleteLoggedSet,
-} from "../queries/useWorkoutMutations";
+} from "~/api/workout/queries";
 import { sortExerciseGroupsByLogOrder } from "../utils/sortExerciseGroupsByLogOrder";
 import { computed, type MaybeRefOrGetter } from "vue";
 

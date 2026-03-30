@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import { useWorkoutLogToday } from "~/pages/gym/logging/queries/useWorkoutLogToday";
+import { useWorkoutLogToday } from "~/api/workout/queries";
 import { formatDateLong } from "~/utils/dateUtil";
 
 const route = useRoute();

@@ -3,7 +3,7 @@ import { Plus, Loader } from "lucide-vue-next";
 import { computed, ref } from "vue";
 import type { Component } from "vue";
 import { useQuery } from "@tanstack/vue-query";
-import { apiClient } from "~/utils/axios";
+import { apiClient } from "~/api/client";
 
 const props = defineProps<{
     route: string;
@@ -18,7 +18,9 @@ const search = ref("");
 const excludedIds = computed(() => new Set(props.prefilter ?? []));
 
 const querySuffix = computed(() =>
-    props.prefilter?.length ? "?" + props.prefilter.map((id) => `exclude=${id}`).join("&") : ""
+    props.prefilter?.length
+        ? "?" + props.prefilter.map((id) => `exclude=${id}`).join("&")
+        : "",
 );
 
 const requestPath = computed(() => {
@@ -45,7 +47,9 @@ const list = computed(() => {
         );
     }
 
-    const firstArray = Object.values(value as object).find((v) => Array.isArray(v));
+    const firstArray = Object.values(value as object).find((v) =>
+        Array.isArray(v),
+    );
     return (firstArray ?? []).filter(
         (item) => !excludedIds.value.has(item.id ?? item.ID),
     );
@@ -60,7 +64,7 @@ const filteredList = computed(() => {
 
 const handleFunctionCall = async <T extends (arg: any) => Promise<boolean>>(
     fn?: T,
-    args?: any
+    args?: any,
 ) => {
     if (!fn) return;
     const success = await fn(args);
@@ -122,7 +126,9 @@ const refresh = () => {
                     <Loader class="spinner" :size="18" />
                 </template>
                 <template v-else>
-                    <span class="no-hover-empty-option">{{ search }} does not exist</span>
+                    <span class="no-hover-empty-option"
+                        >{{ search }} does not exist</span
+                    >
                 </template>
             </div>
         </div>

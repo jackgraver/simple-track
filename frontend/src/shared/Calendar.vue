@@ -1,8 +1,13 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
 import { useQuery } from "@tanstack/vue-query";
-import { apiClient } from "~/utils/axios";
-import { formatDateShort, isSameDay, isSameMonth, monthName } from "~/utils/dateUtil";
+import { apiClient } from "~/api/client";
+import {
+    formatDateShort,
+    isSameDay,
+    isSameMonth,
+    monthName,
+} from "~/utils/dateUtil";
 
 const props = defineProps<{
     fetchURL: string;
@@ -15,8 +20,14 @@ const today = ref(new Date());
 const { data, isPending, error, refetch } = useQuery({
     queryKey: computed(() => ["calendar", props.fetchURL, monthOffset.value]),
     queryFn: async () => {
-        const path = props.fetchURL.startsWith("/") ? props.fetchURL : `/${props.fetchURL}`;
-        const res = await apiClient.get<{ today: string; days: any[]; month: number }>(path, {
+        const path = props.fetchURL.startsWith("/")
+            ? props.fetchURL
+            : `/${props.fetchURL}`;
+        const res = await apiClient.get<{
+            today: string;
+            days: any[];
+            month: number;
+        }>(path, {
             params: { monthoffset: monthOffset.value },
         });
         return res.data;
@@ -62,13 +73,21 @@ const headerMonthLabel = computed(() => {
         <template v-else>
             <div class="flex gap-2">
                 <button type="button" @click="prevMonth">&lt;-</button>
-                <button type="button" @click="setCurrentMonth" :disabled="monthOffset === 0">
+                <button
+                    type="button"
+                    @click="setCurrentMonth"
+                    :disabled="monthOffset === 0"
+                >
                     Today
                 </button>
                 <button type="button" @click="nextMonth">-&gt;</button>
             </div>
             <div class="grid-container">
-                <div v-for="weekday in weekdays" :key="weekday" class="weekday-header">
+                <div
+                    v-for="weekday in weekdays"
+                    :key="weekday"
+                    class="weekday-header"
+                >
                     {{ weekday }}
                 </div>
                 <div
@@ -77,7 +96,9 @@ const headerMonthLabel = computed(() => {
                     :class="[
                         'grid-item',
                         today && isSameDay(today, day.date) ? 'today' : '',
-                        today && !isSameMonth(data?.month ?? 0, day.date) ? 'faded' : '',
+                        today && !isSameMonth(data?.month ?? 0, day.date)
+                            ? 'faded'
+                            : '',
                     ]"
                     @click="() => {}"
                 >

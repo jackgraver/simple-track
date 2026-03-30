@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { toast } from "~/composables/toast/useToast";
-import { apiClient } from "~/utils/axios";
+import { apiClient } from "~/api/client";
 
 const dump = async () => {
     try {

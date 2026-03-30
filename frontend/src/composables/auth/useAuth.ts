@@ -1,6 +1,6 @@
 import { ref, computed } from 'vue';
 import { useRouter } from 'vue-router';
-import { apiClient } from '~/utils/axios';
+import { apiClient } from '~/api/client';
 
 const TOKEN_KEY = 'auth_token';
 const USERNAME_KEY = 'auth_username';
@@ -31,10 +31,10 @@ const isAuthenticated = computed(() => !!token.value);
 
 function loadTokenFromStorage() {
     if (typeof window === 'undefined') return;
-    
+
     const storedToken = sessionStorage.getItem(TOKEN_KEY);
     const storedUsername = sessionStorage.getItem(USERNAME_KEY);
-    
+
     if (storedToken && storedUsername) {
         token.value = storedToken;
         username.value = storedUsername;
@@ -43,7 +43,7 @@ function loadTokenFromStorage() {
 
 function saveTokenToStorage(t: string, u: string) {
     if (typeof window === 'undefined') return;
-    
+
     sessionStorage.setItem(TOKEN_KEY, t);
     sessionStorage.setItem(USERNAME_KEY, u);
     token.value = t;
@@ -52,7 +52,7 @@ function saveTokenToStorage(t: string, u: string) {
 
 function clearTokenFromStorage() {
     if (typeof window === 'undefined') return;
-    
+
     sessionStorage.removeItem(TOKEN_KEY);
     sessionStorage.removeItem(USERNAME_KEY);
     token.value = null;
@@ -61,16 +61,16 @@ function clearTokenFromStorage() {
 
 export function useAuth() {
     const router = useRouter();
-    
+
     loadTokenFromStorage();
-    
+
     async function login(usernameInput: string, password: string): Promise<void> {
         try {
             const response = await apiClient.post<LoginResponse>('/auth/login', {
                 username: usernameInput,
                 password,
             });
-            
+
             if (response.data.token) {
                 saveTokenToStorage(response.data.token, response.data.username);
             } else {
@@ -81,7 +81,7 @@ export function useAuth() {
             throw new Error(message);
         }
     }
-    
+
     async function register(usernameInput: string, password: string, email?: string): Promise<void> {
         try {
             const response = await apiClient.post<RegisterResponse>('/auth/register', {
@@ -89,7 +89,7 @@ export function useAuth() {
                 password,
                 email,
             });
-            
+
             if (response.data.token) {
                 saveTokenToStorage(response.data.token, response.data.username);
             } else {
@@ -100,7 +100,7 @@ export function useAuth() {
             throw new Error(message);
         }
     }
-    
+
     async function logout() {
         try {
             await apiClient.post('/auth/logout');
@@ -111,15 +111,15 @@ export function useAuth() {
             router.push('/signin');
         }
     }
-    
+
     function getToken(): string | null {
         return token.value;
     }
-    
+
     function getUsername(): string | null {
         return username.value;
     }
-    
+
     return {
         token: computed(() => token.value),
         username: computed(() => username.value),

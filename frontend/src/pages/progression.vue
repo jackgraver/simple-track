@@ -3,7 +3,7 @@ import type { Exercise } from "~/types/workout";
 import SearchList from "~/shared/SearchList.vue";
 import { computed, ref, watch } from "vue";
 import { useQuery } from "@tanstack/vue-query";
-import { apiClient } from "~/utils/axios";
+import { apiClient } from "~/api/client";
 
 type ProgressionEntry = {
     date: string;
@@ -18,7 +18,7 @@ const { data: exercisesPayload } = useQuery({
     queryKey: ["workout", "exercises", "all", "progression"],
     queryFn: async () => {
         const res = await apiClient.get<{ exercises: Exercise[] } | Exercise[]>(
-            "/workout/exercises/all"
+            "/workout/exercises/all",
         );
         return res.data;
     },
@@ -28,30 +28,49 @@ const exercises = computed(() => {
     const value = exercisesPayload.value;
     if (!value) return [];
     if (Array.isArray(value)) return value;
-    if (typeof value === "object" && "exercises" in value && Array.isArray(value.exercises)) {
+    if (
+        typeof value === "object" &&
+        "exercises" in value &&
+        Array.isArray(value.exercises)
+    ) {
         return value.exercises;
     }
-    const firstArray = Object.values(value as object).find((v) => Array.isArray(v));
+    const firstArray = Object.values(value as object).find((v) =>
+        Array.isArray(v),
+    );
     return (firstArray as Exercise[]) ?? [];
 });
 
 watch(
     exercises,
     (newExercises) => {
-        if (newExercises.length > 0 && exerciseId.value === null && newExercises[0]) {
+        if (
+            newExercises.length > 0 &&
+            exerciseId.value === null &&
+            newExercises[0]
+        ) {
             selectExercise(newExercises[0]);
         }
     },
-    { immediate: true }
+    { immediate: true },
 );
 
-const { data: progressionPayload, isPending: loading, error: fetchError } = useQuery({
-    queryKey: computed(() => ["workout", "exercises", "progression", exerciseId.value]),
+const {
+    data: progressionPayload,
+    isPending: loading,
+    error: fetchError,
+} = useQuery({
+    queryKey: computed(() => [
+        "workout",
+        "exercises",
+        "progression",
+        exerciseId.value,
+    ]),
     queryFn: async () => {
         const id = exerciseId.value;
         if (id == null) throw new Error("No exercise");
         const res = await apiClient.get<{ progression: ProgressionEntry[] }>(
-            `/workout/exercises/progression/${id}`
+            `/workout/exercises/progression/${id}`,
         );
         return res.data;
     },
@@ -97,17 +116,23 @@ const formatProgressionDate = (dateStr: string): string => {
                 </div>
                 <div v-if="loading" class="loading">Loading...</div>
                 <div v-else-if="error" class="error">{{ error }}</div>
-                <div v-else-if="progression.length === 0 && selectedExercise" class="no-data">
+                <div
+                    v-else-if="progression.length === 0 && selectedExercise"
+                    class="no-data"
+                >
                     No progression data available for this exercise.
                 </div>
-                <div v-else-if="progression.length > 0" class="progression-list">
+                <div
+                    v-else-if="progression.length > 0"
+                    class="progression-list"
+                >
                     <div
                         v-for="(entry, index) in progression"
                         :key="index"
                         class="progression-entry"
                     >
-                        {{ formatProgressionDate(entry.date) }} - {{ entry.weight }} lbs for
-                        {{ entry.reps }} reps
+                        {{ formatProgressionDate(entry.date) }} -
+                        {{ entry.weight }} lbs for {{ entry.reps }} reps
                     </div>
                 </div>
             </div>

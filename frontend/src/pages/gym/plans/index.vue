@@ -7,7 +7,7 @@ import CreateExerciseForPlanDialog from "~/shared/CreateExerciseForPlanDialog.vu
 import { X, Plus } from "lucide-vue-next";
 import { computed, ref, watch } from "vue";
 import { useQuery } from "@tanstack/vue-query";
-import { apiClient } from "~/utils/axios";
+import { apiClient } from "~/api/client";
 
 const { data, isPending, refetch } = useQuery({
     queryKey: ["workout", "plans", "all"],

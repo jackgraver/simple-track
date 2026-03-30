@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import type { LoggedSet } from "~/types/workout";
-import { useWorkoutLogsPrevious } from "../queries/useWorkoutLogsPrevious";
+import { useHomeWorkoutLogsPrevious } from "~/api/workout/queries";
 import GymCard from "./GymCard.vue";
 
 const props = defineProps<{
@@ -12,7 +12,7 @@ const {
     data,
     isPending: pending,
     error,
-} = useWorkoutLogsPrevious(props.dateOffset);
+} = useHomeWorkoutLogsPrevious(props.dateOffset);
 
 const day = computed(() => data.value?.day);
 </script>

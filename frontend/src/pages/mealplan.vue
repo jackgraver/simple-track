@@ -1,12 +1,14 @@
 <script setup lang="ts">
 import { useQuery } from "@tanstack/vue-query";
-import { apiClient } from "~/utils/axios";
+import { apiClient } from "~/api/client";
 import type { Plan } from "~/types/diet";
 
 const { data, isPending, error } = useQuery({
     queryKey: ["diet", "plans", "plan", "all"],
     queryFn: async () => {
-        const res = await apiClient.get<{ plans: Plan[] }>("/diet/plans/plan/all");
+        const res = await apiClient.get<{ plans: Plan[] }>(
+            "/diet/plans/plan/all",
+        );
         return res.data;
     },
 });

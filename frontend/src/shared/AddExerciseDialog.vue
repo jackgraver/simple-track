@@ -3,7 +3,7 @@ import type { WorkoutPlan, Exercise } from "~/types/workout";
 import SearchList from "~/shared/SearchList.vue";
 import { toast } from "~/composables/toast/useToast";
 import { useQueryClient } from "@tanstack/vue-query";
-import { apiClient } from "~/utils/axios";
+import { apiClient } from "~/api/client";
 
 const props = defineProps<{
     plan: WorkoutPlan;
