@@ -3,6 +3,7 @@ import type { ExerciseLoggingSessionViewModel } from "../composables/useExercise
 import { ArrowLeft } from "lucide-vue-next";
 import LoggedSetsList from "./LoggedSetsList.vue";
 import NumericStepper from "./NumericStepper.vue";
+import ExerciseRestTimer from "./ExerciseRestTimer.vue";
 import { computed } from "vue";
 
 const props = defineProps<{
@@ -22,6 +23,13 @@ const previousPerformanceText = computed(() => {
 
     return sets.map((set) => `${set.weight}x${set.reps}`).join(", ");
 });
+
+const exerciseName = computed(
+    () =>
+        props.session.exerciseGroup?.planned?.name ||
+        props.session.exerciseGroup?.logged?.exercise?.name ||
+        "",
+);
 </script>
 
 <template>
@@ -35,10 +43,13 @@ const previousPerformanceText = computed(() => {
                 <ArrowLeft :size="20" />
             </button>
             <h2>
-                {{
-                    session.exerciseGroup?.planned?.name ||
-                    session.exerciseGroup?.logged?.exercise?.name
-                }}
+                <ExerciseRestTimer
+                    :storage-key="session.restTimerStorageKey"
+                    :start-token="session.restTimerStartToken"
+                    :clear-token="session.restTimerClearToken"
+                    :duration-ms="session.restTimerDurationMs"
+                    :fallback-text="exerciseName"
+                />
             </h2>
             <span class="set-indicator"
                 >Set {{ session.currentSetNumber }}</span

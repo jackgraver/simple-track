@@ -1,5 +1,5 @@
 import type { ComputedRef, Ref } from "vue";
-import { reactive, ref, watch } from "vue";
+import { computed, reactive, ref, watch } from "vue";
 import type { Router } from "vue-router";
 import type { ExerciseGroup, LoggedSetWithStatus } from "../store/useWorkoutStore";
 import type { LoggedExercise } from "~/types/workout";
@@ -26,6 +26,10 @@ export type ExerciseLoggingSessionViewModel = {
     weightError: string;
     repsError: string;
     notes: string;
+    restTimerStorageKey: string;
+    restTimerStartToken: number;
+    restTimerClearToken: number;
+    restTimerDurationMs: number;
     incrementWeight: () => void;
     decrementWeight: () => void;
     incrementReps: () => void;
@@ -81,6 +85,20 @@ export function useExerciseLoggingSession(options: {
     const repsError = ref("");
     const draftDirty = ref(false);
     const notes = ref("");
+    const restTimerStartToken = ref(0);
+    const restTimerClearToken = ref(0);
+    const restTimerDurationMs = 2 * 60 * 1000;
+
+    const restTimerStorageKey = computed(() => {
+        const group = exerciseGroup.value;
+        const exerciseIdentity =
+            group?.planned?.ID ??
+            group?.logged?.exercise_id ??
+            group?.logged?.exercise?.ID ??
+            0;
+
+        return `gym-rest-timer:v1:day:${dayId.value}:exercise:${exerciseIdentity}`;
+    });
 
     const clearWeightError = () => {
         weightError.value = "";
@@ -292,6 +310,7 @@ export function useExerciseLoggingSession(options: {
             return;
         }
         clearRepsError();
+        restTimerStartToken.value += 1;
 
         const tempId = `temp-${Date.now()}-${tempIdCounter++}`;
         const newSet: LoggedSetWithStatus = {
@@ -335,6 +354,7 @@ export function useExerciseLoggingSession(options: {
             return;
         }
 
+        restTimerClearToken.value += 1;
         router.push(loggingRoute());
     };
 
@@ -417,6 +437,10 @@ export function useExerciseLoggingSession(options: {
         weightError,
         repsError,
         notes,
+        restTimerStorageKey,
+        restTimerStartToken,
+        restTimerClearToken,
+        restTimerDurationMs,
         incrementWeight,
         decrementWeight,
         incrementReps,
