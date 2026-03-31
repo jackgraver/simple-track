@@ -6,6 +6,7 @@ import AddExerciseDialog from "~/shared/AddExerciseDialog.vue";
 import CreateExerciseForPlanDialog from "~/shared/CreateExerciseForPlanDialog.vue";
 import { X, Plus } from "lucide-vue-next";
 import { computed, ref, watch } from "vue";
+import { apiPUT } from "~/api/client";
 import { useQuery } from "@tanstack/vue-query";
 import { apiClient } from "~/api/client";
 
@@ -68,6 +69,30 @@ const selectedPlan = computed(() => {
     if (id === null) return null;
     return plans.value.find((p) => p.ID === id) ?? null;
 });
+
+const plannedCardioInput = ref("");
+watch(
+    selectedPlan,
+    (p) => {
+        plannedCardioInput.value = p?.planned_cardio_type?.trim() ?? "";
+    },
+    { immediate: true },
+);
+
+const savePlannedCardio = async () => {
+    const plan = selectedPlan.value;
+    if (!plan) return;
+    try {
+        await apiPUT(`workout/plans/${plan.ID}/planned-cardio`, {
+            type: plannedCardioInput.value.trim(),
+        });
+        toast.push("Planned cardio saved", "success");
+        await refresh();
+    } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : String(err);
+        toast.push("Failed to save planned cardio: " + message, "error");
+    }
+};
 
 const getAssignedDays = computed(() => {
     const assigned: number[] = [];
@@ -325,6 +350,24 @@ const unassignPlanFromDay = async (plan: WorkoutPlan) => {
                         </button>
                     </div>
                 </div>
+                <div class="planned-cardio-section">
+                    <label class="planned-cardio-label">Planned cardio (type)</label>
+                    <div class="planned-cardio-row">
+                        <input
+                            v-model="plannedCardioInput"
+                            type="text"
+                            class="planned-cardio-input"
+                            placeholder="e.g. Bike, Run"
+                        />
+                        <button
+                            type="button"
+                            class="planned-cardio-save"
+                            @click="savePlannedCardio"
+                        >
+                            Save
+                        </button>
+                    </div>
+                </div>
                 <div class="exercises-list">
                     <div
                         v-for="exercise in selectedPlan.exercises"
@@ -514,6 +557,43 @@ const unassignPlanFromDay = async (plan: WorkoutPlan) => {
 .add-button:disabled {
     opacity: 0.5;
     cursor: not-allowed;
+}
+.planned-cardio-section {
+    margin-bottom: 0.75rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid #333;
+}
+.planned-cardio-label {
+    display: block;
+    margin-bottom: 0.35rem;
+    font-size: 0.85rem;
+    color: #aaa;
+}
+.planned-cardio-row {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+}
+.planned-cardio-input {
+    flex: 1;
+    padding: 0.5rem 0.65rem;
+    background: #2a2a2a;
+    color: #fff;
+    border: 1px solid #444;
+    border-radius: 0.25rem;
+    font-size: 0.9rem;
+}
+.planned-cardio-save {
+    padding: 0.5rem 0.75rem;
+    background: #4a9eff;
+    color: #fff;
+    border: none;
+    border-radius: 0.25rem;
+    cursor: pointer;
+    font-size: 0.85rem;
+}
+.planned-cardio-save:hover {
+    background: #3a8eef;
 }
 .exercises-list {
     display: flex;

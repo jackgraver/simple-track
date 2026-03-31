@@ -5,6 +5,7 @@ import (
 	"be-simpletracker/internal/utils"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"gorm.io/gorm"
@@ -359,6 +360,43 @@ func UnassignPlanFromDay(db *gorm.DB, planID uint) (*models.WorkoutPlan, error) 
 }
 
 // GetPlanByDay returns the workout plan assigned to a specific day of the week
+// UpsertCardioForWorkoutLog creates or updates the single cardio row for a workout log.
+func UpsertCardioForWorkoutLog(db *gorm.DB, offset int, minutes int, cardioType string) (*models.Cardio, error) {
+	t, err := GetOrCreateToday(db, offset)
+	if err != nil {
+		return nil, err
+	}
+	ctype := strings.TrimSpace(cardioType)
+	if ctype == "" && t.WorkoutPlan != nil {
+		ctype = strings.TrimSpace(t.WorkoutPlan.PlannedCardioType)
+	}
+	if ctype == "" {
+		return nil, fmt.Errorf("cardio type is required when the plan has no planned cardio")
+	}
+	var existing models.Cardio
+	err = db.Where("workout_log_id = ?", t.ID).First(&existing).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		row := models.Cardio{
+			WorkoutLogID: t.ID,
+			Minutes:      minutes,
+			Type:         ctype,
+		}
+		if err := db.Create(&row).Error; err != nil {
+			return nil, err
+		}
+		return &row, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	existing.Minutes = minutes
+	existing.Type = ctype
+	if err := db.Save(&existing).Error; err != nil {
+		return nil, err
+	}
+	return &existing, nil
+}
+
 func GetPlanByDay(db *gorm.DB, dayOfWeek int) (*models.WorkoutPlan, error) {
 	if dayOfWeek < 0 || dayOfWeek > 6 {
 		return nil, fmt.Errorf("day_of_week must be between 0 (Sunday) and 6 (Saturday)")

@@ -5,14 +5,15 @@ import {
     useAddExerciseToWorkout,
     useRemoveExerciseFromWorkout,
     useDeleteLoggedSet,
+    useUpsertCardio,
 } from "~/api/workout/queries";
 import { sortExerciseGroupsByLogOrder } from "../utils/sortExerciseGroupsByLogOrder";
 import { computed, type MaybeRefOrGetter } from "vue";
 
 export type ExerciseGroup = {
-    planned: Exercise;
-    logged: LoggedExercise;
-    previous: LoggedExercise;
+    planned?: Exercise;
+    logged?: LoggedExercise;
+    previous?: LoggedExercise;
 };
 
 export type LoggedSetWithStatus = {
@@ -31,11 +32,19 @@ export function useWorkoutStore(offset: MaybeRefOrGetter<number> = 0) {
     const addExerciseMutation = useAddExerciseToWorkout(offset);
     const removeExerciseMutation = useRemoveExerciseFromWorkout(offset);
     const deleteLoggedSetMutation = useDeleteLoggedSet(offset);
+    const upsertCardioMutation = useUpsertCardio(offset);
 
     const log = computed<ExerciseGroup[]>(() => {
-        const raw = workoutLogsQuery.data.value?.previous_exercises ?? [];
+        const raw = workoutLogsQuery.data.value?.planned_exercises ?? [];
         return sortExerciseGroupsByLogOrder(raw);
     });
+
+    const plannedCardio = computed(
+        () => workoutLogsQuery.data.value?.planned_cardio ?? null,
+    );
+    const loggedCardio = computed(
+        () => workoutLogsQuery.data.value?.logged_cardio ?? null,
+    );
 
     const data = computed(() => workoutLogsQuery.data.value);
     const pending = computed(() => workoutLogsQuery.isPending.value);
@@ -84,6 +93,10 @@ export function useWorkoutStore(offset: MaybeRefOrGetter<number> = 0) {
         }
     };
 
+    const saveCardio = async (minutes: number, type?: string): Promise<void> => {
+        await upsertCardioMutation.mutateAsync({ minutes, type });
+    };
+
     const getExerciseByIndex = (index: number): ExerciseGroup | null => {
         return log.value[index] || null;
     };
@@ -97,6 +110,8 @@ export function useWorkoutStore(offset: MaybeRefOrGetter<number> = 0) {
 
     return {
         log,
+        plannedCardio,
+        loggedCardio,
         data,
         pending,
         error,
@@ -104,6 +119,7 @@ export function useWorkoutStore(offset: MaybeRefOrGetter<number> = 0) {
         addExerciseToWorkout,
         removeExerciseFromWorkout,
         deleteLoggedSet,
+        saveCardio,
         getExerciseByIndex,
         getExerciseIndexById,
     };

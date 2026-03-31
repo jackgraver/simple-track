@@ -1,19 +1,26 @@
 <script setup lang="ts">
-import type { Exercise, LoggedExercise } from "~/types/workout";
+import type {
+    Cardio,
+    Exercise,
+    LoggedExercise,
+    PlannedCardio,
+} from "~/types/workout";
 import { ref, computed } from "vue";
 import { Trash2 } from "lucide-vue-next";
 import { useRouter } from "vue-router";
 import { useAllExercises } from "~/api/workout/queries";
 
 type ExerciseGroup = {
-    planned: Exercise;
-    logged: LoggedExercise;
-    previous: LoggedExercise;
+    planned?: Exercise;
+    logged?: LoggedExercise;
+    previous?: LoggedExercise;
 };
 
 const props = defineProps<{
     workoutName: string;
     exercises: ExerciseGroup[];
+    plannedCardio?: PlannedCardio | null;
+    loggedCardio?: Cardio | null;
 }>();
 
 const workoutName = computed(() => props.workoutName);
@@ -21,7 +28,20 @@ const emit = defineEmits<{
     (e: "select-exercise", index: number): void;
     (e: "add-exercise", exerciseId: number): void;
     (e: "remove-exercise", index: number): void;
+    (e: "select-cardio"): void;
 }>();
+
+const showCardioRow = computed(
+    () => props.plannedCardio != null || props.loggedCardio != null,
+);
+
+const cardioName = computed(
+    () => props.plannedCardio?.type ?? props.loggedCardio?.type ?? "Cardio",
+);
+
+const cardioIsLogged = computed(
+    () => (props.loggedCardio?.minutes ?? 0) > 0,
+);
 
 const router = useRouter();
 
@@ -139,6 +159,21 @@ const isLogged = (exerciseGroup: ExerciseGroup): boolean => {
                 >
                     <Trash2 :size="18" />
                 </button>
+            </li>
+            <li
+                v-if="showCardioRow"
+                key="cardio"
+                @click="emit('select-cardio')"
+                :class="['exercise-item', { 'logged': cardioIsLogged }]"
+            >
+                <div class="exercise-content">
+                    <div class="exercise-title-section">
+                        <span class="exercise-name">{{ cardioName }}</span>
+                        <span v-if="cardioIsLogged" class="exercise-subtitle">
+                            {{ loggedCardio?.minutes }} min
+                        </span>
+                    </div>
+                </div>
             </li>
         </ul>
         <button @click="router.push('/')" type="button" class="finish-button">

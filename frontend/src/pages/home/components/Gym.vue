@@ -31,8 +31,12 @@ const day = computed(() => data.value?.day);
         </div>
         <div class="workout-grid">
             <template
-                v-for="exercise in data?.previous_exercises"
-                :key="exercise.planned.ID"
+                v-for="(exercise, index) in data?.planned_exercises"
+                :key="
+                    exercise.planned?.ID ??
+                    exercise.logged?.exercise_id ??
+                    index
+                "
             >
                 <template v-if="exercise.logged">
                     <GymCard
@@ -52,9 +56,12 @@ const day = computed(() => data.value?.day);
                             created_at: '',
                             updated_at: '',
                             workout_log_id: day?.ID ?? 0,
-                            exercise_id: exercise.planned.ID,
+                            exercise_id:
+                                exercise.planned?.ID ??
+                                exercise.logged?.exercise_id ??
+                                0,
                             sets: [] as LoggedSet[],
-                            exercise: exercise.planned,
+                            exercise: exercise.planned!,
                             notes: '',
                             percent_change: 0,
                         }"

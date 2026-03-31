@@ -30,6 +30,19 @@ const exerciseName = computed(
         props.session.exerciseGroup?.logged?.exercise?.name ||
         "",
 );
+
+const repRolloverWeightHint = computed(() => {
+    const g = props.session.exerciseGroup;
+    const repRollover = g?.previous?.exercise?.rep_rollover;
+    if (typeof repRollover !== "number") return "";
+    const previousReps = (g?.previous?.sets ?? [])
+        .map((set) => Number(set.reps))
+        .filter((reps) => Number.isFinite(reps));
+    if (previousReps.length === 0) return "";
+    const minPreviousReps = Math.min(...previousReps);
+    if (minPreviousReps < repRollover) return "";
+    return `Previously did ${minPreviousReps} reps, consider increase the weight`;
+});
 </script>
 
 <template>
@@ -61,7 +74,7 @@ const exerciseName = computed(
                 :model-value="session.currentWeight"
                 :edit-mode="session.weightEditMode"
                 :input-value="session.weightInputValue"
-                :error="session.weightError"
+                :hint="repRolloverWeightHint"
                 input-step="0.5"
                 @increment="session.incrementWeight"
                 @decrement="session.decrementWeight"
@@ -74,7 +87,6 @@ const exerciseName = computed(
                 :model-value="session.currentReps"
                 :edit-mode="session.repsEditMode"
                 :input-value="session.repsInputValue"
-                :error="session.repsError"
                 @increment="session.incrementReps"
                 @decrement="session.decrementReps"
                 @update:input-value="session.updateRepsInputValue"

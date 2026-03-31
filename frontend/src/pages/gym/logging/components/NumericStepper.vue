@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import { nextTick, useId } from "vue";
+import { Minus, Plus } from "lucide-vue-next";
 
 defineProps<{
     label: string;
     modelValue: number;
     editMode: boolean;
     inputValue: string;
-    error?: string;
+    hint?: string;
     inputStep?: string;
 }>();
 
@@ -23,7 +24,9 @@ const inputId = useId();
 const enterEdit = () => {
     emit("enter-edit");
     nextTick(() => {
-        const input = document.getElementById(inputId) as HTMLInputElement | null;
+        const input = document.getElementById(
+            inputId,
+        ) as HTMLInputElement | null;
         if (input) {
             input.focus();
             input.select();
@@ -39,19 +42,15 @@ const onInput = (e: Event) => {
 <template>
     <div class="stepper-container">
         <label :for="inputId">{{ label }}</label>
-        <div :class="['stepper', { 'stepper-error': error }]">
+        <div class="stepper">
             <button
                 class="stepper-button"
                 type="button"
                 @click="emit('decrement')"
             >
-                −
+                <Minus :size="20" />
             </button>
-            <div
-                v-if="!editMode"
-                class="stepper-display"
-                @click="enterEdit"
-            >
+            <div v-if="!editMode" class="stepper-display" @click="enterEdit">
                 {{ modelValue || 0 }}
             </div>
             <input
@@ -72,10 +71,15 @@ const onInput = (e: Event) => {
                 type="button"
                 @click="emit('increment')"
             >
-                +
+                <Plus :size="20" />
             </button>
         </div>
-        <p v-if="error" class="stepper-error-text">{{ error }}</p>
+        <p
+            v-if="hint"
+            class="mt-1 mb-0 text-[0.85rem] leading-snug text-amber-200/90"
+        >
+            {{ hint }}
+        </p>
     </div>
 </template>
 
@@ -97,12 +101,6 @@ const onInput = (e: Event) => {
     align-items: center;
     justify-content: center;
     gap: 1rem;
-}
-
-.stepper-error .stepper-display,
-.stepper-error .stepper-input,
-.stepper-error .stepper-button {
-    border-color: rgb(150, 60, 60);
 }
 
 .stepper-button {
@@ -171,9 +169,4 @@ const onInput = (e: Event) => {
     background: rgb(35, 35, 35);
 }
 
-.stepper-error-text {
-    margin: 0;
-    color: rgb(220, 110, 110);
-    font-size: 0.85rem;
-}
 </style>

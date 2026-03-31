@@ -36,6 +36,11 @@ const routes: RouteRecordRaw[] = [
         name: 'logging-exercise',
         component: () => import('~/pages/gym/logging/exercise/[id].vue'),
       },
+      {
+        path: 'logging/cardio',
+        name: 'logging-cardio',
+        component: () => import('~/pages/gym/logging/cardio.vue'),
+      },
     ],
   },
   {

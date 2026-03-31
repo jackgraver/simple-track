@@ -6,6 +6,7 @@ import (
 	generics "be-simpletracker/internal/generics"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -36,6 +37,7 @@ func RegisterWorkoutPlanRoutes(group *gin.RouterGroup, db *gorm.DB) {
 		plans.DELETE("/:id/exercises/remove", h.removeExerciseFromPlan)
 		plans.POST("/:id/assign-day", h.assignPlanToDay)
 		plans.DELETE("/:id/assign-day", h.unassignPlanFromDay)
+		plans.PUT("/:id/planned-cardio", h.setPlannedCardio)
 	}
 }
 
@@ -138,6 +140,36 @@ func (h *WorkoutPlanHandler) assignPlanToDay(c *gin.Context) {
 		return
 	}
 
+	c.JSON(http.StatusOK, gin.H{"plan": plan})
+}
+
+type plannedCardioBody struct {
+	Type string `json:"type"`
+}
+
+func (h *WorkoutPlanHandler) setPlannedCardio(c *gin.Context) {
+	planIDStr := c.Param("id")
+	planID, err := strconv.ParseUint(planIDStr, 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid plan ID"})
+		return
+	}
+	var body plannedCardioBody
+	if err := c.ShouldBindJSON(&body); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if err := h.db.Model(&models.WorkoutPlan{}).
+		Where("id = ?", planID).
+		Update("planned_cardio_type", strings.TrimSpace(body.Type)).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	var plan models.WorkoutPlan
+	if err := h.db.Preload("Exercises").First(&plan, planID).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
 	c.JSON(http.StatusOK, gin.H{"plan": plan})
 }
 

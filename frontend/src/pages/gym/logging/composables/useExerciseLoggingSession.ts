@@ -23,8 +23,6 @@ export type ExerciseLoggingSessionViewModel = {
     repsEditMode: boolean;
     weightInputValue: string;
     repsInputValue: string;
-    weightError: string;
-    repsError: string;
     notes: string;
     restTimerStorageKey: string;
     restTimerStartToken: number;
@@ -91,8 +89,6 @@ export function useExerciseLoggingSession(options: {
     const repsEditMode = ref(false);
     const weightInputValue = ref("");
     const repsInputValue = ref("");
-    const weightError = ref("");
-    const repsError = ref("");
     const draftDirty = ref(false);
     const notes = ref("");
     const restTimerStartToken = ref(0);
@@ -109,14 +105,6 @@ export function useExerciseLoggingSession(options: {
 
         return `gym-rest-timer:v1:day:${dayId.value}:exercise:${exerciseIdentity}`;
     });
-
-    const clearWeightError = () => {
-        weightError.value = "";
-    };
-
-    const clearRepsError = () => {
-        repsError.value = "";
-    };
 
     const hasDraftSet = () =>
         currentWeight.value > 0 || currentReps.value > 0;
@@ -187,8 +175,6 @@ export function useExerciseLoggingSession(options: {
         weightEditMode.value = false;
         repsEditMode.value = false;
         draftDirty.value = false;
-        clearWeightError();
-        clearRepsError();
     };
 
     watch(
@@ -249,25 +235,21 @@ export function useExerciseLoggingSession(options: {
     };
 
     const incrementWeight = () => {
-        clearWeightError();
         draftDirty.value = true;
         currentWeight.value = (currentWeight.value || 0) + 2.5;
     };
 
     const decrementWeight = () => {
-        clearWeightError();
         draftDirty.value = true;
         currentWeight.value = Math.max(0, (currentWeight.value || 0) - 2.5);
     };
 
     const incrementReps = () => {
-        clearRepsError();
         draftDirty.value = true;
         currentReps.value = (currentReps.value || 0) + 1;
     };
 
     const decrementReps = () => {
-        clearRepsError();
         draftDirty.value = true;
         currentReps.value = Math.max(0, (currentReps.value || 0) - 1);
     };
@@ -279,13 +261,12 @@ export function useExerciseLoggingSession(options: {
 
     const exitWeightEditMode = () => {
         const trimmedValue = weightInputValue.value.trim();
-        const numValue = parseFloat(trimmedValue);
-        if (trimmedValue !== "" && !isNaN(numValue) && numValue >= 0) {
-            currentWeight.value = numValue;
-            draftDirty.value = true;
-            clearWeightError();
-        } else if (trimmedValue !== "") {
-            weightError.value = "Enter a valid weight greater than or equal to 0.";
+        if (trimmedValue !== "") {
+            const n = Number(trimmedValue);
+            if (Number.isFinite(n) && n >= 0) {
+                currentWeight.value = n;
+                draftDirty.value = true;
+            }
         }
         weightEditMode.value = false;
     };
@@ -297,29 +278,21 @@ export function useExerciseLoggingSession(options: {
 
     const exitRepsEditMode = () => {
         const trimmedValue = repsInputValue.value.trim();
-        const numValue = parseInt(trimmedValue, 10);
-        if (
-            trimmedValue !== "" &&
-            !isNaN(numValue) &&
-            numValue >= 0 &&
-            String(numValue) === trimmedValue
-        ) {
-            currentReps.value = numValue;
-            draftDirty.value = true;
-            clearRepsError();
-        } else if (trimmedValue !== "") {
-            repsError.value = "Enter a whole number of reps.";
+        if (trimmedValue !== "") {
+            const n = Number(trimmedValue);
+            if (Number.isInteger(n) && n >= 0) {
+                currentReps.value = n;
+                draftDirty.value = true;
+            }
         }
         repsEditMode.value = false;
     };
 
     const addNextSet = async () => {
         if (currentReps.value <= 0) {
-            repsError.value = "Enter reps before logging the set.";
             toast.push("Enter reps before logging the set", "error");
             return;
         }
-        clearRepsError();
         restTimerStartToken.value += 1;
 
         const tempId = `temp-${Date.now()}-${tempIdCounter++}`;
@@ -349,7 +322,6 @@ export function useExerciseLoggingSession(options: {
         }
 
         if (currentWeight.value > 0 && currentReps.value === 0) {
-            repsError.value = "Add reps or clear the draft set before finishing.";
             toast.push("Add reps or clear the draft set before finishing", "error");
             return;
         }
@@ -442,12 +414,10 @@ export function useExerciseLoggingSession(options: {
 
     const updateWeightInputValue = (value: string) => {
         weightInputValue.value = value;
-        clearWeightError();
     };
 
     const updateRepsInputValue = (value: string) => {
         repsInputValue.value = value;
-        clearRepsError();
     };
 
     return reactive({
@@ -461,8 +431,6 @@ export function useExerciseLoggingSession(options: {
         repsEditMode,
         weightInputValue,
         repsInputValue,
-        weightError,
-        repsError,
         notes,
         restTimerStorageKey,
         restTimerStartToken,

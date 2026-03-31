@@ -4,7 +4,7 @@ import { apiDELETE, apiGET, apiPOST } from '~/api/client';
 import type { WorkoutLogsPreviousResponse } from '~/api/workout/api';
 import { liveworkoutKeys } from '~/api/workout/keys';
 import { homeKeys } from '~/pages/home/queries/keys';
-import type { Exercise, LoggedExercise } from '~/types/workout';
+import type { Cardio, Exercise, LoggedExercise } from '~/types/workout';
 
 export function useWorkoutLogToday(offset: MaybeRefOrGetter<number> = 0) {
     return useQuery(
@@ -136,6 +136,35 @@ export function useDeleteLoggedSet(offset: MaybeRefOrGetter<number> = 0) {
 
     return useMutation({
         mutationFn: (setId: number) => apiDELETE(`/workout/exercises/sets/${setId}`),
+        onSuccess: () => {
+            const currentOffset = toValue(offset);
+            queryClient.invalidateQueries({
+                queryKey: liveworkoutKeys.workouts.previous(currentOffset),
+            });
+            queryClient.invalidateQueries({
+                queryKey: liveworkoutKeys.workouts.day(currentOffset),
+            });
+        },
+    });
+}
+
+export function useUpsertCardio(offset: MaybeRefOrGetter<number> = 0) {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: async (payload: { minutes: number; type?: string }) => {
+            const body = await apiPOST<{ cardio: Cardio }>(
+                '/workout/logs/cardio',
+                {
+                    minutes: payload.minutes,
+                    ...(payload.type !== undefined && payload.type !== ''
+                        ? { type: payload.type }
+                        : {}),
+                },
+                { params: { offset: toValue(offset) } },
+            );
+            return body.cardio;
+        },
         onSuccess: () => {
             const currentOffset = toValue(offset);
             queryClient.invalidateQueries({

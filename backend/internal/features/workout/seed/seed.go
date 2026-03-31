@@ -104,8 +104,9 @@ func Run(db *gorm.DB) error {
 	friday := 5
 
 	push_plan := models.WorkoutPlan{
-		Name:      "Push",
-		DayOfWeek: &tuesday,
+		Name:              "Push",
+		DayOfWeek:         &tuesday,
+		PlannedCardioType: "Bike",
 		Exercises: []models.Exercise{
 			inclinePress,
 			chestFly,

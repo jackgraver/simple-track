@@ -6,6 +6,7 @@ import (
 	generics "be-simpletracker/internal/generics"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -37,6 +38,7 @@ func RegisterWorkoutLogRoutes(group *gin.RouterGroup, db *gorm.DB) {
 		logs.GET("/today", h.getWorkoutToday)
 		logs.GET("/month", h.getWorkoutMonth)
 		logs.GET("/previous", h.getPreviousWorkout)
+		logs.POST("/cardio", h.upsertCardio)
 	}
 }
 
@@ -85,6 +87,38 @@ type ExerciseGroup struct {
 	Planned  *models.Exercise       `json:"planned,omitempty"`
 	Logged   *models.LoggedExercise `json:"logged,omitempty"`
 	Previous *models.LoggedExercise `json:"previous,omitempty"`
+}
+
+func plannedCardioFromPlan(plan *models.WorkoutPlan) any {
+	if plan == nil {
+		return nil
+	}
+	t := strings.TrimSpace(plan.PlannedCardioType)
+	if t == "" {
+		return nil
+	}
+	return gin.H{"type": t}
+}
+
+type upsertCardioRequest struct {
+	Minutes int    `json:"minutes" binding:"required,gte=0"`
+	Type    string `json:"type"`
+}
+
+func (h *WorkoutLogHandler) upsertCardio(c *gin.Context) {
+	offsetStr := c.Query("offset")
+	offset, _ := strconv.Atoi(offsetStr)
+	var req upsertCardioRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	cardio, err := services.UpsertCardioForWorkoutLog(h.db, offset, req.Minutes, req.Type)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"cardio": cardio})
 }
 
 func (f *WorkoutLogHandler) getPreviousWorkout(c *gin.Context) {
@@ -151,7 +185,9 @@ func (f *WorkoutLogHandler) getPreviousWorkout(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"day":                today,
-		"previous_exercises": results,
+		"day":               today,
+		"planned_exercises": results,
+		"planned_cardio":    plannedCardioFromPlan(today.WorkoutPlan),
+		"logged_cardio":     today.Cardio,
 	})
 }

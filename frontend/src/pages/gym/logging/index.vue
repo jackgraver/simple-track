@@ -14,6 +14,8 @@ const offset = computed(() => {
 });
 const {
     log,
+    plannedCardio,
+    loggedCardio,
     pending,
     error,
     data,
@@ -47,6 +49,13 @@ const handleAddExercise = async (exerciseId: number) => {
     }
 };
 
+const selectCardio = () => {
+    router.push({
+        name: "logging-cardio",
+        query: route.query,
+    });
+};
+
 const handleRemoveExercise = async (index: number) => {
     const exerciseGroup = log.value[index];
     if (!exerciseGroup) return;
@@ -77,10 +86,13 @@ const handleRemoveExercise = async (index: number) => {
     <div v-else class="container">
         <ExerciseListView
             :exercises="log"
+            :planned-cardio="plannedCardio"
+            :logged-cardio="loggedCardio"
             :workoutName="workoutName"
             @select-exercise="selectExercise"
             @add-exercise="handleAddExercise"
             @remove-exercise="handleRemoveExercise"
+            @select-cardio="selectCardio"
         />
     </div>
 </template>
