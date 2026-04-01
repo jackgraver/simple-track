@@ -10,7 +10,7 @@ func BenchmarkMiddleware(router *gin.Engine) gin.HandlerFunc {
 	benchmarker := Benchmarker{Benchmarks: make(map[string]*Benchmark)}
 
 	router.GET("/benchmark", func(c *gin.Context) {
-		c.JSON(200, benchmarker.GetBenchmarksStats("/mealplan/today"))
+		c.JSON(200, benchmarker.GetBenchmarksStats("/workout/exercises/all"))
 	})
 
 	return func(c *gin.Context) {

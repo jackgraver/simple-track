@@ -5,7 +5,7 @@ package main
 
 import (
 	"be-simpletracker/internal/database"
-	workoutseed "be-simpletracker/internal/features/workout/seed"
+	workoutseed "be-simpletracker/internal/workout/seed"
 	"fmt"
 	"os"
 )

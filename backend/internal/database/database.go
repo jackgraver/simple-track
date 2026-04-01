@@ -5,37 +5,14 @@ import (
 	"bytes"
 	"fmt"
 	"log"
-	"net/http"
 	"os"
 	"os/exec"
 	"strings"
-	"time"
 
-	"github.com/gin-gonic/gin"
 	"github.com/glebarez/sqlite"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
-
-func DefineRoutes(router *gin.Engine) {
-	router.POST("/db/dump", func(c *gin.Context) {
-		timestamp := time.Now().Format("2006-01-02_15-04-05")
-		filename := fmt.Sprintf("database/dumps/dbdump_%s.sql", timestamp)
-		dbPath := getEnv("DB_PATH", "st.db")
-
-		if err := DumpSQLiteDB(dbPath, filename); err != nil {
-			c.String(http.StatusInternalServerError, fmt.Sprintf("Dump failed: %v", err))
-			return
-		}
-
-		c.String(http.StatusOK, fmt.Sprintf("Dump successful: %s", filename))
-	})
-
-	router.POST("/db/restore", func(c *gin.Context) {
-		RestoreSQLiteDB("out_dump.sql")
-		c.String(http.StatusOK, "Restore Successful")
-	})
-}
 
 // Initializes a new database connection to a PostgreSQL database.
 func ConnectToPostgres() (*gorm.DB, error) {
