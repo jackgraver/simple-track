@@ -6,6 +6,7 @@ import (
 	diet "be-simpletracker/internal/features/diet"
 	workout "be-simpletracker/internal/features/workout"
 	"be-simpletracker/internal/utils"
+	"fmt"
 	"io"
 	"os"
 	"strings"
@@ -31,6 +32,8 @@ func main() {
 		gin.DefaultWriter = io.MultiWriter(f, os.Stdout)
 	}
 
+	// Set the mode to release mode (stops DEBUG logging like all defined routes)
+	gin.SetMode(gin.ReleaseMode)
 	router := gin.Default()
 
 	router.Use(utils.BenchmarkMiddleware(router))
@@ -61,6 +64,7 @@ func main() {
 	CreateFeatures(db, router)
 
 	addr := getEnv("LISTEN_ADDR", "0.0.0.0:8080")
+	fmt.Println("Server is running on port", addr)
 	router.Run(addr)
 }
 
