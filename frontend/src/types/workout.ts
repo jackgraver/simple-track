@@ -50,6 +50,7 @@ export interface Cardio extends BaseModel {
     workout_log_id: number;
     minutes: number;
     type: string;
+    notes: string;
 }
 
 export interface WorkoutLog extends BaseModel {

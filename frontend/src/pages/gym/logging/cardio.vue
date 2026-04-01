@@ -23,9 +23,9 @@ const goBack = () => {
     });
 };
 
-const handleSave = async (minutes: number) => {
+const handleSave = async (minutes: number, notes: string) => {
     try {
-        await saveCardio(minutes);
+        await saveCardio(minutes, undefined, notes);
         toast.push("Cardio saved", "success");
         goBack();
     } catch (err: any) {

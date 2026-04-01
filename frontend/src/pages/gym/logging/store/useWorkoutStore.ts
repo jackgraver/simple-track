@@ -93,8 +93,8 @@ export function useWorkoutStore(offset: MaybeRefOrGetter<number> = 0) {
         }
     };
 
-    const saveCardio = async (minutes: number, type?: string): Promise<void> => {
-        await upsertCardioMutation.mutateAsync({ minutes, type });
+    const saveCardio = async (minutes: number, type?: string, notes?: string): Promise<void> => {
+        await upsertCardioMutation.mutateAsync({ minutes, type, notes });
     };
 
     const getExerciseByIndex = (index: number): ExerciseGroup | null => {

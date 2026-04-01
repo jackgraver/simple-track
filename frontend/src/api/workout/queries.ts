@@ -152,7 +152,7 @@ export function useUpsertCardio(offset: MaybeRefOrGetter<number> = 0) {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: async (payload: { minutes: number; type?: string }) => {
+        mutationFn: async (payload: { minutes: number; type?: string; notes?: string }) => {
             const body = await apiPOST<{ cardio: Cardio }>(
                 '/workout/logs/cardio',
                 {
@@ -160,6 +160,7 @@ export function useUpsertCardio(offset: MaybeRefOrGetter<number> = 0) {
                     ...(payload.type !== undefined && payload.type !== ''
                         ? { type: payload.type }
                         : {}),
+                    ...(payload.notes !== undefined ? { notes: payload.notes } : {}),
                 },
                 { params: { offset: toValue(offset) } },
             );

@@ -10,7 +10,7 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
-    (e: "save", minutes: number): void;
+    (e: "save", minutes: number, notes: string): void;
     (e: "back"): void;
 }>();
 
@@ -21,6 +21,7 @@ const cardioName = computed(
 const isLogged = computed(() => (props.loggedCardio?.minutes ?? 0) > 0);
 
 const currentMinutes = ref(0);
+const notes = ref("");
 
 const editMode = ref(false);
 const inputValue = ref("");
@@ -31,6 +32,7 @@ watch(
     () => props.loggedCardio,
     (c) => {
         currentMinutes.value = c?.minutes ?? 0;
+        notes.value = c?.notes ?? "";
     },
     { immediate: true },
 );
@@ -81,7 +83,7 @@ const finish = () => {
         error.value = "Enter minutes before saving.";
         return;
     }
-    emit("save", currentMinutes.value);
+    emit("save", currentMinutes.value, notes.value);
 };
 </script>
 
@@ -107,6 +109,16 @@ const finish = () => {
                 @enter-edit="enterEdit"
                 @exit-edit="exitEdit"
             />
+        </div>
+        <div class="input-container">
+            <label>Notes</label>
+            <textarea
+                class="notes-input"
+                :value="notes"
+                placeholder="What did you watch? Any thoughts..."
+                rows="3"
+                @input="notes = ($event.target as HTMLTextAreaElement).value"
+            ></textarea>
         </div>
         <button
             class="bg-green-600 hover:bg-green-500 w-full rounded py-3 text-base font-medium text-white"
@@ -176,6 +188,35 @@ const finish = () => {
     display: flex;
     flex-direction: column;
     gap: 2rem;
+}
+.input-container {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+.input-container label {
+    font-weight: 500;
+    font-size: 0.9rem;
+    color: rgb(150, 150, 150);
+}
+.notes-input {
+    padding: 0.75rem 1rem;
+    border: 1px solid rgb(56, 56, 56);
+    border-radius: 5px;
+    background: rgb(27, 27, 27);
+    color: inherit;
+    font-size: 1rem;
+    font-family: inherit;
+    resize: vertical;
+    transition: border-color 0.2s, background-color 0.2s;
+}
+.notes-input:focus {
+    outline: none;
+    border-color: rgb(100, 100, 100);
+    background: rgb(35, 35, 35);
+}
+.notes-input::placeholder {
+    color: rgb(100, 100, 100);
 }
 @media (max-width: 767px) {
     .logging-view {

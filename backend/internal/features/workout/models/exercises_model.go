@@ -56,6 +56,7 @@ type Cardio struct {
 	WorkoutLogID uint   `json:"workout_log_id" gorm:"uniqueIndex;not null"`
 	Minutes      int    `json:"minutes"`
 	Type         string `json:"type"`
+	Notes        string `json:"notes"`
 }
 
 func (c Cardio) GetID() uint       { return c.ID }

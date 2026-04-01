@@ -103,6 +103,7 @@ func plannedCardioFromPlan(plan *models.WorkoutPlan) any {
 type upsertCardioRequest struct {
 	Minutes int    `json:"minutes" binding:"required,gte=0"`
 	Type    string `json:"type"`
+	Notes   string `json:"notes"`
 }
 
 func (h *WorkoutLogHandler) upsertCardio(c *gin.Context) {
@@ -113,7 +114,7 @@ func (h *WorkoutLogHandler) upsertCardio(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	cardio, err := services.UpsertCardioForWorkoutLog(h.db, offset, req.Minutes, req.Type)
+	cardio, err := services.UpsertCardioForWorkoutLog(h.db, offset, req.Minutes, req.Type, req.Notes)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
