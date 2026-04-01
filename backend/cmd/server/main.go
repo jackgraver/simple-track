@@ -3,11 +3,9 @@ package main
 import (
 	"be-simpletracker/internal/auth"
 	"be-simpletracker/internal/database"
-	diet "be-simpletracker/internal/features/diet"
-	workout "be-simpletracker/internal/features/workout"
-	"be-simpletracker/internal/utils"
+	diet "be-simpletracker/internal/diet"
+	workout "be-simpletracker/internal/workout"
 	"fmt"
-	"io"
 	"os"
 	"strings"
 	"time"
@@ -25,18 +23,11 @@ func getEnv(key, fallback string) string {
 }
 
 func main() {
-	f, err := os.Create("gin.log")
-	if err != nil {
-		gin.DefaultWriter = os.Stdout
-	} else {
-		gin.DefaultWriter = io.MultiWriter(f, os.Stdout)
-	}
-
 	// Set the mode to release mode (stops DEBUG logging like all defined routes)
 	gin.SetMode(gin.ReleaseMode)
 	router := gin.Default()
 
-	router.Use(utils.BenchmarkMiddleware(router))
+	// router.Use(utils.BenchmarkMiddleware(router))
 
 	corsOrigins := getEnv("CORS_ORIGINS", "http://localhost:5173,http://localhost:3000,http://192.168.4.78:3000,http://192.168.4.64:3000")
 	origins := splitString(corsOrigins, ",")
@@ -59,7 +50,6 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	database.DefineRoutes(router)
 
 	CreateFeatures(db, router)
 
