@@ -13,6 +13,8 @@ type WorkoutPlan struct {
 	Name               string     `json:"name"`
 	DayOfWeek          *int       `json:"day_of_week" gorm:"uniqueIndex:idx_day_of_week"` // 0=Sunday, 1=Monday, ..., 6=Saturday, null=unassigned
 	PlannedCardioType  string     `json:"planned_cardio_type,omitempty"`                  // e.g. Run, Bike; empty means no planned cardio
+	PreMobilityItems   []string   `json:"pre_mobility_items,omitempty" gorm:"type:jsonb;serializer:json"`
+	PostMobilityItems  []string   `json:"post_mobility_items,omitempty" gorm:"type:jsonb;serializer:json"`
 	Exercises          []Exercise `gorm:"many2many:workout_plan_exercises;" json:"exercises"`
 }
 

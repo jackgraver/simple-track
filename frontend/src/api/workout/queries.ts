@@ -4,7 +4,7 @@ import { apiDELETE, apiGET, apiPOST } from '~/api/client';
 import type { WorkoutLogsPreviousResponse } from '~/api/workout/api';
 import { liveworkoutKeys } from '~/api/workout/keys';
 import { homeKeys } from '~/pages/home/queries/keys';
-import type { Cardio, Exercise, LoggedExercise } from '~/types/workout';
+import type { Cardio, Exercise, LoggedExercise, MobilityLogged } from '~/types/workout';
 
 export function useWorkoutLogToday(offset: MaybeRefOrGetter<number> = 0) {
     return useQuery(
@@ -136,6 +136,54 @@ export function useDeleteLoggedSet(offset: MaybeRefOrGetter<number> = 0) {
 
     return useMutation({
         mutationFn: (setId: number) => apiDELETE(`/workout/exercises/sets/${setId}`),
+        onSuccess: () => {
+            const currentOffset = toValue(offset);
+            queryClient.invalidateQueries({
+                queryKey: liveworkoutKeys.workouts.previous(currentOffset),
+            });
+            queryClient.invalidateQueries({
+                queryKey: liveworkoutKeys.workouts.day(currentOffset),
+            });
+        },
+    });
+}
+
+export function useUpsertMobilityPre(offset: MaybeRefOrGetter<number> = 0) {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: async (checked: string[]) => {
+            const body = await apiPOST<{ mobility: MobilityLogged }>(
+                '/workout/logs/mobility/pre',
+                { checked },
+                { params: { offset: toValue(offset) } },
+            );
+            return body.mobility;
+        },
+        onSuccess: () => {
+            const currentOffset = toValue(offset);
+            queryClient.invalidateQueries({
+                queryKey: liveworkoutKeys.workouts.previous(currentOffset),
+            });
+            queryClient.invalidateQueries({
+                queryKey: liveworkoutKeys.workouts.day(currentOffset),
+            });
+        },
+    });
+}
+
+export function useUpsertMobilityPost(offset: MaybeRefOrGetter<number> = 0) {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: async (checked: string[]) => {
+            const body = await apiPOST<{ mobility: MobilityLogged }>(
+                '/workout/logs/mobility/post',
+                { checked },
+                { params: { offset: toValue(offset) } },
+            );
+            return body.mobility;
+        },
         onSuccess: () => {
             const currentOffset = toValue(offset);
             queryClient.invalidateQueries({

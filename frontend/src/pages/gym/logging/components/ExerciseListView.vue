@@ -4,6 +4,7 @@ import type {
     Exercise,
     LoggedExercise,
     PlannedCardio,
+    MobilityLogged,
 } from "~/types/workout";
 import { ref, computed } from "vue";
 import { Trash2 } from "lucide-vue-next";
@@ -21,6 +22,8 @@ const props = defineProps<{
     exercises: ExerciseGroup[];
     plannedCardio?: PlannedCardio | null;
     loggedCardio?: Cardio | null;
+    loggedPreMobility?: MobilityLogged | null;
+    loggedPostMobility?: MobilityLogged | null;
 }>();
 
 const workoutName = computed(() => props.workoutName);
@@ -29,6 +32,8 @@ const emit = defineEmits<{
     (e: "add-exercise", exerciseId: number): void;
     (e: "remove-exercise", index: number): void;
     (e: "select-cardio"): void;
+    (e: "select-pre-mobility"): void;
+    (e: "select-post-mobility"): void;
 }>();
 
 const showCardioRow = computed(
@@ -39,9 +44,29 @@ const cardioName = computed(
     () => props.plannedCardio?.type ?? props.loggedCardio?.type ?? "Cardio",
 );
 
-const cardioIsLogged = computed(
-    () => (props.loggedCardio?.minutes ?? 0) > 0,
-);
+const cardioIsLogged = computed(() => (props.loggedCardio?.minutes ?? 0) > 0);
+
+const showPreMobilityRow = computed(() => {
+    const l = props.loggedPreMobility;
+    return l != null && l.items.length > 0;
+});
+
+const showPostMobilityRow = computed(() => {
+    const l = props.loggedPostMobility;
+    return l != null && l.items.length > 0;
+});
+
+const preMobilityComplete = computed(() => {
+    const l = props.loggedPreMobility;
+    if (!l?.items.length) return false;
+    return l.items.every((name) => l.checked.includes(name));
+});
+
+const postMobilityComplete = computed(() => {
+    const l = props.loggedPostMobility;
+    if (!l?.items.length) return false;
+    return l.items.every((name) => l.checked.includes(name));
+});
 
 const router = useRouter();
 
@@ -52,10 +77,13 @@ const { data: allExercisesData } = useAllExercises();
 const allExercises = computed(() => allExercisesData.value ?? []);
 const filteredExercises = computed(() => {
     const query = searchQuery.value.toLowerCase();
-    return allExercises.value.filter(ex => 
-        ex.name.toLowerCase().includes(query) &&
-        !props.exercises.some(eg => eg.planned?.ID === ex.ID)
-    ).slice(0, 10);
+    return allExercises.value
+        .filter(
+            (ex) =>
+                ex.name.toLowerCase().includes(query) &&
+                !props.exercises.some((eg) => eg.planned?.ID === ex.ID),
+        )
+        .slice(0, 10);
 });
 
 // Handle exercise selection
@@ -80,18 +108,29 @@ const removeExercise = (index: number, event: Event) => {
 
 // Get maximum weight from previous exercise
 const getMaxWeight = (exerciseGroup: ExerciseGroup): number | null => {
-    if (!exerciseGroup.previous || !exerciseGroup.previous.sets || exerciseGroup.previous.sets.length === 0) {
+    if (
+        !exerciseGroup.previous ||
+        !exerciseGroup.previous.sets ||
+        exerciseGroup.previous.sets.length === 0
+    ) {
         return null;
     }
-    return Math.max(...exerciseGroup.previous.sets.map(set => set.weight));
+    return Math.max(...exerciseGroup.previous.sets.map((set) => set.weight));
 };
 
 // Get last set from logged exercise
-const getLastSet = (exerciseGroup: ExerciseGroup): { weight: number; reps: number } | null => {
-    if (!exerciseGroup.logged || !exerciseGroup.logged.sets || exerciseGroup.logged.sets.length === 0) {
+const getLastSet = (
+    exerciseGroup: ExerciseGroup,
+): { weight: number; reps: number } | null => {
+    if (
+        !exerciseGroup.logged ||
+        !exerciseGroup.logged.sets ||
+        exerciseGroup.logged.sets.length === 0
+    ) {
         return null;
     }
-    const lastSet = exerciseGroup.logged.sets[exerciseGroup.logged.sets.length - 1];
+    const lastSet =
+        exerciseGroup.logged.sets[exerciseGroup.logged.sets.length - 1];
     if (!lastSet) {
         return null;
     }
@@ -103,7 +142,11 @@ const getLastSet = (exerciseGroup: ExerciseGroup): { weight: number; reps: numbe
 
 // Check if exercise is logged
 const isLogged = (exerciseGroup: ExerciseGroup): boolean => {
-    return !!exerciseGroup.logged && exerciseGroup.logged.sets && exerciseGroup.logged.sets.length > 0;
+    return (
+        !!exerciseGroup.logged &&
+        exerciseGroup.logged.sets &&
+        exerciseGroup.logged.sets.length > 0
+    );
 };
 </script>
 
@@ -122,7 +165,10 @@ const isLogged = (exerciseGroup: ExerciseGroup): boolean => {
                     placeholder="Add exercise..."
                     class="exercise-search-input"
                 />
-                <ul v-if="showSuggestions && filteredExercises.length > 0" class="suggestions-list">
+                <ul
+                    v-if="showSuggestions && filteredExercises.length > 0"
+                    class="suggestions-list"
+                >
                     <li
                         v-for="exercise in filteredExercises"
                         :key="exercise.ID"
@@ -136,18 +182,54 @@ const isLogged = (exerciseGroup: ExerciseGroup): boolean => {
         </div>
         <ul class="exercise-list">
             <li
-                v-for="(exerciseGroup, index) in exercises"
-                :key="exerciseGroup.planned?.ID ?? exerciseGroup.logged?.exercise_id ?? exerciseGroup.logged?.ID ?? index"
-                @click="emit('select-exercise', index)"
-                :class="['exercise-item', { 'logged': isLogged(exerciseGroup) }]"
+                v-if="showPreMobilityRow"
+                key="pre-mobility"
+                @click="emit('select-pre-mobility')"
+                :class="['exercise-item', { logged: preMobilityComplete }]"
             >
                 <div class="exercise-content">
                     <div class="exercise-title-section">
-                        <span class="exercise-name">{{ exerciseGroup.planned?.name || exerciseGroup.logged?.exercise?.name }}</span>
-                        <span v-if="isLogged(exerciseGroup) && getLastSet(exerciseGroup)" class="exercise-subtitle">
-                              <p v-for="set in exerciseGroup.logged?.sets">{{ set.weight }}lbs × {{ set.reps }}</p>
+                        <span class="exercise-name">{{
+                            loggedPreMobility?.title ?? "Pre-workout mobility"
+                        }}</span>
+                    </div>
+                </div>
+            </li>
+            <li
+                v-for="(exerciseGroup, index) in exercises"
+                :key="
+                    exerciseGroup.planned?.ID ??
+                    exerciseGroup.logged?.exercise_id ??
+                    exerciseGroup.logged?.ID ??
+                    index
+                "
+                @click="emit('select-exercise', index)"
+                :class="['exercise-item', { logged: isLogged(exerciseGroup) }]"
+            >
+                <div class="exercise-content">
+                    <div class="exercise-title-section">
+                        <span class="exercise-name">{{
+                            exerciseGroup.planned?.name ||
+                            exerciseGroup.logged?.exercise?.name
+                        }}</span>
+                        <span
+                            v-if="
+                                isLogged(exerciseGroup) &&
+                                getLastSet(exerciseGroup)
+                            "
+                            class="exercise-subtitle"
+                        >
+                            <p v-for="set in exerciseGroup.logged?.sets">
+                                {{ set.weight }}lbs × {{ set.reps }}
+                            </p>
                         </span>
-                        <span v-else-if="!isLogged(exerciseGroup) && getMaxWeight(exerciseGroup) !== null" class="exercise-subtitle">
+                        <span
+                            v-else-if="
+                                !isLogged(exerciseGroup) &&
+                                getMaxWeight(exerciseGroup) !== null
+                            "
+                            class="exercise-subtitle"
+                        >
                             Prev {{ getMaxWeight(exerciseGroup) }}lbs
                         </span>
                     </div>
@@ -164,7 +246,7 @@ const isLogged = (exerciseGroup: ExerciseGroup): boolean => {
                 v-if="showCardioRow"
                 key="cardio"
                 @click="emit('select-cardio')"
-                :class="['exercise-item', { 'logged': cardioIsLogged }]"
+                :class="['exercise-item', { logged: cardioIsLogged }]"
             >
                 <div class="exercise-content">
                     <div class="exercise-title-section">
@@ -172,6 +254,20 @@ const isLogged = (exerciseGroup: ExerciseGroup): boolean => {
                         <span v-if="cardioIsLogged" class="exercise-subtitle">
                             {{ loggedCardio?.minutes }} min
                         </span>
+                    </div>
+                </div>
+            </li>
+            <li
+                v-if="showPostMobilityRow"
+                key="post-mobility"
+                @click="emit('select-post-mobility')"
+                :class="['exercise-item', { logged: postMobilityComplete }]"
+            >
+                <div class="exercise-content">
+                    <div class="exercise-title-section">
+                        <span class="exercise-name">{{
+                            loggedPostMobility?.title ?? "Post-workout mobility"
+                        }}</span>
                     </div>
                 </div>
             </li>
@@ -262,7 +358,9 @@ const isLogged = (exerciseGroup: ExerciseGroup): boolean => {
     border-radius: 5px;
     background: rgb(27, 27, 27);
     cursor: pointer;
-    transition: background-color 0.2s, opacity 0.2s;
+    transition:
+        background-color 0.2s,
+        opacity 0.2s;
     width: 100%;
     box-sizing: border-box;
     gap: 1rem;
@@ -335,7 +433,9 @@ const isLogged = (exerciseGroup: ExerciseGroup): boolean => {
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: background-color 0.2s, border-color 0.2s;
+    transition:
+        background-color 0.2s,
+        border-color 0.2s;
     padding: 0;
     flex-shrink: 0;
 }
@@ -361,4 +461,3 @@ const isLogged = (exerciseGroup: ExerciseGroup): boolean => {
     background: rgb(100, 100, 50) !important;
 }
 </style>
-

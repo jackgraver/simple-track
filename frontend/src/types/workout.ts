@@ -17,6 +17,8 @@ export interface WorkoutPlan extends BaseModel {
     name: string;
     day_of_week: number | null; // 0=Sunday, 1=Monday, ..., 6=Saturday, null=unassigned
     planned_cardio_type?: string;
+    pre_mobility_items?: string[];
+    post_mobility_items?: string[];
     exercises: Exercise[];
 }
 
@@ -53,10 +55,21 @@ export interface Cardio extends BaseModel {
     notes: string;
 }
 
+export interface MobilityRoutine {
+    title: string;
+    items: string[];
+}
+
+export interface MobilityLogged extends MobilityRoutine {
+    checked: string[];
+}
+
 export interface WorkoutLog extends BaseModel {
     date: string; // ISO string for time.Time
     workout_plan_id?: number | null;
     workout_plan?: WorkoutPlan | null;
     exercises: LoggedExercise[];
     cardio?: Cardio | null;
+    pre_mobility_checked?: string[];
+    post_mobility_checked?: string[];
 }

@@ -75,3 +75,21 @@ func (r *WorkoutLogRepository) CreateCardio(ctx context.Context, row *models.Car
 func (r *WorkoutLogRepository) SaveCardio(ctx context.Context, row *models.Cardio) error {
 	return r.db.WithContext(ctx).Save(row).Error
 }
+
+func (r *WorkoutLogRepository) UpdatePreMobilityChecked(ctx context.Context, workoutLogID uint, checked []string) error {
+	var wl models.WorkoutLog
+	if err := r.db.WithContext(ctx).First(&wl, workoutLogID).Error; err != nil {
+		return err
+	}
+	wl.PreMobilityChecked = checked
+	return r.db.WithContext(ctx).Session(&gorm.Session{FullSaveAssociations: false}).Save(&wl).Error
+}
+
+func (r *WorkoutLogRepository) UpdatePostMobilityChecked(ctx context.Context, workoutLogID uint, checked []string) error {
+	var wl models.WorkoutLog
+	if err := r.db.WithContext(ctx).First(&wl, workoutLogID).Error; err != nil {
+		return err
+	}
+	wl.PostMobilityChecked = checked
+	return r.db.WithContext(ctx).Session(&gorm.Session{FullSaveAssociations: false}).Save(&wl).Error
+}
