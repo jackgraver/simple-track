@@ -16,6 +16,8 @@ const {
     log,
     plannedCardio,
     loggedCardio,
+    loggedPreMobility,
+    loggedPostMobility,
     pending,
     error,
     data,
@@ -56,6 +58,20 @@ const selectCardio = () => {
     });
 };
 
+const selectPreMobility = () => {
+    router.push({
+        name: "logging-mobility-pre",
+        query: route.query,
+    });
+};
+
+const selectPostMobility = () => {
+    router.push({
+        name: "logging-mobility-post",
+        query: route.query,
+    });
+};
+
 const handleRemoveExercise = async (index: number) => {
     const exerciseGroup = log.value[index];
     if (!exerciseGroup) return;
@@ -88,11 +104,15 @@ const handleRemoveExercise = async (index: number) => {
             :exercises="log"
             :planned-cardio="plannedCardio"
             :logged-cardio="loggedCardio"
+            :logged-pre-mobility="loggedPreMobility"
+            :logged-post-mobility="loggedPostMobility"
             :workoutName="workoutName"
             @select-exercise="selectExercise"
             @add-exercise="handleAddExercise"
             @remove-exercise="handleRemoveExercise"
             @select-cardio="selectCardio"
+            @select-pre-mobility="selectPreMobility"
+            @select-post-mobility="selectPostMobility"
         />
     </div>
 </template>

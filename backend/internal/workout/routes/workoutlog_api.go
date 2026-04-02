@@ -25,6 +25,8 @@ func RegisterWorkoutLogRoutes(group *gin.RouterGroup, db *gorm.DB) {
 		logs.GET("/month", h.getWorkoutMonth)
 		logs.GET("/previous", h.getPreviousWorkout)
 		logs.POST("/cardio", h.upsertCardio)
+		logs.POST("/mobility/pre", h.upsertMobilityPre)
+		logs.POST("/mobility/post", h.upsertMobilityPost)
 	}
 }
 
@@ -97,4 +99,46 @@ func (h *WorkoutLogHandler) getPreviousWorkout(reqCtx *gin.Context) {
 	}
 
 	reqCtx.JSON(http.StatusOK, payload)
+}
+
+type upsertMobilityRequest struct {
+	Checked []string `json:"checked"`
+}
+
+func (h *WorkoutLogHandler) upsertMobilityPre(reqCtx *gin.Context) {
+	offset, err := utils.ParseQueryInt(reqCtx, weekOffsetQuery)
+	if err != nil {
+		reqCtx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	var req upsertMobilityRequest
+	if err := reqCtx.ShouldBindJSON(&req); err != nil {
+		reqCtx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	view, err := h.svc.UpsertMobilityPre(reqCtx.Request.Context(), offset, req.Checked)
+	if err != nil {
+		reqCtx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	reqCtx.JSON(http.StatusOK, gin.H{"mobility": view})
+}
+
+func (h *WorkoutLogHandler) upsertMobilityPost(reqCtx *gin.Context) {
+	offset, err := utils.ParseQueryInt(reqCtx, weekOffsetQuery)
+	if err != nil {
+		reqCtx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	var req upsertMobilityRequest
+	if err := reqCtx.ShouldBindJSON(&req); err != nil {
+		reqCtx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	view, err := h.svc.UpsertMobilityPost(reqCtx.Request.Context(), offset, req.Checked)
+	if err != nil {
+		reqCtx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	reqCtx.JSON(http.StatusOK, gin.H{"mobility": view})
 }

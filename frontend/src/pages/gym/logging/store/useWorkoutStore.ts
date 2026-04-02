@@ -6,6 +6,8 @@ import {
     useRemoveExerciseFromWorkout,
     useDeleteLoggedSet,
     useUpsertCardio,
+    useUpsertMobilityPre,
+    useUpsertMobilityPost,
 } from "~/api/workout/queries";
 import { sortExerciseGroupsByLogOrder } from "../utils/sortExerciseGroupsByLogOrder";
 import { computed, type MaybeRefOrGetter } from "vue";
@@ -33,6 +35,8 @@ export function useWorkoutStore(offset: MaybeRefOrGetter<number> = 0) {
     const removeExerciseMutation = useRemoveExerciseFromWorkout(offset);
     const deleteLoggedSetMutation = useDeleteLoggedSet(offset);
     const upsertCardioMutation = useUpsertCardio(offset);
+    const upsertMobilityPreMutation = useUpsertMobilityPre(offset);
+    const upsertMobilityPostMutation = useUpsertMobilityPost(offset);
 
     const log = computed<ExerciseGroup[]>(() => {
         const raw = workoutLogsQuery.data.value?.planned_exercises ?? [];
@@ -44,6 +48,19 @@ export function useWorkoutStore(offset: MaybeRefOrGetter<number> = 0) {
     );
     const loggedCardio = computed(
         () => workoutLogsQuery.data.value?.logged_cardio ?? null,
+    );
+
+    const plannedPreMobility = computed(
+        () => workoutLogsQuery.data.value?.planned_pre_mobility ?? null,
+    );
+    const loggedPreMobility = computed(
+        () => workoutLogsQuery.data.value?.logged_pre_mobility ?? null,
+    );
+    const plannedPostMobility = computed(
+        () => workoutLogsQuery.data.value?.planned_post_mobility ?? null,
+    );
+    const loggedPostMobility = computed(
+        () => workoutLogsQuery.data.value?.logged_post_mobility ?? null,
     );
 
     const data = computed(() => workoutLogsQuery.data.value);
@@ -97,6 +114,14 @@ export function useWorkoutStore(offset: MaybeRefOrGetter<number> = 0) {
         await upsertCardioMutation.mutateAsync({ minutes, type, notes });
     };
 
+    const savePreMobility = async (checked: string[]): Promise<void> => {
+        await upsertMobilityPreMutation.mutateAsync(checked);
+    };
+
+    const savePostMobility = async (checked: string[]): Promise<void> => {
+        await upsertMobilityPostMutation.mutateAsync(checked);
+    };
+
     const getExerciseByIndex = (index: number): ExerciseGroup | null => {
         return log.value[index] || null;
     };
@@ -112,6 +137,10 @@ export function useWorkoutStore(offset: MaybeRefOrGetter<number> = 0) {
         log,
         plannedCardio,
         loggedCardio,
+        plannedPreMobility,
+        loggedPreMobility,
+        plannedPostMobility,
+        loggedPostMobility,
         data,
         pending,
         error,
@@ -120,6 +149,8 @@ export function useWorkoutStore(offset: MaybeRefOrGetter<number> = 0) {
         removeExerciseFromWorkout,
         deleteLoggedSet,
         saveCardio,
+        savePreMobility,
+        savePostMobility,
         getExerciseByIndex,
         getExerciseIndexById,
     };

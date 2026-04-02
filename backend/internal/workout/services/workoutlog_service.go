@@ -81,10 +81,92 @@ type MonthWorkoutLogsResponse struct {
 }
 
 type PreviousWorkoutResponse struct {
-	Day              models.WorkoutLog `json:"day"`
-	PlannedExercises []ExerciseGroup   `json:"planned_exercises"`
-	PlannedCardio    any               `json:"planned_cardio"`
-	LoggedCardio     *models.Cardio    `json:"logged_cardio"`
+	Day                 models.WorkoutLog `json:"day"`
+	PlannedExercises    []ExerciseGroup   `json:"planned_exercises"`
+	PlannedCardio       any               `json:"planned_cardio"`
+	LoggedCardio        *models.Cardio    `json:"logged_cardio"`
+	PlannedPreMobility  *MobilityRoutineView `json:"planned_pre_mobility"`
+	LoggedPreMobility   *MobilityLoggedView  `json:"logged_pre_mobility"`
+	PlannedPostMobility *MobilityRoutineView `json:"planned_post_mobility"`
+	LoggedPostMobility  *MobilityLoggedView  `json:"logged_post_mobility"`
+}
+
+// MobilityRoutineView is planned stretches for one slot (pre or post).
+type MobilityRoutineView struct {
+	Title string   `json:"title"`
+	Items []string `json:"items"`
+}
+
+// MobilityLoggedView is planned items plus which are checked for this workout log.
+type MobilityLoggedView struct {
+	Title   string   `json:"title"`
+	Items   []string `json:"items"`
+	Checked []string `json:"checked"`
+}
+
+const (
+	preMobilityTitle  = "Pre-workout mobility"
+	postMobilityTitle = "Post-workout mobility"
+)
+
+func plannedPreMobilityFromPlan(plan *models.WorkoutPlan) *MobilityRoutineView {
+	if plan == nil || len(plan.PreMobilityItems) == 0 {
+		return nil
+	}
+	return &MobilityRoutineView{Title: preMobilityTitle, Items: append([]string{}, plan.PreMobilityItems...)}
+}
+
+func plannedPostMobilityFromPlan(plan *models.WorkoutPlan) *MobilityRoutineView {
+	if plan == nil || len(plan.PostMobilityItems) == 0 {
+		return nil
+	}
+	return &MobilityRoutineView{Title: postMobilityTitle, Items: append([]string{}, plan.PostMobilityItems...)}
+}
+
+func filterCheckedToItems(items []string, checked []string) []string {
+	valid := make(map[string]struct{}, len(items))
+	for _, it := range items {
+		valid[it] = struct{}{}
+	}
+	out := make([]string, 0, len(checked))
+	for _, c := range checked {
+		if _, ok := valid[c]; ok {
+			out = append(out, c)
+		}
+	}
+	return out
+}
+
+func loggedPreMobilityView(plan *models.WorkoutPlan, log *models.WorkoutLog) *MobilityLoggedView {
+	var items []string
+	if plan != nil {
+		items = append([]string{}, plan.PreMobilityItems...)
+	}
+	checked := append([]string{}, log.PreMobilityChecked...)
+	if len(items) == 0 && len(checked) == 0 {
+		return nil
+	}
+	if len(items) == 0 {
+		items = append([]string{}, checked...)
+	}
+	checked = filterCheckedToItems(items, checked)
+	return &MobilityLoggedView{Title: preMobilityTitle, Items: items, Checked: checked}
+}
+
+func loggedPostMobilityView(plan *models.WorkoutPlan, log *models.WorkoutLog) *MobilityLoggedView {
+	var items []string
+	if plan != nil {
+		items = append([]string{}, plan.PostMobilityItems...)
+	}
+	checked := append([]string{}, log.PostMobilityChecked...)
+	if len(items) == 0 && len(checked) == 0 {
+		return nil
+	}
+	if len(items) == 0 {
+		items = append([]string{}, checked...)
+	}
+	checked = filterCheckedToItems(items, checked)
+	return &MobilityLoggedView{Title: postMobilityTitle, Items: items, Checked: checked}
 }
 
 func plannedCardioFromPlan(plan *models.WorkoutPlan) any {
@@ -204,11 +286,61 @@ func (s *WorkoutLogService) GetPreviousWorkoutView(ctx context.Context, offset i
 		}
 	}
 	return PreviousWorkoutResponse{
-		Day:              today,
-		PlannedExercises: results,
-		PlannedCardio:    plannedCardioFromPlan(today.WorkoutPlan),
-		LoggedCardio:     today.Cardio,
+		Day:                 today,
+		PlannedExercises:    results,
+		PlannedCardio:       plannedCardioFromPlan(today.WorkoutPlan),
+		LoggedCardio:        today.Cardio,
+		PlannedPreMobility:  plannedPreMobilityFromPlan(today.WorkoutPlan),
+		LoggedPreMobility:   loggedPreMobilityView(today.WorkoutPlan, &today),
+		PlannedPostMobility: plannedPostMobilityFromPlan(today.WorkoutPlan),
+		LoggedPostMobility:  loggedPostMobilityView(today.WorkoutPlan, &today),
 	}, nil
+}
+
+func (s *WorkoutLogService) UpsertMobilityPre(ctx context.Context, offset int, checked []string) (*MobilityLoggedView, error) {
+	t, err := s.GetOrCreateToday(ctx, offset)
+	if err != nil {
+		return nil, err
+	}
+	var items []string
+	if t.WorkoutPlan != nil {
+		items = append([]string{}, t.WorkoutPlan.PreMobilityItems...)
+	}
+	if len(items) == 0 {
+		return nil, fmt.Errorf("no pre-workout mobility planned for this day")
+	}
+	filtered := filterCheckedToItems(items, checked)
+	if err := s.repo.UpdatePreMobilityChecked(ctx, t.ID, filtered); err != nil {
+		return nil, err
+	}
+	reloaded, err := s.repo.LoadByDate(ctx, utils.ZerodTime(offset))
+	if err != nil {
+		return nil, err
+	}
+	return loggedPreMobilityView(reloaded.WorkoutPlan, &reloaded), nil
+}
+
+func (s *WorkoutLogService) UpsertMobilityPost(ctx context.Context, offset int, checked []string) (*MobilityLoggedView, error) {
+	t, err := s.GetOrCreateToday(ctx, offset)
+	if err != nil {
+		return nil, err
+	}
+	var items []string
+	if t.WorkoutPlan != nil {
+		items = append([]string{}, t.WorkoutPlan.PostMobilityItems...)
+	}
+	if len(items) == 0 {
+		return nil, fmt.Errorf("no post-workout mobility planned for this day")
+	}
+	filtered := filterCheckedToItems(items, checked)
+	if err := s.repo.UpdatePostMobilityChecked(ctx, t.ID, filtered); err != nil {
+		return nil, err
+	}
+	reloaded, err := s.repo.LoadByDate(ctx, utils.ZerodTime(offset))
+	if err != nil {
+		return nil, err
+	}
+	return loggedPostMobilityView(reloaded.WorkoutPlan, &reloaded), nil
 }
 
 func GetAll(database *gorm.DB) ([]models.WorkoutLog, error) {

@@ -8,19 +8,34 @@ import (
 	"gorm.io/gorm"
 )
 
+// dropWorkoutTables removes workout schema in FK-safe order (PostgreSQL).
+// Also drops the many2many join table workout_plan_exercises, which GORM does not
+// include when dropping models alone.
+func dropWorkoutTables(db *gorm.DB) error {
+	// Child / join tables first; CASCADE tolerates leftover FKs during dev resets.
+	names := []string{
+		"logged_sets",
+		"logged_exercises",
+		"cardios",
+		"workout_logs",
+		"workout_plan_exercises",
+		"workout_plans",
+		"exercises",
+	}
+	for _, name := range names {
+		if err := db.Exec(fmt.Sprintf("DROP TABLE IF EXISTS %q CASCADE", name)).Error; err != nil {
+			return fmt.Errorf("drop %s: %w", name, err)
+		}
+	}
+	return nil
+}
+
 // Run drops workout-related tables, re-migrates, and seeds demo plans/exercises/logs.
 // Destructive: do not run against production data without a backup.
 func Run(db *gorm.DB) error {
 	fmt.Println("Migrating workout database")
-	if err := db.Migrator().DropTable(
-		&models.WorkoutPlan{},
-		&models.WorkoutLog{},
-		&models.LoggedExercise{},
-		&models.Exercise{},
-		&models.LoggedSet{},
-		&models.Cardio{},
-	); err != nil {
-		fmt.Printf("Failed to drop workout database: %v\n", err)
+	if err := dropWorkoutTables(db); err != nil {
+		return err
 	}
 
 	if err := db.AutoMigrate(
@@ -31,7 +46,7 @@ func Run(db *gorm.DB) error {
 		&models.LoggedSet{},
 		&models.Cardio{},
 	); err != nil {
-		fmt.Printf("Failed to migrate workout database: %v\n", err)
+		return fmt.Errorf("auto migrate: %w", err)
 	}
 
 	fmt.Println("Seeding workout database")
@@ -89,6 +104,7 @@ func Run(db *gorm.DB) error {
 		&hipExtensions,
 		&outerThigh,
 		&innerThigh,
+		&hackSquat,
 	}
 
 	for _, exercise := range exercises {
@@ -107,6 +123,16 @@ func Run(db *gorm.DB) error {
 		Name:              "Push",
 		DayOfWeek:         &tuesday,
 		PlannedCardioType: "Bike",
+		PreMobilityItems: []string{
+			"Arm circles",
+			"Band pull-aparts",
+			"Scap push-ups",
+		},
+		PostMobilityItems: []string{
+			"Pec stretch doorway",
+			"Triceps stretch overhead",
+			"Neck half circles",
+		},
 		Exercises: []models.Exercise{
 			inclinePress,
 			chestFly,

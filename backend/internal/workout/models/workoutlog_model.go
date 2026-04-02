@@ -11,11 +11,13 @@ import (
 // Contains the exercises performed, sets logged, and optional cardio activity
 type WorkoutLog struct {
 	gorm.Model
-	Date          time.Time        `json:"date"`
-	WorkoutPlanID *uint            `json:"workout_plan_id"`
-	WorkoutPlan   *WorkoutPlan     `json:"workout_plan" gorm:"foreignKey:WorkoutPlanID"`
-	Exercises     []LoggedExercise `json:"exercises" gorm:"constraint:OnDelete:CASCADE;"`
-	Cardio        *Cardio          `json:"cardio" gorm:"constraint:OnDelete:CASCADE;"`
+	Date                time.Time        `json:"date"`
+	WorkoutPlanID       *uint            `json:"workout_plan_id"`
+	WorkoutPlan         *WorkoutPlan     `json:"workout_plan" gorm:"foreignKey:WorkoutPlanID"`
+	Exercises           []LoggedExercise `json:"exercises" gorm:"constraint:OnDelete:CASCADE;"`
+	Cardio              *Cardio          `json:"cardio" gorm:"constraint:OnDelete:CASCADE;"`
+	PreMobilityChecked  []string         `json:"pre_mobility_checked,omitempty" gorm:"type:jsonb;serializer:json"`
+	PostMobilityChecked []string         `json:"post_mobility_checked,omitempty" gorm:"type:jsonb;serializer:json"`
 }
 
 func (w WorkoutLog) GetID() uint        { return w.ID }
