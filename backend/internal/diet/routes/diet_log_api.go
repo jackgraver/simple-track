@@ -4,6 +4,7 @@ import (
 	"be-simpletracker/internal/diet/models"
 	"be-simpletracker/internal/diet/services"
 	"be-simpletracker/internal/generics"
+	"be-simpletracker/internal/utils"
 	"net/http"
 	"strconv"
 	"time"
@@ -38,8 +39,11 @@ func RegisterDietLogRoutes(group *gin.RouterGroup, db *gorm.DB) {
 }
 
 func (h *DietLogHandler) getMealPlanToday(c *gin.Context) {
-	offsetStr := c.Query("offset")
-	offset, _ := strconv.Atoi(offsetStr)
+	offset, err := utils.ParseQueryInt(c, weekOffsetQuery)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
 
 	day, daysErr := services.MealPlanToday(h.db, offset)
 	if daysErr != nil {
@@ -76,8 +80,11 @@ func (h *DietLogHandler) getMealPlanWeek(c *gin.Context) {
 }
 
 func (h *DietLogHandler) getMealPlanMonth(c *gin.Context) {
-	offsetStr := c.Query("monthoffset")
-	offset, _ := strconv.Atoi(offsetStr)
+	offset, err := utils.ParseQueryInt(c, monthOffsetQuery)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
 
 	today := time.Now()
 	target := today.AddDate(0, offset, 0)

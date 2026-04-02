@@ -1,9 +1,9 @@
 package routes
 
 import (
+	"be-simpletracker/internal/utils"
 	"be-simpletracker/internal/workout/services"
 	"net/http"
-	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -28,24 +28,31 @@ func RegisterWorkoutLogRoutes(group *gin.RouterGroup, db *gorm.DB) {
 	}
 }
 
-func (h *WorkoutLogHandler) getWorkoutToday(c *gin.Context) {
-	day, err := h.svc.GetOrCreateToday(c.Request.Context(), 0)
+func (h *WorkoutLogHandler) getWorkoutToday(reqCtx *gin.Context) {
+	// 													       offset
+	day, err := h.svc.GetOrCreateToday(reqCtx.Request.Context(), 0)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		reqCtx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, day)
+
+	reqCtx.JSON(http.StatusOK, day)
 }
 
-func (h *WorkoutLogHandler) getWorkoutMonth(c *gin.Context) {
-	offsetStr := c.Query("monthoffset")
-	offset, _ := strconv.Atoi(offsetStr)
-	data, err := h.svc.GetMonthWorkoutLogs(c.Request.Context(), offset)
+func (h *WorkoutLogHandler) getWorkoutMonth(reqCtx *gin.Context) {
+	offset, err := utils.ParseQueryInt(reqCtx, monthOffsetQuery)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		reqCtx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, data)
+
+	data, err := h.svc.GetMonthWorkoutLogs(reqCtx.Request.Context(), offset)
+	if err != nil {
+		reqCtx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	reqCtx.JSON(http.StatusOK, data)
 }
 
 type upsertCardioRequest struct {
@@ -54,29 +61,40 @@ type upsertCardioRequest struct {
 	Notes   string `json:"notes"`
 }
 
-func (h *WorkoutLogHandler) upsertCardio(c *gin.Context) {
-	offsetStr := c.Query("offset")
-	offset, _ := strconv.Atoi(offsetStr)
-	var req upsertCardioRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-	cardio, err := h.svc.UpsertCardio(c.Request.Context(), offset, req.Minutes, req.Type, req.Notes)
+func (h *WorkoutLogHandler) upsertCardio(reqCtx *gin.Context) {
+	offset, err := utils.ParseQueryInt(reqCtx, weekOffsetQuery)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		reqCtx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"cardio": cardio})
+
+	var req upsertCardioRequest
+	if err := reqCtx.ShouldBindJSON(&req); err != nil {
+		reqCtx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	cardio, err := h.svc.UpsertCardio(reqCtx.Request.Context(), offset, req.Minutes, req.Type, req.Notes)
+	if err != nil {
+		reqCtx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	reqCtx.JSON(http.StatusOK, gin.H{"cardio": cardio})
 }
 
-func (h *WorkoutLogHandler) getPreviousWorkout(c *gin.Context) {
-	offsetStr := c.Query("offset")
-	offset, _ := strconv.Atoi(offsetStr)
-	payload, err := h.svc.GetPreviousWorkoutView(c.Request.Context(), offset)
+func (h *WorkoutLogHandler) getPreviousWorkout(reqCtx *gin.Context) {
+	offset, err := utils.ParseQueryInt(reqCtx, weekOffsetQuery)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		reqCtx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, payload)
+
+	payload, err := h.svc.GetPreviousWorkoutView(reqCtx.Request.Context(), offset)
+	if err != nil {
+		reqCtx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	reqCtx.JSON(http.StatusOK, payload)
 }
