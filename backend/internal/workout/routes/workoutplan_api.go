@@ -22,7 +22,6 @@ func NewWorkoutPlanHandler(db *gorm.DB) *WorkoutPlanHandler {
 
 // RegisterWorkoutPlanRoutes registers all plan routes under the workout group
 func RegisterWorkoutPlanRoutes(group *gin.RouterGroup, db *gorm.DB) {
-
 	h := NewWorkoutPlanHandler(db)
 
 	plans := group.Group("/plans")

@@ -101,7 +101,7 @@ func (h *ExercisesHandler) addExerciseToWorkout(c *gin.Context) {
 	offsetStr := c.Query("offset")
 	offset, _ := strconv.Atoi(offsetStr)
 
-	today, err := services.GetOrCreateToday(h.db, offset)
+	today, err := services.GetOrCreateToday(c.Request.Context(), h.db, offset)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -154,7 +154,7 @@ func (h *ExercisesHandler) removeExerciseFromWorkout(c *gin.Context) {
 	offsetStr := c.Query("offset")
 	offset, _ := strconv.Atoi(offsetStr)
 
-	today, err := services.GetOrCreateToday(h.db, offset)
+	today, err := services.GetOrCreateToday(c.Request.Context(), h.db, offset)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
