@@ -3,6 +3,8 @@ package services
 import (
 	"be-simpletracker/internal/utils"
 	"be-simpletracker/internal/workout/models"
+	workoutrepo "be-simpletracker/internal/workout/repository"
+	"context"
 	"errors"
 	"fmt"
 	"strings"
@@ -11,37 +13,31 @@ import (
 	"gorm.io/gorm"
 )
 
-func loadWorkoutLogForDate(database *gorm.DB, date time.Time) (models.WorkoutLog, error) {
-	var workoutDay models.WorkoutLog
-	err := database.
-		Preload("Cardio").
-		Preload("Exercises.Sets").
-		Preload("Exercises.Exercise").
-		Preload("WorkoutPlan.Exercises").
-		Where("date = ?", date).
-		First(&workoutDay).Error
-	if err != nil {
-		return models.WorkoutLog{}, err
-	}
-	return workoutDay, nil
+// WorkoutLogService coordinates workout log business logic and persistence.
+type WorkoutLogService struct {
+	db   *gorm.DB
+	repo *workoutrepo.WorkoutLogRepository
 }
 
-func GetToday(database *gorm.DB, offset int) (models.WorkoutLog, error) {
-	return loadWorkoutLogForDate(database, utils.ZerodTime(offset))
+func NewWorkoutLogService(db *gorm.DB) *WorkoutLogService {
+	return &WorkoutLogService{
+		db:   db,
+		repo: workoutrepo.NewWorkoutLogRepository(db),
+	}
 }
 
 // GetOrCreateToday returns the workout log for the calendar day (with offset from today),
 // creating a row if missing and attaching the plan for that weekday when one exists.
-func GetOrCreateToday(database *gorm.DB, offset int) (models.WorkoutLog, error) {
+func (s *WorkoutLogService) GetOrCreateToday(ctx context.Context, offset int) (models.WorkoutLog, error) {
 	day := utils.ZerodTime(offset)
-	workoutDay, err := loadWorkoutLogForDate(database, day)
+	workoutDay, err := s.repo.LoadByDate(ctx, day)
 	if err == nil {
 		return workoutDay, nil
 	}
 	if !errors.Is(err, gorm.ErrRecordNotFound) {
 		return models.WorkoutLog{}, err
 	}
-	plan, err := GetPlanByDay(database, int(day.Weekday()))
+	plan, err := GetPlanByDay(s.db, int(day.Weekday()))
 	if err != nil {
 		return models.WorkoutLog{}, err
 	}
@@ -54,10 +50,165 @@ func GetOrCreateToday(database *gorm.DB, offset int) (models.WorkoutLog, error) 
 		Date:          day,
 		WorkoutPlanID: planID,
 	}
-	if err := database.Omit("WorkoutPlan", "Exercises", "Cardio").Create(&newLog).Error; err != nil {
+	if err := s.repo.CreateMinimal(ctx, &newLog); err != nil {
 		return models.WorkoutLog{}, err
 	}
-	return loadWorkoutLogForDate(database, day)
+	return s.repo.LoadByDate(ctx, day)
+}
+
+// GetOrCreateToday is a package-level helper for handlers that only have *gorm.DB.
+func GetOrCreateToday(ctx context.Context, db *gorm.DB, offset int) (models.WorkoutLog, error) {
+	return NewWorkoutLogService(db).GetOrCreateToday(ctx, offset)
+}
+
+type ExerciseGroup struct {
+	Planned  *models.Exercise       `json:"planned,omitempty"`
+	Logged   *models.LoggedExercise `json:"logged,omitempty"`
+	Previous *models.LoggedExercise `json:"previous,omitempty"`
+}
+
+type MonthRange struct {
+	Start time.Time `json:"start"`
+	End   time.Time `json:"end"`
+}
+
+type MonthWorkoutLogsResponse struct {
+	Days   []models.WorkoutLog `json:"days"`
+	Today  time.Time           `json:"today"`
+	Range  MonthRange          `json:"range"`
+	Month  time.Month          `json:"month"`
+	Offset int                 `json:"offset"`
+}
+
+type PreviousWorkoutResponse struct {
+	Day              models.WorkoutLog `json:"day"`
+	PlannedExercises []ExerciseGroup   `json:"planned_exercises"`
+	PlannedCardio    any               `json:"planned_cardio"`
+	LoggedCardio     *models.Cardio    `json:"logged_cardio"`
+}
+
+func plannedCardioFromPlan(plan *models.WorkoutPlan) any {
+	if plan == nil {
+		return nil
+	}
+	t := strings.TrimSpace(plan.PlannedCardioType)
+	if t == "" {
+		return nil
+	}
+	return map[string]any{"type": t}
+}
+
+func (s *WorkoutLogService) GetMonthWorkoutLogs(ctx context.Context, monthOffset int) (MonthWorkoutLogsResponse, error) {
+	today := time.Now()
+	target := today.AddDate(0, monthOffset, 0)
+	startOfMonth := time.Date(target.Year(), target.Month(), 1, 0, 0, 0, 0, target.Location())
+	endOfMonth := startOfMonth.AddDate(0, 1, -1)
+	start := startOfMonth.AddDate(0, 0, -int(startOfMonth.Weekday()))
+	end := endOfMonth.AddDate(0, 0, 7-int(endOfMonth.Weekday()))
+	data, err := s.repo.GetByDateRange(ctx, start, end)
+	if err != nil {
+		return MonthWorkoutLogsResponse{}, err
+	}
+	return MonthWorkoutLogsResponse{
+		Days:   data,
+		Today:  today,
+		Range:  MonthRange{Start: start, End: end},
+		Month:  target.Month(),
+		Offset: monthOffset,
+	}, nil
+}
+
+func (s *WorkoutLogService) UpsertCardio(ctx context.Context, offset int, minutes int, cardioType string, notes string) (*models.Cardio, error) {
+	t, err := s.GetOrCreateToday(ctx, offset)
+	if err != nil {
+		return nil, err
+	}
+	ctype := strings.TrimSpace(cardioType)
+	if ctype == "" && t.WorkoutPlan != nil {
+		ctype = strings.TrimSpace(t.WorkoutPlan.PlannedCardioType)
+	}
+	if ctype == "" {
+		return nil, fmt.Errorf("cardio type is required when the plan has no planned cardio")
+	}
+	existing, err := s.repo.FirstCardioByWorkoutLogID(ctx, t.ID)
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		row := models.Cardio{
+			WorkoutLogID: t.ID,
+			Minutes:      minutes,
+			Type:         ctype,
+			Notes:        notes,
+		}
+		if err := s.repo.CreateCardio(ctx, &row); err != nil {
+			return nil, err
+		}
+		return &row, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	existing.Minutes = minutes
+	existing.Type = ctype
+	existing.Notes = notes
+	if err := s.repo.SaveCardio(ctx, &existing); err != nil {
+		return nil, err
+	}
+	return &existing, nil
+}
+
+func UpsertCardioForWorkoutLog(ctx context.Context, db *gorm.DB, offset int, minutes int, cardioType string, notes string) (*models.Cardio, error) {
+	return NewWorkoutLogService(db).UpsertCardio(ctx, offset, minutes, cardioType, notes)
+}
+
+func (s *WorkoutLogService) GetPreviousWorkoutView(ctx context.Context, offset int) (PreviousWorkoutResponse, error) {
+	today, err := s.GetOrCreateToday(ctx, offset)
+	if err != nil {
+		return PreviousWorkoutResponse{}, err
+	}
+	logged := today.Exercises
+	var planned []models.Exercise
+	if today.WorkoutPlan != nil {
+		planned = today.WorkoutPlan.Exercises
+	}
+	loggedMap := make(map[string]models.LoggedExercise)
+	for _, l := range logged {
+		if l.Exercise != nil {
+			loggedMap[l.Exercise.Name] = l
+		}
+	}
+	results := make([]ExerciseGroup, 0)
+	for _, p := range planned {
+		group := ExerciseGroup{Planned: &p}
+		if log, ok := loggedMap[p.Name]; ok {
+			group.Logged = &log
+			delete(loggedMap, p.Name)
+		}
+		prev, err := s.repo.GetPreviousExerciseLog(ctx, today.Date, p.Name, 0)
+		if err == nil {
+			group.Previous = &prev
+		}
+		results = append(results, group)
+	}
+	for _, l := range loggedMap {
+		if l.Exercise == nil {
+			results = append(results, ExerciseGroup{Logged: &l})
+			continue
+		}
+		prev, err := s.repo.GetPreviousExerciseLog(ctx, today.Date, l.Exercise.Name, 0)
+		if err == nil {
+			results = append(results, ExerciseGroup{
+				Logged:   &l,
+				Previous: &prev,
+			})
+		} else {
+			results = append(results, ExerciseGroup{Logged: &l})
+		}
+	}
+	return PreviousWorkoutResponse{
+		Day:              today,
+		PlannedExercises: results,
+		PlannedCardio:    plannedCardioFromPlan(today.WorkoutPlan),
+		LoggedCardio:     today.Cardio,
+	}, nil
 }
 
 func GetAll(database *gorm.DB) ([]models.WorkoutLog, error) {
@@ -90,28 +241,6 @@ func GetPrevious(db *gorm.DB, day string) (models.WorkoutLog, error) {
 		return models.WorkoutLog{}, err
 	}
 	return workoutDay, nil
-}
-
-func GetPreviousExerciseLog(db *gorm.DB, day time.Time, exercise string, offset int) (models.LoggedExercise, error) {
-	var exerciseLog models.LoggedExercise
-
-	err := db.
-		Joins("JOIN workout_logs ON workout_logs.id = logged_exercises.workout_log_id").
-		Joins("JOIN exercises ON exercises.id = logged_exercises.exercise_id").
-		Where("exercises.name = ?", exercise).
-		Where("workout_logs.date != ?", day).
-		Where("workout_logs.date < ?", day).
-		Preload("Sets").
-		Preload("Exercise").
-		Order("workout_logs.date DESC").
-		Offset(offset).
-		Limit(1).
-		Find(&exerciseLog).Error
-
-	if err != nil {
-		return models.LoggedExercise{}, err
-	}
-	return exerciseLog, nil
 }
 
 func LogExercise(db *gorm.DB, exercise *models.LoggedExercise) error {
@@ -359,46 +488,7 @@ func UnassignPlanFromDay(db *gorm.DB, planID uint) (*models.WorkoutPlan, error) 
 	return &plan, nil
 }
 
-// GetPlanByDay returns the workout plan assigned to a specific day of the week
-// UpsertCardioForWorkoutLog creates or updates the single cardio row for a workout log.
-func UpsertCardioForWorkoutLog(db *gorm.DB, offset int, minutes int, cardioType string, notes string) (*models.Cardio, error) {
-	t, err := GetOrCreateToday(db, offset)
-	if err != nil {
-		return nil, err
-	}
-	ctype := strings.TrimSpace(cardioType)
-	if ctype == "" && t.WorkoutPlan != nil {
-		ctype = strings.TrimSpace(t.WorkoutPlan.PlannedCardioType)
-	}
-	if ctype == "" {
-		return nil, fmt.Errorf("cardio type is required when the plan has no planned cardio")
-	}
-	var existing models.Cardio
-	err = db.Where("workout_log_id = ?", t.ID).First(&existing).Error
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		row := models.Cardio{
-			WorkoutLogID: t.ID,
-			Minutes:      minutes,
-			Type:         ctype,
-			Notes:        notes,
-		}
-		if err := db.Create(&row).Error; err != nil {
-			return nil, err
-		}
-		return &row, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-	existing.Minutes = minutes
-	existing.Type = ctype
-	existing.Notes = notes
-	if err := db.Save(&existing).Error; err != nil {
-		return nil, err
-	}
-	return &existing, nil
-}
-
+// GetPlanByDay returns the workout plan assigned to a specific day of the week.
 func GetPlanByDay(db *gorm.DB, dayOfWeek int) (*models.WorkoutPlan, error) {
 	if dayOfWeek < 0 || dayOfWeek > 6 {
 		return nil, fmt.Errorf("day_of_week must be between 0 (Sunday) and 6 (Saturday)")

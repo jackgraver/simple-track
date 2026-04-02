@@ -3,6 +3,7 @@ package services
 import (
 	"be-simpletracker/internal/utils"
 	"be-simpletracker/internal/workout/models"
+	"context"
 	"testing"
 
 	"github.com/glebarez/sqlite"
@@ -34,7 +35,7 @@ func TestUpsertCardioForWorkoutLog_usesPlannedTypeWhenTypeEmpty(t *testing.T) {
 	if err := db.Create(&wl).Error; err != nil {
 		t.Fatal(err)
 	}
-	c, err := UpsertCardioForWorkoutLog(db, 0, 25, "", "S3E4 of Breaking Bad")
+	c, err := UpsertCardioForWorkoutLog(context.Background(), db, 0, 25, "", "S3E4 of Breaking Bad")
 	if err != nil {
 		t.Fatal(err)
 	}
