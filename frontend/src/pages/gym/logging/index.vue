@@ -4,14 +4,11 @@ import ExerciseListView from "./components/ExerciseListView.vue";
 import { useRoute, useRouter } from "vue-router";
 import { computed } from "vue";
 import { toast } from "~/composables/toast/useToast";
+import { useLoggingRouteContext } from "./composables/useLoggingRouteContext";
 
 const router = useRouter();
 const route = useRoute();
-const offset = computed(() => {
-    const raw = route.query.offset;
-    const value = typeof raw === "string" ? Number.parseInt(raw, 10) : 0;
-    return Number.isNaN(value) ? 0 : value;
-});
+const { offset } = useLoggingRouteContext();
 const {
     log,
     plannedCardio,
@@ -60,14 +57,16 @@ const selectCardio = () => {
 
 const selectPreMobility = () => {
     router.push({
-        name: "logging-mobility-pre",
+        name: "logging-mobility",
+        params: { slot: "pre" },
         query: route.query,
     });
 };
 
 const selectPostMobility = () => {
     router.push({
-        name: "logging-mobility-post",
+        name: "logging-mobility",
+        params: { slot: "post" },
         query: route.query,
     });
 };

@@ -1,6 +1,7 @@
 import type { ComputedRef, Ref } from "vue";
 import { computed, reactive, ref, watch } from "vue";
 import type { Router } from "vue-router";
+import { buildLoggingListQuery } from "./useLoggingRouteContext";
 import type { ExerciseGroup, LoggedSetWithStatus } from "../store/useWorkoutStore";
 import type { LoggedExercise } from "~/types/workout";
 import { toast } from "~/composables/toast/useToast";
@@ -62,6 +63,7 @@ export function useExerciseLoggingSession(options: {
     logExercise: LogExerciseFn;
     deleteLoggedSet: DeleteLoggedSetFn;
     router: Router;
+    enabled?: ComputedRef<boolean> | Ref<boolean>;
 }): ExerciseLoggingSessionViewModel {
     const {
         exerciseGroup,
@@ -71,10 +73,11 @@ export function useExerciseLoggingSession(options: {
         logExercise,
         deleteLoggedSet,
         router,
+        enabled = computed(() => true),
     } = options;
     const loggingRoute = () => ({
         name: "logging" as const,
-        query: offset.value === 0 ? {} : { offset: String(offset.value) },
+        query: buildLoggingListQuery(offset.value),
     });
 
     const currentWeight = ref(0);
@@ -110,6 +113,7 @@ export function useExerciseLoggingSession(options: {
         currentWeight.value > 0 || currentReps.value > 0;
 
     const initializeExercise = () => {
+        if (!enabled.value) return;
         if (pending.value) return;
 
         const group = exerciseGroup.value;
@@ -178,8 +182,9 @@ export function useExerciseLoggingSession(options: {
     };
 
     watch(
-        [() => exerciseGroup.value, () => pending.value],
-        ([group, isPending]) => {
+        [() => enabled.value, () => exerciseGroup.value, () => pending.value],
+        ([isEnabled, group, isPending]) => {
+            if (!isEnabled) return;
             if (!isPending && group) {
                 initializeExercise();
             } else if (!isPending && !group) {

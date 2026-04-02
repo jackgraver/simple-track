@@ -39,17 +39,12 @@ const routes: RouteRecordRaw[] = [
       {
         path: 'logging/cardio',
         name: 'logging-cardio',
-        component: () => import('~/pages/gym/logging/cardio.vue'),
+        component: () => import('~/pages/gym/logging/exercise/[id].vue'),
       },
       {
-        path: 'logging/mobility/pre',
-        name: 'logging-mobility-pre',
-        component: () => import('~/pages/gym/logging/pre-mobility.vue'),
-      },
-      {
-        path: 'logging/mobility/post',
-        name: 'logging-mobility-post',
-        component: () => import('~/pages/gym/logging/post-mobility.vue'),
+        path: 'logging/mobility/:slot',
+        name: 'logging-mobility',
+        component: () => import('~/pages/gym/logging/exercise/[id].vue'),
       },
     ],
   },

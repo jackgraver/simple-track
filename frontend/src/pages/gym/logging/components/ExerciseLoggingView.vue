@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { ExerciseLoggingSessionViewModel } from "../composables/useExerciseLoggingSession";
-import { ArrowLeft } from "lucide-vue-next";
+import LoggingHeader from "./LoggingHeader.vue";
 import LoggedSetsList from "./LoggedSetsList.vue";
 import NumericStepper from "./NumericStepper.vue";
 import ExerciseRestTimer from "./ExerciseRestTimer.vue";
@@ -47,27 +47,22 @@ const repRolloverWeightHint = computed(() => {
 
 <template>
     <div class="logging-view">
-        <div class="logging-header">
-            <button
-                class="back-button"
-                type="button"
-                @click="session.goBackToList()"
-            >
-                <ArrowLeft :size="20" />
-            </button>
-            <h2>
-                <ExerciseRestTimer
-                    :storage-key="session.restTimerStorageKey"
-                    :start-token="session.restTimerStartToken"
-                    :clear-token="session.restTimerClearToken"
-                    :duration-ms="session.restTimerDurationMs"
-                    :fallback-text="exerciseName"
-                />
-            </h2>
-            <span class="set-indicator"
-                >Set {{ session.currentSetNumber }}</span
-            >
-        </div>
+        <LoggingHeader @back="session.goBackToList()">
+            <template #center>
+                <h2 class="logging-title m-0 min-w-0 truncate text-center text-lg font-medium">
+                    <ExerciseRestTimer
+                        :storage-key="session.restTimerStorageKey"
+                        :start-token="session.restTimerStartToken"
+                        :clear-token="session.restTimerClearToken"
+                        :duration-ms="session.restTimerDurationMs"
+                        :fallback-text="exerciseName"
+                    />
+                </h2>
+            </template>
+            <template #right>
+                <span class="set-indicator">Set {{ session.currentSetNumber }}</span>
+            </template>
+        </LoggingHeader>
         <div class="input-group">
             <NumericStepper
                 label="Weight (lbs)"
@@ -168,47 +163,10 @@ const repRolloverWeightHint = computed(() => {
     box-sizing: border-box;
 }
 
-.logging-header {
-    display: grid;
-    grid-template-columns: auto 1fr auto;
-    align-items: center;
-    gap: 0.5rem;
-    padding-bottom: 0.5rem;
-    border-bottom: 1px solid rgb(56, 56, 56);
-    width: 100%;
-    box-sizing: border-box;
-}
-
-.back-button {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 2.5rem;
-    height: 2.5rem;
-    background: transparent;
-    border: 1px solid rgb(56, 56, 56);
-    border-radius: 0.25rem;
-    color: inherit;
-    cursor: pointer;
-    transition:
-        background-color 0.2s,
-        border-color 0.2s;
-    padding: 0;
-}
-
-.back-button:hover {
-    background: rgb(40, 40, 40);
-    border-color: rgb(100, 100, 100);
-}
-
-.logging-header h2 {
-    margin: 0;
-    text-align: center;
-    grid-column: 2;
+.logging-title {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    min-width: 0;
 }
 
 .set-indicator {
@@ -378,21 +336,12 @@ const repRolloverWeightHint = computed(() => {
         padding: 0 1rem 0 0.5rem;
     }
 
-    .logging-header {
-        gap: 0.75rem;
-    }
-
-    .logging-header h2 {
+    .logging-title {
         font-size: 1.25rem;
     }
 
     .set-indicator {
         font-size: 0.85rem;
-    }
-
-    .back-button {
-        width: 2.25rem;
-        height: 2.25rem;
     }
 
     .previous-performance {

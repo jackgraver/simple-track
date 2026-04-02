@@ -1,18 +1,18 @@
 <script setup lang="ts">
 import type { Cardio, PlannedCardio } from "~/types/workout";
-import { ArrowLeft } from "lucide-vue-next";
+import LoggingHeader from "./LoggingHeader.vue";
 import NumericStepper from "./NumericStepper.vue";
 import { ref, watch, computed, nextTick, useId } from "vue";
+import { useWorkoutStore } from "../store/useWorkoutStore";
+import { useLoggingRouteContext } from "../composables/useLoggingRouteContext";
+import { toast } from "~/composables/toast/useToast";
 
 const props = defineProps<{
     plannedCardio: PlannedCardio | null;
     loggedCardio: Cardio | null;
 }>();
-
-const emit = defineEmits<{
-    (e: "save", minutes: number, notes: string): void;
-    (e: "back"): void;
-}>();
+const { offset, goBackToLogging } = useLoggingRouteContext();
+const { saveCardio } = useWorkoutStore(offset);
 
 const cardioName = computed(
     () => props.plannedCardio?.type ?? props.loggedCardio?.type ?? "Cardio",
@@ -78,24 +78,28 @@ const updateInputValue = (v: string) => {
     error.value = "";
 };
 
-const finish = () => {
+const finish = async () => {
     if (currentMinutes.value <= 0) {
         error.value = "Enter minutes before saving.";
         return;
     }
-    emit("save", currentMinutes.value, notes.value);
+    try {
+        await saveCardio(currentMinutes.value, undefined, notes.value);
+        toast.push("Cardio saved", "success");
+        goBackToLogging();
+    } catch (err: any) {
+        toast.push(err.message || "Failed to save cardio", "error");
+    }
 };
 </script>
 
 <template>
     <div class="logging-view">
-        <div class="logging-header">
-            <button class="back-button" type="button" @click="emit('back')">
-                <ArrowLeft :size="20" />
-            </button>
-            <h2>{{ cardioName }}</h2>
-            <span v-if="isLogged" class="logged-badge">Logged</span>
-        </div>
+        <LoggingHeader :title="cardioName" @back="goBackToLogging">
+            <template #right>
+                <span v-if="isLogged" class="logged-badge">Logged</span>
+            </template>
+        </LoggingHeader>
         <div class="input-group">
             <NumericStepper
                 label="Time (minutes)"
@@ -140,48 +144,10 @@ const finish = () => {
     padding: 0 0.75rem 0 0.375rem;
     box-sizing: border-box;
 }
-.logging-header {
-    display: grid;
-    grid-template-columns: auto 1fr auto;
-    align-items: center;
-    gap: 0.5rem;
-    padding-bottom: 0.5rem;
-    border-bottom: 1px solid rgb(56, 56, 56);
-    width: 100%;
-    box-sizing: border-box;
-}
-.back-button {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 2.5rem;
-    height: 2.5rem;
-    background: transparent;
-    border: 1px solid rgb(56, 56, 56);
-    border-radius: 0.25rem;
-    color: inherit;
-    cursor: pointer;
-    transition: background-color 0.2s, border-color 0.2s;
-    padding: 0;
-}
-.back-button:hover {
-    background: rgb(40, 40, 40);
-    border-color: rgb(100, 100, 100);
-}
-.logging-header h2 {
-    margin: 0;
-    text-align: center;
-    grid-column: 2;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    min-width: 0;
-}
 .logged-badge {
     color: rgb(100, 200, 120);
     font-size: 0.85rem;
     font-weight: 500;
-    grid-column: 3;
     white-space: nowrap;
 }
 .input-group {
@@ -221,16 +187,6 @@ const finish = () => {
 @media (max-width: 767px) {
     .logging-view {
         padding: 0 1rem 0 0.5rem;
-    }
-    .logging-header {
-        gap: 0.75rem;
-    }
-    .logging-header h2 {
-        font-size: 1.25rem;
-    }
-    .back-button {
-        width: 2.25rem;
-        height: 2.25rem;
     }
 }
 </style>
