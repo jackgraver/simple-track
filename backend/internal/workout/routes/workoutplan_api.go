@@ -26,12 +26,23 @@ func RegisterWorkoutPlanRoutes(group *gin.RouterGroup, db *gorm.DB) {
 
 	plans := group.Group("/plans")
 	{
+		plans.GET("/all", h.getAllWorkoutPlans)
 		plans.POST("/:id/exercises/add", h.addExerciseToPlan)
 		plans.DELETE("/:id/exercises/remove", h.removeExerciseFromPlan)
 		plans.POST("/:id/assign-day", h.assignPlanToDay)
 		plans.DELETE("/:id/assign-day", h.unassignPlanFromDay)
 		plans.PUT("/:id/planned-cardio", h.setPlannedCardio)
 	}
+}
+
+func (h *WorkoutPlanHandler) getAllWorkoutPlans(c *gin.Context) {
+	workoutPlans, err := services.GetAllWorkoutPlans(h.db)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"plans": workoutPlans})
 }
 
 type PlanExerciseRequest struct {
