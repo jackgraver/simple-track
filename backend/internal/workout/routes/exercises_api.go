@@ -2,6 +2,7 @@ package routes
 
 import (
 	generics "be-simpletracker/internal/generics"
+	"be-simpletracker/internal/utils"
 	"be-simpletracker/internal/workout/models"
 	"be-simpletracker/internal/workout/services"
 	"errors"
@@ -98,8 +99,11 @@ func (h *ExercisesHandler) addExerciseToWorkout(c *gin.Context) {
 		return
 	}
 
-	offsetStr := c.Query("offset")
-	offset, _ := strconv.Atoi(offsetStr)
+	offset, err := utils.ParseQueryInt(c, weekOffsetQuery)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
 
 	today, err := services.GetOrCreateToday(c.Request.Context(), h.db, offset)
 	if err != nil {
@@ -151,8 +155,11 @@ func (h *ExercisesHandler) removeExerciseFromWorkout(c *gin.Context) {
 		return
 	}
 
-	offsetStr := c.Query("offset")
-	offset, _ := strconv.Atoi(offsetStr)
+	offset, err := utils.ParseQueryInt(c, weekOffsetQuery)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
 
 	today, err := services.GetOrCreateToday(c.Request.Context(), h.db, offset)
 	if err != nil {
