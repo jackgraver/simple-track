@@ -1,7 +1,6 @@
 package routes
 
 import (
-	generics "be-simpletracker/internal/generics"
 	"be-simpletracker/internal/utils"
 	"be-simpletracker/internal/workout/models"
 	"be-simpletracker/internal/workout/services"
@@ -37,12 +36,51 @@ func RegisterExercisesRoutes(group *gin.RouterGroup, db *gorm.DB) {
 }
 
 func (h *ExercisesHandler) getAllExercises(c *gin.Context) {
-	exercises, err := generics.GetAll[models.Exercise](c.Request.Context(), h.db)
+	page, err := utils.ParseQueryInt(c, pageQuery)
 	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	pageSize, err := utils.ParseQueryInt(c, pageSizeQuery)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	search := c.Query("search")
+
+	query := h.db.Model(&models.Exercise{})
+	if search != "" {
+		query = query.Where("name ILIKE ?", "%"+search+"%")
+	}
+	query = query.Order("name ASC")
+
+	var total int64
+	if err := query.Count(&total).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"exercises": exercises})
+
+	var exercises []models.Exercise
+	if pageSize > 0 {
+		query = query.Limit(pageSize).Offset((page - 1) * pageSize)
+	}
+	if err := query.Find(&exercises).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	hasNext := false
+	if pageSize > 0 {
+		hasNext = int64(page*pageSize) < total
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"exercises": exercises,
+		"total":     total,
+		"has_next":  hasNext,
+		"page":      page,
+		"page_size": pageSize,
+	})
 }
 
 type LogExerciseRequest struct {

@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query';
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/vue-query';
 import { computed, toValue, type MaybeRefOrGetter } from 'vue';
 import { apiDELETE, apiGET, apiPOST } from '~/api/client';
 import type { WorkoutLogsPreviousResponse } from '~/api/workout/api';
@@ -55,6 +55,32 @@ export function useAllExercises() {
         },
         staleTime: 1000 * 60 * 10,
     });
+}
+
+type ExercisesPageResponse = {
+    exercises: Exercise[];
+    has_next: boolean;
+    total: number;
+    page: number;
+    page_size: number;
+};
+
+export function useExercisesPaginated(search: MaybeRefOrGetter<string> = '', pageSize = 10) {
+    return useInfiniteQuery(
+        computed(() => ({
+            queryKey: liveworkoutKeys.exercises.paginated(toValue(search)),
+            queryFn: async ({ pageParam }: { pageParam: number }) => {
+                const params: Record<string, string | number> = { page: pageParam, page_size: pageSize };
+                const s = toValue(search);
+                if (s) params.search = s;
+                return apiGET<ExercisesPageResponse>('/workout/exercises/all', { params });
+            },
+            getNextPageParam: (lastPage: ExercisesPageResponse) =>
+                lastPage.has_next ? lastPage.page + 1 : undefined,
+            initialPageParam: 1,
+            staleTime: 1000 * 60 * 10,
+        })),
+    );
 }
 
 export function useLogExercise(offset: MaybeRefOrGetter<number> = 0) {

@@ -5,6 +5,7 @@ import { useRoute, useRouter } from "vue-router";
 import { computed } from "vue";
 import { toast } from "~/composables/toast/useToast";
 import { useLoggingRouteContext } from "./composables/useLoggingRouteContext";
+import EditLogDialog from "~/shared/today/EditLogDialog.vue";
 
 const router = useRouter();
 const route = useRoute();

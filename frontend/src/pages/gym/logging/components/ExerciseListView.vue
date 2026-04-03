@@ -6,10 +6,12 @@ import type {
     PlannedCardio,
     MobilityLogged,
 } from "~/types/workout";
+import type { DropdownOption } from "~/shared/input/Dropdown.vue";
+import Dropdown from "~/shared/input/Dropdown.vue";
 import { ref, computed } from "vue";
 import { Trash2 } from "lucide-vue-next";
 import { useRouter } from "vue-router";
-import { useAllExercises } from "~/api/workout/queries";
+import { useExercisesPaginated } from "~/api/workout/queries";
 
 type ExerciseGroup = {
     planned?: Exercise;
@@ -70,34 +72,36 @@ const postMobilityComplete = computed(() => {
 
 const router = useRouter();
 
-// Autocomplete state
-const searchQuery = ref("");
-const showSuggestions = ref(false);
-const { data: allExercisesData } = useAllExercises();
-const allExercises = computed(() => allExercisesData.value ?? []);
-const filteredExercises = computed(() => {
-    const query = searchQuery.value.toLowerCase();
-    return allExercises.value
-        .filter(
-            (ex) =>
-                ex.name.toLowerCase().includes(query) &&
-                !props.exercises.some((eg) => eg.planned?.ID === ex.ID),
-        )
-        .slice(0, 10);
+const exerciseSearch = ref("");
+const {
+    data: exercisesPages,
+    fetchNextPage,
+    hasNextPage,
+    isFetching,
+} = useExercisesPaginated(exerciseSearch);
+
+const exerciseOptions = computed<DropdownOption[]>(() => {
+    const all = exercisesPages.value?.pages.flatMap((p) => p.exercises) ?? [];
+    const existingIds = new Set(
+        props.exercises
+            .map((eg) => eg.planned?.ID ?? eg.logged?.exercise_id)
+            .filter((id): id is number => id != null),
+    );
+    return all
+        .filter((ex) => !existingIds.has(ex.ID))
+        .map((ex) => ({ label: ex.name, value: ex.ID }));
 });
 
-// Handle exercise selection
-const selectExercise = (exercise: Exercise) => {
-    emit("add-exercise", exercise.ID);
-    searchQuery.value = "";
-    showSuggestions.value = false;
+const handleExerciseSelect = (option: DropdownOption) => {
+    emit("add-exercise", option.value as number);
 };
 
-// Handle blur with delay to allow clicking suggestions
-const handleBlur = () => {
-    setTimeout(() => {
-        showSuggestions.value = false;
-    }, 200);
+const handleExerciseSearch = (query: string) => {
+    exerciseSearch.value = query;
+};
+
+const handleLoadMore = () => {
+    if (hasNextPage.value) fetchNextPage();
 };
 
 // Handle remove exercise
@@ -155,30 +159,16 @@ const isLogged = (exerciseGroup: ExerciseGroup): boolean => {
         <header>
             <h1 v-if="workoutName">{{ workoutName }} Day</h1>
         </header>
-        <div class="add-exercise-container">
-            <div class="autocomplete-wrapper">
-                <input
-                    v-model="searchQuery"
-                    @focus="showSuggestions = true"
-                    @blur="handleBlur"
-                    type="text"
-                    placeholder="Add exercise..."
-                    class="exercise-search-input"
-                />
-                <ul
-                    v-if="showSuggestions && filteredExercises.length > 0"
-                    class="suggestions-list"
-                >
-                    <li
-                        v-for="exercise in filteredExercises"
-                        :key="exercise.ID"
-                        @mousedown.prevent="selectExercise(exercise)"
-                        class="suggestion-item"
-                    >
-                        {{ exercise.name }}
-                    </li>
-                </ul>
-            </div>
+        <div class="mb-2">
+            <Dropdown
+                :options="exerciseOptions"
+                :on-select="handleExerciseSelect"
+                :has-more="hasNextPage ?? false"
+                :loading="isFetching"
+                placeholder="Add exercise..."
+                @load-more="handleLoadMore"
+                @search="handleExerciseSearch"
+            />
         </div>
         <ul class="exercise-list">
             <li
@@ -285,58 +275,6 @@ const isLogged = (exerciseGroup: ExerciseGroup): boolean => {
     gap: 1rem;
     width: 100%;
     max-width: 100%;
-}
-
-.add-exercise-container {
-    margin-bottom: 0.5rem;
-}
-
-.autocomplete-wrapper {
-    position: relative;
-    width: 100%;
-}
-
-.exercise-search-input {
-    width: 100%;
-    padding: 0.75rem;
-    border: 1px solid rgb(56, 56, 56);
-    border-radius: 5px;
-    background: rgb(27, 27, 27);
-    color: inherit;
-    font-size: 1rem;
-    box-sizing: border-box;
-}
-
-.exercise-search-input:focus {
-    outline: none;
-    border-color: rgb(100, 100, 100);
-    background: rgb(35, 35, 35);
-}
-
-.suggestions-list {
-    position: absolute;
-    top: 100%;
-    left: 0;
-    right: 0;
-    margin-top: 0.25rem;
-    list-style: none;
-    padding: 0;
-    background: rgb(27, 27, 27);
-    border: 1px solid rgb(56, 56, 56);
-    border-radius: 5px;
-    max-height: 200px;
-    overflow-y: auto;
-    z-index: 1000;
-}
-
-.suggestion-item {
-    padding: 0.75rem;
-    cursor: pointer;
-    transition: background-color 0.2s;
-}
-
-.suggestion-item:hover {
-    background: rgb(40, 40, 40);
 }
 
 .exercise-list {

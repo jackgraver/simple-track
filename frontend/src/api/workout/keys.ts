@@ -15,5 +15,7 @@ export const liveworkoutKeys = {
     exercises: {
         all: [...liveworkoutKeysBase.all, 'exercises'] as const,
         allList: () => [...liveworkoutKeysBase.all, 'exercises', 'all'] as const,
+        paginated: (search: string) =>
+            [...liveworkoutKeysBase.all, 'exercises', 'paginated', search] as const,
     },
 } as const;
