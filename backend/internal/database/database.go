@@ -9,6 +9,8 @@ import (
 	"os/exec"
 	"strings"
 
+	"be-simpletracker/internal/utils"
+
 	"github.com/glebarez/sqlite"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -16,7 +18,9 @@ import (
 
 // Initializes a new database connection to a PostgreSQL database.
 func ConnectToPostgres() (*gorm.DB, error) {
-	dsn := getEnv("DATABASE_URL", "postgres://postgres:postgres@localhost:5432/simpletracker?sslmode=disable")
+	utils.LoadEnvIfNeeded()
+
+	dsn := resolvePostgresDSN()
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
 	if err != nil {
 		return nil, err
@@ -30,6 +34,28 @@ func getEnv(key, fallback string) string {
 		return value
 	}
 	return fallback
+}
+
+func resolvePostgresDSN() string {
+	if dsn, ok := os.LookupEnv("DATABASE_URL"); ok && strings.TrimSpace(dsn) != "" {
+		return dsn
+	}
+
+	appEnv := normalizeEnv(getEnv("APP_ENV", getEnv("GO_ENV", "development")))
+	if appEnv == "production" {
+		return getEnv("DATABASE_URL_PRODUCTION", "postgres://postgres:postgres@localhost:5433/simpletracker_prod?sslmode=disable")
+	}
+
+	return getEnv("DATABASE_URL_DEVELOPMENT", "postgres://postgres:postgres@localhost:5432/simpletracker_dev?sslmode=disable")
+}
+
+func normalizeEnv(value string) string {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "prod", "production":
+		return "production"
+	default:
+		return "development"
+	}
 }
 
 // Initializes a new database connection to a SQLite database

@@ -8,6 +8,8 @@ import (
 
 func LoadEnvIfNeeded() {
 	if err := godotenv.Load(".env"); err != nil {
-		log.Println("No .env file found, using environment variables")
+		if err2 := godotenv.Load("../../.env"); err2 != nil {
+			log.Fatalf("No .env file found at .env or ../../.env, and loading env failed: %v, %v", err, err2)
+		}
 	}
 }
