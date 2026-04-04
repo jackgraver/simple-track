@@ -1,8 +1,7 @@
 package routes
 
 import (
-	"be-simpletracker/internal/diet/models"
-	"be-simpletracker/internal/generics"
+	"be-simpletracker/internal/diet/services"
 	"be-simpletracker/internal/utils"
 	"net/http"
 
@@ -14,17 +13,12 @@ type DietPlanHandler struct {
 	db *gorm.DB
 }
 
-// NewHandler creates a new workout plan handler
 func NewDietPlanHandler(db *gorm.DB) *DietPlanHandler {
 	return &DietPlanHandler{db: db}
 }
 
 func RegisterDietPlanRoutes(group *gin.RouterGroup, db *gorm.DB) {
 	h := NewDietPlanHandler(db)
-
-	config := generics.DefaultCRUDConfig[models.Plan]("/plans", "plan")
-	generics.RegisterBasicCRUD(group, db, config)
-
 	plans := group.Group("/plans")
 	{
 		plans.GET("/plan/all", h.getAllPlans)
@@ -33,15 +27,12 @@ func RegisterDietPlanRoutes(group *gin.RouterGroup, db *gorm.DB) {
 
 func (h *DietPlanHandler) getAllPlans(c *gin.Context) {
 	ctx := c.Request.Context()
-
-	// Use the service function - encapsulates all repository logic
-	// result, err := services.GetAllPlans(ctx, f.db, c)
-	result, err := utils.GetAllWithOptions[*models.Plan](ctx, h.db, c, "id", true)
+	params := utils.ParseQueryParams(c)
+	result, err := services.GetAllPlans(ctx, h.db, params)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-
 	if result.Pagination != nil {
 		c.JSON(http.StatusOK, gin.H{
 			"plans": &result.Data,
@@ -54,9 +45,9 @@ func (h *DietPlanHandler) getAllPlans(c *gin.Context) {
 				"hasPrev":    result.Pagination.HasPrev,
 			},
 		})
-	} else {
-		c.JSON(http.StatusOK, gin.H{
-			"plans": &result.Data,
-		})
+		return
 	}
+	c.JSON(http.StatusOK, gin.H{
+		"plans": &result.Data,
+	})
 }

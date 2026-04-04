@@ -1,9 +1,7 @@
 package routes
 
 import (
-	"be-simpletracker/internal/diet/models"
 	"be-simpletracker/internal/diet/services"
-	"be-simpletracker/internal/generics"
 	"be-simpletracker/internal/utils"
 	"net/http"
 	"strconv"
@@ -14,20 +12,15 @@ import (
 )
 
 type DietLogHandler struct {
-	db *gorm.DB
+	svc *services.DietLogService
 }
 
-// NewHandler creates a new workout plan handler
 func NewDietLogHandler(db *gorm.DB) *DietLogHandler {
-	return &DietLogHandler{db: db}
+	return &DietLogHandler{svc: services.NewDietLogService(db)}
 }
 
 func RegisterDietLogRoutes(group *gin.RouterGroup, db *gorm.DB) {
 	h := NewDietLogHandler(db)
-
-	config := generics.DefaultCRUDConfig[models.DayLog]("/logs", "log")
-	generics.RegisterBasicCRUD(group, db, config)
-
 	logs := group.Group("/logs")
 	{
 		logs.GET("/today", h.getMealPlanToday)
@@ -44,15 +37,11 @@ func (h *DietLogHandler) getMealPlanToday(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-
-	day, daysErr := services.MealPlanToday(h.db, offset)
-	if daysErr != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": daysErr.Error()})
+	day, totalCalories, totalProtein, totalFiber, totalCarbs, err := h.svc.MealPlanToday(c.Request.Context(), offset)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-
-	totalCalories, totalProtein, totalFiber, totalCarbs := services.CalculateTotals(h.db, day.ID)
-
 	c.JSON(http.StatusOK, gin.H{
 		"day":           day,
 		"totalCalories": totalCalories,
@@ -64,11 +53,7 @@ func (h *DietLogHandler) getMealPlanToday(c *gin.Context) {
 }
 
 func (h *DietLogHandler) getMealPlanWeek(c *gin.Context) {
-	today := time.Now()
-	start := today.AddDate(0, 0, -3) // 3 days before
-	end := today.AddDate(0, 0, 3)    // 3 days after
-	// data, err := services.MealPlanRange(f.db, today, start, end)
-	data, err := generics.GetByDateRange[*models.Day](c.Request.Context(), h.db, start, end)
+	data, err := h.svc.MealPlanWeek(c.Request.Context())
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -85,46 +70,35 @@ func (h *DietLogHandler) getMealPlanMonth(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-
-	today := time.Now()
-	target := today.AddDate(0, offset, 0)
-
-	startOfMonth := time.Date(target.Year(), target.Month(), 1, 0, 0, 0, 0, target.Location())
-	endOfMonth := startOfMonth.AddDate(0, 1, -1)
-
-	data, err := generics.GetByDateRange[*models.Day](c.Request.Context(), h.db, startOfMonth, endOfMonth)
+	days, startOfMonth, endOfMonth, month, err := h.svc.MealPlanMonth(c.Request.Context(), offset)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{
-		"days":  data,
+		"days":  days,
 		"today": time.Now(),
 		"range": gin.H{
 			"start": startOfMonth,
 			"end":   endOfMonth,
 		},
-		"month":  target.Month(),
+		"month":  month,
 		"offset": offset,
 	})
 }
 
 func (h *DietLogHandler) getMealPlanDay(c *gin.Context) {
 	idStr := c.Param("id")
-	id, err := strconv.Atoi(idStr)
+	id64, err := strconv.ParseUint(idStr, 10, 32)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid ID"})
 		return
 	}
-
-	day, err := generics.GetByID[*models.Day](c.Request.Context(), h.db, uint(id))
+	day, totalCalories, totalProtein, totalFiber, totalCarbs, err := h.svc.MealPlanDay(c.Request.Context(), uint(id64))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-
-	totalCalories, totalProtein, totalFiber, totalCarbs := services.CalculateTotals(h.db, day.ID)
-
 	c.JSON(http.StatusOK, gin.H{
 		"day":           day,
 		"totalCalories": totalCalories,
@@ -135,7 +109,7 @@ func (h *DietLogHandler) getMealPlanDay(c *gin.Context) {
 }
 
 func (h *DietLogHandler) getGoalsToday(c *gin.Context) {
-	goals, err := services.GoalsToday(h.db)
+	goals, err := h.svc.GoalsToday()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
