@@ -1,0 +1,1 @@
+pgcli postgres://postgres:postgres@localhost:5433/simpletracker_prod

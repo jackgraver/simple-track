@@ -5,12 +5,21 @@ import { buildLoggingListQuery } from "./useLoggingRouteContext";
 import type { ExerciseGroup, LoggedSetWithStatus } from "../store/useWorkoutStore";
 import type { LoggedExercise } from "~/types/workout";
 import { toast } from "~/composables/toast/useToast";
+import { useGlobalRestTimer } from "~/composables/useGlobalRestTimer";
 import {
     buildAllSetsForSave,
     buildExerciseToLog,
     mergeSavedExerciseIntoLoggedSets,
     markPendingSetsAsExerciseError,
 } from "../domain/exerciseLoggingPayload";
+
+type StoredDraft = {
+    weight: number;
+    reps: number;
+    weightSetup: string;
+    notes: string;
+    dirty: boolean;
+};
 
 /** Plain shape for templates (refs unwrapped via reactive session object). */
 export type ExerciseLoggingSessionViewModel = {
@@ -25,10 +34,6 @@ export type ExerciseLoggingSessionViewModel = {
     weightInputValue: string;
     repsInputValue: string;
     notes: string;
-    restTimerStorageKey: string;
-    restTimerStartToken: number;
-    restTimerClearToken: number;
-    restTimerDurationMs: number;
     incrementWeight: () => void;
     decrementWeight: () => void;
     incrementReps: () => void;
@@ -94,20 +99,78 @@ export function useExerciseLoggingSession(options: {
     const repsInputValue = ref("");
     const draftDirty = ref(false);
     const notes = ref("");
-    const restTimerStartToken = ref(0);
-    const restTimerClearToken = ref(0);
-    const restTimerDurationMs = 2 * 60 * 1000;
+    const globalTimer = useGlobalRestTimer();
+    const REST_DURATION_MS = 2 * 60 * 1000;
 
-    const restTimerStorageKey = computed(() => {
+    const exerciseIdentity = computed(() => {
         const group = exerciseGroup.value;
-        const exerciseIdentity =
+        return (
             group?.planned?.ID ??
             group?.logged?.exercise_id ??
             group?.logged?.exercise?.ID ??
-            0;
-
-        return `gym-rest-timer:v1:day:${dayId.value}:exercise:${exerciseIdentity}`;
+            0
+        );
     });
+
+    const exerciseDisplayName = computed(() => {
+        const group = exerciseGroup.value;
+        return (
+            group?.planned?.name ??
+            group?.logged?.exercise?.name ??
+            ""
+        );
+    });
+
+    const draftStorageKey = computed(
+        () => `gym-draft:v1:day:${dayId.value}:exercise:${exerciseIdentity.value}`,
+    );
+
+    let draftSaveEnabled = false;
+
+    const saveDraft = () => {
+        if (!draftSaveEnabled) return;
+        const key = draftStorageKey.value;
+        if (!key || exerciseIdentity.value === 0) return;
+        const payload: StoredDraft = {
+            weight: currentWeight.value,
+            reps: currentReps.value,
+            weightSetup: currentWeightSetup.value,
+            notes: notes.value,
+            dirty: draftDirty.value,
+        };
+        window.sessionStorage.setItem(key, JSON.stringify(payload));
+    };
+
+    const restoreDraft = (): boolean => {
+        const key = draftStorageKey.value;
+        if (!key || exerciseIdentity.value === 0) return false;
+        const raw = window.sessionStorage.getItem(key);
+        if (!raw) return false;
+        try {
+            const parsed = JSON.parse(raw) as Partial<StoredDraft>;
+            if (typeof parsed.weight !== "number") return false;
+            currentWeight.value = parsed.weight;
+            currentReps.value = parsed.reps ?? 0;
+            currentWeightSetup.value = parsed.weightSetup ?? "";
+            notes.value = parsed.notes ?? "";
+            draftDirty.value = parsed.dirty ?? false;
+            return true;
+        } catch {
+            window.sessionStorage.removeItem(key);
+            return false;
+        }
+    };
+
+    const clearDraft = () => {
+        const key = draftStorageKey.value;
+        if (key) window.sessionStorage.removeItem(key);
+    };
+
+    watch(
+        [currentWeight, currentReps, currentWeightSetup, notes, draftDirty],
+        () => saveDraft(),
+        { flush: "post" },
+    );
 
     const hasDraftSet = () =>
         currentWeight.value > 0 || currentReps.value > 0;
@@ -179,6 +242,9 @@ export function useExerciseLoggingSession(options: {
         weightEditMode.value = false;
         repsEditMode.value = false;
         draftDirty.value = false;
+
+        restoreDraft();
+        draftSaveEnabled = true;
     };
 
     watch(
@@ -298,7 +364,7 @@ export function useExerciseLoggingSession(options: {
             toast.push("Enter reps before logging the set", "error");
             return;
         }
-        restTimerStartToken.value += 1;
+        globalTimer.start(REST_DURATION_MS, exerciseDisplayName.value);
 
         const tempId = `temp-${Date.now()}-${tempIdCounter++}`;
         const newSet: LoggedSetWithStatus = {
@@ -341,7 +407,8 @@ export function useExerciseLoggingSession(options: {
             return;
         }
 
-        restTimerClearToken.value += 1;
+        globalTimer.clear();
+        clearDraft();
         router.push(loggingRoute());
     };
 
@@ -437,10 +504,6 @@ export function useExerciseLoggingSession(options: {
         weightInputValue,
         repsInputValue,
         notes,
-        restTimerStorageKey,
-        restTimerStartToken,
-        restTimerClearToken,
-        restTimerDurationMs,
         incrementWeight,
         decrementWeight,
         incrementReps,

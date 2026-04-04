@@ -101,6 +101,7 @@ const onInput = (e: Event) => {
     align-items: center;
     justify-content: center;
     gap: 1rem;
+    touch-action: manipulation;
 }
 
 .stepper-button {

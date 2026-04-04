@@ -3,7 +3,7 @@ import type { ExerciseLoggingSessionViewModel } from "../composables/useExercise
 import LoggingHeader from "./LoggingHeader.vue";
 import LoggedSetsList from "./LoggedSetsList.vue";
 import NumericStepper from "./NumericStepper.vue";
-import ExerciseRestTimer from "./ExerciseRestTimer.vue";
+import { useGlobalRestTimer } from "~/composables/useGlobalRestTimer";
 import { computed } from "vue";
 
 const props = defineProps<{
@@ -31,6 +31,12 @@ const exerciseName = computed(
         "",
 );
 
+const { isActive: timerActive, displayText: timerText } = useGlobalRestTimer();
+
+const headerText = computed(() =>
+    timerActive.value ? timerText.value : exerciseName.value,
+);
+
 const repRolloverWeightHint = computed(() => {
     const g = props.session.exerciseGroup;
     const repRollover = g?.previous?.exercise?.rep_rollover;
@@ -49,15 +55,7 @@ const repRolloverWeightHint = computed(() => {
     <div class="logging-view">
         <LoggingHeader @back="session.goBackToList()">
             <template #center>
-                <h2 class="logging-title m-0 min-w-0 truncate text-center text-lg font-medium">
-                    <ExerciseRestTimer
-                        :storage-key="session.restTimerStorageKey"
-                        :start-token="session.restTimerStartToken"
-                        :clear-token="session.restTimerClearToken"
-                        :duration-ms="session.restTimerDurationMs"
-                        :fallback-text="exerciseName"
-                    />
-                </h2>
+                <h2 class="logging-title m-0 min-w-0 truncate text-center text-lg font-medium">{{ headerText }}</h2>
             </template>
             <template #right>
                 <span class="set-indicator">Set {{ session.currentSetNumber }}</span>
