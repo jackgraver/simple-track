@@ -5,6 +5,8 @@ import App from './App.vue'
 import './style.css'
 import PrimeVue from 'primevue/config'
 import Aura from '@primeuix/themes/aura'
+import { setUnauthorizedRedirect } from './composables/auth/session'
+import { resolveAuthSession } from './composables/auth/useAuth'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -15,6 +17,14 @@ const queryClient = new QueryClient({
       refetchOnWindowFocus: false,
     },
   },
+})
+
+setUnauthorizedRedirect(() => {
+  if (router.currentRoute.value.name === 'signin') return
+  void router.push({
+    name: 'signin',
+    query: { redirect: router.currentRoute.value.fullPath },
+  })
 })
 
 const app = createApp(App)
@@ -31,5 +41,6 @@ app.use(PrimeVue, {
   },
 })
 
-app.mount('#app')
-
+void resolveAuthSession().then(() => {
+  app.mount('#app')
+})

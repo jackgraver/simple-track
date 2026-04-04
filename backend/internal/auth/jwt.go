@@ -25,13 +25,19 @@ func init() {
 type Claims struct {
 	Username  string `json:"username"`
 	Timestamp int64  `json:"timestamp"`
+	Iat       int64  `json:"iat,omitempty"`
+	Exp       int64  `json:"exp,omitempty"`
 }
 
-// GenerateToken creates a JWT token with username and timestamp
+// GenerateToken creates a JWT token with username, iat/exp aligned with session cookie TTL.
 func GenerateToken(username string) (string, error) {
+	now := time.Now().Unix()
+	ttl := int64(CookieMaxAgeSeconds())
 	claims := Claims{
 		Username:  username,
-		Timestamp: time.Now().Unix(),
+		Timestamp: now,
+		Iat:       now,
+		Exp:       now + ttl,
 	}
 
 	header := map[string]string{
@@ -82,6 +88,10 @@ func VerifyToken(token string) (*Claims, error) {
 	var claims Claims
 	if err := json.Unmarshal(claimsJSON, &claims); err != nil {
 		return nil, fmt.Errorf("invalid token claims: %v", err)
+	}
+
+	if claims.Exp > 0 && time.Now().Unix() > claims.Exp {
+		return nil, fmt.Errorf("token expired")
 	}
 
 	return &claims, nil

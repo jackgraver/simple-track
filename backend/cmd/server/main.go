@@ -62,11 +62,12 @@ func CreateFeatures(db *gorm.DB, router *gin.Engine) {
 	authHandler := auth.NewHandler(db)
 	authHandler.RegisterRoutes(router)
 
+	authMW := auth.AuthMiddleware()
 	dietHandler := diet.NewHandler(db)
-	dietHandler.RegisterRoutes(router)
+	dietHandler.RegisterRoutes(router, authMW)
 
 	workoutHandler := workout.NewHandler(db)
-	workoutHandler.RegisterRoutes(router)
+	workoutHandler.RegisterRoutes(router, authMW)
 }
 
 func splitString(s, sep string) []string {

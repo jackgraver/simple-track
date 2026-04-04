@@ -4,8 +4,8 @@
 package main
 
 import (
+	"be-simpletracker/internal/auth/models"
 	"be-simpletracker/internal/database"
-	workoutseed "be-simpletracker/internal/workout/seed"
 	"fmt"
 	"os"
 )
@@ -16,9 +16,12 @@ func main() {
 		fmt.Fprintf(os.Stderr, "database: %v\n", err)
 		os.Exit(1)
 	}
-	if err := workoutseed.Run(db); err != nil {
-		fmt.Fprintf(os.Stderr, "seed: %v\n", err)
-		os.Exit(1)
-	}
+	// if err := workoutseed.Run(db); err != nil {
+	// 	fmt.Fprintf(os.Stderr, "seed: %v\n", err)
+	// 	os.Exit(1)
+	// }
+
+	db.AutoMigrate(&models.User{})
+
 	fmt.Println("Workout seed completed.")
 }

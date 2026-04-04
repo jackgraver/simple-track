@@ -18,7 +18,7 @@ func NewHandler(db *gorm.DB) *Handler {
 
 func (h *Handler) RegisterRoutes(router *gin.Engine) {
 	group := router.Group("/")
-	routes.RegisterAuthRoutes(group, h.db, AuthMiddleware(), GenerateToken)
+	routes.RegisterAuthRoutes(group, h.db, AuthMiddleware(), GenerateToken, CookieMaxAgeSeconds(), CookieSecure(), CookieSameSite())
 }
 
 func (h *Handler) Migrate() error {

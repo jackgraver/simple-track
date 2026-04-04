@@ -1,5 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import type { RouteRecordRaw } from 'vue-router'
+import { authStatus } from '~/composables/auth/session'
+import { resolveAuthSession } from '~/composables/auth/useAuth'
 
 const routes: RouteRecordRaw[] = [
   {
@@ -82,5 +84,20 @@ const routes: RouteRecordRaw[] = [
 export const router = createRouter({
   history: createWebHistory(),
   routes,
+})
+
+router.beforeEach(async (to) => {
+  if (to.name === 'signin') {
+    if (authStatus.value === 'unknown') await resolveAuthSession()
+    if (authStatus.value === 'authenticated') {
+      return { name: 'gym' }
+    }
+    return true
+  }
+  if (authStatus.value === 'unknown') await resolveAuthSession()
+  if (authStatus.value !== 'authenticated') {
+    return { name: 'signin', query: { redirect: to.fullPath } }
+  }
+  return true
 })
 

@@ -1,9 +1,12 @@
-import { ref, computed } from 'vue';
-import { useRouter } from 'vue-router';
-import { apiClient } from '~/api/client';
-
-const TOKEN_KEY = 'auth_token';
-const USERNAME_KEY = 'auth_username';
+import { useRouter } from "vue-router";
+import { apiClient } from "~/api/client";
+import {
+    authStatus,
+    isAuthenticated,
+    markAuthenticated,
+    markUnauthorized,
+    username,
+} from "~/composables/auth/session";
 
 interface LoginResponse {
     token: string;
@@ -25,95 +28,83 @@ interface RegisterResponse {
     };
 }
 
-const token = ref<string | null>(null);
-const username = ref<string | null>(null);
-const isAuthenticated = computed(() => !!token.value);
+let resolveInFlight: Promise<void> | null = null;
 
-function loadTokenFromStorage() {
-    if (typeof window === 'undefined') return;
-
-    const storedToken = sessionStorage.getItem(TOKEN_KEY);
-    const storedUsername = sessionStorage.getItem(USERNAME_KEY);
-
-    if (storedToken && storedUsername) {
-        token.value = storedToken;
-        username.value = storedUsername;
+export async function resolveAuthSession(): Promise<void> {
+    if (authStatus.value !== "unknown") {
+        return;
     }
-}
-
-function saveTokenToStorage(t: string, u: string) {
-    if (typeof window === 'undefined') return;
-
-    sessionStorage.setItem(TOKEN_KEY, t);
-    sessionStorage.setItem(USERNAME_KEY, u);
-    token.value = t;
-    username.value = u;
-}
-
-function clearTokenFromStorage() {
-    if (typeof window === 'undefined') return;
-
-    sessionStorage.removeItem(TOKEN_KEY);
-    sessionStorage.removeItem(USERNAME_KEY);
-    token.value = null;
-    username.value = null;
+    if (!resolveInFlight) {
+        resolveInFlight = (async () => {
+            try {
+                const { data } = await apiClient.get<{ user?: { username: string }; username?: string }>(
+                    "/auth/me",
+                );
+                const name = data.username ?? data.user?.username;
+                if (name) {
+                    markAuthenticated(name);
+                } else {
+                    markUnauthorized();
+                }
+            } catch {
+                markUnauthorized();
+            }
+        })();
+    }
+    await resolveInFlight;
 }
 
 export function useAuth() {
     const router = useRouter();
 
-    loadTokenFromStorage();
-
     async function login(usernameInput: string, password: string): Promise<void> {
         try {
-            const response = await apiClient.post<LoginResponse>('/auth/login', {
+            const response = await apiClient.post<LoginResponse>("/auth/login", {
                 username: usernameInput,
                 password,
             });
 
-            if (response.data.token) {
-                saveTokenToStorage(response.data.token, response.data.username);
+            const name = response.data.username ?? response.data.user?.username;
+            if (name) {
+                markAuthenticated(name);
             } else {
-                throw new Error('No token received from server');
+                throw new Error("No user in login response");
             }
         } catch (error: any) {
-            const message = error.response?.data?.error || error.message || 'Login failed';
+            const message = error.response?.data?.error || error.message || "Login failed";
             throw new Error(message);
         }
     }
 
     async function register(usernameInput: string, password: string, email?: string): Promise<void> {
         try {
-            const response = await apiClient.post<RegisterResponse>('/auth/register', {
+            const response = await apiClient.post<RegisterResponse>("/auth/register", {
                 username: usernameInput,
                 password,
                 email,
             });
 
-            if (response.data.token) {
-                saveTokenToStorage(response.data.token, response.data.username);
+            const name = response.data.username ?? response.data.user?.username;
+            if (name) {
+                markAuthenticated(name);
             } else {
-                throw new Error('No token received from server');
+                throw new Error("No user in registration response");
             }
         } catch (error: any) {
-            const message = error.response?.data?.error || error.message || 'Registration failed';
+            const message = error.response?.data?.error || error.message || "Registration failed";
             throw new Error(message);
         }
     }
 
     async function logout() {
         try {
-            await apiClient.post('/auth/logout');
+            await apiClient.post("/auth/logout");
         } catch (error) {
-            console.error('Logout error:', error);
+            console.error("Logout error:", error);
         } finally {
-            clearTokenFromStorage();
-            router.push('/signin');
+            markUnauthorized();
+            router.push("/signin");
         }
-    }
-
-    function getToken(): string | null {
-        return token.value;
     }
 
     function getUsername(): string | null {
@@ -121,14 +112,11 @@ export function useAuth() {
     }
 
     return {
-        token: computed(() => token.value),
-        username: computed(() => username.value),
+        username,
         isAuthenticated,
         login,
         register,
         logout,
-        getToken,
         getUsername,
     };
 }
-

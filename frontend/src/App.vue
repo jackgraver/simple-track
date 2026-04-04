@@ -2,6 +2,9 @@
 import { onMounted } from "vue";
 import ToastContainer from "./composables/toast/ToastContainer.vue";
 import DialogContainer from "./composables/dialog/DialogContainer.vue";
+import { useAuth } from "./composables/auth/useAuth";
+
+const { getUsername } = useAuth();
 
 onMounted(() => {
     document.documentElement.classList.add("dark-mode");
@@ -10,21 +13,25 @@ onMounted(() => {
 
 <template>
     <main
-        class="dark-mode mx-auto box-border w-full max-w-full min-h-dvh overflow-x-clip lg:max-w-8/12"
+        class="dark-mode mx-auto box-border w-full max-w-full min-h-dvh overflow-x-clip"
     >
         <div
-            class="flex w-full flex-col items-stretch lg:items-center gap-4 px-4 lg:px-0"
+            v-if="getUsername()"
+            class="flex items-center justify-end lg:pr-16 pb-2"
         >
-            <div class="flex items-center">
-                <div class="flex items-center gap-2 pt-2">
-                    <router-link :to="{ name: 'gym' }">
-                        <p class="bg-gray-500 rounded-md p-2">Gym</p>
-                    </router-link>
-                    <router-link :to="{ name: 'gym-plans' }">
-                        <p class="bg-gray-500 rounded-md p-2">Manage Plans</p>
-                    </router-link>
-                </div>
+            <div class="flex items-center gap-2 pt-2">
+                <router-link :to="{ name: 'gym' }">
+                    <p class="bg-gray-500 rounded-md p-2">Gym</p>
+                </router-link>
+                <router-link :to="{ name: 'gym-plans' }">
+                    <p class="bg-gray-500 rounded-md p-2">Manage Plans</p>
+                </router-link>
+                <p>{{ getUsername() }}</p>
             </div>
+        </div>
+        <div
+            class="flex w-full flex-col items-stretch lg:items-center gap-4 px-4 lg:px-0 lg:max-w-8/12"
+        >
             <RouterView />
         </div>
     </main>

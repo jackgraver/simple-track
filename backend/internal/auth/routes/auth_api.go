@@ -10,14 +10,20 @@ import (
 )
 
 type AuthHandler struct {
-	db            *gorm.DB
-	generateToken func(string) (string, error)
+	db             *gorm.DB
+	generateToken  func(string) (string, error)
+	cookieMaxAge   int
+	cookieSecure   bool
+	cookieSameSite http.SameSite
 }
 
-func NewAuthHandler(db *gorm.DB, generateToken func(string) (string, error)) *AuthHandler {
+func NewAuthHandler(db *gorm.DB, generateToken func(string) (string, error), cookieMaxAge int, cookieSecure bool, cookieSameSite http.SameSite) *AuthHandler {
 	return &AuthHandler{
-		db:            db,
-		generateToken: generateToken,
+		db:             db,
+		generateToken:  generateToken,
+		cookieMaxAge:   cookieMaxAge,
+		cookieSecure:   cookieSecure,
+		cookieSameSite: cookieSameSite,
 	}
 }
 
@@ -77,8 +83,8 @@ func (h *AuthHandler) Register(c *gin.Context) {
 
 	user.Password = ""
 
-	c.SetSameSite(http.SameSiteLaxMode)
-	c.SetCookie("auth_token", token, 7*24*3600, "/", "", false, true)
+	c.SetSameSite(h.cookieSameSite)
+	c.SetCookie("auth_token", token, h.cookieMaxAge, "/", "", h.cookieSecure, true)
 
 	c.JSON(http.StatusCreated, AuthResponse{
 		Token:    token,
@@ -118,8 +124,8 @@ func (h *AuthHandler) Login(c *gin.Context) {
 
 	user.Password = ""
 
-	c.SetSameSite(http.SameSiteLaxMode)
-	c.SetCookie("auth_token", token, 7*24*3600, "/", "", false, true)
+	c.SetSameSite(h.cookieSameSite)
+	c.SetCookie("auth_token", token, h.cookieMaxAge, "/", "", h.cookieSecure, true)
 
 	c.JSON(http.StatusOK, AuthResponse{
 		Token:    token,
@@ -149,13 +155,13 @@ func (h *AuthHandler) GetCurrentUser(c *gin.Context) {
 
 // Logout clears the authentication cookie
 func (h *AuthHandler) Logout(c *gin.Context) {
-	c.SetSameSite(http.SameSiteLaxMode)
-	c.SetCookie("auth_token", "", -1, "/", "", false, true)
+	c.SetSameSite(h.cookieSameSite)
+	c.SetCookie("auth_token", "", -1, "/", "", h.cookieSecure, true)
 	c.JSON(http.StatusOK, gin.H{"message": "Logged out successfully"})
 }
 
-func RegisterAuthRoutes(group *gin.RouterGroup, db *gorm.DB, authMiddleware gin.HandlerFunc, generateToken func(string) (string, error)) {
-	handler := NewAuthHandler(db, generateToken)
+func RegisterAuthRoutes(group *gin.RouterGroup, db *gorm.DB, authMiddleware gin.HandlerFunc, generateToken func(string) (string, error), cookieMaxAge int, cookieSecure bool, cookieSameSite http.SameSite) {
+	handler := NewAuthHandler(db, generateToken, cookieMaxAge, cookieSecure, cookieSameSite)
 
 	auth := group.Group("/auth")
 	{

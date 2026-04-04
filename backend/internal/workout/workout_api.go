@@ -16,9 +16,9 @@ func NewHandler(db *gorm.DB) *Handler {
 	return &Handler{db: db}
 }
 
-// RegisterRoutes registers all workout feature routes
-func (h *Handler) RegisterRoutes(router *gin.Engine) {
-	group := router.Group("/workout")
+// RegisterRoutes registers all workout feature routes (requires authMiddleware).
+func (h *Handler) RegisterRoutes(router *gin.Engine, authMiddleware gin.HandlerFunc) {
+	group := router.Group("/workout", authMiddleware)
 
 	routes.RegisterWorkoutPlanRoutes(group, h.db)
 	routes.RegisterExercisesRoutes(group, h.db)

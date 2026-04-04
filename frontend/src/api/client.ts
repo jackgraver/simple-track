@@ -1,7 +1,10 @@
 import axios, { type AxiosRequestConfig } from 'axios';
 import { config } from '~/config/env';
+import { markUnauthorized, notifyUnauthorized } from '~/composables/auth/session';
 
 const BASE_URL = config.apiBase || "/api";
+
+console.log("BASE_URL", BASE_URL);
 
 export const api = axios.create({
     baseURL: BASE_URL,
@@ -43,11 +46,23 @@ export const apiDELETE = async <T = any>(url: string, config?: AxiosRequestConfi
     return response.data as T;
 };
 
+function isAuthCredentialRequest(url: string): boolean {
+    return (
+        url.includes("/auth/me") ||
+        url.includes("/auth/login") ||
+        url.includes("/auth/register")
+    );
+}
+
 api.interceptors.response.use(
     (response) => response,
     (error) => {
         if (error.response?.status === 401) {
-            //TODO: logout / refresh / redirect
+            markUnauthorized();
+            const reqUrl = typeof error.config?.url === "string" ? error.config.url : "";
+            if (!isAuthCredentialRequest(reqUrl)) {
+                notifyUnauthorized();
+            }
         }
         return Promise.reject(error);
     },

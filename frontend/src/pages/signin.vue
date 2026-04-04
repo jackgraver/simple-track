@@ -1,40 +1,50 @@
 <script setup lang="ts">
-import { ref } from 'vue';
-import { useRouter } from 'vue-router';
-import { useAuth } from '~/composables/auth/useAuth';
-import { toast } from '~/composables/toast/useToast';
+import { ref } from "vue";
+import { useRoute, useRouter } from "vue-router";
+import { useAuth } from "~/composables/auth/useAuth";
+import { toast } from "~/composables/toast/useToast";
+import Input from "~/shared/input/Input.vue";
 
 const router = useRouter();
-const { login, register, isAuthenticated } = useAuth();
+const route = useRoute();
+const { login, register } = useAuth();
 
-const isLoginMode = ref(true);
-const username = ref('');
-const password = ref('');
-const email = ref('');
-const isLoading = ref(false);
-const error = ref('');
-
-if (isAuthenticated.value) {
-    router.push('/');
+function redirectAfterSignIn() {
+    const r = route.query.redirect;
+    if (typeof r === "string" && r.startsWith("/") && !r.startsWith("//")) {
+        return r;
+    }
+    return "/";
 }
 
+const isLoginMode = ref(true);
+const username = ref("");
+const password = ref("");
+const email = ref("");
+const isLoading = ref(false);
+const error = ref("");
+
 const handleSubmit = async () => {
-    error.value = '';
+    error.value = "";
     isLoading.value = true;
 
     try {
         if (isLoginMode.value) {
             await login(username.value, password.value);
-            toast.push('Login successful!', 'success');
-            router.push('/');
+            toast.push("Login successful!", "success");
+            await router.push(redirectAfterSignIn());
         } else {
-            await register(username.value, password.value, email.value || undefined);
-            toast.push('Registration successful!', 'success');
-            router.push('/');
+            // await register(
+            //     username.value,
+            //     password.value,
+            //     email.value || undefined,
+            // );
+            // toast.push("Registration successful!", "success");
+            // await router.push(redirectAfterSignIn());
         }
     } catch (err: any) {
-        error.value = err.message || 'An error occurred';
-        toast.push(error.value, 'error');
+        error.value = err.message || "An error occurred";
+        toast.push(error.value, "error");
     } finally {
         isLoading.value = false;
     }
@@ -42,66 +52,112 @@ const handleSubmit = async () => {
 
 const toggleMode = () => {
     isLoginMode.value = !isLoginMode.value;
-    error.value = '';
-    password.value = '';
-    email.value = '';
+    error.value = "";
+    password.value = "";
+    email.value = "";
 };
 </script>
 
 <template>
     <div class="signin-container">
         <div class="signin-card">
-            <h1>{{ isLoginMode ? 'Sign In' : 'Sign Up' }}</h1>
-            
+            <!-- <h1>{{ isLoginMode ? "Sign In" : "Sign Up" }}</h1> -->
+
             <form @submit.prevent="handleSubmit" class="signin-form">
                 <div v-if="error" class="error-message">{{ error }}</div>
-                
+
                 <div class="form-group">
-                    <label for="username">Username</label>
-                    <input
-                        id="username"
+                    <Input
+                        label=""
                         v-model="username"
                         type="text"
-                        required
+                        :required="true"
                         autocomplete="username"
-                        placeholder="Enter your username"
+                        placeholder=""
+                        :error="error && !username ? error : ''"
                     />
                 </div>
-                
+
                 <div class="form-group">
-                    <label for="password">Password</label>
-                    <input
-                        id="password"
+                    <Input
+                        label=""
                         v-model="password"
                         type="password"
-                        required
+                        :required="true"
+                        autocomplete="current-password"
+                        placeholder=""
+                        :error="error && !password ? error : ''"
+                    />
+                </div>
+
+                <div class="form-group">
+                    <Input
+                        label=""
+                        v-model="email"
+                        type="text"
+                        autocomplete=""
+                        placeholder=""
+                        :error="''"
+                    />
+                </div>
+
+                <!-- <div class="form-group">
+                    <Input
+                        label="Username"
+                        v-model="username"
+                        type="text"
+                        :required="true"
+                        autocomplete="username"
+                        placeholder="Enter your username"
+                        :error="error && !username ? error : ''"
+                    />
+                </div>
+
+                <div class="form-group">
+                    <Input
+                        label="Password"
+                        v-model="password"
+                        type="password"
+                        :required="true"
                         autocomplete="current-password"
                         placeholder="Enter your password"
+                        :error="error && !password ? error : ''"
                     />
-                </div>
-                
+                </div> -->
+
                 <div v-if="!isLoginMode" class="form-group">
-                    <label for="email">Email (optional)</label>
-                    <input
-                        id="email"
+                    <Input
+                        label="Email (optional)"
                         v-model="email"
                         type="email"
+                        :required="false"
                         autocomplete="email"
                         placeholder="Enter your email"
+                        :error="error && !email && !isLoginMode ? error : ''"
                     />
                 </div>
-                
-                <button type="submit" :disabled="isLoading" class="submit-button">
-                    {{ isLoading ? 'Loading...' : (isLoginMode ? 'Sign In' : 'Sign Up') }}
+
+                <button
+                    type="submit"
+                    :disabled="isLoading"
+                    class="submit-button"
+                >
+                    {{
+                        isLoading ? "Loading..." : isLoginMode ? "" : "Sign Up"
+                    }}
                 </button>
             </form>
-            
-            <div class="toggle-mode">
-                <span>{{ isLoginMode ? "Don't have an account?" : 'Already have an account?' }}</span>
+
+            <!-- <div class="toggle-mode">
+                <span>{{
+                    isLoginMode
+                        ? "Don't have an account?"
+                        : "Already have an account?"
+                }}</span>
                 <button type="button" @click="toggleMode" class="toggle-button">
-                    {{ isLoginMode ? 'Sign Up' : 'Sign In' }}
+                    {{ isLoginMode ? "Sign Up" : "Sign In" }}
                 </button>
-            </div>
+            </div> -->
         </div>
     </div>
 </template>
@@ -137,48 +193,6 @@ const toggleMode = () => {
     display: flex;
     flex-direction: column;
     gap: 1.5rem;
-}
-
-.form-group {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-}
-
-.form-group label {
-    color: rgb(200, 200, 200);
-    font-size: 0.9rem;
-    font-weight: 500;
-}
-
-.form-group input {
-    padding: 0.75rem;
-    background: rgb(35, 35, 35);
-    border: 1px solid rgb(56, 56, 56);
-    border-radius: 4px;
-    color: white;
-    font-size: 1rem;
-    transition: border-color 0.2s, background-color 0.2s;
-}
-
-.form-group input:focus {
-    outline: none;
-    border-color: rgb(100, 100, 100);
-    background: rgb(40, 40, 40);
-}
-
-.form-group input::placeholder {
-    color: rgb(120, 120, 120);
-}
-
-.error-message {
-    padding: 0.75rem;
-    background: rgb(60, 20, 20);
-    border: 1px solid rgb(120, 40, 40);
-    border-radius: 4px;
-    color: rgb(255, 150, 150);
-    font-size: 0.9rem;
-    text-align: center;
 }
 
 .submit-button {
@@ -227,4 +241,3 @@ const toggleMode = () => {
     color: rgb(150, 200, 255);
 }
 </style>
-
