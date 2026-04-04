@@ -27,6 +27,7 @@ func RegisterExercisesRoutes(group *gin.RouterGroup, db *gorm.DB) {
 	exercises := group.Group("/exercises")
 	{
 		exercises.GET("/all", h.getAllExercises)
+		exercises.POST("", h.createExercise)
 		exercises.POST("/log", h.logExercise)
 		exercises.POST("/add", h.addExerciseToWorkout)
 		exercises.DELETE("/remove", h.removeExerciseFromWorkout)
@@ -113,6 +114,9 @@ func (h *ExercisesHandler) logExercise(c *gin.Context) {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
+	default:
+		c.JSON(http.StatusBadRequest, gin.H{"error": `type must be "previous" or "logged"`})
+		return
 	}
 
 	// Reload the exercise with all relations to get updated IDs
@@ -267,6 +271,7 @@ func (h *ExercisesHandler) getExerciseProgression(c *gin.Context) {
 type CreateExerciseRequest struct {
 	Name        string `json:"name"`
 	RepRollover uint   `json:"rep_rollover"`
+	Cues        string `json:"cues"`
 }
 
 func (h *ExercisesHandler) createExercise(c *gin.Context) {
@@ -285,7 +290,7 @@ func (h *ExercisesHandler) createExercise(c *gin.Context) {
 		request.RepRollover = 10
 	}
 
-	exercise, err := services.CreateExercise(h.db, request.Name, request.RepRollover)
+	exercise, err := services.CreateExercise(h.db, request.Name, request.RepRollover, request.Cues)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

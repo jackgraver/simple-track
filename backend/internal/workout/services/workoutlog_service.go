@@ -343,38 +343,6 @@ func (s *WorkoutLogService) UpsertMobilityPost(ctx context.Context, offset int, 
 	return loggedPostMobilityView(reloaded.WorkoutPlan, &reloaded), nil
 }
 
-func GetAll(database *gorm.DB) ([]models.WorkoutLog, error) {
-	var workoutDay []models.WorkoutLog
-
-	err := database.
-		Preload("Cardio").
-		Preload("Exercises.Sets").
-		Find(&workoutDay).Error
-
-	if err != nil {
-		return []models.WorkoutLog{}, err
-	}
-	return workoutDay, nil
-}
-
-func GetPrevious(db *gorm.DB, day string) (models.WorkoutLog, error) {
-	var workoutDay models.WorkoutLog
-
-	err := db.
-		Preload("Cardio").
-		Preload("Exercises.Sets").
-		Where("WorkoutPlan.name = ?", day).
-		Where("date < ?", time.Now()).
-		Order("date DESC").
-		Limit(1).
-		Find(&workoutDay).Error
-
-	if err != nil {
-		return models.WorkoutLog{}, err
-	}
-	return workoutDay, nil
-}
-
 func LogExercise(db *gorm.DB, exercise *models.LoggedExercise) error {
 	err := db.Omit("Exercise").Create(exercise).Error
 	if err != nil {
@@ -552,10 +520,11 @@ func RemoveExerciseFromPlan(db *gorm.DB, planID uint, exerciseID uint) error {
 	return db.Model(&plan).Association("Exercises").Delete(&exercise)
 }
 
-func CreateExercise(db *gorm.DB, name string, repRollover uint) (*models.Exercise, error) {
+func CreateExercise(db *gorm.DB, name string, repRollover uint, cues string) (*models.Exercise, error) {
 	exercise := models.Exercise{
 		Name:        name,
 		RepRollover: repRollover,
+		Cues:        cues,
 	}
 
 	if err := db.Create(&exercise).Error; err != nil {
