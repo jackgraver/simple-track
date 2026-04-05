@@ -55,10 +55,16 @@ const repRolloverWeightHint = computed(() => {
     <div class="logging-view">
         <LoggingHeader @back="session.goBackToList()">
             <template #center>
-                <h2 class="logging-title m-0 min-w-0 truncate text-center text-lg font-medium">{{ headerText }}</h2>
+                <h2
+                    class="logging-title m-0 min-w-0 truncate text-center text-lg font-medium"
+                >
+                    {{ headerText }}
+                </h2>
             </template>
             <template #right>
-                <span class="set-indicator">Set {{ session.currentSetNumber }}</span>
+                <span class="set-indicator"
+                    >Set {{ session.currentSetNumber }}</span
+                >
             </template>
         </LoggingHeader>
         <div class="input-group">

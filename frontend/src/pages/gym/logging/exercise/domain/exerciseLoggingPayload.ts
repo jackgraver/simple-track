@@ -1,5 +1,5 @@
 import type { LoggedExercise, LoggedSet } from "~/types/workout";
-import type { ExerciseGroup, LoggedSetWithStatus } from "../store/useWorkoutStore";
+import type { ExerciseGroup, LoggedSetWithStatus } from "../../store/useWorkoutStore";
 
 export function setsMatchLocalToSaved(
     local: Pick<LoggedSetWithStatus, "weight" | "reps" | "weight_setup">,

@@ -2,8 +2,8 @@
 import type { MobilityLogged } from "~/types/workout";
 import LoggingHeader from "./LoggingHeader.vue";
 import { ref, watch, computed } from "vue";
-import { useWorkoutStore } from "../store/useWorkoutStore";
-import { useLoggingRouteContext } from "../composables/useLoggingRouteContext";
+import { useWorkoutStore } from "../../store/useWorkoutStore";
+import { useLoggingRouteContext } from "../../composables/useLoggingRouteContext";
 import { toast } from "~/composables/toast/useToast";
 
 const props = defineProps<{
@@ -26,8 +26,8 @@ watch(
 const items = computed(() => props.loggedMobility.items);
 const title = computed(() => props.loggedMobility.title);
 
-const doneCount = computed(() =>
-    items.value.filter((name) => localChecked.value.has(name)).length,
+const doneCount = computed(
+    () => items.value.filter((name) => localChecked.value.has(name)).length,
 );
 
 const headerProgress = computed(() => {
@@ -63,7 +63,11 @@ const isChecked = (name: string) => localChecked.value.has(name);
     <div class="flex w-full max-w-full flex-col gap-6 px-1 pb-2 box-border">
         <LoggingHeader :title="title" @back="goBackToLogging">
             <template #right>
-                <span v-if="headerProgress" class="text-sm font-medium text-zinc-300 tabular-nums">{{ headerProgress }}</span>
+                <span
+                    v-if="headerProgress"
+                    class="text-sm font-medium text-zinc-300 tabular-nums"
+                    >{{ headerProgress }}</span
+                >
             </template>
         </LoggingHeader>
         <ul class="m-0 flex list-none flex-col gap-2 p-0">

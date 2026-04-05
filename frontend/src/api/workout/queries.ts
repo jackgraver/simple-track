@@ -6,7 +6,10 @@ import { liveworkoutKeys } from '~/api/workout/keys';
 import { homeKeys } from '~/pages/home/queries/keys';
 import type { Cardio, Exercise, LoggedExercise, MobilityLogged } from '~/types/workout';
 
-export function useWorkoutLogToday(offset: MaybeRefOrGetter<number> = 0) {
+export function useWorkoutLogToday(
+    offset: MaybeRefOrGetter<number> = 0,
+    enabled: MaybeRefOrGetter<boolean> = true,
+) {
     return useQuery(
         computed(() => ({
             queryKey: liveworkoutKeys.workouts.day(toValue(offset)),
@@ -18,6 +21,7 @@ export function useWorkoutLogToday(offset: MaybeRefOrGetter<number> = 0) {
                 return response.day;
             },
             staleTime: 1000 * 60 * 2,
+            enabled: toValue(enabled),
         })),
     );
 }

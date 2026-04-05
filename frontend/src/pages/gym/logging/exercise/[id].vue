@@ -4,11 +4,11 @@ import type { MobilityLogged } from "~/types/workout";
 import { useWorkoutStore } from "../store/useWorkoutStore";
 import { computed, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import ExerciseLoggingView from "../components/ExerciseLoggingView.vue";
-import CardioLoggingView from "../components/CardioLoggingView.vue";
-import MobilityLoggingView from "../components/MobilityLoggingView.vue";
-import LoggingPageShell from "../components/LoggingPageShell.vue";
-import { useExerciseLoggingSession } from "../composables/useExerciseLoggingSession";
+import ExerciseLoggingView from "./components/ExerciseLoggingView.vue";
+import CardioLoggingView from "./components/CardioLoggingView.vue";
+import MobilityLoggingView from "./components/MobilityLoggingView.vue";
+import LoggingPageShell from "./components/LoggingPageShell.vue";
+import { useExerciseLoggingSession } from "./composables/useExerciseLoggingSession";
 import { useLoggingRouteContext } from "../composables/useLoggingRouteContext";
 
 const router = useRouter();
@@ -35,12 +35,15 @@ const mobilitySlot = computed<"pre" | "post" | null>(() => {
     return null;
 });
 
-const loggingKind = computed<"exercise" | "cardio" | "mobility" | "unknown">(() => {
-    if (route.name === "logging-exercise") return "exercise";
-    if (route.name === "logging-cardio") return "cardio";
-    if (route.name === "logging-mobility" && mobilitySlot.value) return "mobility";
-    return "unknown";
-});
+const loggingKind = computed<"exercise" | "cardio" | "mobility" | "unknown">(
+    () => {
+        if (route.name === "logging-exercise") return "exercise";
+        if (route.name === "logging-cardio") return "cardio";
+        if (route.name === "logging-mobility" && mobilitySlot.value)
+            return "mobility";
+        return "unknown";
+    },
+);
 
 watch(
     () => loggingKind.value,
@@ -65,7 +68,11 @@ const exerciseId = computed(() => {
 });
 
 const exerciseGroup = computed<ExerciseGroup | null>(() => {
-    if (loggingKind.value !== "exercise" || !exerciseId.value || pending.value) {
+    if (
+        loggingKind.value !== "exercise" ||
+        !exerciseId.value ||
+        pending.value
+    ) {
         return null;
     }
     const index = log.value.findIndex(
@@ -122,7 +129,10 @@ const isEmpty = computed(() => {
         :empty-message="emptyMessage"
         @back="goBackToLogging"
     >
-        <div v-if="loggingKind === 'exercise' && exerciseGroup" class="container">
+        <div
+            v-if="loggingKind === 'exercise' && exerciseGroup"
+            class="container"
+        >
             <ExerciseLoggingView :session="session" />
         </div>
         <div v-else-if="loggingKind === 'cardio'" class="container">
@@ -131,7 +141,10 @@ const isEmpty = computed(() => {
                 :logged-cardio="loggedCardio"
             />
         </div>
-        <div v-else-if="loggingKind === 'mobility' && loggedMobility" class="container">
+        <div
+            v-else-if="loggingKind === 'mobility' && loggedMobility"
+            class="container"
+        >
             <MobilityLoggingView
                 :logged-mobility="loggedMobility"
                 :slot="mobilitySlot ?? 'pre'"

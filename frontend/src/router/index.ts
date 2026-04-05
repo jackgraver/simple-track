@@ -21,7 +21,7 @@ const routes: RouteRecordRaw[] = [
   {
     path: '/gym',
     name: 'gym',
-    component: () => import('~/pages/gym/gym.vue'),
+    component: () => import('~/pages/gym/index.vue'),
     children: [
       {
         path: 'plans',

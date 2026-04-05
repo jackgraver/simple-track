@@ -1,5 +1,5 @@
 import type { LoggedExercise, LoggedSet } from "~/types/workout";
-import type { ExerciseGroup } from "../store/useWorkoutStore";
+import type { ExerciseGroup } from "./useWorkoutStore";
 
 function parseTimeMs(obj: unknown): number | null {
     if (!obj || typeof obj !== "object") return null;
@@ -21,7 +21,7 @@ function earliestSetTimeMs(sets: LoggedSet[] | undefined): number | null {
 }
 
 /** First submit/log activity for this exercise in today's session (logged sets, else logged row time). */
-export function logOrderTimeMs(group: ExerciseGroup): number | null {
+function logOrderTimeMs(group: ExerciseGroup): number | null {
     const logged = group.logged as LoggedExercise | undefined;
     if (!logged) return null;
     const fromSets = earliestSetTimeMs(logged.sets);

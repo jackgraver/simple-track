@@ -9,7 +9,7 @@ import {
     useUpsertMobilityPre,
     useUpsertMobilityPost,
 } from "~/api/workout/queries";
-import { sortExerciseGroupsByLogOrder } from "../utils/sortExerciseGroupsByLogOrder";
+import { sortExerciseGroupsByLogOrder } from "./sortExerciseGroupsByLogOrder";
 import { computed, type MaybeRefOrGetter } from "vue";
 
 export type ExerciseGroup = {

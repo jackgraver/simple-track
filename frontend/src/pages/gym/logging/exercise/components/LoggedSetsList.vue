@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { LoggedSetWithStatus } from "../store/useWorkoutStore";
+import type { LoggedSetWithStatus } from "../../store/useWorkoutStore";
 import { Loader, X, RotateCcw } from "lucide-vue-next";
 
 defineProps<{

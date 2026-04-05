@@ -3,6 +3,7 @@ import { computed } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useWorkoutLogToday } from "~/api/workout/queries";
 import { formatDateLong } from "~/utils/dateUtil";
+import { ChevronLeftIcon, ChevronRightIcon } from "lucide-vue-next";
 
 const route = useRoute();
 const router = useRouter();
@@ -12,7 +13,10 @@ const dayOffset = computed(() => {
     const value = typeof raw === "string" ? Number.parseInt(raw, 10) : 0;
     return Number.isNaN(value) ? 0 : value;
 });
-const { data, isPending, isError, error } = useWorkoutLogToday(dayOffset);
+const { data, isPending, isError, error } = useWorkoutLogToday(
+    dayOffset,
+    isGymHome,
+);
 
 const updateOffset = (nextOffset: number) => {
     const nextQuery = { ...route.query };
@@ -65,7 +69,7 @@ const loggingRoute = computed(() => ({
                         class="date-nav-button"
                         @click="goToPreviousDay"
                     >
-                        Prev
+                        <ChevronLeftIcon />
                     </button>
                     <p class="date">{{ dateLabel }}</p>
                     <button
@@ -73,7 +77,7 @@ const loggingRoute = computed(() => ({
                         class="date-nav-button"
                         @click="goToNextDay"
                     >
-                        Next
+                        <ChevronRightIcon />
                     </button>
                 </div>
                 <h1 class="split">{{ splitLabel }}</h1>
@@ -123,34 +127,8 @@ const loggingRoute = computed(() => ({
     font-size: 1.5rem;
     font-weight: 600;
 }
-.plan-block {
-    margin: 0;
-}
-.plan-heading {
-    margin: 0 0 0.5rem;
-    font-size: 0.85rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    color: #909090;
-}
-.plan-list {
-    margin: 0;
-    padding-left: 1.15rem;
-    color: #dcdcdc;
-    line-height: 1.5;
-}
-.plan-item {
-    margin: 0.15rem 0;
-}
-.plan-empty {
-    margin: 0;
-    font-size: 0.9rem;
-    color: #888;
-}
 .gym-cta {
     display: inline-block;
-    align-self: flex-start;
     margin-top: 0.5rem;
     padding: 10px 18px;
     border-radius: 6px;

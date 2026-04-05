@@ -1,8 +1,8 @@
 import type { ComputedRef, Ref } from "vue";
 import { computed, reactive, ref, watch } from "vue";
 import type { Router } from "vue-router";
-import { buildLoggingListQuery } from "./useLoggingRouteContext";
-import type { ExerciseGroup, LoggedSetWithStatus } from "../store/useWorkoutStore";
+import { buildLoggingListQuery } from "../../composables/useLoggingRouteContext";
+import type { ExerciseGroup, LoggedSetWithStatus } from "../../store/useWorkoutStore";
 import type { LoggedExercise } from "~/types/workout";
 import { toast } from "~/composables/toast/useToast";
 import { useGlobalRestTimer } from "~/composables/useGlobalRestTimer";

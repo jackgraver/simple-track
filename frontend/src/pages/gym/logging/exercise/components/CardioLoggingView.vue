@@ -3,8 +3,8 @@ import type { Cardio, PlannedCardio } from "~/types/workout";
 import LoggingHeader from "./LoggingHeader.vue";
 import NumericStepper from "./NumericStepper.vue";
 import { ref, watch, computed, nextTick, useId } from "vue";
-import { useWorkoutStore } from "../store/useWorkoutStore";
-import { useLoggingRouteContext } from "../composables/useLoggingRouteContext";
+import { useWorkoutStore } from "../../store/useWorkoutStore";
+import { useLoggingRouteContext } from "../../composables/useLoggingRouteContext";
 import { toast } from "~/composables/toast/useToast";
 
 const props = defineProps<{
@@ -174,7 +174,9 @@ const finish = async () => {
     font-size: 1rem;
     font-family: inherit;
     resize: vertical;
-    transition: border-color 0.2s, background-color 0.2s;
+    transition:
+        border-color 0.2s,
+        background-color 0.2s;
 }
 .notes-input:focus {
     outline: none;
