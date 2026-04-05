@@ -1,9 +1,9 @@
 package routes
 
 import (
+	"be-simpletracker/internal/core/workout/models"
+	"be-simpletracker/internal/core/workout/services"
 	"be-simpletracker/internal/utils"
-	"be-simpletracker/internal/workout/models"
-	"be-simpletracker/internal/workout/services"
 	"errors"
 	"net/http"
 	"strconv"

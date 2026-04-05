@@ -1,7 +1,7 @@
 package seed
 
 import (
-	"be-simpletracker/internal/workout/models"
+	"be-simpletracker/internal/core/workout/models"
 	"fmt"
 	"time"
 

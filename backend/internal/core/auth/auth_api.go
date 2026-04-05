@@ -1,8 +1,8 @@
 package auth
 
 import (
-	"be-simpletracker/internal/auth/models"
-	"be-simpletracker/internal/auth/routes"
+	"be-simpletracker/internal/core/auth/models"
+	"be-simpletracker/internal/core/auth/routes"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"

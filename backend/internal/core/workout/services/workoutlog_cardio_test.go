@@ -1,8 +1,8 @@
 package services
 
 import (
+	"be-simpletracker/internal/core/workout/models"
 	"be-simpletracker/internal/utils"
-	"be-simpletracker/internal/workout/models"
 	"context"
 	"testing"
 

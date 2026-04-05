@@ -1,8 +1,8 @@
 package routes
 
 import (
-	"be-simpletracker/internal/workout/models"
-	"be-simpletracker/internal/workout/services"
+	"be-simpletracker/internal/core/workout/models"
+	"be-simpletracker/internal/core/workout/services"
 	"net/http"
 	"strconv"
 	"strings"

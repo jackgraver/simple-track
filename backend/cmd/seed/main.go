@@ -4,7 +4,7 @@
 package main
 
 import (
-	"be-simpletracker/internal/auth/models"
+	"be-simpletracker/internal/core/auth/models"
 	"be-simpletracker/internal/database"
 	"fmt"
 	"os"

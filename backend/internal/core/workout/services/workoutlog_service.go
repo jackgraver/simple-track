@@ -1,9 +1,9 @@
 package services
 
 import (
+	"be-simpletracker/internal/core/workout/models"
+	workoutrepo "be-simpletracker/internal/core/workout/repository"
 	"be-simpletracker/internal/utils"
-	"be-simpletracker/internal/workout/models"
-	workoutrepo "be-simpletracker/internal/workout/repository"
 	"context"
 	"errors"
 	"fmt"

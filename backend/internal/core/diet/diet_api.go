@@ -1,8 +1,8 @@
 package diet
 
 import (
-	"be-simpletracker/internal/diet/models"
-	"be-simpletracker/internal/diet/routes"
+	"be-simpletracker/internal/core/diet/models"
+	"be-simpletracker/internal/core/diet/routes"
 	"fmt"
 	"time"
 

@@ -1,10 +1,10 @@
 package main
 
 import (
-	"be-simpletracker/internal/auth"
+	"be-simpletracker/internal/core/auth"
+	diet "be-simpletracker/internal/core/diet"
+	workout "be-simpletracker/internal/core/workout"
 	"be-simpletracker/internal/database"
-	diet "be-simpletracker/internal/diet"
-	workout "be-simpletracker/internal/workout"
 	"fmt"
 	"os"
 	"strings"

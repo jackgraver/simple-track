@@ -4,8 +4,8 @@ import (
 	"context"
 	"time"
 
+	"be-simpletracker/internal/core/workout/models"
 	dbrepo "be-simpletracker/internal/database/repository"
-	"be-simpletracker/internal/workout/models"
 
 	"gorm.io/gorm"
 )

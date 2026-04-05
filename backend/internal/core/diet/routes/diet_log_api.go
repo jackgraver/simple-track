@@ -1,7 +1,7 @@
 package routes
 
 import (
-	"be-simpletracker/internal/diet/services"
+	"be-simpletracker/internal/core/diet/services"
 	"be-simpletracker/internal/utils"
 	"net/http"
 	"strconv"

@@ -1,7 +1,7 @@
 package routes
 
 import (
-	"be-simpletracker/internal/auth/models"
+	"be-simpletracker/internal/core/auth/models"
 	"net/http"
 
 	"github.com/gin-gonic/gin"

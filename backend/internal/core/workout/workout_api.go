@@ -1,7 +1,7 @@
 package workout
 
 import (
-	"be-simpletracker/internal/workout/routes"
+	"be-simpletracker/internal/core/workout/routes"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"

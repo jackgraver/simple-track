@@ -1,8 +1,8 @@
 package routes
 
 import (
+	"be-simpletracker/internal/core/workout/services"
 	"be-simpletracker/internal/utils"
-	"be-simpletracker/internal/workout/services"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
