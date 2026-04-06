@@ -4,7 +4,7 @@ export interface BaseModel {
     updated_at: string;
 }
 
-export interface Day extends BaseModel {
+export interface DietDay extends BaseModel {
     date: string;
     plan: Plan;
     plannedMeals: PlannedMeal[];

@@ -12,11 +12,11 @@ import (
 )
 
 // MealPlanToday returns today's meal plan day with meals and goals.
-func MealPlanToday(db *gorm.DB, offset int) (models.Day, error) {
+func MealPlanToday(db *gorm.DB, offset int) (models.DietDay, error) {
 	return dietrepo.New(db).DayMealPlanToday(offset)
 }
 
-func MealPlanDayByID(db *gorm.DB, id int) (*models.Day, error) {
+func MealPlanDayByID(db *gorm.DB, id int) (*models.DietDay, error) {
 	return dietrepo.New(db).DayByID(id)
 }
 
@@ -24,7 +24,7 @@ func CalculateTotals(db *gorm.DB, dayID uint) (float32, float32, float32, float3
 	return dietrepo.New(db).CalculateTotals(dayID)
 }
 
-func AllMealDays(db *gorm.DB) ([]models.Day, error) {
+func AllMealDays(db *gorm.DB) ([]models.DietDay, error) {
 	return dietrepo.New(db).AllMealDays()
 }
 
@@ -52,7 +52,7 @@ func MealByID(db *gorm.DB, id uint) (*models.Meal, error) {
 	return dietrepo.New(db).MealByID(id)
 }
 
-func FindMealPlanDay(db *gorm.DB, date time.Time) (*models.Day, error) {
+func FindMealPlanDay(db *gorm.DB, date time.Time) (*models.DietDay, error) {
 	return dietrepo.New(db).FindDayByDate(date)
 }
 

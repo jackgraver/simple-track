@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { Day, Food, Meal, MealItem } from "~/types/diet";
+import type { Food, Meal, MealItem } from "~/types/diet";
 import { Check, Plus, Trash2, ChevronUp, ChevronDown } from "lucide-vue-next";
 import { ref } from "vue";
 //TODO: calculate amount based on inputting "xg" or "1.5 servings"

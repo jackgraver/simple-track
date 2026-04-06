@@ -6,8 +6,8 @@ import (
 	"gorm.io/gorm"
 )
 
-// Day represents a day in the diet plan
-type Day struct {
+// DietDay represents a day in the diet plan
+type DietDay struct {
 	gorm.Model
 	Date         time.Time     `json:"date"`
 	PlanID       uint          `json:"plan_id"`
@@ -16,10 +16,10 @@ type Day struct {
 	Logs         []DayLog      `json:"loggedMeals"`
 }
 
-func (d Day) GetID() uint        { return d.ID }
-func (d Day) TableName() string  { return "days" }
-func (d Day) GetDate() time.Time { return d.Date }
-func (d Day) Preloads() []string {
+func (d DietDay) GetID() uint        { return d.ID }
+func (d DietDay) TableName() string  { return "days" }
+func (d DietDay) GetDate() time.Time { return d.Date }
+func (d DietDay) Preloads() []string {
 	return []string{"PlannedMeals.Meal.Items.Food", "Plan", "Logs.Meal.Items.Food"}
 }
 

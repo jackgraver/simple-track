@@ -1,8 +1,8 @@
 import { apiClient } from '~/api/client';
-import type { Day, Meal } from '~/types/diet';
+import type { DietDay, Meal } from '~/types/diet';
 
 export type DietLogsTodayResponse = {
-    day: Day;
+    day: DietDay;
     totalCalories: number;
     totalProtein: number;
     totalFiber: number;
@@ -18,7 +18,7 @@ export type CreateMealResponse = {
 };
 
 export type LogMealResponse = {
-    day: Day;
+    day: DietDay;
     totalCalories: number;
     totalProtein: number;
     totalFiber: number;

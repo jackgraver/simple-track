@@ -41,7 +41,7 @@ func seedDatabase(db *gorm.DB) error {
 		&models.Meal{},
 		&models.SavedMeal{},
 		&models.Food{},
-		&models.Day{},
+		&models.DietDay{},
 		&models.Plan{},
 	); err != nil {
 		fmt.Printf("Failed to drop meal plan database: %v\n", err)
@@ -49,7 +49,7 @@ func seedDatabase(db *gorm.DB) error {
 
 	if err := db.AutoMigrate(
 		&models.Plan{},
-		&models.Day{},
+		&models.DietDay{},
 		&models.Meal{},
 		&models.MealItem{},
 		&models.SavedMeal{},
@@ -76,7 +76,7 @@ func seedDatabase(db *gorm.DB) error {
 	end := time.Date(2026, time.April, 30, 0, 0, 0, 0, time.Local)
 
 	for date := start; !date.After(end); date = date.AddDate(0, 0, 1) {
-		mpd := models.Day{
+		mpd := models.DietDay{
 			Date:         date,
 			Plan:         bulk,
 			PlannedMeals: []models.PlannedMeal{},

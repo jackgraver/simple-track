@@ -66,9 +66,9 @@ func (r *Repository) MealCreate(meal *models.Meal) (uint, error) {
 	return meal.ID, nil
 }
 
-func (r *Repository) DayMealPlanToday(offset int) (models.Day, error) {
+func (r *Repository) DayMealPlanToday(offset int) (models.DietDay, error) {
 	today := utils.ZerodTime(offset)
-	var day models.Day
+	var day models.DietDay
 	if err := r.db.
 		Preload("PlannedMeals", "logged = ?", false).
 		Preload("PlannedMeals.Meal.Items.Food").
@@ -76,13 +76,13 @@ func (r *Repository) DayMealPlanToday(offset int) (models.Day, error) {
 		Preload("Logs.Meal.Items.Food").
 		Where("date = ?", today).
 		First(&day).Error; err != nil {
-		return models.Day{}, err
+		return models.DietDay{}, err
 	}
 	return day, nil
 }
 
-func (r *Repository) DayByID(id int) (*models.Day, error) {
-	var day models.Day
+func (r *Repository) DayByID(id int) (*models.DietDay, error) {
+	var day models.DietDay
 	if err := r.db.
 		Preload("PlannedMeals", "logged = ?", false).
 		Preload("PlannedMeals.Meal.Items.Food").
@@ -94,13 +94,13 @@ func (r *Repository) DayByID(id int) (*models.Day, error) {
 	return &day, nil
 }
 
-func (r *Repository) DaysByDateRange(ctx context.Context, start, end time.Time) ([]models.Day, error) {
-	repo := dbrepo.NewGormRepository[models.Day](r.db)
+func (r *Repository) DaysByDateRange(ctx context.Context, start, end time.Time) ([]models.DietDay, error) {
+	repo := dbrepo.NewGormRepository[models.DietDay](r.db)
 	return repo.GetByDateRange(ctx, start, end, dbrepo.WithDefaultPreloads())
 }
 
-func (r *Repository) DayByIDGeneric(ctx context.Context, id uint) (models.Day, error) {
-	repo := dbrepo.NewGormRepository[models.Day](r.db)
+func (r *Repository) DayByIDGeneric(ctx context.Context, id uint) (models.DietDay, error) {
+	repo := dbrepo.NewGormRepository[models.DietDay](r.db)
 	return repo.GetByID(ctx, id, dbrepo.WithDefaultPreloads())
 }
 
@@ -127,8 +127,8 @@ func (r *Repository) CalculateTotals(dayID uint) (float32, float32, float32, flo
 	return totals.TotalCalories, totals.TotalProtein, totals.TotalFiber, totals.TotalCarbs
 }
 
-func (r *Repository) AllMealDays() ([]models.Day, error) {
-	var days []models.Day
+func (r *Repository) AllMealDays() ([]models.DietDay, error) {
+	var days []models.DietDay
 	if err := r.db.Find(&days).Error; err != nil {
 		return nil, err
 	}
@@ -137,7 +137,7 @@ func (r *Repository) AllMealDays() ([]models.Day, error) {
 
 func (r *Repository) GoalsToday() (*models.Plan, error) {
 	today := time.Now().Truncate(24 * time.Hour)
-	var todayDay models.Day
+	var todayDay models.DietDay
 	if err := r.db.Where("date = ?", today.Format("2006-01-02")).First(&todayDay).Error; err != nil {
 		return nil, err
 	}
@@ -148,8 +148,8 @@ func (r *Repository) GoalsToday() (*models.Plan, error) {
 	return &plan, nil
 }
 
-func (r *Repository) FindDayByDate(date time.Time) (*models.Day, error) {
-	var day models.Day
+func (r *Repository) FindDayByDate(date time.Time) (*models.DietDay, error) {
+	var day models.DietDay
 	err := r.db.Where("date = ?", date).First(&day).Error
 	if err != nil {
 		if err == gorm.ErrRecordNotFound {
