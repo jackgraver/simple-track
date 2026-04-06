@@ -23,8 +23,8 @@ onMounted(() => {
                 <router-link :to="{ name: 'gym' }">
                     <p class="bg-gray-500 rounded-md p-2">Gym</p>
                 </router-link>
-                <router-link :to="{ name: 'gym-plans' }">
-                    <p class="bg-gray-500 rounded-md p-2">Manage Plans</p>
+                <router-link :to="{ name: 'diet' }">
+                    <p class="bg-gray-500 rounded-md p-2">Diet</p>
                 </router-link>
                 <p>{{ getUsername() }}</p>
             </div>

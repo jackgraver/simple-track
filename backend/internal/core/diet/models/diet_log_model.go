@@ -12,8 +12,8 @@ type DietDay struct {
 	Date         time.Time     `json:"date"`
 	PlanID       uint          `json:"plan_id"`
 	Plan         Plan          `gorm:"foreignKey:PlanID" json:"plan"`
-	PlannedMeals []PlannedMeal `json:"plannedMeals"`
-	Logs         []DayLog      `json:"loggedMeals"`
+	PlannedMeals []PlannedMeal `gorm:"foreignKey:DayID" json:"plannedMeals"`
+	Logs         []DayLog      `gorm:"foreignKey:DayID" json:"loggedMeals"`
 }
 
 func (d DietDay) GetID() uint        { return d.ID }

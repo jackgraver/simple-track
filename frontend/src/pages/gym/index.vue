@@ -57,6 +57,14 @@ const loggingRoute = computed(() => ({
 
 <template>
     <div class="gym">
+        <div class="flex items-center gap-2 pt-2">
+            <router-link :to="{ name: 'gym-plans' }">
+                <p class="bg-gray-500 rounded-md p-2">Manage Plans</p>
+            </router-link>
+            <router-link :to="{ name: 'progression' }">
+                <p class="bg-gray-500 rounded-md p-2">Progression</p>
+            </router-link>
+        </div>
         <template v-if="isGymHome">
             <div v-if="isPending" class="state">Loading...</div>
             <div v-else-if="isError" class="state">
