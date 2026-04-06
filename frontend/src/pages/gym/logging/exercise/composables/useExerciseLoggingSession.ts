@@ -407,7 +407,6 @@ export function useExerciseLoggingSession(options: {
             return;
         }
 
-        globalTimer.clear();
         clearDraft();
         router.push(loggingRoute());
     };

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { useWorkoutStore } from "./store/useWorkoutStore";
+import { useWorkoutStore, type ExerciseGroup } from "./store/useWorkoutStore";
 import ExerciseListView from "./components/ExerciseListView.vue";
 import { useRoute, useRouter } from "vue-router";
 import { computed } from "vue";
@@ -19,8 +19,11 @@ const {
     error,
     data,
     addExerciseToWorkout,
+    hideExerciseLocally,
     removeExerciseFromWorkout,
 } = useWorkoutStore(offset);
+
+const hasLoggedSets = (g: ExerciseGroup) => Boolean(g.logged?.sets?.length);
 
 const workoutName = computed(() => data.value?.day?.workout_plan?.name || "");
 
@@ -79,6 +82,12 @@ const handleRemoveExercise = async (index: number) => {
         exerciseGroup.logged?.exercise_id || exerciseGroup.planned?.ID;
     if (!exerciseId) {
         toast.push("Cannot remove exercise: ID not found", "error");
+        return;
+    }
+
+    if (!hasLoggedSets(exerciseGroup)) {
+        hideExerciseLocally(exerciseId);
+        toast.push("Exercise removed", "success");
         return;
     }
 

@@ -10,7 +10,7 @@ import {
     useUpsertMobilityPost,
 } from "~/api/workout/queries";
 import { sortExerciseGroupsByLogOrder } from "./sortExerciseGroupsByLogOrder";
-import { computed, type MaybeRefOrGetter } from "vue";
+import { computed, ref, type MaybeRefOrGetter } from "vue";
 
 export type ExerciseGroup = {
     planned?: Exercise;
@@ -38,9 +38,32 @@ export function useWorkoutStore(offset: MaybeRefOrGetter<number> = 0) {
     const upsertMobilityPreMutation = useUpsertMobilityPre(offset);
     const upsertMobilityPostMutation = useUpsertMobilityPost(offset);
 
+    /** Catalog exercise IDs hidden for this page session only (no persisted skip). */
+    const sessionHiddenExerciseIds = ref<Set<number>>(new Set());
+
+    const hideExerciseLocally = (exerciseId: number) => {
+        const next = new Set(sessionHiddenExerciseIds.value);
+        next.add(exerciseId);
+        sessionHiddenExerciseIds.value = next;
+    };
+
+    const unhideExerciseFromSession = (exerciseId: number) => {
+        if (!sessionHiddenExerciseIds.value.has(exerciseId)) return;
+        const next = new Set(sessionHiddenExerciseIds.value);
+        next.delete(exerciseId);
+        sessionHiddenExerciseIds.value = next;
+    };
+
     const log = computed<ExerciseGroup[]>(() => {
         const raw = workoutLogsQuery.data.value?.planned_exercises ?? [];
-        return sortExerciseGroupsByLogOrder(raw);
+        const sorted = sortExerciseGroupsByLogOrder(raw);
+        const hidden = sessionHiddenExerciseIds.value;
+        if (hidden.size === 0) return sorted;
+        return sorted.filter((eg) => {
+            const id = eg.logged?.exercise_id ?? eg.planned?.ID;
+            if (id == null) return true;
+            return !hidden.has(id);
+        });
     });
 
     const plannedCardio = computed(
@@ -86,6 +109,7 @@ export function useWorkoutStore(offset: MaybeRefOrGetter<number> = 0) {
     const addExerciseToWorkout = async (exerciseId: number): Promise<void> => {
         try {
             await addExerciseMutation.mutateAsync(exerciseId);
+            unhideExerciseFromSession(exerciseId);
         } catch (error) {
             console.error("Error adding exercise:", error);
             throw error;
@@ -146,6 +170,7 @@ export function useWorkoutStore(offset: MaybeRefOrGetter<number> = 0) {
         error,
         logExercise,
         addExerciseToWorkout,
+        hideExerciseLocally,
         removeExerciseFromWorkout,
         deleteLoggedSet,
         saveCardio,
