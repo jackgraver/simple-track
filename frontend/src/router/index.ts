@@ -16,7 +16,7 @@ const routes: RouteRecordRaw[] = [
   {
     path: '/diet',
     name: 'diet',
-    component: () => import('~/pages/diet.vue'),
+    component: () => import('~/pages/diet/diet.vue'),
   },
   {
     path: '/gym',
@@ -48,36 +48,23 @@ const routes: RouteRecordRaw[] = [
         name: 'logging-mobility',
         component: () => import('~/pages/gym/logging/exercise/[id].vue'),
       },
+      {
+        path: 'progression',
+        name: 'progression',
+        component: () => import('~/pages/gym/progression/progression.vue'),
+      },
     ],
-  },
-  {
-    path: '/settings',
-    name: 'settings',
-    component: () => import('~/pages/settings.vue'),
-  },
-  {
-    path: '/progression',
-    name: 'progression',
-    component: () => import('~/pages/progression.vue'),
-  },
-  {
-    path: '/manageplans',
-    redirect: { name: 'gym-plans' },
   },
   {
     path: '/logmeal',
     name: 'logmeal',
     component: () => import('~/pages/logmeal/logmeal.vue'),
   },
+
   {
-    path: '/mealplan',
-    name: 'mealplan',
-    component: () => import('~/pages/mealplan.vue'),
-  },
-  {
-    path: '/signin',
+    path: '/auth/signin',
     name: 'signin',
-    component: () => import('~/pages/signin.vue'),
+    component: () => import('~/pages/auth/signin/index.vue'),
   },
 ]
 
