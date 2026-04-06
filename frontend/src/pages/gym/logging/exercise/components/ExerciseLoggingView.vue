@@ -127,6 +127,18 @@ const repRolloverWeightHint = computed(() => {
             <span class="exercise-cues-label">Cues</span>
             <p class="exercise-cues">{{ cuesText }}</p>
         </div>
+        <LoggedSetsList
+            :logged-sets="session.loggedSets"
+            @retry="session.retrySet"
+            @delete="session.deleteSet"
+            @edit="session.editSet"
+        />
+        <div v-if="previousPerformanceText" class="previous-performance">
+            <span class="previous-performance-label">Last time</span>
+            <span class="previous-performance-value">{{
+                previousPerformanceText
+            }}</span>
+        </div>
         <div class="input-container">
             <label>Notes</label>
             <textarea
@@ -141,18 +153,6 @@ const repRolloverWeightHint = computed(() => {
                 "
             ></textarea>
         </div>
-        <div v-if="previousPerformanceText" class="previous-performance">
-            <span class="previous-performance-label">Last time</span>
-            <span class="previous-performance-value">{{
-                previousPerformanceText
-            }}</span>
-        </div>
-        <LoggedSetsList
-            :logged-sets="session.loggedSets"
-            @retry="session.retrySet"
-            @delete="session.deleteSet"
-            @edit="session.editSet"
-        />
     </div>
 </template>
 
