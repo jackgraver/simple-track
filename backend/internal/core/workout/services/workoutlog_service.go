@@ -61,6 +61,35 @@ func GetOrCreateToday(ctx context.Context, db *gorm.DB, offset int) (models.Work
 	return NewWorkoutLogService(db).GetOrCreateToday(ctx, offset)
 }
 
+// SwitchPlan sets workout_plan_id on the log for the given day offset without changing weekly plan assignments.
+func (s *WorkoutLogService) SwitchPlan(ctx context.Context, offset int, planID *uint) (PreviousWorkoutResponse, error) {
+	day, err := s.GetOrCreateToday(ctx, offset)
+	if err != nil {
+		return PreviousWorkoutResponse{}, err
+	}
+	if planID != nil {
+		var n int64
+		if err := s.db.WithContext(ctx).Model(&models.WorkoutPlan{}).Where("id = ?", *planID).Count(&n).Error; err != nil {
+			return PreviousWorkoutResponse{}, err
+		}
+		if n == 0 {
+			return PreviousWorkoutResponse{}, fmt.Errorf("workout plan not found")
+		}
+	}
+	var wid any
+	if planID == nil {
+		wid = nil
+	} else {
+		wid = *planID
+	}
+	if err := s.db.WithContext(ctx).Model(&models.WorkoutLog{}).Where("id = ?", day.ID).Updates(map[string]any{
+		"workout_plan_id": wid,
+	}).Error; err != nil {
+		return PreviousWorkoutResponse{}, err
+	}
+	return s.GetPreviousWorkoutView(ctx, offset)
+}
+
 type ExerciseGroup struct {
 	Planned  *models.Exercise       `json:"planned,omitempty"`
 	Logged   *models.LoggedExercise `json:"logged,omitempty"`

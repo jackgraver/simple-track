@@ -1,8 +1,14 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import { useWorkoutLogToday } from "~/api/workout/queries";
+import axios from "axios";
+import {
+    useWorkoutLogToday,
+    useWorkoutPlansAll,
+    useSwitchWorkoutPlan,
+} from "~/api/workout/queries";
 import { formatDateLong } from "~/utils/dateUtil";
+import { toast } from "~/composables/toast/useToast";
 import { ChevronLeftIcon, ChevronRightIcon } from "lucide-vue-next";
 
 const route = useRoute();
@@ -17,6 +23,47 @@ const { data, isPending, isError, error } = useWorkoutLogToday(
     dayOffset,
     isGymHome,
 );
+
+const plansQuery = useWorkoutPlansAll();
+const switchPlanMutation = useSwitchWorkoutPlan(dayOffset);
+
+const planOptions = computed(() =>
+    (plansQuery.data.value?.plans ?? []).map((p) => ({
+        id: p.ID,
+        name: p.name,
+    })),
+);
+
+const currentPlanId = computed(() => data.value?.workout_plan_id ?? null);
+
+const planSelectValue = computed(() => {
+    const id = currentPlanId.value;
+    return id == null ? "" : String(id);
+});
+
+const handleSwitchPlan = async (e: Event) => {
+    const v = (e.target as HTMLSelectElement).value;
+    const planId = v === "" ? null : Number(v);
+    if (planId === currentPlanId.value) return;
+    try {
+        await switchPlanMutation.mutateAsync(planId);
+        toast.push("Workout plan updated", "success");
+    } catch (err: unknown) {
+        let msg = "Failed to switch plan";
+        if (
+            axios.isAxiosError(err) &&
+            err.response?.data &&
+            typeof err.response.data === "object" &&
+            "error" in err.response.data
+        ) {
+            const e0 = (err.response.data as { error?: string }).error;
+            if (e0) msg = e0;
+        } else if (err instanceof Error) {
+            msg = err.message;
+        }
+        toast.push(msg, "error");
+    }
+};
 
 const updateOffset = (nextOffset: number) => {
     const nextQuery = { ...route.query };
@@ -48,6 +95,8 @@ const dateLabel = computed(() => {
 const splitLabel = computed(
     () => data.value?.workout_plan?.name ?? "No split assigned",
 );
+
+const switchingPlan = computed(() => switchPlanMutation.isPending.value);
 
 const loggingRoute = computed(() => ({
     name: "logging",
@@ -87,6 +136,32 @@ const loggingRoute = computed(() => ({
                     >
                         <ChevronRightIcon />
                     </button>
+                </div>
+                <div
+                    v-if="planOptions.length"
+                    class="flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-3"
+                >
+                    <label
+                        for="gym-plan-switch"
+                        class="text-sm font-medium text-zinc-400"
+                        >Today's plan</label
+                    >
+                    <select
+                        id="gym-plan-switch"
+                        class="w-full max-w-md rounded border border-zinc-600 bg-zinc-900 px-2 py-1.5 text-sm text-inherit disabled:opacity-50 sm:w-auto"
+                        :value="planSelectValue"
+                        :disabled="switchingPlan"
+                        @change="handleSwitchPlan"
+                    >
+                        <option value="">No plan</option>
+                        <option
+                            v-for="p in planOptions"
+                            :key="p.id"
+                            :value="String(p.id)"
+                        >
+                            {{ p.name }}
+                        </option>
+                    </select>
                 </div>
                 <h1 class="split">{{ splitLabel }}</h1>
                 <router-link :to="loggingRoute" class="gym-cta"

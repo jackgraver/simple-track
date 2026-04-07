@@ -27,6 +27,7 @@ func RegisterWorkoutLogRoutes(group *gin.RouterGroup, db *gorm.DB) {
 		logs.POST("/cardio", h.upsertCardio)
 		logs.POST("/mobility/pre", h.upsertMobilityPre)
 		logs.POST("/mobility/post", h.upsertMobilityPost)
+		logs.PATCH("/switch-plan", h.switchPlan)
 	}
 }
 
@@ -98,6 +99,29 @@ func (h *WorkoutLogHandler) getPreviousWorkout(reqCtx *gin.Context) {
 		return
 	}
 
+	reqCtx.JSON(http.StatusOK, payload)
+}
+
+type switchPlanRequest struct {
+	PlanID *uint `json:"plan_id"`
+}
+
+func (h *WorkoutLogHandler) switchPlan(reqCtx *gin.Context) {
+	offset, err := utils.ParseQueryInt(reqCtx, weekOffsetQuery)
+	if err != nil {
+		reqCtx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	var req switchPlanRequest
+	if err := reqCtx.ShouldBindJSON(&req); err != nil {
+		reqCtx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	payload, err := h.svc.SwitchPlan(reqCtx.Request.Context(), offset, req.PlanID)
+	if err != nil {
+		reqCtx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
 	reqCtx.JSON(http.StatusOK, payload)
 }
 

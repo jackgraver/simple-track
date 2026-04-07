@@ -30,7 +30,7 @@ onMounted(() => {
             </div>
         </div>
         <div
-            class="flex w-full flex-col items-stretch lg:items-center gap-4 px-4 lg:px-0 lg:max-w-8/12"
+            class="flex w-full flex-col items-stretch gap-4 px-4 lg:px-0 lg:mx-auto lg:max-w-8/12"
         >
             <RouterView />
         </div>

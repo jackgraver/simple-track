@@ -1,3 +1,4 @@
+import { apiPATCH } from "~/api/client";
 import type {
     WorkoutLog,
     Exercise,
@@ -24,3 +25,14 @@ export type WorkoutLogsPreviousResponse = {
     planned_post_mobility: MobilityRoutine | null;
     logged_post_mobility: MobilityLogged | null;
 };
+
+export async function switchWorkoutPlan(
+    offset: number,
+    planId: number | null,
+): Promise<WorkoutLogsPreviousResponse> {
+    return apiPATCH<WorkoutLogsPreviousResponse>(
+        "/workout/logs/switch-plan",
+        { plan_id: planId },
+        { params: { offset } },
+    );
+}

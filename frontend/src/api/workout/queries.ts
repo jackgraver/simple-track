@@ -1,10 +1,10 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/vue-query';
 import { computed, toValue, type MaybeRefOrGetter } from 'vue';
 import { apiDELETE, apiGET, apiPOST } from '~/api/client';
-import type { WorkoutLogsPreviousResponse } from '~/api/workout/api';
+import { switchWorkoutPlan, type WorkoutLogsPreviousResponse } from '~/api/workout/api';
 import { liveworkoutKeys } from '~/api/workout/keys';
 import { homeKeys } from '~/pages/home/queries/keys';
-import type { Cardio, Exercise, LoggedExercise, MobilityLogged } from '~/types/workout';
+import type { Cardio, Exercise, LoggedExercise, MobilityLogged, WorkoutPlan } from '~/types/workout';
 
 export function useWorkoutLogToday(
     offset: MaybeRefOrGetter<number> = 0,
@@ -47,6 +47,36 @@ export function useHomeWorkoutLogsPrevious(offset: number) {
                 params: { offset },
             }),
         staleTime: 1000 * 60 * 2,
+    });
+}
+
+export function useWorkoutPlansAll() {
+    return useQuery({
+        queryKey: ['workout', 'plans', 'all'] as const,
+        queryFn: () => apiGET<{ plans: WorkoutPlan[] }>('/workout/plans/all'),
+        staleTime: 1000 * 60 * 10,
+    });
+}
+
+export function useSwitchWorkoutPlan(offset: MaybeRefOrGetter<number> = 0) {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: async (planId: number | null) => {
+            return switchWorkoutPlan(toValue(offset), planId);
+        },
+        onSuccess: () => {
+            const currentOffset = toValue(offset);
+            queryClient.invalidateQueries({
+                queryKey: liveworkoutKeys.workouts.previous(currentOffset),
+            });
+            queryClient.invalidateQueries({
+                queryKey: liveworkoutKeys.workouts.day(currentOffset),
+            });
+            queryClient.invalidateQueries({
+                queryKey: homeKeys.workouts.previous(currentOffset),
+            });
+        },
     });
 }
 
