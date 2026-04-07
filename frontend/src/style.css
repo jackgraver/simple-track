@@ -5,4 +5,37 @@
         "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif,
         "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol",
         "Noto Color Emoji";
+    --color-mainBg: var(--color-main-bg);
+    --color-mainBgTransparent: var(--color-main-bg-transparent);
+    --color-firstBg: var(--color-first-bg);
+    --color-secondBg: var(--color-second-bg);
+    --color-thirdBg: var(--color-third-bg);
+    --color-textPrimary: var(--color-text-primary);
+    --color-textSecondary: var(--color-text-secondary);
+}
+
+:root {
+    --color-cf-red: hsl(0, 100%, 49%);
+    --color-cf-red-dark: hsl(0, 100%, 42%);
+    --color-main-bg: hsl(0, 0%, 95%);
+    --color-first-bg: hsl(0, 0%, 90%);
+    --color-main-bg-transparent: hsla(0, 0%, 100%, 0.6);
+    --color-second-bg: hsl(0, 0%, 85%);
+    --color-third-bg: hsl(0, 0%, 75%);
+    --color-text-primary: hsl(0, 0%, 0%);
+    --color-text-secondary: hsl(0, 0%, 50%);
+    --color-border: hsl(0, 0%, 80%);
+}
+
+.dark {
+    --color-cf-red: hsl(0, 100%, 49%);
+    --color-cf-red-dark: hsl(0, 100%, 42%);
+    --color-main-bg: hsl(0, 0%, 5%);
+    --color-main-bg-transparent: hsla(0, 0%, 0%, 0.6);
+    --color-first-bg: hsl(0, 0%, 15%);
+    --color-second-bg: hsl(0, 0%, 25%);
+    --color-third-bg: hsl(0, 0%, 35%);
+    --color-text-primary: hsl(0, 0%, 95%);
+    --color-text-secondary: hsl(0, 0%, 70%);
+    --color-border: hsl(0, 0%, 30%);
 }

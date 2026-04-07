@@ -7,13 +7,13 @@ import { useAuth } from "./composables/auth/useAuth";
 const { getUsername } = useAuth();
 
 onMounted(() => {
-    document.documentElement.classList.add("dark-mode");
+    document.documentElement.classList.add("dark");
 });
 </script>
 
 <template>
     <main
-        class="dark-mode mx-auto box-border w-full max-w-full min-h-dvh overflow-x-clip"
+        class="dark mx-auto box-border w-full max-w-full min-h-dvh overflow-x-clip"
     >
         <div
             v-if="getUsername()"
@@ -21,10 +21,14 @@ onMounted(() => {
         >
             <div class="flex items-center gap-2 pt-2">
                 <router-link :to="{ name: 'gym' }">
-                    <p class="bg-gray-500 rounded-md p-2">Gym</p>
+                    <p class="bg-firstBg hover:bg-secondBg rounded-md p-2">
+                        Gym
+                    </p>
                 </router-link>
                 <router-link :to="{ name: 'diet' }">
-                    <p class="bg-gray-500 rounded-md p-2">Diet</p>
+                    <p class="bg-firstBg hover:bg-secondBg rounded-md p-2">
+                        Diet
+                    </p>
                 </router-link>
                 <p>{{ getUsername() }}</p>
             </div>
@@ -42,7 +46,7 @@ onMounted(() => {
 <style>
 html {
     color: rgb(218, 218, 218);
-    background-color: rgb(20, 20, 20);
+    background-color: var(--color-main-bg);
     font-family:
         system-ui,
         -apple-system,
