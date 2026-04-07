@@ -109,10 +109,14 @@ const loggingRoute = computed(() => ({
     <div class="gym">
         <div class="flex items-center gap-2 pt-2">
             <router-link :to="{ name: 'gym-plans' }">
-                <p class="bg-gray-500 rounded-md p-2">Manage Plans</p>
+                <p class="bg-firstBg hover:bg-secondBg rounded-md p-2">
+                    Manage Plans
+                </p>
             </router-link>
             <router-link :to="{ name: 'progression' }">
-                <p class="bg-gray-500 rounded-md p-2">Progression</p>
+                <p class="bg-firstBg hover:bg-secondBg rounded-md p-2">
+                    Progression
+                </p>
             </router-link>
         </div>
         <template v-if="isGymHome">
