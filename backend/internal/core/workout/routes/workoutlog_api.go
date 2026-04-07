@@ -5,7 +5,6 @@ import (
 	"be-simpletracker/internal/utils"
 	"errors"
 	"net/http"
-	"strconv"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -134,27 +133,13 @@ func (h *WorkoutLogHandler) getWorkoutActivity(reqCtx *gin.Context) {
 	if mode == "" {
 		mode = "rolling"
 	}
-	daysStr := strings.TrimSpace(reqCtx.Query("days"))
-	var daysVal int
-	useDays := false
-	if daysStr != "" {
-		v, err := strconv.Atoi(daysStr)
-		if err != nil || v < 1 {
-			reqCtx.JSON(http.StatusBadRequest, gin.H{"error": "days must be a positive integer"})
-			return
-		}
-		useDays = true
-		daysVal = v
-		if daysVal > 730 {
-			daysVal = 730
-		}
-	}
+
 	weeks, err := utils.ParseQueryInt(reqCtx, activityWeeksQuery)
 	if err != nil {
 		reqCtx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	data, err := h.svc.GetWorkoutActivity(reqCtx.Request.Context(), mode, weeks, daysVal, useDays)
+	data, err := h.svc.GetWorkoutActivity(reqCtx.Request.Context(), mode, weeks)
 	if err != nil {
 		if errors.Is(err, services.ErrInvalidActivityMode) {
 			reqCtx.JSON(http.StatusBadRequest, gin.H{"error": "mode must be year or rolling"})

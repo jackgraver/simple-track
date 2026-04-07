@@ -246,7 +246,7 @@ type WorkoutActivityResponse struct {
 
 // GetWorkoutActivity aggregates days with logged sets for the given mode.
 // When useDays is true, days is the inclusive rolling window length (capped); otherwise weeks is used (capped).
-func (s *WorkoutLogService) GetWorkoutActivity(ctx context.Context, mode string, weeks int, days int, useDays bool) (WorkoutActivityResponse, error) {
+func (s *WorkoutLogService) GetWorkoutActivity(ctx context.Context, mode string, weeks int) (WorkoutActivityResponse, error) {
 	if mode != "year" && mode != "rolling" {
 		return WorkoutActivityResponse{}, ErrInvalidActivityMode
 	}
@@ -261,25 +261,14 @@ func (s *WorkoutLogService) GetWorkoutActivity(ctx context.Context, mode string,
 		start = time.Date(y, 1, 1, 0, 0, 0, 0, loc)
 		end = time.Date(y, 12, 31, 0, 0, 0, 0, loc)
 	case "rolling":
-		if useDays {
-			d := days
-			if d < 1 {
-				d = 1
-			}
-			if d > maxActivityRollingDays {
-				d = maxActivityRollingDays
-			}
-			start = end.AddDate(0, 0, -(d - 1))
-		} else {
-			w := weeks
-			if w < 1 {
-				w = 52
-			}
-			if w > maxActivityWeeks {
-				w = maxActivityWeeks
-			}
-			start = end.AddDate(0, 0, -(w*7 - 1))
+		w := weeks
+		if w < 1 {
+			w = 52
 		}
+		if w > maxActivityWeeks {
+			w = maxActivityWeeks
+		}
+		start = end.AddDate(0, 0, -(w*7 - 1))
 	}
 
 	dates, err := s.repo.DatesWithLoggedSets(ctx, start, end)
