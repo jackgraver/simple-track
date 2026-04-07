@@ -1,18 +1,19 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, ref, watch, nextTick } from "vue";
+import { useRouter } from "vue-router";
 import { useWorkoutActivity, type WorkoutActivityQueryOpts } from "~/api/workout/queries";
 import { formatDateLong } from "~/utils/dateUtil";
 
-type ViewMode = "year" | "weeks52" | "days365";
+const router = useRouter();
+
+type ViewMode = "year" | "weeks52";
 
 const viewMode = ref<ViewMode>("weeks52");
+const scrollContainer = ref<HTMLElement | null>(null);
 
 const activityOpts = computed<WorkoutActivityQueryOpts>(() => {
     if (viewMode.value === "year") {
         return { mode: "year", weeks: null, days: null };
-    }
-    if (viewMode.value === "days365") {
-        return { mode: "rolling", weeks: null, days: 365 };
     }
     return { mode: "rolling", weeks: 52, days: null };
 });
@@ -69,99 +70,134 @@ const gridCells = computed(() => {
     const rangeEnd = parseDateOnly(res.range.end);
     const gridStart = startOfWeekSunday(rangeStart);
     const gridEnd = endOfWeekSaturday(rangeEnd);
-    const rangeStartKey = dateKey(rangeStart);
-    const rangeEndKey = dateKey(rangeEnd);
-    const cells: { key: string; inRange: boolean; isFuture: boolean; active: boolean }[] = [];
+    const cells: { key: string; isFuture: boolean; active: boolean }[] = [];
     for (let d = new Date(gridStart); d <= gridEnd; d.setDate(d.getDate() + 1)) {
         const k = dateKey(new Date(d));
-        const inRange = k >= rangeStartKey && k <= rangeEndKey;
         const isFuture = k > todayKey.value;
         const active = activeSet.value.has(k);
-        cells.push({ key: k, inRange, isFuture, active });
+        cells.push({ key: k, isFuture, active });
     }
     return cells;
 });
 
-function cellClass(c: {
-    inRange: boolean;
-    isFuture: boolean;
-    active: boolean;
-}): string {
-    if (!c.inRange) {
-        return "bg-zinc-800/40 border border-zinc-700/50";
-    }
+const todayWeekIndex = computed(() => {
+    const tk = todayKey.value;
+    const idx = gridCells.value.findIndex((c) => c.key === tk);
+    if (idx < 0) return -1;
+    return Math.floor(idx / 7);
+});
+
+function scrollToToday() {
+    nextTick(() => {
+        const el = scrollContainer.value;
+        if (!el) return;
+        const weekIdx = todayWeekIndex.value;
+        if (weekIdx < 0) {
+            el.scrollLeft = el.scrollWidth;
+            return;
+        }
+        const cellSize = 10;
+        const gap = 3;
+        const targetX = weekIdx * (cellSize + gap);
+        const maxScroll = el.scrollWidth - el.clientWidth;
+        el.scrollLeft = Math.min(targetX, maxScroll);
+    });
+}
+
+function cellClass(c: { isFuture: boolean; active: boolean }): string {
     if (c.active) {
-        return "bg-emerald-600 border border-emerald-500/80";
+        return "bg-emerald-500";
     }
     if (c.isFuture) {
-        return "bg-zinc-800/60 border border-zinc-700/50";
+        return "bg-secondBg/45";
     }
-    return "bg-zinc-700/80 border border-zinc-600/60";
+    return "bg-firstBg";
 }
 
 function titleForKey(k: string): string {
     return formatDateLong(`${k}T12:00:00`);
 }
+
+/** Matches gym `offset` query: 0 = today, positive = that many days in the past, negative = future. */
+function offsetForDateKey(dateKeyStr: string): number {
+    const clicked = parseDateOnly(dateKeyStr);
+    const today = new Date();
+    const t0 = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
+    const t1 = new Date(clicked.getFullYear(), clicked.getMonth(), clicked.getDate()).getTime();
+    return Math.round((t0 - t1) / 86400000);
+}
+
+function goToGymDay(key: string) {
+    const offset = offsetForDateKey(key);
+    router.push({
+        name: "gym",
+        query: offset === 0 ? {} : { offset: String(offset) },
+    });
+}
+
+watch(gridCells, () => scrollToToday());
 </script>
 
 <template>
     <div class="flex flex-col gap-2 w-full min-w-0">
-        <p class="m-0 text-sm text-zinc-400">Activity</p>
-        <div class="flex flex-wrap gap-1.5">
-            <button
-                type="button"
-                class="rounded-md px-2 py-1 text-xs border transition-colors"
-                :class="
-                    viewMode === 'year'
-                        ? 'border-emerald-600 bg-emerald-900/40 text-zinc-100'
-                        : 'border-zinc-600 bg-zinc-800 text-zinc-300'
-                "
-                @click="viewMode = 'year'"
-            >
-                This year
-            </button>
-            <button
-                type="button"
-                class="rounded-md px-2 py-1 text-xs border transition-colors"
-                :class="
-                    viewMode === 'weeks52'
-                        ? 'border-emerald-600 bg-emerald-900/40 text-zinc-100'
-                        : 'border-zinc-600 bg-zinc-800 text-zinc-300'
-                "
-                @click="viewMode = 'weeks52'"
-            >
-                52 weeks
-            </button>
-            <button
-                type="button"
-                class="rounded-md px-2 py-1 text-xs border transition-colors"
-                :class="
-                    viewMode === 'days365'
-                        ? 'border-emerald-600 bg-emerald-900/40 text-zinc-100'
-                        : 'border-zinc-600 bg-zinc-800 text-zinc-300'
-                "
-                @click="viewMode = 'days365'"
-            >
-                365 days
-            </button>
+        <div class="flex items-center justify-between">
+            <p class="m-0 text-sm text-textSecondary">Activity</p>
+            <div class="flex gap-1">
+                <button
+                    type="button"
+                    class="rounded px-2 py-0.5 text-xs transition-colors"
+                    :class="
+                        viewMode === 'year'
+                            ? 'bg-secondBg text-textPrimary'
+                            : 'text-textSecondary hover:bg-firstBg hover:text-textPrimary'
+                    "
+                    @click="viewMode = 'year'"
+                >
+                    This year
+                </button>
+                <button
+                    type="button"
+                    class="rounded px-2 py-0.5 text-xs transition-colors"
+                    :class="
+                        viewMode === 'weeks52'
+                            ? 'bg-secondBg text-textPrimary'
+                            : 'text-textSecondary hover:bg-firstBg hover:text-textPrimary'
+                    "
+                    @click="viewMode = 'weeks52'"
+                >
+                    52 weeks
+                </button>
+            </div>
         </div>
-        <div v-if="isPending" class="text-sm text-zinc-500">Loading activity…</div>
-        <div v-else-if="isError" class="text-sm text-red-400">
+        <div v-if="isPending" class="text-sm text-textSecondary">Loading activity…</div>
+        <div v-else-if="isError" class="text-sm text-(--color-cf-red)">
             {{ error?.message ?? "Failed to load activity" }}
         </div>
-        <div v-else class="overflow-x-auto pb-1 -mx-0.5">
+        <div
+            v-else
+            ref="scrollContainer"
+            class="w-full min-w-0 overflow-x-auto scrollbar-thin"
+        >
             <div
-                class="grid w-max gap-1 grid-rows-7 grid-flow-col auto-cols-max p-0.5"
+                class="grid grid-rows-7 grid-flow-col gap-[3px] w-max"
                 role="grid"
-                :aria-label="'Workout activity'"
+                aria-label="Workout activity"
             >
-                <div
+                <button
                     v-for="(c, i) in gridCells"
                     :key="c.key + '-' + i"
+                    type="button"
                     role="gridcell"
-                    class="h-2.5 w-2.5 rounded-sm shrink-0"
-                    :class="cellClass(c)"
+                    class="m-0! min-h-0! size-[10px] rounded-sm p-0! border-0 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-thirdBg"
+                    :class="[
+                        cellClass(c),
+                        c.key === todayKey
+                            ? 'shadow-[inset_0_0_0_2px_#fb923c]!'
+                            : 'shadow-none!',
+                    ]"
                     :title="titleForKey(c.key)"
+                    :aria-label="titleForKey(c.key)"
+                    @click="goToGymDay(c.key)"
                 />
             </div>
         </div>

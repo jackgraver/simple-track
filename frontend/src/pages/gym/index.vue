@@ -184,7 +184,7 @@ const loggingRoute = computed(() => ({
     display: flex;
     flex-direction: column;
     gap: 1rem;
-    max-width: 28rem;
+    max-width: 44rem;
 }
 .state {
     color: #aaa;
