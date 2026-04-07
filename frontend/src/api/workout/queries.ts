@@ -1,10 +1,43 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/vue-query';
 import { computed, toValue, type MaybeRefOrGetter } from 'vue';
 import { apiDELETE, apiGET, apiPOST } from '~/api/client';
-import { switchWorkoutPlan, type WorkoutLogsPreviousResponse } from '~/api/workout/api';
+import { switchWorkoutPlan, type WorkoutActivityResponse, WorkoutLogsPreviousResponse } from '~/api/workout/api';
 import { liveworkoutKeys } from '~/api/workout/keys';
 import { homeKeys } from '~/pages/home/queries/keys';
 import type { Cardio, Exercise, LoggedExercise, MobilityLogged, WorkoutPlan } from '~/types/workout';
+
+export type WorkoutActivityQueryOpts = {
+    mode: 'year' | 'rolling';
+    weeks: number | null;
+    days: number | null;
+};
+
+function invalidateWorkoutActivityQueries(queryClient: ReturnType<typeof useQueryClient>) {
+    queryClient.invalidateQueries({ queryKey: liveworkoutKeys.workouts.activityPrefix() });
+}
+
+export function useWorkoutActivity(opts: MaybeRefOrGetter<WorkoutActivityQueryOpts>) {
+    return useQuery(
+        computed(() => {
+            const o = toValue(opts);
+            return {
+                queryKey: liveworkoutKeys.workouts.activity(o),
+                queryFn: async () => {
+                    const params: Record<string, string | number> = { mode: o.mode };
+                    if (o.mode === 'rolling') {
+                        if (o.days != null && o.days > 0) {
+                            params.days = o.days;
+                        } else if (o.weeks != null && o.weeks > 0) {
+                            params.weeks = o.weeks;
+                        }
+                    }
+                    return apiGET<WorkoutActivityResponse>('/workout/logs/activity', { params });
+                },
+                staleTime: 1000 * 60 * 2,
+            };
+        }),
+    );
+}
 
 export function useWorkoutLogToday(
     offset: MaybeRefOrGetter<number> = 0,
@@ -142,6 +175,7 @@ export function useLogExercise(offset: MaybeRefOrGetter<number> = 0) {
             queryClient.invalidateQueries({
                 queryKey: liveworkoutKeys.workouts.day(currentOffset),
             });
+            invalidateWorkoutActivityQueries(queryClient);
         },
     });
 }
@@ -166,6 +200,7 @@ export function useAddExerciseToWorkout(offset: MaybeRefOrGetter<number> = 0) {
             queryClient.invalidateQueries({
                 queryKey: liveworkoutKeys.workouts.day(currentOffset),
             });
+            invalidateWorkoutActivityQueries(queryClient);
         },
     });
 }
@@ -187,6 +222,7 @@ export function useRemoveExerciseFromWorkout(offset: MaybeRefOrGetter<number> = 
             queryClient.invalidateQueries({
                 queryKey: liveworkoutKeys.workouts.day(currentOffset),
             });
+            invalidateWorkoutActivityQueries(queryClient);
         },
     });
 }
@@ -204,6 +240,7 @@ export function useDeleteLoggedSet(offset: MaybeRefOrGetter<number> = 0) {
             queryClient.invalidateQueries({
                 queryKey: liveworkoutKeys.workouts.day(currentOffset),
             });
+            invalidateWorkoutActivityQueries(queryClient);
         },
     });
 }
@@ -228,6 +265,7 @@ export function useUpsertMobilityPre(offset: MaybeRefOrGetter<number> = 0) {
             queryClient.invalidateQueries({
                 queryKey: liveworkoutKeys.workouts.day(currentOffset),
             });
+            invalidateWorkoutActivityQueries(queryClient);
         },
     });
 }
@@ -252,6 +290,7 @@ export function useUpsertMobilityPost(offset: MaybeRefOrGetter<number> = 0) {
             queryClient.invalidateQueries({
                 queryKey: liveworkoutKeys.workouts.day(currentOffset),
             });
+            invalidateWorkoutActivityQueries(queryClient);
         },
     });
 }
@@ -282,6 +321,7 @@ export function useUpsertCardio(offset: MaybeRefOrGetter<number> = 0) {
             queryClient.invalidateQueries({
                 queryKey: liveworkoutKeys.workouts.day(currentOffset),
             });
+            invalidateWorkoutActivityQueries(queryClient);
         },
     });
 }
