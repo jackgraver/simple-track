@@ -229,6 +229,75 @@ func (s *WorkoutLogService) GetMonthWorkoutLogs(ctx context.Context, monthOffset
 	}, nil
 }
 
+const (
+	maxActivityRollingDays = 730
+	maxActivityWeeks       = 104
+)
+
+// ErrInvalidActivityMode is returned when mode is not "year" or "rolling".
+var ErrInvalidActivityMode = errors.New("invalid activity mode")
+
+// WorkoutActivityResponse lists calendar days (local YYYY-MM-DD) with at least one logged set in range.
+type WorkoutActivityResponse struct {
+	ActiveDates []string   `json:"active_dates"`
+	Range       MonthRange `json:"range"`
+	Mode        string     `json:"mode"`
+}
+
+// GetWorkoutActivity aggregates days with logged sets for the given mode.
+// When useDays is true, days is the inclusive rolling window length (capped); otherwise weeks is used (capped).
+func (s *WorkoutLogService) GetWorkoutActivity(ctx context.Context, mode string, weeks int, days int, useDays bool) (WorkoutActivityResponse, error) {
+	if mode != "year" && mode != "rolling" {
+		return WorkoutActivityResponse{}, ErrInvalidActivityMode
+	}
+	now := time.Now()
+	loc := now.Location()
+	end := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, loc)
+	var start time.Time
+
+	switch mode {
+	case "year":
+		y := now.Year()
+		start = time.Date(y, 1, 1, 0, 0, 0, 0, loc)
+		end = time.Date(y, 12, 31, 0, 0, 0, 0, loc)
+	case "rolling":
+		if useDays {
+			d := days
+			if d < 1 {
+				d = 1
+			}
+			if d > maxActivityRollingDays {
+				d = maxActivityRollingDays
+			}
+			start = end.AddDate(0, 0, -(d - 1))
+		} else {
+			w := weeks
+			if w < 1 {
+				w = 52
+			}
+			if w > maxActivityWeeks {
+				w = maxActivityWeeks
+			}
+			start = end.AddDate(0, 0, -(w*7 - 1))
+		}
+	}
+
+	dates, err := s.repo.DatesWithLoggedSets(ctx, start, end)
+	if err != nil {
+		return WorkoutActivityResponse{}, err
+	}
+	active := make([]string, 0, len(dates))
+	for _, d := range dates {
+		d = d.In(loc)
+		active = append(active, time.Date(d.Year(), d.Month(), d.Day(), 0, 0, 0, 0, loc).Format("2006-01-02"))
+	}
+	return WorkoutActivityResponse{
+		ActiveDates: active,
+		Range:       MonthRange{Start: start, End: end},
+		Mode:        mode,
+	}, nil
+}
+
 func (s *WorkoutLogService) UpsertCardio(ctx context.Context, offset int, minutes int, cardioType string, notes string) (*models.Cardio, error) {
 	t, err := s.GetOrCreateToday(ctx, offset)
 	if err != nil {

@@ -3,7 +3,10 @@ package routes
 import (
 	"be-simpletracker/internal/core/workout/services"
 	"be-simpletracker/internal/utils"
+	"errors"
 	"net/http"
+	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -24,6 +27,7 @@ func RegisterWorkoutLogRoutes(group *gin.RouterGroup, db *gorm.DB) {
 		logs.GET("/today", h.getWorkoutToday)
 		logs.GET("/month", h.getWorkoutMonth)
 		logs.GET("/previous", h.getPreviousWorkout)
+		logs.GET("/activity", h.getWorkoutActivity)
 		logs.POST("/cardio", h.upsertCardio)
 		logs.POST("/mobility/pre", h.upsertMobilityPre)
 		logs.POST("/mobility/post", h.upsertMobilityPost)
@@ -123,6 +127,43 @@ func (h *WorkoutLogHandler) switchPlan(reqCtx *gin.Context) {
 		return
 	}
 	reqCtx.JSON(http.StatusOK, payload)
+}
+
+func (h *WorkoutLogHandler) getWorkoutActivity(reqCtx *gin.Context) {
+	mode := strings.TrimSpace(strings.ToLower(reqCtx.Query("mode")))
+	if mode == "" {
+		mode = "rolling"
+	}
+	daysStr := strings.TrimSpace(reqCtx.Query("days"))
+	var daysVal int
+	useDays := false
+	if daysStr != "" {
+		v, err := strconv.Atoi(daysStr)
+		if err != nil || v < 1 {
+			reqCtx.JSON(http.StatusBadRequest, gin.H{"error": "days must be a positive integer"})
+			return
+		}
+		useDays = true
+		daysVal = v
+		if daysVal > 730 {
+			daysVal = 730
+		}
+	}
+	weeks, err := utils.ParseQueryInt(reqCtx, activityWeeksQuery)
+	if err != nil {
+		reqCtx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	data, err := h.svc.GetWorkoutActivity(reqCtx.Request.Context(), mode, weeks, daysVal, useDays)
+	if err != nil {
+		if errors.Is(err, services.ErrInvalidActivityMode) {
+			reqCtx.JSON(http.StatusBadRequest, gin.H{"error": "mode must be year or rolling"})
+			return
+		}
+		reqCtx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	reqCtx.JSON(http.StatusOK, data)
 }
 
 type upsertMobilityRequest struct {

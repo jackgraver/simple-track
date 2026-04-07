@@ -10,6 +10,7 @@ import {
 import { formatDateLong } from "~/utils/dateUtil";
 import { toast } from "~/composables/toast/useToast";
 import { ChevronLeftIcon, ChevronRightIcon } from "lucide-vue-next";
+import WorkoutActivityGraph from "~/pages/gym/WorkoutActivityGraph.vue";
 
 const route = useRoute();
 const router = useRouter();
@@ -164,6 +165,7 @@ const loggingRoute = computed(() => ({
                     </select>
                 </div>
                 <h1 class="split">{{ splitLabel }}</h1>
+                <WorkoutActivityGraph />
                 <router-link :to="loggingRoute" class="gym-cta"
                     >Log workout</router-link
                 >

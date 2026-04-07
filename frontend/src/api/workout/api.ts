@@ -15,6 +15,17 @@ export type ExerciseGroup = {
     previous?: LoggedExercise;
 };
 
+export type WorkoutActivityRange = {
+    start: string;
+    end: string;
+};
+
+export type WorkoutActivityResponse = {
+    active_dates: string[];
+    range: WorkoutActivityRange;
+    mode: string;
+};
+
 export type WorkoutLogsPreviousResponse = {
     day: WorkoutLog;
     planned_exercises: ExerciseGroup[];

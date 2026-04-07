@@ -42,6 +42,30 @@ func (r *WorkoutLogRepository) GetByDateRange(ctx context.Context, start, end ti
 	return repo.GetByDateRange(ctx, start, end, dbrepo.WithDefaultPreloads())
 }
 
+// DatesWithLoggedSets returns distinct workout log dates in [start, end] that have at least one logged set.
+func (r *WorkoutLogRepository) DatesWithLoggedSets(ctx context.Context, start, end time.Time) ([]time.Time, error) {
+	var rows []struct {
+		D time.Time `gorm:"column:d"`
+	}
+	err := r.db.WithContext(ctx).Raw(`
+SELECT workout_logs.date AS d
+FROM logged_sets
+JOIN logged_exercises ON logged_exercises.id = logged_sets.logged_exercise_id
+JOIN workout_logs ON workout_logs.id = logged_exercises.workout_log_id
+WHERE workout_logs.date >= ? AND workout_logs.date <= ?
+GROUP BY workout_logs.date
+ORDER BY workout_logs.date ASC
+`, start, end).Scan(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+	out := make([]time.Time, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, row.D)
+	}
+	return out, nil
+}
+
 func (r *WorkoutLogRepository) GetPreviousExerciseLog(ctx context.Context, day time.Time, exercise string, offset int) (models.LoggedExercise, error) {
 	var exerciseLog models.LoggedExercise
 	err := r.db.WithContext(ctx).

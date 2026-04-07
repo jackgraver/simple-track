@@ -23,4 +23,9 @@ var (
 		Default:    0,
 		ErrInvalid: "page_size must be an integer",
 	}
+	activityWeeksQuery = utils.QueryIntVar{
+		Key:        "weeks",
+		Default:    52,
+		ErrInvalid: "weeks must be an integer",
+	}
 )
