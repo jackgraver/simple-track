@@ -10,12 +10,12 @@ import CreateFoodDialog from "./dialog/CreateFoodDialog.vue";
 import { computed, ref, watch } from "vue";
 import { useMeal } from "./queries/useMeal";
 import { useDietLogsToday } from "./queries/useDietLogsToday";
-import { 
-    useCreateMeal, 
-    useLogEditedMeal, 
-    useUpdateLoggedMeal 
+import {
+    useCreateMeal,
+    useLogEditedMeal,
+    useUpdateLoggedMeal,
 } from "./queries/useMealMutations";
-import MacroBars from "~/shared/MacroBars.vue";
+import MacroBars from "~/pages/diet/components/MacroBars.vue";
 import SimpleMacros from "~/shared/SimpleMacros.vue";
 
 function formatNum(n: number): number {
@@ -43,11 +43,19 @@ function formatFoodLabel(item: any): string {
 }
 
 const route = useRoute();
+const backTo = computed(() =>
+    route.name === "diet-log"
+        ? { name: "diet" as const }
+        : { name: "home" as const },
+);
+const backLabel = computed(() =>
+    route.name === "diet-log" ? "← Diet" : "← Home",
+);
 const type = route.query.type as string | undefined;
 const id = computed(() => Number(route.query.id ?? 0));
 
 // Fetch meal if ID is provided - pass computed ref for reactivity
-const mealId = computed(() => id.value !== 0 ? id.value : null);
+const mealId = computed(() => (id.value !== 0 ? id.value : null));
 const { data: mealData, error: mealError } = useMeal(mealId);
 
 // Fetch today's diet logs
@@ -63,24 +71,32 @@ const meal = ref<Meal>({
 });
 
 // Watch for meal data and update meal ref
-watch(mealData, (newMealData) => {
-    if (newMealData?.meal) {
-        meal.value = newMealData.meal;
-    }
-}, { immediate: true });
+watch(
+    mealData,
+    (newMealData) => {
+        if (newMealData?.meal) {
+            meal.value = newMealData.meal;
+        }
+    },
+    { immediate: true },
+);
 
 // Reset meal when ID becomes 0 (creating new meal) or when no meal data
-watch([id, mealData], ([newId, newMealData]) => {
-    if (newId === 0 && !newMealData?.meal) {
-        meal.value = {
-            ID: 0,
-            created_at: "",
-            updated_at: "",
-            name: "",
-            items: [],
-        };
-    }
-}, { immediate: true });
+watch(
+    [id, mealData],
+    ([newId, newMealData]) => {
+        if (newId === 0 && !newMealData?.meal) {
+            meal.value = {
+                ID: 0,
+                created_at: "",
+                updated_at: "",
+                name: "",
+                items: [],
+            };
+        }
+    },
+    { immediate: true },
+);
 
 const totalMacros = computed(() => {
     return {
@@ -200,9 +216,9 @@ const updateLoggedMeal = async () => {
     const oldMealID = meal.value.ID;
     const mealToUpdate = { ...meal.value, ID: 0 };
     try {
-        await updateLoggedMealMutation.mutateAsync({ 
-            meal: mealToUpdate, 
-            oldMealId: oldMealID 
+        await updateLoggedMealMutation.mutateAsync({
+            meal: mealToUpdate,
+            oldMealId: oldMealID,
         });
         toast.push("Meal Updated Successfully!", "success");
     } catch (error: any) {
@@ -213,8 +229,16 @@ const updateLoggedMeal = async () => {
 
 <template>
     <div class="page-wrapper">
+        <router-link
+            :to="backTo"
+            class="back-crumb mb-2 w-[80%] max-w-[80%] text-left text-sm text-zinc-400 hover:text-zinc-200"
+            >{{ backLabel }}</router-link
+        >
         <div v-if="mealError && id !== 0" class="error-container">
-            <span>Error loading meal: {{ mealError?.message || 'Unknown error' }}</span>
+            <span
+                >Error loading meal:
+                {{ mealError?.message || "Unknown error" }}</span
+            >
         </div>
         <div v-else-if="meal" class="container">
             <article class="cell left">
@@ -256,11 +280,20 @@ const updateLoggedMeal = async () => {
                                 <Plus />
                             </button>
                             <span>
-                                {{ formatNum(item.amount * item.food!.calories) }}C
-                                / {{ formatNum(item.amount * item.food!.protein) }}P
-                                / {{ formatNum(item.amount * item.food!.fiber) }}F
+                                {{
+                                    formatNum(
+                                        item.amount * item.food!.calories,
+                                    )
+                                }}C /
+                                {{
+                                    formatNum(item.amount * item.food!.protein)
+                                }}P /
+                                {{ formatNum(item.amount * item.food!.fiber) }}F
                             </span>
-                            <button class="delete-button" @click="removeFood(i)">
+                            <button
+                                class="delete-button"
+                                @click="removeFood(i)"
+                            >
                                 <Trash2 :size="20" />
                             </button>
                         </div>
@@ -268,16 +301,28 @@ const updateLoggedMeal = async () => {
                 </section>
                 <footer class="footer">
                     <div class="action-buttons">
-                        <button v-if="type === 'edit'" @click="updateLoggedMeal">
+                        <button
+                            v-if="type === 'edit'"
+                            @click="updateLoggedMeal"
+                        >
                             Update
                         </button>
-                        <button v-if="type === 'editlogged'" @click="logEditedMeal">
+                        <button
+                            v-if="type === 'editlogged'"
+                            @click="logEditedMeal"
+                        >
                             Log
                         </button>
-                        <button v-if="type === 'create'" @click="createMeal(false)">
+                        <button
+                            v-if="type === 'create'"
+                            @click="createMeal(false)"
+                        >
                             Create
                         </button>
-                        <button v-if="type === 'create'" @click="createMeal(true)">
+                        <button
+                            v-if="type === 'create'"
+                            @click="createMeal(true)"
+                        >
                             Create and Log
                         </button>
                     </div>
@@ -288,8 +333,12 @@ const updateLoggedMeal = async () => {
                         :totalProtein="
                             totalMacros.protein + (today?.totalProtein ?? 0)
                         "
-                        :totalFiber="totalMacros.fiber + (today?.totalFiber ?? 0)"
-                        :totalCarbs="totalMacros.carbs + (today?.totalCarbs ?? 0)"
+                        :totalFiber="
+                            totalMacros.fiber + (today?.totalFiber ?? 0)
+                        "
+                        :totalCarbs="
+                            totalMacros.carbs + (today?.totalCarbs ?? 0)
+                        "
                         :planned-calories="today?.day.plan.calories ?? 0"
                         :planned-protein="today?.day.plan.protein ?? 0"
                         :planned-fiber="today?.day.plan.fiber ?? 0"
@@ -321,12 +370,14 @@ const updateLoggedMeal = async () => {
 <style scoped>
 .page-wrapper {
     display: flex;
-    justify-content: center;
+    flex-direction: column;
+    justify-content: flex-start;
     align-items: center;
-    height: 98vh;
+    min-height: 98vh;
     padding-block: 2rem;
     box-sizing: border-box;
-    overflow: hidden;
+    overflow-x: hidden;
+    overflow-y: auto;
 }
 
 .container {
@@ -338,7 +389,6 @@ const updateLoggedMeal = async () => {
     height: 100%;
     max-height: 100%;
 }
-
 
 .cell {
     display: flex;

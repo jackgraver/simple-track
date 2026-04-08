@@ -4,8 +4,8 @@ import { Trash2, SquarePen, Check } from "lucide-vue-next";
 import { h } from "vue";
 
 function formatNum(n: number) {
-    const s = n.toFixed(2); // always 2 decimals
-    return s.replace(/\.?0+$/, ""); // drop trailing zeros and optional dot
+    const s = n.toFixed(2);
+    return s.replace(/\.?0+$/, "");
 }
 
 function mealMacros(meal: Meal) {
@@ -27,7 +27,7 @@ function mealMacros(meal: Meal) {
     ]);
 }
 
-const props = defineProps<{
+defineProps<{
     meal: Meal;
     type: "planned" | "logged";
     onLogPlanned: (meal: Meal) => void;
@@ -136,8 +136,8 @@ const props = defineProps<{
 .right {
     display: flex;
     flex-direction: column;
-    justify-content: flex-end; /* push actions to bottom */
-    align-items: flex-end; /* align to right edge */
+    justify-content: flex-end;
+    align-items: flex-end;
 }
 
 .food .details {

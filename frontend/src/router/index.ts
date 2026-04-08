@@ -16,7 +16,14 @@ const routes: RouteRecordRaw[] = [
   {
     path: '/diet',
     name: 'diet',
-    component: () => import('~/pages/diet/diet.vue'),
+    component: () => import('~/pages/diet/index.vue'),
+    children: [
+      {
+        path: 'log',
+        name: 'diet-log',
+        component: () => import('~/pages/diet/logmeal/logmeal.vue'),
+      },
+    ]
   },
   {
     path: '/gym',
@@ -58,7 +65,7 @@ const routes: RouteRecordRaw[] = [
   {
     path: '/logmeal',
     name: 'logmeal',
-    component: () => import('~/pages/logmeal/logmeal.vue'),
+    component: () => import('~/pages/diet/logmeal/logmeal.vue'),
   },
 
   {

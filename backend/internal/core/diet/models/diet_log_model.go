@@ -9,7 +9,7 @@ import (
 // DietDay represents a day in the diet plan
 type DietDay struct {
 	gorm.Model
-	Date         time.Time     `json:"date"`
+	Date         time.Time     `json:"date" gorm:"uniqueIndex;not null"`
 	PlanID       uint          `json:"plan_id"`
 	Plan         Plan          `gorm:"foreignKey:PlanID" json:"plan"`
 	PlannedMeals []PlannedMeal `gorm:"foreignKey:DayID" json:"plannedMeals"`

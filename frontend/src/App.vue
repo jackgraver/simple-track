@@ -16,26 +16,26 @@ onMounted(() => {
         class="dark mx-auto box-border w-full max-w-full min-h-dvh overflow-x-clip"
     >
         <div
-            v-if="getUsername()"
-            class="flex items-center justify-end lg:pr-16 pb-2"
-        >
-            <div class="flex items-center gap-2 pt-2">
-                <router-link :to="{ name: 'gym' }">
-                    <p class="bg-firstBg hover:bg-secondBg rounded-md p-2">
-                        Gym
-                    </p>
-                </router-link>
-                <router-link :to="{ name: 'diet' }">
-                    <p class="bg-firstBg hover:bg-secondBg rounded-md p-2">
-                        Diet
-                    </p>
-                </router-link>
-                <p>{{ getUsername() }}</p>
-            </div>
-        </div>
-        <div
             class="flex w-full flex-col items-stretch gap-4 px-4 lg:px-0 lg:mx-auto lg:max-w-8/12"
         >
+            <div
+                v-if="getUsername()"
+                class="flex items-center justify-end lg:pr-16 pb-2 lg:max-w-8/12"
+            >
+                <div class="flex items-center gap-2 pt-2">
+                    <router-link :to="{ name: 'gym' }">
+                        <p class="bg-firstBg hover:bg-secondBg rounded-md p-2">
+                            Gym
+                        </p>
+                    </router-link>
+                    <router-link :to="{ name: 'diet' }">
+                        <p class="bg-firstBg hover:bg-secondBg rounded-md p-2">
+                            Diet
+                        </p>
+                    </router-link>
+                    <p>{{ getUsername() }}</p>
+                </div>
+            </div>
             <RouterView />
         </div>
     </main>

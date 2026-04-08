@@ -1,26 +1,21 @@
 <script setup lang="ts">
 import type { Meal } from "~/types/diet";
-import LogEditedDialog from "../dialog/LogEditedDialog.vue";
+import LogEditedDialog from "~/pages/home/dialog/LogEditedDialog.vue";
 import { toast } from "~/composables/toast/useToast";
 import { dialogManager } from "~/composables/dialog/useDialog";
 import { ChevronDown, ChevronUp } from "lucide-vue-next";
 import { useRouter } from "vue-router";
-import { useDietLogsToday } from "../queries/useDietLogsToday";
+import { useDietLogsToday } from "~/pages/home/queries/useDietLogsToday";
 import {
     useLogPlannedMeal,
     useDeleteLoggedMeal,
     useEditLoggedMeal,
-} from "../queries/useMealMutations";
+} from "~/pages/home/queries/useMealMutations";
 import { computed, ref } from "vue";
-import MealCard from "~/pages/diet/components/MealCard.vue";
+import MealCard from "./MealCard.vue";
 import MacroBars from "~/pages/diet/components/MacroBars.vue";
-import QuickSavedMeals from "./QuickSavedMeals.vue";
 
 const router = useRouter();
-
-const emit = defineEmits<{
-    (e: "date-change", direction: "next" | "prev"): void;
-}>();
 
 const props = defineProps<{
     dateOffset: number;
@@ -40,7 +35,7 @@ const logPlannedMeal = async (meal: Meal) => {
     try {
         await logPlannedMealMutation.mutateAsync(meal.ID);
         toast.push("Planned Meal Log Successfully!", "success");
-    } catch (error) {
+    } catch {
         toast.push("Planned Meal Log Failed!", "error");
     }
 };
@@ -78,7 +73,7 @@ const deleteLoggedMeal = async (meal: Meal) => {
             dayId: data.value.day.ID,
         });
         toast.push("Delete Successfully!", "success");
-    } catch (error) {
+    } catch {
         toast.push("Delete Failed!", "error");
     }
 };
@@ -99,11 +94,10 @@ const editLogMeal = (meal: Meal) => {
                     oldMealId: oldMealID,
                 });
                 toast.push("Meal Edited Successfully!", "success");
-            } catch (error: any) {
-                toast.push(
-                    "Log Edited Failed! " + (error.message || ""),
-                    "error",
-                );
+            } catch (error: unknown) {
+                const msg =
+                    error instanceof Error ? error.message : "Unknown error";
+                toast.push("Log Edited Failed! " + msg, "error");
             }
         })
         .catch((err) => {
@@ -132,13 +126,8 @@ function prev() {
 <template>
     <div v-if="pending">Loading...</div>
     <div v-else-if="error">Error: {{ error.message }}</div>
-    <div v-else class="container">
-        <div v-if="data" style="width: 100%">
-            <div class="title-row">
-                <button type="button" @click="logMeal(null, 'create')">
-                    Build meal
-                </button>
-            </div>
+    <div v-else class="flex w-full flex-col gap-4">
+        <div v-if="data" class="w-full">
             <MacroBars
                 :totalCalories="data?.totalCalories ?? 0"
                 :totalProtein="data?.totalProtein ?? 0"
@@ -149,13 +138,14 @@ function prev() {
                 :plannedFiber="data?.day.plan.fiber ?? 0"
                 :plannedCarbs="data?.day.plan.carbs ?? 0"
             />
-            <QuickSavedMeals />
-            <div class="meals-section">
-                <div class="meals-container">
-                    <h2>Logged</h2>
-                    <span v-if="data.day.loggedMeals.length === 0">
-                        Nothing logged yet.
-                    </span>
+            <div class="flex w-full flex-col gap-2 sm:flex-row sm:gap-2">
+                <div class="flex min-w-0 flex-1 flex-col gap-2 pt-2">
+                    <h2 class="mb-0 text-lg font-semibold">Logged</h2>
+                    <span
+                        v-if="data.day.loggedMeals.length === 0"
+                        class="text-zinc-500"
+                        >Nothing logged yet.</span
+                    >
                     <MealCard
                         v-for="log in data.day.loggedMeals"
                         :key="log.ID"
@@ -167,17 +157,33 @@ function prev() {
                         type="logged"
                     />
                 </div>
-                <div class="meals-container">
-                    <div class="small-title-row">
-                        <h2>Planned</h2>
+                <div class="flex min-w-0 flex-1 flex-col gap-2 pt-2">
+                    <div class="flex flex-row items-end gap-2">
+                        <h2 class="mb-0 flex-1 text-lg font-semibold">
+                            Planned
+                        </h2>
                         <template v-if="data.day.plannedMeals.length > 2">
-                            <button @click="prev"><ChevronUp /></button>
-                            <button @click="next"><ChevronDown /></button>
+                            <button
+                                type="button"
+                                aria-label="Previous"
+                                @click="prev"
+                            >
+                                <ChevronUp />
+                            </button>
+                            <button
+                                type="button"
+                                aria-label="Next"
+                                @click="next"
+                            >
+                                <ChevronDown />
+                            </button>
                         </template>
                     </div>
-                    <span v-if="visibleItems?.length === 0">
-                        Nothing else planned.
-                    </span>
+                    <span
+                        v-if="visibleItems?.length === 0"
+                        class="text-zinc-500"
+                        >Nothing else planned.</span
+                    >
                     <MealCard
                         v-for="log in visibleItems"
                         :key="log.ID"
@@ -193,68 +199,3 @@ function prev() {
         </div>
     </div>
 </template>
-<style scoped>
-.container {
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-    width: 100%;
-}
-
-.title-row {
-    display: flex;
-    flex-direction: row;
-    gap: 1rem;
-    align-items: center;
-}
-
-.title-row button {
-    margin-top: 6px;
-    border-radius: 4px;
-    font-size: large;
-    padding: 6px 12px;
-    font-weight: bold;
-    text-decoration: none;
-    font-size: large;
-    padding: 6px 16px;
-}
-
-.small-title-row {
-    display: flex;
-    flex-direction: row;
-    align-items: end;
-}
-
-.small-title-row h2 {
-    flex: 1;
-}
-
-.small-title-row button {
-    margin-bottom: 0;
-}
-
-.meals-section {
-    display: flex;
-    flex-direction: row;
-    gap: 0.5rem;
-    width: 100%;
-}
-
-.meals-container {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-    padding-top: 0.5rem;
-    /* Split the meals section evenly (50/50) */
-    flex: 1 1 0%;
-}
-
-.meals-container h2 {
-    margin-bottom: 0;
-}
-
-.expected-header {
-    display: flex;
-    flex-direction: row;
-}
-</style>

@@ -2,6 +2,8 @@ package repository
 
 import (
 	"context"
+	"errors"
+	"strings"
 	"time"
 
 	"be-simpletracker/internal/core/diet/models"
@@ -66,22 +68,80 @@ func (r *Repository) MealCreate(meal *models.Meal) (uint, error) {
 	return meal.ID, nil
 }
 
-func (r *Repository) DayMealPlanToday(offset int) (models.DietDay, error) {
-	today := utils.ZerodTime(offset)
+func calendarDayRange(t time.Time) (start, end time.Time) {
+	loc := t.Location()
+	start = time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, loc)
+	end = start.Add(24 * time.Hour)
+	return start, end
+}
+
+func (r *Repository) defaultPlanID() (uint, error) {
+	var plan models.Plan
+	if err := r.db.Order("id ASC").First(&plan).Error; err != nil {
+		if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return 0, err
+		}
+		p := models.Plan{
+			Name:     "Default",
+			Calories: 2000,
+			Protein:  150,
+			Fiber:    30,
+			Carbs:    200,
+		}
+		if err := r.db.Create(&p).Error; err != nil {
+			return 0, err
+		}
+		return p.ID, nil
+	}
+	return plan.ID, nil
+}
+
+// findOrCreateDietDayForCalendarDate returns a day row for the wall-clock calendar day of t (location from t).
+func (r *Repository) findOrCreateDietDayForCalendarDate(t time.Time) (models.DietDay, error) {
+	start, end := calendarDayRange(t)
 	var day models.DietDay
-	if err := r.db.
-		Preload("PlannedMeals", "logged = ?", false).
-		Preload("PlannedMeals.Meal.Items.Food").
-		Preload("Plan").
-		Preload("Logs.Meal.Items.Food").
-		Where("date = ?", today).
-		First(&day).Error; err != nil {
+	err := r.db.Where("date >= ? AND date < ?", start, end).First(&day).Error
+	if err == nil {
+		return day, nil
+	}
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return models.DietDay{}, err
+	}
+
+	planID, err := r.defaultPlanID()
+	if err != nil {
+		return models.DietDay{}, err
+	}
+
+	loc := t.Location()
+	atMidnight := time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, loc)
+	day = models.DietDay{
+		Date:   atMidnight,
+		PlanID: planID,
+	}
+	if err := r.db.Create(&day).Error; err != nil {
+		if isUniqueConstraintError(err) {
+			if err := r.db.Where("date >= ? AND date < ?", start, end).First(&day).Error; err != nil {
+				return models.DietDay{}, err
+			}
+			return day, nil
+		}
 		return models.DietDay{}, err
 	}
 	return day, nil
 }
 
-func (r *Repository) DayByID(id int) (*models.DietDay, error) {
+func isUniqueConstraintError(err error) bool {
+	if err == nil {
+		return false
+	}
+	s := strings.ToLower(err.Error())
+	return strings.Contains(s, "duplicate key") ||
+		strings.Contains(s, "unique constraint") ||
+		strings.Contains(s, "unique constraint failed")
+}
+
+func (r *Repository) loadDietDayWithPreloads(id uint) (models.DietDay, error) {
 	var day models.DietDay
 	if err := r.db.
 		Preload("PlannedMeals", "logged = ?", false).
@@ -89,6 +149,22 @@ func (r *Repository) DayByID(id int) (*models.DietDay, error) {
 		Preload("Plan").
 		Preload("Logs.Meal.Items.Food").
 		First(&day, id).Error; err != nil {
+		return models.DietDay{}, err
+	}
+	return day, nil
+}
+
+func (r *Repository) DayMealPlanToday(offset int) (models.DietDay, error) {
+	d, err := r.findOrCreateDietDayForCalendarDate(utils.ZerodTime(offset))
+	if err != nil {
+		return models.DietDay{}, err
+	}
+	return r.loadDietDayWithPreloads(d.ID)
+}
+
+func (r *Repository) DayByID(id int) (*models.DietDay, error) {
+	day, err := r.loadDietDayWithPreloads(uint(id))
+	if err != nil {
 		return nil, err
 	}
 	return &day, nil
@@ -136,9 +212,8 @@ func (r *Repository) AllMealDays() ([]models.DietDay, error) {
 }
 
 func (r *Repository) GoalsToday() (*models.Plan, error) {
-	today := time.Now().Truncate(24 * time.Hour)
-	var todayDay models.DietDay
-	if err := r.db.Where("date = ?", today.Format("2006-01-02")).First(&todayDay).Error; err != nil {
+	todayDay, err := r.findOrCreateDietDayForCalendarDate(utils.ZerodTime(0))
+	if err != nil {
 		return nil, err
 	}
 	var plan models.Plan
@@ -149,12 +224,8 @@ func (r *Repository) GoalsToday() (*models.Plan, error) {
 }
 
 func (r *Repository) FindDayByDate(date time.Time) (*models.DietDay, error) {
-	var day models.DietDay
-	err := r.db.Where("date = ?", date).First(&day).Error
+	day, err := r.findOrCreateDietDayForCalendarDate(date)
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
-			return nil, nil
-		}
 		return nil, err
 	}
 	return &day, nil

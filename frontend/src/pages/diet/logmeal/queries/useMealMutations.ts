@@ -5,6 +5,25 @@ import { homeKeys } from '~/pages/home/queries/keys';
 import type { Meal } from '~/types/diet';
 import { useRouter } from 'vue-router';
 
+function invalidateDietQueries(
+    queryClient: ReturnType<typeof useQueryClient>,
+) {
+    queryClient.invalidateQueries({ queryKey: logmealKeys.diet.today() });
+    queryClient.invalidateQueries({ queryKey: homeKeys.diet.all });
+}
+
+function afterMealLogNavigate(router: ReturnType<typeof useRouter>) {
+    const name = router.currentRoute.value.name;
+    if (name === 'diet-log') {
+        router.push({ name: 'diet' });
+        return;
+    }
+    if (name === 'home') {
+        return;
+    }
+    router.push({ name: 'gym' });
+}
+
 export function useCreateMeal() {
     const queryClient = useQueryClient();
     const router = useRouter();
@@ -13,12 +32,9 @@ export function useCreateMeal() {
         mutationFn: ({ meal, log }: { meal: Meal; log: boolean }) =>
             createMeal(meal, log),
         onSuccess: (_, variables) => {
-            // Invalidate today's diet logs
-            queryClient.invalidateQueries({ queryKey: logmealKeys.diet.today() });
-            queryClient.invalidateQueries({ queryKey: homeKeys.diet.today(0) });
-
+            invalidateDietQueries(queryClient);
             if (variables.log) {
-                router.push('/');
+                afterMealLogNavigate(router);
             }
         },
     });
@@ -31,10 +47,8 @@ export function useLogEditedMeal() {
     return useMutation({
         mutationFn: (meal: Meal) => logEditedMeal(meal),
         onSuccess: () => {
-            // Invalidate today's diet logs
-            queryClient.invalidateQueries({ queryKey: logmealKeys.diet.today() });
-            queryClient.invalidateQueries({ queryKey: homeKeys.diet.today(0) });
-            router.push('/');
+            invalidateDietQueries(queryClient);
+            afterMealLogNavigate(router);
         },
     });
 }
@@ -47,10 +61,8 @@ export function useUpdateLoggedMeal() {
         mutationFn: ({ meal, oldMealId }: { meal: Meal; oldMealId: number }) =>
             updateLoggedMeal(meal, oldMealId),
         onSuccess: () => {
-            // Invalidate today's diet logs
-            queryClient.invalidateQueries({ queryKey: logmealKeys.diet.today() });
-            queryClient.invalidateQueries({ queryKey: homeKeys.diet.today(0) });
-            router.push('/');
+            invalidateDietQueries(queryClient);
+            afterMealLogNavigate(router);
         },
     });
 }
