@@ -149,11 +149,15 @@ export function useExerciseLoggingSession(options: {
         try {
             const parsed = JSON.parse(raw) as Partial<StoredDraft>;
             if (typeof parsed.weight !== "number") return false;
+            if (parsed.dirty !== true) {
+                window.sessionStorage.removeItem(key);
+                return false;
+            }
             currentWeight.value = parsed.weight;
             currentReps.value = parsed.reps ?? 0;
             currentWeightSetup.value = parsed.weightSetup ?? "";
             notes.value = parsed.notes ?? "";
-            draftDirty.value = parsed.dirty ?? false;
+            draftDirty.value = true;
             return true;
         } catch {
             window.sessionStorage.removeItem(key);
@@ -224,11 +228,12 @@ export function useExerciseLoggingSession(options: {
                 Array.isArray(group.previous.sets) &&
                 group.previous.sets.length > 0
             ) {
-                const firstSet = group.previous.sets[0];
-                currentWeight.value = firstSet ? firstSet.weight : 0;
-                currentReps.value = firstSet ? firstSet.reps : 0;
-                currentWeightSetup.value = firstSet
-                    ? firstSet.weight_setup || ""
+                const prevSets = group.previous.sets;
+                const lastPrev = prevSets[prevSets.length - 1];
+                currentWeight.value = lastPrev ? lastPrev.weight : 0;
+                currentReps.value = lastPrev ? lastPrev.reps : 0;
+                currentWeightSetup.value = lastPrev
+                    ? lastPrev.weight_setup || ""
                     : "";
             } else {
                 currentWeight.value = 0;
