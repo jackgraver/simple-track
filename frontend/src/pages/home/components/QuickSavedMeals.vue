@@ -2,9 +2,10 @@
 import { computed } from "vue";
 import { useQuery } from "@tanstack/vue-query";
 import { apiClient } from "~/api/client";
-import type { Meal } from "~/types/diet";
+import type { SavedMeal } from "~/types/diet";
 import { useCreateMeal } from "~/pages/diet/logmeal/queries/useMealMutations";
 import { cloneMealForNewLog } from "~/utils/cloneMealForLog";
+import { savedMealToMeal } from "~/utils/savedMealToMeal";
 import { toast } from "~/composables/toast/useToast";
 import SimpleMacros from "~/shared/SimpleMacros.vue";
 
@@ -16,25 +17,25 @@ const {
 } = useQuery({
     queryKey: ["savedMeals", "all"],
     queryFn: async () => {
-        const res = await apiClient.get<unknown>("/diet/meals/meal/all");
+        const res = await apiClient.get<unknown>("/diet/meals/saved-meal/all");
         return res.data;
     },
 });
 
-const meals = computed((): Meal[] => {
+const meals = computed((): SavedMeal[] => {
     const v = data.value;
     if (!v) return [];
-    if (Array.isArray(v)) return v as Meal[];
+    if (Array.isArray(v)) return v as SavedMeal[];
     const arr = Object.values(v as object).find((x) => Array.isArray(x));
-    return (arr ?? []) as Meal[];
+    return (arr ?? []) as SavedMeal[];
 });
 
 const { mutateAsync, isPending: savingMeal } = useCreateMeal();
 
-const quickLog = async (m: Meal) => {
+const quickLog = async (m: SavedMeal) => {
     try {
         await mutateAsync({
-            meal: cloneMealForNewLog(m),
+            meal: cloneMealForNewLog(savedMealToMeal(m)),
             log: true,
         });
         toast.push(`Logged “${m.name}”`, "success");

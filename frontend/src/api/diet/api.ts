@@ -74,11 +74,16 @@ export async function getMealById(id: number): Promise<MealResponse> {
     return response.data;
 }
 
-export async function createMeal(meal: Meal, log: boolean): Promise<CreateMealResponse> {
-    const response = await apiClient.post<CreateMealResponse>('/diet/meals/meal/new', {
-        meal,
-        log,
-    });
+export async function createMeal(
+    meal: Meal,
+    log: boolean,
+    saveToLibrary?: boolean
+): Promise<CreateMealResponse> {
+    const body: { meal: Meal; log: boolean; save_to_library?: boolean } = { meal, log };
+    if (log) {
+        body.save_to_library = saveToLibrary === true;
+    }
+    const response = await apiClient.post<CreateMealResponse>('/diet/meals/meal/new', body);
     return response.data;
 }
 
