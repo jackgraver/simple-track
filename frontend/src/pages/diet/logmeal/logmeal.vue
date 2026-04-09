@@ -39,8 +39,7 @@ function macrosForMeal(m: Meal): MealMacroTotals {
         calories: formatNum(
             m.items.reduce(
                 (total, item) =>
-                    total +
-                    Number(item.amount) * (item.food?.calories ?? 0),
+                    total + Number(item.amount) * (item.food?.calories ?? 0),
                 0,
             ),
         ),
@@ -235,9 +234,7 @@ const addFood = async (food: Food): Promise<boolean> => {
     );
     if (existingIndex !== -1) {
         meal.value.items = meal.value.items.map((it, i) =>
-            i === existingIndex
-                ? { ...it, amount: Number(it.amount) + 1 }
-                : it,
+            i === existingIndex ? { ...it, amount: Number(it.amount) + 1 } : it,
         );
         return true;
     }
