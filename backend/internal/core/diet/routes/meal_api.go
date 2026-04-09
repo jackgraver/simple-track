@@ -29,6 +29,7 @@ func RegisterMealRoutes(group *gin.RouterGroup, db *gorm.DB) {
 	{
 		meals.GET("/food/all", h.getAllFoods)
 		meals.GET("/meal/all", h.getAllMeals)
+		meals.GET("/saved-meal/all", h.getAllSavedMeals)
 		meals.GET("/meal/:id", h.getMeal)
 		meals.POST("/meal/new", h.postNewMeal)
 		meals.POST("/meal/log-planned", h.postLogPlanned)
@@ -84,6 +85,33 @@ func (h *MealHandler) getAllMeals(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"meals": meals})
 }
 
+func (h *MealHandler) getAllSavedMeals(c *gin.Context) {
+	excludeIDsStr := c.Query("exclude")
+	var excludeIDs []uint
+	if excludeIDsStr != "" {
+		if id, err := strconv.ParseUint(excludeIDsStr, 10, 32); err == nil {
+			excludeIDs = append(excludeIDs, uint(id))
+		}
+	}
+	saved, err := services.AllSavedMeals(h.db, excludeIDs)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"saved_meals": saved})
+}
+
+func savedMealFromMealTemplate(m *models.Meal) *models.SavedMeal {
+	s := &models.SavedMeal{Name: m.Name}
+	for _, it := range m.Items {
+		s.Items = append(s.Items, models.SavedMealItem{
+			FoodID: it.FoodID,
+			Amount: float64(it.Amount),
+		})
+	}
+	return s
+}
+
 func (h *MealHandler) getMeal(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := strconv.ParseUint(idStr, 10, 32)
@@ -100,8 +128,9 @@ func (h *MealHandler) getMeal(c *gin.Context) {
 }
 
 type CreateMealRequest struct {
-	Meal models.Meal `json:"meal"`
-	Log  bool        `json:"log"`
+	Meal          models.Meal `json:"meal"`
+	Log           bool        `json:"log"`
+	SaveToLibrary bool        `json:"save_to_library"`
 }
 
 func (h *MealHandler) postNewMeal(c *gin.Context) {
@@ -130,6 +159,14 @@ func (h *MealHandler) postNewMeal(c *gin.Context) {
 			DayID:  day.ID,
 			MealID: mealID,
 		}); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+	}
+
+	if req.Log && req.SaveToLibrary {
+		sm := savedMealFromMealTemplate(&req.Meal)
+		if _, err := services.CreateSavedMeal(h.db, sm); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
@@ -187,7 +224,6 @@ func (h *MealHandler) postLogEdited(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-
 	newMealID, err := services.CreateMeal(h.db, &req.Meal)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})

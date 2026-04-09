@@ -10,6 +10,10 @@ function invalidateDietQueries(
 ) {
     queryClient.invalidateQueries({ queryKey: logmealKeys.diet.today() });
     queryClient.invalidateQueries({ queryKey: homeKeys.diet.all });
+    queryClient.invalidateQueries({ queryKey: ['savedMeals'] });
+    queryClient.invalidateQueries({
+        queryKey: ['searchList', '/diet/meals/saved-meal/all'],
+    });
 }
 
 function afterMealLogNavigate(router: ReturnType<typeof useRouter>) {
@@ -29,8 +33,15 @@ export function useCreateMeal() {
     const router = useRouter();
 
     return useMutation({
-        mutationFn: ({ meal, log }: { meal: Meal; log: boolean }) =>
-            createMeal(meal, log),
+        mutationFn: ({
+            meal,
+            log,
+            saveToLibrary,
+        }: {
+            meal: Meal;
+            log: boolean;
+            saveToLibrary?: boolean;
+        }) => createMeal(meal, log, saveToLibrary),
         onSuccess: (_, variables) => {
             invalidateDietQueries(queryClient);
             if (variables.log) {

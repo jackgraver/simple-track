@@ -50,6 +50,28 @@ func (r *Repository) MealsAll(excludeIDs []uint) ([]models.Meal, error) {
 	return meals, nil
 }
 
+func (r *Repository) SavedMealsAll(excludeIDs []uint) ([]models.SavedMeal, error) {
+	var meals []models.SavedMeal
+	query := r.db.Model(&models.SavedMeal{})
+	if len(excludeIDs) > 0 {
+		query = query.Where("id NOT IN ?", excludeIDs)
+	}
+	if err := query.Preload("Items.Food").Find(&meals).Distinct("name").Error; err != nil {
+		return nil, err
+	}
+	return meals, nil
+}
+
+func (r *Repository) SavedMealCreate(sm *models.SavedMeal) (uint, error) {
+	for i := range sm.Items {
+		sm.Items[i].ID = 0
+	}
+	if err := r.db.Create(sm).Error; err != nil {
+		return 0, err
+	}
+	return sm.ID, nil
+}
+
 func (r *Repository) MealByID(id uint) (*models.Meal, error) {
 	var meal models.Meal
 	if err := r.db.Preload("Items.Food").First(&meal, id).Error; err != nil {

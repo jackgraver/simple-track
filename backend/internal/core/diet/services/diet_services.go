@@ -64,6 +64,14 @@ func CreateMeal(db *gorm.DB, meal *models.Meal) (uint, error) {
 	return dietrepo.New(db).MealCreate(meal)
 }
 
+func AllSavedMeals(db *gorm.DB, excludeIDs []uint) ([]models.SavedMeal, error) {
+	return dietrepo.New(db).SavedMealsAll(excludeIDs)
+}
+
+func CreateSavedMeal(db *gorm.DB, sm *models.SavedMeal) (uint, error) {
+	return dietrepo.New(db).SavedMealCreate(sm)
+}
+
 func SetPlannedMealLogged(db *gorm.DB, dayID uint, mealID uint) error {
 	return dietrepo.New(db).SetPlannedMealLogged(dayID, mealID)
 }

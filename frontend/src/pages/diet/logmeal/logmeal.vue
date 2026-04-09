@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useRoute } from "vue-router";
-import type { Food, Meal, MealItem } from "~/types/diet";
+import type { Food, Meal, MealItem, SavedMeal } from "~/types/diet";
 import SearchList from "~/shared/SearchList.vue";
 import { Plus, Trash2, Minus } from "lucide-vue-next";
 import FoodDisplay from "~/shared/FoodDisplay.vue";
@@ -17,6 +17,7 @@ import {
 } from "./queries/useMealMutations";
 import MacroBars from "~/pages/diet/components/MacroBars.vue";
 import SimpleMacros from "~/shared/SimpleMacros.vue";
+import { savedMealToMeal } from "~/utils/savedMealToMeal";
 
 function formatNum(n: number): number {
     const s = n.toFixed(2); // always 2 decimals
@@ -172,8 +173,12 @@ const removeFood = async (index: number) => {
     meal.value.items.splice(index, 1);
 };
 
-const setMeal = async (newMeal: Meal): Promise<boolean> => {
-    meal.value = newMeal;
+const setMeal = async (item: Meal | SavedMeal): Promise<boolean> => {
+    const first = item.items[0];
+    meal.value =
+        first && "saved_meal_id" in first
+            ? savedMealToMeal(item as SavedMeal)
+            : (item as Meal);
     return true;
 };
 
@@ -182,23 +187,22 @@ const createMealMutation = useCreateMeal();
 const logEditedMealMutation = useLogEditedMeal();
 const updateLoggedMealMutation = useUpdateLoggedMeal();
 
-const createMeal = async (log: boolean) => {
+const logMealToDay = async (saveToLibrary: boolean) => {
     const mealToCreate = { ...meal.value, ID: 0 };
     try {
-        await createMealMutation.mutateAsync({ meal: mealToCreate, log });
-        toast.push("Meal Created Successfully!", "success");
-        if (!log) {
-            // Reset meal if not logging
-            meal.value = {
-                ID: 0,
-                created_at: "",
-                updated_at: "",
-                name: "",
-                items: [],
-            };
-        }
+        await createMealMutation.mutateAsync({
+            meal: mealToCreate,
+            log: true,
+            saveToLibrary,
+        });
+        toast.push(
+            saveToLibrary
+                ? "Meal logged and saved for later!"
+                : "Meal logged!",
+            "success",
+        );
     } catch (error: any) {
-        toast.push("Create Meal Failed! " + (error.message || ""), "error");
+        toast.push("Log meal failed! " + (error.message || ""), "error");
     }
 };
 
@@ -315,15 +319,15 @@ const updateLoggedMeal = async () => {
                         </button>
                         <button
                             v-if="type === 'create'"
-                            @click="createMeal(false)"
+                            @click="logMealToDay(false)"
                         >
-                            Create
+                            Log Meal
                         </button>
                         <button
                             v-if="type === 'create'"
-                            @click="createMeal(true)"
+                            @click="logMealToDay(true)"
                         >
-                            Create and Log
+                            Log and Save Meal
                         </button>
                     </div>
                     <MacroBars
@@ -359,7 +363,7 @@ const updateLoggedMeal = async () => {
                 <h2>Select Saved Meal</h2>
                 <SearchList
                     :key="meal.ID"
-                    :route="'diet/meals/meal/all'"
+                    :route="'diet/meals/saved-meal/all'"
                     :on-select="setMeal"
                 />
             </aside>

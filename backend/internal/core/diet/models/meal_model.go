@@ -2,7 +2,7 @@ package models
 
 import "gorm.io/gorm"
 
-// Meal represents a meal
+// Meal represents a logged meal instance (foods eaten in one sitting); day_logs reference this.
 type Meal struct {
 	gorm.Model
 	Name  string     `json:"name" gorm:"not null"`
@@ -27,7 +27,7 @@ func (m MealItem) GetID() uint        { return m.ID }
 func (m MealItem) TableName() string  { return "meal_items" }
 func (m MealItem) Preloads() []string { return []string{"Food"} }
 
-// SavedMeal represents a saved meal
+// SavedMeal is a reusable template (e.g. meals you eat often), not tied to a specific day log.
 type SavedMeal struct {
 	gorm.Model
 	Name  string          `json:"name" gorm:"not null"`
