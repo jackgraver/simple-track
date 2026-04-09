@@ -12,6 +12,7 @@
     --color-thirdBg: var(--color-third-bg);
     --color-textPrimary: var(--color-text-primary);
     --color-textSecondary: var(--color-text-secondary);
+    --color-cfRed: var(--color-cf-red);
 }
 
 :root {

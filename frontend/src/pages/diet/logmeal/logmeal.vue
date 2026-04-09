@@ -290,31 +290,53 @@ const updateLoggedMeal = async () => {
 </script>
 
 <template>
-    <div class="page-wrapper">
+    <div class="flex flex-col items-center py-4">
         <router-link
             :to="backTo"
-            class="back-crumb mb-2 w-[80%] max-w-[80%] text-left text-sm text-zinc-400 hover:text-zinc-200"
+            class="mb-2 w-[80%] max-w-[80%] text-left text-sm text-textSecondary hover:text-textPrimary"
             >{{ backLabel }}</router-link
         >
-        <div v-if="editMissingId" class="error-container">
+        <div
+            v-if="editMissingId"
+            class="flex h-[60dvh] items-center justify-center p-8 text-cfRed"
+        >
             <span>Missing meal id for this edit.</span>
         </div>
-        <div v-else-if="mealError && id !== 0" class="error-container">
+        <div
+            v-else-if="mealError && id !== 0"
+            class="flex h-[60dvh] items-center justify-center p-8 text-cfRed"
+        >
             <span
                 >Error loading meal:
                 {{ mealError?.message || "Unknown error" }}</span
             >
         </div>
-        <div v-else-if="meal" class="container">
-            <article class="cell left">
-                <header class="title-bar">
-                    <div class="title-row">
-                        <h1>{{ pageTitle }}</h1>
+        <div
+            v-else-if="meal"
+            class="grid h-[calc(100dvh-7rem)] w-full grid-cols-[2fr_1fr] grid-rows-2 gap-4 pb-8"
+        >
+            <article
+                class="row-span-2 flex min-h-0 flex-col overflow-hidden rounded-lg bg-firstBg"
+            >
+                <header
+                    class="shrink-0 border-b border-secondBg p-4 text-textPrimary"
+                >
+                    <div class="mb-4">
+                        <h1 class="m-0 text-xl font-semibold">
+                            {{ pageTitle }}
+                        </h1>
                     </div>
-                    <div class="meal-header">
-                        <div class="meal-name">
-                            <label for="name">Meal Name</label>
-                            <input type="text" id="name" v-model="meal.name" />
+                    <div class="flex items-end justify-between gap-6">
+                        <div class="flex min-w-0 flex-1 flex-col gap-2">
+                            <label class="text-sm text-textSecondary" for="name"
+                                >Meal Name</label
+                            >
+                            <input
+                                class="w-full rounded bg-secondBg px-2 py-2 text-base text-textPrimary focus:outline-none focus:ring-1 focus:ring-thirdBg"
+                                type="text"
+                                id="name"
+                                v-model="meal.name"
+                            />
                         </div>
                         <SimpleMacros
                             :calories="totalMacros.calories"
@@ -324,25 +346,46 @@ const updateLoggedMeal = async () => {
                         />
                     </div>
                 </header>
-                <section class="meal-items-section">
-                    <h3>Meal Items</h3>
-                    <div class="meal-items">
+                <section
+                    class="flex min-h-0 flex-1 flex-col overflow-hidden text-textPrimary"
+                >
+                    <h3
+                        class="m-0 shrink-0 px-4 pb-3 pt-4 text-base font-medium"
+                    >
+                        Meal Items
+                    </h3>
+                    <div
+                        class="flex min-h-0 flex-1 flex-col gap-2.5 overflow-y-auto px-4"
+                    >
                         <div
                             v-for="(item, i) in meal.items"
                             :key="item.ID"
-                            class="items-rows"
+                            class="flex w-full items-center justify-between gap-2"
                         >
-                            <button @click="amountPlusMinus(item, 'minus')">
+                            <button
+                                class="shrink-0 rounded bg-secondBg p-1.5 text-textPrimary hover:bg-thirdBg"
+                                type="button"
+                                @click="amountPlusMinus(item, 'minus')"
+                            >
                                 <Minus />
                             </button>
-                            <span style="font-size: large"
-                                >{{ formatFoodLabel(item) }}
-                            </span>
-                            <span v-if="item.food!.serving_type === 'g'">g</span
-                            ><button @click="amountPlusMinus(item, 'plus')">
+                            <span
+                                class="min-w-0 flex-1 text-lg text-textPrimary"
+                                >{{ formatFoodLabel(item) }}</span
+                            >
+                            <span
+                                v-if="item.food!.serving_type === 'g'"
+                                class="shrink-0 text-textSecondary"
+                                >g</span
+                            >
+                            <button
+                                class="shrink-0 rounded bg-secondBg p-1.5 text-textPrimary hover:bg-thirdBg"
+                                type="button"
+                                @click="amountPlusMinus(item, 'plus')"
+                            >
                                 <Plus />
                             </button>
-                            <span>
+                            <span class="shrink-0 text-sm text-textSecondary">
                                 {{
                                     formatNum(
                                         item.amount * item.food!.calories,
@@ -354,7 +397,8 @@ const updateLoggedMeal = async () => {
                                 {{ formatNum(item.amount * item.food!.fiber) }}F
                             </span>
                             <button
-                                class="delete-button"
+                                class="shrink-0 rounded p-1 text-textSecondary hover:bg-secondBg hover:text-cfRed"
+                                type="button"
                                 @click="removeFood(i)"
                             >
                                 <Trash2 :size="20" />
@@ -362,22 +406,30 @@ const updateLoggedMeal = async () => {
                         </div>
                     </div>
                 </section>
-                <footer class="footer">
-                    <div class="action-buttons">
+                <footer
+                    class="flex shrink-0 flex-col gap-4 border-t border-secondBg p-4"
+                >
+                    <div class="flex w-full flex-row gap-3">
                         <button
                             v-if="pageMode === PAGE_MODE.create"
+                            class="flex-1 cursor-pointer rounded bg-secondBg px-5 py-2.5 text-sm text-textPrimary hover:bg-thirdBg"
+                            type="button"
                             @click="saveSavedMealTemplate"
                         >
                             Save Meal
                         </button>
                         <button
                             v-if="pageMode === PAGE_MODE.log"
+                            class="flex-1 cursor-pointer rounded bg-secondBg px-5 py-2.5 text-sm text-textPrimary hover:bg-thirdBg"
+                            type="button"
                             @click="logMealToDay(false)"
                         >
                             Log Meal
                         </button>
                         <button
                             v-if="pageMode === PAGE_MODE.log"
+                            class="flex-1 cursor-pointer rounded bg-secondBg px-5 py-2.5 text-sm text-textPrimary hover:bg-thirdBg"
+                            type="button"
                             @click="logMealToDay(true)"
                         >
                             Log and Save Meal
@@ -387,6 +439,8 @@ const updateLoggedMeal = async () => {
                                 pageMode === PAGE_MODE.edit &&
                                 editVariant === EDIT_VARIANT.logged
                             "
+                            class="flex-1 cursor-pointer rounded bg-secondBg px-5 py-2.5 text-sm text-textPrimary hover:bg-thirdBg"
+                            type="button"
                             @click="updateLoggedMeal"
                         >
                             Update
@@ -396,6 +450,8 @@ const updateLoggedMeal = async () => {
                                 pageMode === PAGE_MODE.edit &&
                                 editVariant === EDIT_VARIANT.planned
                             "
+                            class="flex-1 cursor-pointer rounded bg-secondBg px-5 py-2.5 text-sm text-textPrimary hover:bg-thirdBg"
+                            type="button"
                             @click="logEditedMeal"
                         >
                             Log
@@ -421,8 +477,10 @@ const updateLoggedMeal = async () => {
                     />
                 </footer>
             </article>
-            <aside class="cell right-top">
-                <h2>Add Foods</h2>
+            <aside
+                class="flex min-h-0 flex-col overflow-hidden rounded-lg bg-firstBg p-4 text-textPrimary"
+            >
+                <h2 class="mt-0 text-lg font-semibold">Add Foods</h2>
                 <SearchList
                     :route="'diet/meals/food/all'"
                     :onSelect="addFood"
@@ -430,8 +488,10 @@ const updateLoggedMeal = async () => {
                     :displayComponent="FoodDisplay"
                 />
             </aside>
-            <aside class="cell right-bottom">
-                <h2>Select Saved Meal</h2>
+            <aside
+                class="flex min-h-0 flex-col overflow-hidden rounded-lg bg-firstBg p-4 text-textPrimary"
+            >
+                <h2 class="mt-0 text-lg font-semibold">Select Saved Meal</h2>
                 <SearchList
                     :key="meal.ID"
                     :route="'diet/meals/saved-meal/all'"
@@ -441,166 +501,3 @@ const updateLoggedMeal = async () => {
         </div>
     </div>
 </template>
-
-<style scoped>
-.page-wrapper {
-    display: flex;
-    flex-direction: column;
-    justify-content: flex-start;
-    align-items: center;
-    min-height: 98vh;
-    padding-block: 2rem;
-    box-sizing: border-box;
-    overflow-x: hidden;
-    overflow-y: auto;
-}
-
-.container {
-    display: grid;
-    grid-template-columns: 2fr 1fr;
-    grid-template-rows: 1fr 1fr;
-    gap: 1rem;
-    width: 80%;
-    height: 100%;
-    max-height: 100%;
-}
-
-.cell {
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-    border: 1px solid rgb(56, 56, 56);
-    border-radius: 5px;
-    min-height: 0;
-    background: rgb(27, 27, 27);
-}
-
-.cell > h1,
-h2 {
-    margin-top: 0;
-}
-
-.left {
-    grid-row: 1 / span 2;
-    padding: 0;
-    display: flex;
-    flex-direction: column;
-    min-height: 0;
-}
-
-.right-top,
-.right-bottom {
-    padding: 1rem;
-}
-
-header.title-bar {
-    padding: 1rem;
-    border-bottom: 1px solid rgb(56, 56, 56);
-    flex-shrink: 0;
-}
-
-.title-row h1 {
-    margin: 0 0 1rem 0;
-}
-
-.meal-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-end;
-    gap: 1.5rem;
-}
-
-.meal-name {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-    flex: 1;
-}
-
-.meal-name label {
-    font-size: 0.9rem;
-    color: #ccc;
-}
-
-.meal-name input {
-    background-color: rgb(50, 50, 50);
-    color: white;
-    border: 1px solid #3d3d3d;
-    border-radius: 4px;
-    padding: 0.5rem;
-    font-size: 1rem;
-}
-
-section.meal-items-section {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    min-height: 0;
-    overflow: hidden;
-}
-
-.meal-items-section h3 {
-    margin: 0;
-    padding: 1rem 1rem 0.75rem 1rem;
-    flex-shrink: 0;
-}
-
-.meal-items {
-    display: flex;
-    flex-direction: column;
-    gap: 0.6rem;
-    padding: 0 1rem;
-    overflow-y: auto;
-    flex: 1;
-}
-
-.items-rows {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    width: 100%;
-    gap: 0.5rem;
-}
-
-footer.footer {
-    padding: 1rem;
-    border-top: 1px solid rgb(56, 56, 56);
-    flex-shrink: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-}
-
-.action-buttons {
-    display: flex;
-    flex-direction: row;
-    gap: 0.75rem;
-    width: 100%;
-}
-
-.action-buttons button {
-    flex: 1;
-    padding: 0.625rem 1.25rem;
-    cursor: pointer;
-    font-size: 0.9rem;
-}
-
-.small-input {
-    width: 16px;
-    text-align: center;
-}
-
-.loading-container,
-.error-container {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    height: 100%;
-    padding: 2rem;
-    color: #ccc;
-}
-
-.error-container {
-    color: #ff6b6b;
-}
-</style>

@@ -1,6 +1,6 @@
 /** @type {import('tailwindcss').Config} */
 export default {
-    content: ["./src/**/*.{js,ts,jsx,tsx}"],
+    content: ["./src/**/*.{js,ts,jsx,tsx,vue}"],
     theme: {
         extend: {
             colors: {
@@ -12,6 +12,7 @@ export default {
                 textPrimary: "var(--color-text-primary)",
                 textSecondary: "var(--color-text-secondary)",
                 border: "var(--color-border)",
+                cfRed: "var(--color-cf-red)",
                 gradient: "var(--color-gradient)",
             },
         },
