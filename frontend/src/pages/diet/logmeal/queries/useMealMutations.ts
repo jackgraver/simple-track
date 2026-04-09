@@ -1,5 +1,10 @@
 import { useMutation, useQueryClient } from '@tanstack/vue-query';
-import { createMeal, logEditedMeal, updateLoggedMeal } from '~/api/diet/api';
+import {
+    createMeal,
+    createSavedMeal,
+    logEditedMeal,
+    updateLoggedMeal,
+} from '~/api/diet/api';
 import { logmealKeys } from './keys';
 import { homeKeys } from '~/pages/home/queries/keys';
 import type { Meal } from '~/types/diet';
@@ -26,6 +31,21 @@ function afterMealLogNavigate(router: ReturnType<typeof useRouter>) {
         return;
     }
     router.push({ name: 'gym' });
+}
+
+export function useCreateSavedMeal() {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: (payload: { name: string; items: { food_id: number; amount: number }[] }) =>
+            createSavedMeal(payload),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['savedMeals'] });
+            queryClient.invalidateQueries({
+                queryKey: ['searchList', '/diet/meals/saved-meal/all'],
+            });
+        },
+    });
 }
 
 export function useCreateMeal() {

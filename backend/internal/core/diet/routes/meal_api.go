@@ -30,6 +30,7 @@ func RegisterMealRoutes(group *gin.RouterGroup, db *gorm.DB) {
 		meals.GET("/food/all", h.getAllFoods)
 		meals.GET("/meal/all", h.getAllMeals)
 		meals.GET("/saved-meal/all", h.getAllSavedMeals)
+		meals.POST("/saved-meal/new", h.postNewSavedMeal)
 		meals.GET("/meal/:id", h.getMeal)
 		meals.POST("/meal/new", h.postNewMeal)
 		meals.POST("/meal/log-planned", h.postLogPlanned)
@@ -99,6 +100,21 @@ func (h *MealHandler) getAllSavedMeals(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"saved_meals": saved})
+}
+
+func (h *MealHandler) postNewSavedMeal(c *gin.Context) {
+	var sm models.SavedMeal
+	if err := c.ShouldBindJSON(&sm); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	sm.ID = 0
+	id, err := services.CreateSavedMeal(h.db, &sm)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusCreated, gin.H{"saved_meal_id": id})
 }
 
 func savedMealFromMealTemplate(m *models.Meal) *models.SavedMeal {
