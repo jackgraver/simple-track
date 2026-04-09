@@ -15,6 +15,11 @@ import { computed, ref } from "vue";
 import MealCard from "~/pages/diet/components/MealCard.vue";
 import MacroBars from "~/pages/diet/components/MacroBars.vue";
 import QuickSavedMeals from "./QuickSavedMeals.vue";
+import {
+    EDIT_LOGGED_TYPE,
+    EDIT_TYPE,
+    LOG_TYPE,
+} from "~/pages/diet/logmeal/logmealMode";
 
 const router = useRouter();
 
@@ -47,10 +52,10 @@ const logPlannedMeal = async (meal: Meal) => {
 
 const logMeal = async (
     meal: Meal | null,
-    type: "edit" | "editlogged" | "create",
+    type: typeof LOG_TYPE | typeof EDIT_TYPE | typeof EDIT_LOGGED_TYPE,
 ) => {
-    if (type === "create") {
-        router.push({ name: "diet-log", query: { type } });
+    if (type === LOG_TYPE) {
+        router.push({ name: "diet-log", query: { type: LOG_TYPE } });
         return;
     }
     router.push({
@@ -135,8 +140,8 @@ function prev() {
     <div v-else class="container">
         <div v-if="data" style="width: 100%">
             <div class="title-row">
-                <button type="button" @click="logMeal(null, 'create')">
-                    Build meal
+                <button type="button" @click="logMeal(null, LOG_TYPE)">
+                    Log meal
                 </button>
             </div>
             <MacroBars

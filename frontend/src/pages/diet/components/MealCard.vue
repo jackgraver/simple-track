@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { Meal } from "~/types/diet";
+import { EDIT_LOGGED_TYPE, EDIT_TYPE } from "~/pages/diet/logmeal/logmealMode";
 import { Trash2, SquarePen, Check } from "lucide-vue-next";
 import { h } from "vue";
 
@@ -31,7 +32,10 @@ defineProps<{
     meal: Meal;
     type: "planned" | "logged";
     onLogPlanned: (meal: Meal) => void;
-    onLogEdited: (meal: Meal, type: "edit" | "editlogged") => void;
+    onLogEdited: (
+        meal: Meal,
+        type: typeof EDIT_TYPE | typeof EDIT_LOGGED_TYPE,
+    ) => void;
     onDelete: (meal: Meal) => void;
     onEdit: (meal: Meal) => void;
 }>();
@@ -78,7 +82,7 @@ defineProps<{
             </div>
             <div class="right">
                 <div class="actions" v-if="type === 'logged'">
-                    <button @click="onLogEdited(meal, 'edit')">
+                    <button @click="onLogEdited(meal, EDIT_TYPE)">
                         <SquarePen :size="20" /></button
                     ><button class="delete-button" @click="onDelete(meal)">
                         <Trash2 :size="20" />
@@ -86,7 +90,7 @@ defineProps<{
                 </div>
 
                 <div class="actions" v-else-if="type === 'planned'">
-                    <button @click="onLogEdited(meal, 'editlogged')">
+                    <button @click="onLogEdited(meal, EDIT_LOGGED_TYPE)">
                         <SquarePen :size="20" />
                     </button>
                     <button class="confirm-button" @click="onLogPlanned(meal)">

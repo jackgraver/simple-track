@@ -12,12 +12,20 @@ import { useMeal } from "./queries/useMeal";
 import { useDietLogsToday } from "./queries/useDietLogsToday";
 import {
     useCreateMeal,
+    useCreateSavedMeal,
     useLogEditedMeal,
     useUpdateLoggedMeal,
 } from "./queries/useMealMutations";
 import MacroBars from "~/pages/diet/components/MacroBars.vue";
 import SimpleMacros from "~/shared/SimpleMacros.vue";
 import { savedMealToMeal } from "~/utils/savedMealToMeal";
+import {
+    EDIT_VARIANT,
+    PAGE_MODE,
+    parseEditMealVariant,
+    parseLogMealPageMode,
+    type LogMealPageMode,
+} from "./logmealMode";
 
 function formatNum(n: number): number {
     const s = n.toFixed(2); // always 2 decimals
@@ -52,11 +60,40 @@ const backTo = computed(() =>
 const backLabel = computed(() =>
     route.name === "diet-log" ? "← Diet" : "← Home",
 );
-const type = route.query.type as string | undefined;
+const queryType = computed(() => {
+    const t = route.query.type;
+    return Array.isArray(t) ? t[0] : t;
+});
+const pageMode = computed(
+    (): LogMealPageMode => parseLogMealPageMode(queryType.value),
+);
+const editVariant = computed(() =>
+    pageMode.value === PAGE_MODE.edit
+        ? parseEditMealVariant(queryType.value)
+        : null,
+);
 const id = computed(() => Number(route.query.id ?? 0));
-
-// Fetch meal if ID is provided - pass computed ref for reactivity
-const mealId = computed(() => (id.value !== 0 ? id.value : null));
+const mealId = computed(() => {
+    if (pageMode.value !== PAGE_MODE.edit) return null;
+    return id.value !== 0 ? id.value : null;
+});
+const editMissingId = computed(
+    () => pageMode.value === PAGE_MODE.edit && id.value === 0,
+);
+const pageTitle = computed(() => {
+    switch (pageMode.value) {
+        case PAGE_MODE.create:
+            return "Create saved meal";
+        case PAGE_MODE.log:
+            return "Log meal";
+        case PAGE_MODE.edit:
+            return editVariant.value === EDIT_VARIANT.planned
+                ? "Log meal"
+                : "Edit logged meal";
+        default:
+            return "Log meal";
+    }
+});
 const { data: mealData, error: mealError } = useMeal(mealId);
 
 // Fetch today's diet logs
@@ -71,22 +108,13 @@ const meal = ref<Meal>({
     items: [],
 });
 
-// Watch for meal data and update meal ref
 watch(
-    mealData,
-    (newMealData) => {
-        if (newMealData?.meal) {
-            meal.value = newMealData.meal;
-        }
-    },
-    { immediate: true },
-);
-
-// Reset meal when ID becomes 0 (creating new meal) or when no meal data
-watch(
-    [id, mealData],
-    ([newId, newMealData]) => {
-        if (newId === 0 && !newMealData?.meal) {
+    [pageMode, id, mealData],
+    ([mode, newId, newMealData]) => {
+        if (
+            (mode === PAGE_MODE.log || mode === PAGE_MODE.create) &&
+            newId === 0
+        ) {
             meal.value = {
                 ID: 0,
                 created_at: "",
@@ -94,6 +122,10 @@ watch(
                 name: "",
                 items: [],
             };
+            return;
+        }
+        if (newMealData?.meal) {
+            meal.value = newMealData.meal;
         }
     },
     { immediate: true },
@@ -184,6 +216,7 @@ const setMeal = async (item: Meal | SavedMeal): Promise<boolean> => {
 
 // Mutations
 const createMealMutation = useCreateMeal();
+const createSavedMealMutation = useCreateSavedMeal();
 const logEditedMealMutation = useLogEditedMeal();
 const updateLoggedMealMutation = useUpdateLoggedMeal();
 
@@ -196,13 +229,38 @@ const logMealToDay = async (saveToLibrary: boolean) => {
             saveToLibrary,
         });
         toast.push(
-            saveToLibrary
-                ? "Meal logged and saved for later!"
-                : "Meal logged!",
+            saveToLibrary ? "Meal logged and saved for later!" : "Meal logged!",
             "success",
         );
     } catch (error: any) {
         toast.push("Log meal failed! " + (error.message || ""), "error");
+    }
+};
+
+const saveSavedMealTemplate = async () => {
+    const name = meal.value.name.trim();
+    if (!name || meal.value.items.length === 0) {
+        toast.push("Add a name and at least one food.", "error");
+        return;
+    }
+    try {
+        await createSavedMealMutation.mutateAsync({
+            name,
+            items: meal.value.items.map((i) => ({
+                food_id: i.food_id,
+                amount: i.amount,
+            })),
+        });
+        toast.push("Saved meal created!", "success");
+        meal.value = {
+            ID: 0,
+            created_at: "",
+            updated_at: "",
+            name: "",
+            items: [],
+        };
+    } catch (error: any) {
+        toast.push("Could not save meal. " + (error?.message || ""), "error");
     }
 };
 
@@ -238,7 +296,10 @@ const updateLoggedMeal = async () => {
             class="back-crumb mb-2 w-[80%] max-w-[80%] text-left text-sm text-zinc-400 hover:text-zinc-200"
             >{{ backLabel }}</router-link
         >
-        <div v-if="mealError && id !== 0" class="error-container">
+        <div v-if="editMissingId" class="error-container">
+            <span>Missing meal id for this edit.</span>
+        </div>
+        <div v-else-if="mealError && id !== 0" class="error-container">
             <span
                 >Error loading meal:
                 {{ mealError?.message || "Unknown error" }}</span
@@ -248,9 +309,7 @@ const updateLoggedMeal = async () => {
             <article class="cell left">
                 <header class="title-bar">
                     <div class="title-row">
-                        <h1 v-if="type === 'edit'">Log Meal</h1>
-                        <h1 v-if="type === 'editlogged'">Log Meal</h1>
-                        <h1 v-if="type === 'create'">Create Meal</h1>
+                        <h1>{{ pageTitle }}</h1>
                     </div>
                     <div class="meal-header">
                         <div class="meal-name">
@@ -306,28 +365,40 @@ const updateLoggedMeal = async () => {
                 <footer class="footer">
                     <div class="action-buttons">
                         <button
-                            v-if="type === 'edit'"
-                            @click="updateLoggedMeal"
+                            v-if="pageMode === PAGE_MODE.create"
+                            @click="saveSavedMealTemplate"
                         >
-                            Update
+                            Save Meal
                         </button>
                         <button
-                            v-if="type === 'editlogged'"
-                            @click="logEditedMeal"
-                        >
-                            Log
-                        </button>
-                        <button
-                            v-if="type === 'create'"
+                            v-if="pageMode === PAGE_MODE.log"
                             @click="logMealToDay(false)"
                         >
                             Log Meal
                         </button>
                         <button
-                            v-if="type === 'create'"
+                            v-if="pageMode === PAGE_MODE.log"
                             @click="logMealToDay(true)"
                         >
                             Log and Save Meal
+                        </button>
+                        <button
+                            v-if="
+                                pageMode === PAGE_MODE.edit &&
+                                editVariant === EDIT_VARIANT.logged
+                            "
+                            @click="updateLoggedMeal"
+                        >
+                            Update
+                        </button>
+                        <button
+                            v-if="
+                                pageMode === PAGE_MODE.edit &&
+                                editVariant === EDIT_VARIANT.planned
+                            "
+                            @click="logEditedMeal"
+                        >
+                            Log
                         </button>
                     </div>
                     <MacroBars

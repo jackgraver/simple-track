@@ -14,6 +14,11 @@ import {
 import { computed, ref } from "vue";
 import MealCard from "./MealCard.vue";
 import MacroBars from "~/pages/diet/components/MacroBars.vue";
+import {
+    EDIT_LOGGED_TYPE,
+    EDIT_TYPE,
+    LOG_TYPE,
+} from "~/pages/diet/logmeal/logmealMode";
 
 const router = useRouter();
 
@@ -42,10 +47,10 @@ const logPlannedMeal = async (meal: Meal) => {
 
 const logMeal = async (
     meal: Meal | null,
-    type: "edit" | "editlogged" | "create",
+    type: typeof LOG_TYPE | typeof EDIT_TYPE | typeof EDIT_LOGGED_TYPE,
 ) => {
-    if (type === "create") {
-        router.push({ name: "diet-log", query: { type } });
+    if (type === LOG_TYPE) {
+        router.push({ name: "diet-log", query: { type: LOG_TYPE } });
         return;
     }
     router.push({

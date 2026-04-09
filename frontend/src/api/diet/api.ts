@@ -17,6 +17,10 @@ export type CreateMealResponse = {
     meal_id: number;
 };
 
+export type CreateSavedMealResponse = {
+    saved_meal_id: number;
+};
+
 export type LogMealResponse = {
     day: DietDay;
     totalCalories: number;
@@ -71,6 +75,17 @@ export async function editLoggedMeal(
 
 export async function getMealById(id: number): Promise<MealResponse> {
     const response = await apiClient.get<MealResponse>(`/diet/meals/meal/${id}`);
+    return response.data;
+}
+
+export async function createSavedMeal(payload: {
+    name: string;
+    items: { food_id: number; amount: number }[];
+}): Promise<CreateSavedMealResponse> {
+    const response = await apiClient.post<CreateSavedMealResponse>(
+        "/diet/meals/saved-meal/new",
+        payload,
+    );
     return response.data;
 }
 
