@@ -1,7 +1,10 @@
 <script setup lang="ts">
 import { computed, ref, watch, nextTick } from "vue";
 import { useRouter } from "vue-router";
-import { useWorkoutActivity, type WorkoutActivityQueryOpts } from "~/api/workout/queries";
+import {
+    useWorkoutActivity,
+    type WorkoutActivityQueryOpts,
+} from "~/api/workout/queries";
 import { formatDateLong } from "~/utils/dateUtil";
 
 const router = useRouter();
@@ -70,12 +73,22 @@ const gridCells = computed(() => {
     const rangeEnd = parseDateOnly(res.range.end);
     const gridStart = startOfWeekSunday(rangeStart);
     const gridEnd = endOfWeekSaturday(rangeEnd);
-    const cells: { key: string; isFuture: boolean; active: boolean }[] = [];
-    for (let d = new Date(gridStart); d <= gridEnd; d.setDate(d.getDate() + 1)) {
+    const cells: {
+        key: string;
+        isFuture: boolean;
+        isPast: boolean;
+        active: boolean;
+    }[] = [];
+    for (
+        let d = new Date(gridStart);
+        d <= gridEnd;
+        d.setDate(d.getDate() + 1)
+    ) {
         const k = dateKey(new Date(d));
         const isFuture = k > todayKey.value;
+        const isPast = k < todayKey.value;
         const active = activeSet.value.has(k);
-        cells.push({ key: k, isFuture, active });
+        cells.push({ key: k, isFuture, isPast, active });
     }
     return cells;
 });
@@ -104,12 +117,16 @@ function scrollToToday() {
     });
 }
 
-function cellClass(c: { isFuture: boolean; active: boolean }): string {
+function cellClass(c: {
+    isFuture: boolean;
+    isPast: boolean;
+    active: boolean;
+}): string {
     if (c.active) {
         return "bg-emerald-500";
     }
     if (c.isFuture) {
-        return "bg-secondBg/45";
+        return "bg-firstBg/30";
     }
     return "bg-firstBg";
 }
@@ -122,8 +139,16 @@ function titleForKey(k: string): string {
 function offsetForDateKey(dateKeyStr: string): number {
     const clicked = parseDateOnly(dateKeyStr);
     const today = new Date();
-    const t0 = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
-    const t1 = new Date(clicked.getFullYear(), clicked.getMonth(), clicked.getDate()).getTime();
+    const t0 = new Date(
+        today.getFullYear(),
+        today.getMonth(),
+        today.getDate(),
+    ).getTime();
+    const t1 = new Date(
+        clicked.getFullYear(),
+        clicked.getMonth(),
+        clicked.getDate(),
+    ).getTime();
     return Math.round((t0 - t1) / 86400000);
 }
 
@@ -169,7 +194,9 @@ watch(gridCells, () => scrollToToday());
                 </button>
             </div>
         </div>
-        <div v-if="isPending" class="text-sm text-textSecondary">Loading activity…</div>
+        <div v-if="isPending" class="text-sm text-textSecondary">
+            Loading activity…
+        </div>
         <div v-else-if="isError" class="text-sm text-(--color-cf-red)">
             {{ error?.message ?? "Failed to load activity" }}
         </div>
@@ -188,13 +215,8 @@ watch(gridCells, () => scrollToToday());
                     :key="c.key + '-' + i"
                     type="button"
                     role="gridcell"
-                    class="m-0! min-h-0! size-[10px] rounded-sm p-0! border-0 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-thirdBg"
-                    :class="[
-                        cellClass(c),
-                        c.key === todayKey
-                            ? 'shadow-[inset_0_0_0_2px_#fb923c]!'
-                            : 'shadow-none!',
-                    ]"
+                    class="m-0! min-h-0! size-[10px] rounded-sm p-0! border-0 cursor-pointer shadow-none! focus:outline-none focus-visible:ring-2 focus-visible:ring-thirdBg"
+                    :class="cellClass(c)"
                     :title="titleForKey(c.key)"
                     :aria-label="titleForKey(c.key)"
                     @click="goToGymDay(c.key)"
