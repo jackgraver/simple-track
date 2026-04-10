@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { useWorkoutStore, type ExerciseGroup } from "./store/useWorkoutStore";
+import { useWorkoutStore } from "./store/useWorkoutStore";
 import ExerciseListView from "./components/ExerciseListView.vue";
 import { useRoute, useRouter } from "vue-router";
 import { computed } from "vue";
@@ -20,10 +20,7 @@ const {
     data,
     addExerciseToWorkout,
     hideExerciseLocally,
-    removeExerciseFromWorkout,
 } = useWorkoutStore(offset);
-
-const hasLoggedSets = (g: ExerciseGroup) => Boolean(g.logged?.sets?.length);
 
 const workoutName = computed(() => data.value?.day?.workout_plan?.name || "");
 
@@ -74,7 +71,7 @@ const selectPostMobility = () => {
     });
 };
 
-const handleRemoveExercise = async (index: number) => {
+const handleRemoveExercise = (index: number) => {
     const exerciseGroup = log.value[index];
     if (!exerciseGroup) return;
 
@@ -85,18 +82,8 @@ const handleRemoveExercise = async (index: number) => {
         return;
     }
 
-    if (!hasLoggedSets(exerciseGroup)) {
-        hideExerciseLocally(exerciseId);
-        toast.push("Exercise removed", "success");
-        return;
-    }
-
-    try {
-        await removeExerciseFromWorkout(exerciseId);
-        toast.push("Exercise removed", "success");
-    } catch (err: any) {
-        toast.push(err.message || "Failed to remove exercise", "error");
-    }
+    hideExerciseLocally(exerciseId);
+    toast.push("Exercise removed", "success");
 };
 </script>
 

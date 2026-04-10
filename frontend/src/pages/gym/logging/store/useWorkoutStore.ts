@@ -3,7 +3,6 @@ import {
     useWorkoutLogsPrevious,
     useLogExercise,
     useAddExerciseToWorkout,
-    useRemoveExerciseFromWorkout,
     useDeleteLoggedSet,
     useUpsertCardio,
     useUpsertMobilityPre,
@@ -32,37 +31,36 @@ export function useWorkoutStore(offset: MaybeRefOrGetter<number> = 0) {
     const workoutLogsQuery = useWorkoutLogsPrevious(offset);
     const logExerciseMutation = useLogExercise(offset);
     const addExerciseMutation = useAddExerciseToWorkout(offset);
-    const removeExerciseMutation = useRemoveExerciseFromWorkout(offset);
     const deleteLoggedSetMutation = useDeleteLoggedSet(offset);
     const upsertCardioMutation = useUpsertCardio(offset);
     const upsertMobilityPreMutation = useUpsertMobilityPre(offset);
     const upsertMobilityPostMutation = useUpsertMobilityPost(offset);
 
-    /** Catalog exercise IDs hidden for this page session only (no persisted skip). */
-    const sessionHiddenExerciseIds = ref<Set<number>>(new Set());
+    /** Catalog exercise IDs skipped on the log list for this session only (not persisted). */
+    const skippedExerciseIds = ref<Set<number>>(new Set());
 
     const hideExerciseLocally = (exerciseId: number) => {
-        const next = new Set(sessionHiddenExerciseIds.value);
+        const next = new Set(skippedExerciseIds.value);
         next.add(exerciseId);
-        sessionHiddenExerciseIds.value = next;
+        skippedExerciseIds.value = next;
     };
 
     const unhideExerciseFromSession = (exerciseId: number) => {
-        if (!sessionHiddenExerciseIds.value.has(exerciseId)) return;
-        const next = new Set(sessionHiddenExerciseIds.value);
+        if (!skippedExerciseIds.value.has(exerciseId)) return;
+        const next = new Set(skippedExerciseIds.value);
         next.delete(exerciseId);
-        sessionHiddenExerciseIds.value = next;
+        skippedExerciseIds.value = next;
     };
 
     const log = computed<ExerciseGroup[]>(() => {
         const raw = workoutLogsQuery.data.value?.planned_exercises ?? [];
         const sorted = sortExerciseGroupsByLogOrder(raw);
-        const hidden = sessionHiddenExerciseIds.value;
-        if (hidden.size === 0) return sorted;
+        const skipped = skippedExerciseIds.value;
+        if (skipped.size === 0) return sorted;
         return sorted.filter((eg) => {
             const id = eg.logged?.exercise_id ?? eg.planned?.ID;
             if (id == null) return true;
-            return !hidden.has(id);
+            return !skipped.has(id);
         });
     });
 
@@ -116,15 +114,6 @@ export function useWorkoutStore(offset: MaybeRefOrGetter<number> = 0) {
         }
     };
 
-    const removeExerciseFromWorkout = async (exerciseId: number): Promise<void> => {
-        try {
-            await removeExerciseMutation.mutateAsync(exerciseId);
-        } catch (error) {
-            console.error("Error removing exercise:", error);
-            throw error;
-        }
-    };
-
     const deleteLoggedSet = async (setId: number): Promise<void> => {
         try {
             await deleteLoggedSetMutation.mutateAsync(setId);
@@ -171,7 +160,6 @@ export function useWorkoutStore(offset: MaybeRefOrGetter<number> = 0) {
         logExercise,
         addExerciseToWorkout,
         hideExerciseLocally,
-        removeExerciseFromWorkout,
         deleteLoggedSet,
         saveCardio,
         savePreMobility,

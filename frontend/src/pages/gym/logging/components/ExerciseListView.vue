@@ -262,7 +262,11 @@ const isLogged = (exerciseGroup: ExerciseGroup): boolean => {
                 </div>
             </li>
         </ul>
-        <button @click="router.push('/')" type="button" class="finish-button">
+        <button
+            @click="router.push('/')"
+            type="button"
+            class="finish-button bg-green-600 hover:bg-green-500"
+        >
             <span>Finish Workout</span>
         </button>
     </div>
@@ -388,14 +392,9 @@ const isLogged = (exerciseGroup: ExerciseGroup): boolean => {
     padding: 0.75rem 1.5rem;
     border: 1px solid rgb(56, 56, 56);
     border-radius: 5px;
-    background: rgb(80, 80, 40) !important;
     color: inherit;
     font-size: 1rem;
     cursor: pointer;
     transition: background-color 0.2s;
-}
-
-.finish-button:hover {
-    background: rgb(100, 100, 50) !important;
 }
 </style>
