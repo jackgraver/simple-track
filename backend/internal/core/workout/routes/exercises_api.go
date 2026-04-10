@@ -23,14 +23,14 @@ func NewExercisesHandler(db *gorm.DB) *ExercisesHandler {
 
 func RegisterExercisesRoutes(group *gin.RouterGroup, db *gorm.DB) {
 	h := NewExercisesHandler(db)
-
+	dayOff := utils.DayOffsetMiddleware()
 	exercises := group.Group("/exercises")
 	{
 		exercises.GET("/all", h.getAllExercises)
 		exercises.POST("", h.createExercise)
 		exercises.POST("/log", h.logExercise)
-		exercises.POST("/add", h.addExerciseToWorkout)
-		exercises.DELETE("/remove", h.removeExerciseFromWorkout)
+		exercises.POST("/add", dayOff, h.addExerciseToWorkout)
+		exercises.DELETE("/remove", dayOff, h.removeExerciseFromWorkout)
 		exercises.DELETE("/sets/:id", h.deleteLoggedSet)
 		exercises.GET("/progression/:id", h.getExerciseProgression)
 	}
@@ -134,22 +134,23 @@ type AddExerciseRequest struct {
 	ExerciseID uint `json:"exercise_id"`
 }
 
+func getOrCreateTodayOrAbort(c *gin.Context, db *gorm.DB) (models.WorkoutLog, bool) {
+	today, err := services.GetOrCreateToday(c.Request.Context(), db, utils.GetDayOffset(c))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return models.WorkoutLog{}, false
+	}
+	return today, true
+}
+
 func (h *ExercisesHandler) addExerciseToWorkout(c *gin.Context) {
 	var request AddExerciseRequest
 	if err := c.ShouldBindJSON(&request); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-
-	offset, err := utils.ParseQueryInt(c, weekOffsetQuery)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	today, err := services.GetOrCreateToday(c.Request.Context(), h.db, offset)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+	today, ok := getOrCreateTodayOrAbort(c, h.db)
+	if !ok {
 		return
 	}
 
@@ -169,13 +170,11 @@ func (h *ExercisesHandler) addExerciseToWorkout(c *gin.Context) {
 		Notes:        "",
 	}
 
-	err = services.LogExercise(h.db, &newExercise)
+	err := services.LogExercise(h.db, &newExercise)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-
-	// Reload the exercise with Exercise relation using the ID that was set by Create
 	var createdExercise models.LoggedExercise
 	err = h.db.Preload("Exercise").Preload("Sets").Where("id = ?", newExercise.ID).First(&createdExercise).Error
 	if err != nil {
@@ -196,22 +195,12 @@ func (h *ExercisesHandler) removeExerciseFromWorkout(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-
-	offset, err := utils.ParseQueryInt(c, weekOffsetQuery)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+	today, ok := getOrCreateTodayOrAbort(c, h.db)
+	if !ok {
 		return
 	}
-
-	today, err := services.GetOrCreateToday(c.Request.Context(), h.db, offset)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-
-	// Find and delete the logged exercise
 	var loggedExercise models.LoggedExercise
-	err = h.db.Where("workout_log_id = ? AND exercise_id = ?", today.ID, request.ExerciseID).First(&loggedExercise).Error
+	err := h.db.Where("workout_log_id = ? AND exercise_id = ?", today.ID, request.ExerciseID).First(&loggedExercise).Error
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Exercise not found in workout"})
 		return

@@ -21,7 +21,7 @@ func NewWorkoutLogHandler(db *gorm.DB) *WorkoutLogHandler {
 
 func RegisterWorkoutLogRoutes(group *gin.RouterGroup, db *gorm.DB) {
 	h := NewWorkoutLogHandler(db)
-	logs := group.Group("/logs")
+	logs := group.Group("/logs", utils.DayOffsetMiddleware())
 	{
 		logs.GET("/today", h.getWorkoutToday)
 		logs.GET("/month", h.getWorkoutMonth)
@@ -35,8 +35,7 @@ func RegisterWorkoutLogRoutes(group *gin.RouterGroup, db *gorm.DB) {
 }
 
 func (h *WorkoutLogHandler) getWorkoutToday(reqCtx *gin.Context) {
-	// 													       offset
-	day, err := h.svc.GetOrCreateToday(reqCtx.Request.Context(), 0)
+	day, err := h.svc.GetOrCreateToday(reqCtx.Request.Context(), utils.GetDayOffset(reqCtx))
 	if err != nil {
 		reqCtx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -68,12 +67,7 @@ type upsertCardioRequest struct {
 }
 
 func (h *WorkoutLogHandler) upsertCardio(reqCtx *gin.Context) {
-	offset, err := utils.ParseQueryInt(reqCtx, weekOffsetQuery)
-	if err != nil {
-		reqCtx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
+	offset := utils.GetDayOffset(reqCtx)
 	var req upsertCardioRequest
 	if err := reqCtx.ShouldBindJSON(&req); err != nil {
 		reqCtx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -90,12 +84,7 @@ func (h *WorkoutLogHandler) upsertCardio(reqCtx *gin.Context) {
 }
 
 func (h *WorkoutLogHandler) getPreviousWorkout(reqCtx *gin.Context) {
-	offset, err := utils.ParseQueryInt(reqCtx, weekOffsetQuery)
-	if err != nil {
-		reqCtx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
+	offset := utils.GetDayOffset(reqCtx)
 	payload, err := h.svc.GetPreviousWorkoutView(reqCtx.Request.Context(), offset)
 	if err != nil {
 		reqCtx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -110,11 +99,7 @@ type switchPlanRequest struct {
 }
 
 func (h *WorkoutLogHandler) switchPlan(reqCtx *gin.Context) {
-	offset, err := utils.ParseQueryInt(reqCtx, weekOffsetQuery)
-	if err != nil {
-		reqCtx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
+	offset := utils.GetDayOffset(reqCtx)
 	var req switchPlanRequest
 	if err := reqCtx.ShouldBindJSON(&req); err != nil {
 		reqCtx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -156,11 +141,7 @@ type upsertMobilityRequest struct {
 }
 
 func (h *WorkoutLogHandler) upsertMobilityPre(reqCtx *gin.Context) {
-	offset, err := utils.ParseQueryInt(reqCtx, weekOffsetQuery)
-	if err != nil {
-		reqCtx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
+	offset := utils.GetDayOffset(reqCtx)
 	var req upsertMobilityRequest
 	if err := reqCtx.ShouldBindJSON(&req); err != nil {
 		reqCtx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -175,11 +156,7 @@ func (h *WorkoutLogHandler) upsertMobilityPre(reqCtx *gin.Context) {
 }
 
 func (h *WorkoutLogHandler) upsertMobilityPost(reqCtx *gin.Context) {
-	offset, err := utils.ParseQueryInt(reqCtx, weekOffsetQuery)
-	if err != nil {
-		reqCtx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
+	offset := utils.GetDayOffset(reqCtx)
 	var req upsertMobilityRequest
 	if err := reqCtx.ShouldBindJSON(&req); err != nil {
 		reqCtx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
