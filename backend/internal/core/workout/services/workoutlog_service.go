@@ -701,6 +701,25 @@ func CreateExercise(db *gorm.DB, name string, repRollover uint, cues string) (*m
 	return &exercise, nil
 }
 
+// UpdateExercise updates global exercise fields (name, rep rollover, cues).
+func UpdateExercise(db *gorm.DB, id uint, name string, repRollover uint, cues string) (*models.Exercise, error) {
+	var exercise models.Exercise
+	if err := db.First(&exercise, id).Error; err != nil {
+		return nil, err
+	}
+	if err := db.Model(&exercise).Updates(map[string]interface{}{
+		"name":         name,
+		"rep_rollover": repRollover,
+		"cues":         cues,
+	}).Error; err != nil {
+		return nil, err
+	}
+	if err := db.First(&exercise, id).Error; err != nil {
+		return nil, err
+	}
+	return &exercise, nil
+}
+
 // AssignPlanToDay assigns a workout plan to a specific day of the week
 // If another plan is already assigned to that day, it will be unassigned first
 // dayOfWeek: 0=Sunday, 1=Monday, ..., 6=Saturday

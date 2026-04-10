@@ -4,7 +4,8 @@ import { toast } from "~/composables/toast/useToast";
 import { dialogManager } from "~/composables/dialog/useDialog";
 import AddExerciseDialog from "~/shared/AddExerciseDialog.vue";
 import CreateExerciseForPlanDialog from "~/shared/CreateExerciseForPlanDialog.vue";
-import { X, Plus, ChevronUp, ChevronDown } from "lucide-vue-next";
+import EditExerciseDialog from "~/shared/EditExerciseDialog.vue";
+import { X, Plus, ChevronUp, ChevronDown, Pencil } from "lucide-vue-next";
 import { computed, ref, watch } from "vue";
 import { apiPUT } from "~/api/client";
 import { useQuery } from "@tanstack/vue-query";
@@ -171,6 +172,20 @@ const openCreateExerciseDialog = () => {
         .custom<boolean>({
             title: "Create exercise",
             component: CreateExerciseForPlanDialog,
+        })
+        .then((result) => {
+            if (result !== null) {
+                refresh();
+            }
+        });
+};
+
+const openEditExerciseDialog = (exercise: Exercise) => {
+    dialogManager
+        .custom<boolean>({
+            title: `Edit ${exercise.name}`,
+            component: EditExerciseDialog,
+            props: { exercise },
         })
         .then((result) => {
             if (result !== null) {
@@ -377,7 +392,9 @@ const moveExerciseInPlan = async (
                     </div>
                 </div>
                 <div class="planned-cardio-section">
-                    <label class="planned-cardio-label">Planned cardio (type)</label>
+                    <label class="planned-cardio-label"
+                        >Planned cardio (type)</label
+                    >
                     <div class="planned-cardio-row">
                         <input
                             v-model="plannedCardioInput"
@@ -396,11 +413,25 @@ const moveExerciseInPlan = async (
                 </div>
                 <div class="exercises-list">
                     <div
-                        v-for="(exercise, exerciseIndex) in selectedPlan.exercises"
+                        v-for="(
+                            exercise, exerciseIndex
+                        ) in selectedPlan.exercises"
                         :key="exercise.ID"
                         class="exercise-item"
                     >
-                        <span>{{ exercise.name }}</span>
+                        <div class="exercise-item-main">
+                            <button
+                                type="button"
+                                class="bg-none hover:bg-secondBg p-1"
+                                title="Edit exercise"
+                                @click="openEditExerciseDialog(exercise)"
+                            >
+                                <Pencil :size="14" />
+                            </button>
+                            <span class="exercise-name">{{
+                                exercise.name
+                            }}</span>
+                        </div>
                         <div class="exercise-item-actions">
                             <button
                                 type="button"
@@ -439,7 +470,10 @@ const moveExerciseInPlan = async (
                                 type="button"
                                 class="remove-button"
                                 @click="
-                                    removeExerciseFromPlan(selectedPlan, exercise)
+                                    removeExerciseFromPlan(
+                                        selectedPlan,
+                                        exercise,
+                                    )
                                 "
                             >
                                 <X :size="16" />
@@ -665,10 +699,39 @@ const moveExerciseInPlan = async (
     display: flex;
     justify-content: space-between;
     align-items: center;
+    gap: 0.5rem;
     padding: 0.65rem 0.75rem;
     background: #2a2a2a;
     border-radius: 0.25rem;
     border: 1px solid #444;
+}
+.exercise-item-main {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    min-width: 0;
+    flex: 1;
+}
+.edit-exercise-button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    padding: 0.25rem;
+    background: transparent;
+    border: none;
+    color: #aaa;
+    cursor: pointer;
+    border-radius: 0.25rem;
+}
+.edit-exercise-button:hover {
+    background: rgba(255, 255, 255, 0.08);
+    color: #4a9eff;
+}
+.exercise-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 .exercise-item-actions {
     display: flex;
