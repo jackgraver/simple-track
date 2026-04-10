@@ -23,14 +23,14 @@ func NewExercisesHandler(db *gorm.DB) *ExercisesHandler {
 
 func RegisterExercisesRoutes(group *gin.RouterGroup, db *gorm.DB) {
 	h := NewExercisesHandler(db)
-	dayOff := utils.DayOffsetMiddleware()
+	dayOffsetMiddleware := utils.DayOffsetMiddleware()
 	exercises := group.Group("/exercises")
 	{
 		exercises.GET("/all", h.getAllExercises)
 		exercises.POST("", h.createExercise)
 		exercises.POST("/log", h.logExercise)
-		exercises.POST("/add", dayOff, h.addExerciseToWorkout)
-		exercises.DELETE("/remove", dayOff, h.removeExerciseFromWorkout)
+		exercises.POST("/add", dayOffsetMiddleware, h.addExerciseToWorkout)
+		exercises.DELETE("/remove", dayOffsetMiddleware, h.removeExerciseFromWorkout)
 		exercises.DELETE("/sets/:id", h.deleteLoggedSet)
 		exercises.GET("/progression/:id", h.getExerciseProgression)
 	}

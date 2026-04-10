@@ -570,41 +570,121 @@ func GetExerciseProgression(db *gorm.DB, exerciseID uint) ([]ExerciseProgression
 	return entries, nil
 }
 
+// LoadPlanWithOrderedExercises loads a plan and its exercises sorted by join position.
+func LoadPlanWithOrderedExercises(db *gorm.DB, planID uint) (*models.WorkoutPlan, error) {
+	var plan models.WorkoutPlan
+	if err := db.First(&plan, planID).Error; err != nil {
+		return nil, err
+	}
+	ex, err := models.LoadExercisesOrderedForPlan(db, planID)
+	if err != nil {
+		return nil, err
+	}
+	plan.Exercises = ex
+	return &plan, nil
+}
+
 func GetAllWorkoutPlans(db *gorm.DB) ([]models.WorkoutPlan, error) {
 	var workoutPlans []models.WorkoutPlan
-	err := db.Preload("Exercises").Find(&workoutPlans).Error
+	err := db.Find(&workoutPlans).Error
 	if err != nil {
 		return []models.WorkoutPlan{}, err
+	}
+	for i := range workoutPlans {
+		ex, err := models.LoadExercisesOrderedForPlan(db, workoutPlans[i].ID)
+		if err != nil {
+			return nil, err
+		}
+		workoutPlans[i].Exercises = ex
 	}
 	return workoutPlans, nil
 }
 
 func AddExerciseToPlan(db *gorm.DB, planID uint, exerciseID uint) error {
-	var plan models.WorkoutPlan
-	if err := db.First(&plan, planID).Error; err != nil {
+	if err := db.First(&models.WorkoutPlan{}, planID).Error; err != nil {
 		return err
 	}
-
-	var exercise models.Exercise
-	if err := db.First(&exercise, exerciseID).Error; err != nil {
+	if err := db.First(&models.Exercise{}, exerciseID).Error; err != nil {
 		return err
 	}
+	var n int64
+	if err := db.Model(&models.WorkoutPlanExercise{}).Where("workout_plan_id = ? AND exercise_id = ?", planID, exerciseID).Count(&n).Error; err != nil {
+		return err
+	}
+	if n > 0 {
+		return fmt.Errorf("exercise already in plan")
+	}
+	var count int64
+	if err := db.Model(&models.WorkoutPlanExercise{}).Where("workout_plan_id = ?", planID).Count(&count).Error; err != nil {
+		return err
+	}
+	return db.Create(&models.WorkoutPlanExercise{
+		WorkoutPlanID: planID,
+		ExerciseID:    exerciseID,
+		Position:      int(count),
+	}).Error
+}
 
-	return db.Model(&plan).Association("Exercises").Append(&exercise)
+func renumberWorkoutPlanExercisePositions(db *gorm.DB, planID uint) error {
+	var rows []models.WorkoutPlanExercise
+	if err := db.Where("workout_plan_id = ?", planID).Order("position ASC").Find(&rows).Error; err != nil {
+		return err
+	}
+	for i := range rows {
+		if rows[i].Position != i {
+			if err := db.Model(&models.WorkoutPlanExercise{}).
+				Where("workout_plan_id = ? AND exercise_id = ?", planID, rows[i].ExerciseID).
+				Update("position", i).Error; err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 func RemoveExerciseFromPlan(db *gorm.DB, planID uint, exerciseID uint) error {
-	var plan models.WorkoutPlan
-	if err := db.First(&plan, planID).Error; err != nil {
+	res := db.Where("workout_plan_id = ? AND exercise_id = ?", planID, exerciseID).Delete(&models.WorkoutPlanExercise{})
+	if res.Error != nil {
+		return res.Error
+	}
+	if res.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return renumberWorkoutPlanExercisePositions(db, planID)
+}
+
+// ReorderPlanExercises sets exercise order for a plan. exerciseIDs must be a permutation of the plan's exercises.
+func ReorderPlanExercises(db *gorm.DB, planID uint, exerciseIDs []uint) error {
+	var existing []models.WorkoutPlanExercise
+	if err := db.Where("workout_plan_id = ?", planID).Find(&existing).Error; err != nil {
 		return err
 	}
-
-	var exercise models.Exercise
-	if err := db.First(&exercise, exerciseID).Error; err != nil {
-		return err
+	if len(exerciseIDs) != len(existing) {
+		return fmt.Errorf("exercise list must include all plan exercises")
 	}
-
-	return db.Model(&plan).Association("Exercises").Delete(&exercise)
+	existingSet := make(map[uint]struct{}, len(existing))
+	for _, e := range existing {
+		existingSet[e.ExerciseID] = struct{}{}
+	}
+	for _, id := range exerciseIDs {
+		if _, ok := existingSet[id]; !ok {
+			return fmt.Errorf("invalid exercise id for plan")
+		}
+		delete(existingSet, id)
+	}
+	if len(existingSet) != 0 {
+		return fmt.Errorf("exercise list must include all plan exercises")
+	}
+	return db.Transaction(func(tx *gorm.DB) error {
+		for i, eid := range exerciseIDs {
+			if err := tx.Model(&models.WorkoutPlanExercise{}).
+				Where("workout_plan_id = ? AND exercise_id = ?", planID, eid).
+				Update("position", i).Error; err != nil {
+				return err
+			}
+		}
+		return nil
+	})
 }
 
 func CreateExercise(db *gorm.DB, name string, repRollover uint, cues string) (*models.Exercise, error) {
@@ -649,12 +729,12 @@ func AssignPlanToDay(db *gorm.DB, planID uint, dayOfWeek int) (*models.WorkoutPl
 		return nil, fmt.Errorf("failed to assign plan to day: %w", err)
 	}
 
-	// Reload the plan with exercises
-	if err := db.Preload("Exercises").First(&plan, planID).Error; err != nil {
+	reloaded, err := LoadPlanWithOrderedExercises(db, planID)
+	if err != nil {
 		return nil, fmt.Errorf("failed to reload plan: %w", err)
 	}
 
-	return &plan, nil
+	return reloaded, nil
 }
 
 // UnassignPlanFromDay removes the day assignment from a workout plan
@@ -668,12 +748,12 @@ func UnassignPlanFromDay(db *gorm.DB, planID uint) (*models.WorkoutPlan, error) 
 		return nil, fmt.Errorf("failed to unassign plan from day: %w", err)
 	}
 
-	// Reload the plan with exercises
-	if err := db.Preload("Exercises").First(&plan, planID).Error; err != nil {
+	reloaded, err := LoadPlanWithOrderedExercises(db, planID)
+	if err != nil {
 		return nil, fmt.Errorf("failed to reload plan: %w", err)
 	}
 
-	return &plan, nil
+	return reloaded, nil
 }
 
 // GetPlanByDay returns the workout plan assigned to a specific day of the week.
@@ -683,7 +763,7 @@ func GetPlanByDay(db *gorm.DB, dayOfWeek int) (*models.WorkoutPlan, error) {
 	}
 
 	var plan models.WorkoutPlan
-	err := db.Preload("Exercises").Where("day_of_week = ?", dayOfWeek).First(&plan).Error
+	err := db.Where("day_of_week = ?", dayOfWeek).First(&plan).Error
 	if err != nil {
 		if err == gorm.ErrRecordNotFound {
 			return nil, nil // No plan assigned to this day
@@ -691,5 +771,5 @@ func GetPlanByDay(db *gorm.DB, dayOfWeek int) (*models.WorkoutPlan, error) {
 		return nil, err
 	}
 
-	return &plan, nil
+	return LoadPlanWithOrderedExercises(db, plan.ID)
 }

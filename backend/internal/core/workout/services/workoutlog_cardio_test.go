@@ -25,6 +25,9 @@ func TestUpsertCardioForWorkoutLog_usesPlannedTypeWhenTypeEmpty(t *testing.T) {
 	); err != nil {
 		t.Fatal(err)
 	}
+	if err := db.AutoMigrate(&models.WorkoutPlanExercise{}); err != nil {
+		t.Fatal(err)
+	}
 	today := utils.ZerodTime(0)
 	dow := int(today.Weekday())
 	plan := models.WorkoutPlan{Name: "Test", DayOfWeek: &dow, PlannedCardioType: "Bike"}

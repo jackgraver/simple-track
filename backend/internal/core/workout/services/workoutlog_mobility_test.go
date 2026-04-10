@@ -25,6 +25,9 @@ func TestUpsertMobilityPre_persistsChecked(t *testing.T) {
 	); err != nil {
 		t.Fatal(err)
 	}
+	if err := db.AutoMigrate(&models.WorkoutPlanExercise{}); err != nil {
+		t.Fatal(err)
+	}
 	today := utils.ZerodTime(0)
 	plan := models.WorkoutPlan{
 		Name:             "MobilityTestPlan",

@@ -24,11 +24,18 @@ func (r *WorkoutLogRepository) LoadByDate(ctx context.Context, date time.Time) (
 		Preload("Cardio").
 		Preload("Exercises.Sets").
 		Preload("Exercises.Exercise").
-		Preload("WorkoutPlan.Exercises").
+		Preload("WorkoutPlan").
 		Where("date = ?", date).
 		First(&workoutDay).Error
 	if err != nil {
 		return models.WorkoutLog{}, err
+	}
+	if workoutDay.WorkoutPlan != nil {
+		ex, err := models.LoadExercisesOrderedForPlan(r.db, workoutDay.WorkoutPlan.ID)
+		if err != nil {
+			return models.WorkoutLog{}, err
+		}
+		workoutDay.WorkoutPlan.Exercises = ex
 	}
 	return workoutDay, nil
 }

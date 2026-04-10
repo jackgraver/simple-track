@@ -4,7 +4,7 @@ import { toast } from "~/composables/toast/useToast";
 import { dialogManager } from "~/composables/dialog/useDialog";
 import AddExerciseDialog from "~/shared/AddExerciseDialog.vue";
 import CreateExerciseForPlanDialog from "~/shared/CreateExerciseForPlanDialog.vue";
-import { X, Plus } from "lucide-vue-next";
+import { X, Plus, ChevronUp, ChevronDown } from "lucide-vue-next";
 import { computed, ref, watch } from "vue";
 import { apiPUT } from "~/api/client";
 import { useQuery } from "@tanstack/vue-query";
@@ -253,6 +253,32 @@ const unassignPlanFromDay = async (plan: WorkoutPlan) => {
         toast.push("Failed to unassign day: " + message, "error");
     }
 };
+
+const moveExerciseInPlan = async (
+    plan: WorkoutPlan,
+    index: number,
+    delta: number,
+) => {
+    const list = plan.exercises;
+    const next = index + delta;
+    if (next < 0 || next >= list.length) return;
+    const reordered = [...list];
+    const a = reordered[index];
+    const b = reordered[next];
+    if (a === undefined || b === undefined) return;
+    reordered[index] = b;
+    reordered[next] = a;
+    try {
+        await apiPUT(`workout/plans/${plan.ID}/exercises/reorder`, {
+            exercise_ids: reordered.map((e) => e.ID),
+        });
+        toast.push("Exercise order updated", "success");
+        await refresh();
+    } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : String(err);
+        toast.push("Failed to reorder: " + message, "error");
+    }
+};
 </script>
 
 <template>
@@ -370,20 +396,55 @@ const unassignPlanFromDay = async (plan: WorkoutPlan) => {
                 </div>
                 <div class="exercises-list">
                     <div
-                        v-for="exercise in selectedPlan.exercises"
+                        v-for="(exercise, exerciseIndex) in selectedPlan.exercises"
                         :key="exercise.ID"
                         class="exercise-item"
                     >
                         <span>{{ exercise.name }}</span>
-                        <button
-                            type="button"
-                            class="remove-button"
-                            @click="
-                                removeExerciseFromPlan(selectedPlan, exercise)
-                            "
-                        >
-                            <X :size="16" />
-                        </button>
+                        <div class="exercise-item-actions">
+                            <button
+                                type="button"
+                                class="reorder-button"
+                                :disabled="exerciseIndex === 0"
+                                title="Move up"
+                                @click="
+                                    moveExerciseInPlan(
+                                        selectedPlan,
+                                        exerciseIndex,
+                                        -1,
+                                    )
+                                "
+                            >
+                                <ChevronUp :size="16" />
+                            </button>
+                            <button
+                                type="button"
+                                class="reorder-button"
+                                :disabled="
+                                    exerciseIndex ===
+                                    selectedPlan.exercises.length - 1
+                                "
+                                title="Move down"
+                                @click="
+                                    moveExerciseInPlan(
+                                        selectedPlan,
+                                        exerciseIndex,
+                                        1,
+                                    )
+                                "
+                            >
+                                <ChevronDown :size="16" />
+                            </button>
+                            <button
+                                type="button"
+                                class="remove-button"
+                                @click="
+                                    removeExerciseFromPlan(selectedPlan, exercise)
+                                "
+                            >
+                                <X :size="16" />
+                            </button>
+                        </div>
                     </div>
                     <div
                         v-if="selectedPlan.exercises.length === 0"
@@ -608,6 +669,30 @@ const unassignPlanFromDay = async (plan: WorkoutPlan) => {
     background: #2a2a2a;
     border-radius: 0.25rem;
     border: 1px solid #444;
+}
+.exercise-item-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.15rem;
+}
+.reorder-button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.25rem;
+    background: transparent;
+    border: none;
+    color: #aaa;
+    cursor: pointer;
+    border-radius: 0.25rem;
+}
+.reorder-button:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.08);
+    color: #fff;
+}
+.reorder-button:disabled {
+    opacity: 0.25;
+    cursor: not-allowed;
 }
 .remove-button {
     display: flex;
