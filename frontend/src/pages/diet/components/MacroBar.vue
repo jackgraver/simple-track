@@ -1,7 +1,8 @@
 <script setup lang="ts">
-function formatNum(n: number): string {
-    const s = n.toFixed(2); // always 2 decimals
-    return s.replace(/\.?0+$/, ""); // drop trailing zeros and optional dot
+import { ref, watch, onBeforeUnmount } from "vue";
+
+function formatInt(n: number): string {
+    return String(Math.round(n));
 }
 
 function calcWidth(total: number, planned: number): number {
@@ -24,6 +25,55 @@ const props = defineProps<{
     type: "calories" | "protein" | "fiber" | "carbs";
     indicateOverflow?: boolean;
 }>();
+
+/** Ease-out cubic: quick start, settles gently at the end */
+function easeOutCubic(t: number): number {
+    return 1 - Math.pow(1 - t, 3);
+}
+
+const DURATION_MS = 380;
+const displayTotal = ref(props.total ?? 0);
+const displayPlanned = ref(props.planned ?? 0);
+
+let rafId: number | null = null;
+
+function animateTo(targetTotal: number, targetPlanned: number) {
+    if (rafId != null) {
+        cancelAnimationFrame(rafId);
+        rafId = null;
+    }
+    const fromTotal = displayTotal.value;
+    const fromPlanned = displayPlanned.value;
+    if (fromTotal === targetTotal && fromPlanned === targetPlanned) return;
+
+    const start = performance.now();
+    const step = (now: number) => {
+        const elapsed = now - start;
+        const t = Math.min(1, elapsed / DURATION_MS);
+        const e = easeOutCubic(t);
+        displayTotal.value = fromTotal + (targetTotal - fromTotal) * e;
+        displayPlanned.value = fromPlanned + (targetPlanned - fromPlanned) * e;
+        if (t < 1) {
+            rafId = requestAnimationFrame(step);
+        } else {
+            displayTotal.value = targetTotal;
+            displayPlanned.value = targetPlanned;
+            rafId = null;
+        }
+    };
+    rafId = requestAnimationFrame(step);
+}
+
+watch(
+    () => [props.total ?? 0, props.planned ?? 0] as const,
+    ([t, p]) => {
+        animateTo(t, p);
+    }
+);
+
+onBeforeUnmount(() => {
+    if (rafId != null) cancelAnimationFrame(rafId);
+});
 </script>
 
 <template>
@@ -32,11 +82,11 @@ const props = defineProps<{
             class="fill"
             :class="type"
             :style="{
-                width: `${calcWidth(total, planned)}%`,
+                width: `${calcWidth(displayTotal, displayPlanned)}%`,
             }"
         >
-            <span :class="determineOverflow(total, planned)">{{
-                formatNum(total ?? 0) + " / " + formatNum(planned ?? 0)
+            <span class="tabular-nums" :class="determineOverflow(Math.round(displayTotal), Math.round(displayPlanned))">{{
+                formatInt(displayTotal) + " / " + formatInt(displayPlanned)
             }}</span>
         </div>
     </div>
@@ -59,7 +109,6 @@ const props = defineProps<{
     white-space: nowrap;
     line-height: 20px;
     border-radius: 4px;
-    transition: width 0.6s ease-in-out;
 }
 
 .fill span {

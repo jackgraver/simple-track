@@ -83,15 +83,15 @@ const editMissingId = computed(
 const pageTitle = computed(() => {
     switch (pageMode.value) {
         case PAGE_MODE.create:
-            return "Create saved meal";
+            return "Create New Meal";
         case PAGE_MODE.log:
-            return "Log meal";
+            return "Log Meal";
         case PAGE_MODE.edit:
             return editVariant.value === EDIT_VARIANT.planned
-                ? "Log meal"
-                : "Edit logged meal";
+                ? "Log Meal"
+                : "Edit Logged Meal";
         default:
-            return "Log meal";
+            return "Log Meal";
     }
 });
 const { data: mealData, error: mealError } = useMeal(mealId);
