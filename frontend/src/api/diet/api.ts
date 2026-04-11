@@ -74,8 +74,8 @@ export async function editLoggedMeal(
 }
 
 export async function getMealById(id: number): Promise<MealResponse> {
-    const response = await apiClient.get<MealResponse>(`/diet/meals/meal/${id}`);
-    return response.data;
+    const response = await apiClient.get<Meal>(`/diet/meals/meal/${id}`);
+    return { meal: response.data };
 }
 
 export async function createSavedMeal(payload: {
