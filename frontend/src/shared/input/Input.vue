@@ -52,7 +52,7 @@ label {
 
 input {
     padding: 0.5rem;
-    background: rgb(35, 35, 35);
+    background: var(--color-second-bg);
     border: 1px solid rgb(56, 56, 56);
     color: white;
     font-size: 1rem;
@@ -64,7 +64,7 @@ input {
 input:focus {
     outline: none;
     border-color: rgb(100, 100, 100);
-    background: rgb(40, 40, 40);
+    background: var(--color-third-bg);
 }
 
 input::placeholder {

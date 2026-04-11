@@ -4,6 +4,7 @@ import type { Food, Meal, MealItem, SavedMeal } from "~/types/diet";
 import SearchList from "~/shared/SearchList.vue";
 import { Plus, Trash2, Minus } from "lucide-vue-next";
 import FoodDisplay from "~/shared/FoodDisplay.vue";
+import Input from "~/shared/input/Input.vue";
 import { dialogManager } from "~/composables/dialog/useDialog";
 import { toast } from "~/composables/toast/useToast";
 import CreateFoodDialog from "./dialog/CreateFoodDialog.vue";
@@ -326,23 +327,12 @@ const updateLoggedMeal = async () => {
                             {{ pageTitle }}
                         </h1>
                     </div>
-                    <div class="flex items-end justify-between gap-6">
-                        <div class="flex min-w-0 flex-1 flex-col gap-2">
-                            <label class="text-sm text-textSecondary" for="name"
-                                >Meal Name</label
-                            >
-                            <input
-                                class="w-full rounded bg-secondBg px-2 py-2 text-base text-textPrimary focus:outline-none focus:ring-1 focus:ring-thirdBg"
-                                type="text"
-                                id="name"
-                                v-model="meal.name"
-                            />
-                        </div>
-                        <SimpleMacros
-                            :calories="totalMacros.calories"
-                            :protein="totalMacros.protein"
-                            :fiber="totalMacros.fiber"
-                            font-size="1.3rem"
+                    <div class="flex min-w-0 flex-1 flex-col gap-2">
+                        <Input
+                            label="Meal Name"
+                            type="text"
+                            v-model="meal.name"
+                            required
                         />
                     </div>
                 </header>

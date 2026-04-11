@@ -44,8 +44,8 @@ type SavedMealItem struct {
 	SavedMealID uint    `json:"saved_meal_id" gorm:"not null;index"`
 	FoodID      uint    `json:"food_id" gorm:"not null;index"`
 	Amount      float64 `json:"amount"`
-	SavedMeal   SavedMeal
-	Food        Food
+	SavedMeal   SavedMeal `json:"-"`
+	Food        Food      `json:"food"`
 }
 
 func (s SavedMealItem) GetID() uint       { return s.ID }

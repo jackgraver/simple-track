@@ -1,4 +1,8 @@
-import type { Meal, MealItem, SavedMeal } from "~/types/diet";
+import type { Food, Meal, MealItem, SavedMeal } from "~/types/diet";
+
+function itemFood(it: SavedMeal["items"][number]): Food | undefined {
+    return it.food ?? (it as SavedMeal["items"][number] & { Food?: Food }).Food;
+}
 
 export function savedMealToMeal(s: SavedMeal): Meal {
     return {
@@ -13,7 +17,7 @@ export function savedMealToMeal(s: SavedMeal): Meal {
                 updated_at: "",
                 meal_id: 0,
                 food_id: it.food_id,
-                food: it.food,
+                food: itemFood(it),
                 amount: it.amount,
             }),
         ),
