@@ -18,7 +18,6 @@ import {
     useUpdateLoggedMeal,
 } from "./queries/useMealMutations";
 import MacroBars from "~/pages/diet/components/MacroBars.vue";
-import SimpleMacros from "~/shared/SimpleMacros.vue";
 import { savedMealToMeal } from "~/utils/savedMealToMeal";
 import {
     EDIT_VARIANT,
@@ -44,12 +43,8 @@ function amountPlusMinus(item: MealItem, direction: "plus" | "minus") {
     }
 }
 
-function formatFoodLabel(item: any): string {
-    const servingAmount = (item.food?.serving_amount || 1) * item.amount;
-    const type = item.food?.serving_type === "g" ? "g" : "";
-    const name = item.food?.name ?? "";
-
-    return `(${servingAmount}${type}) ${name}`;
+function itemServingAmount(item: MealItem): number {
+    return (item.food?.serving_amount || 1) * item.amount;
 }
 
 const route = useRoute();
@@ -345,50 +340,70 @@ const updateLoggedMeal = async () => {
                         Meal Items
                     </h3>
                     <div
-                        class="flex min-h-0 flex-1 flex-col gap-2.5 overflow-y-auto px-4"
+                        class="flex min-h-0 flex-1 flex-col overflow-y-auto px-4 pb-1"
                     >
+                        <div
+                            v-if="meal.items.length"
+                            class="mb-1 hidden grid-cols-[minmax(0,1fr)_9rem_11rem_2.5rem] gap-x-3 border-b border-secondBg pb-2 text-xs font-medium text-textSecondary sm:grid"
+                        >
+                            <span>Item</span>
+                            <span class="text-center">Qty</span>
+                            <span class="text-right">Macros</span>
+                            <span
+                                class="w-9 shrink-0"
+                                aria-hidden="true"
+                            ></span>
+                        </div>
                         <div
                             v-for="(item, i) in meal.items"
                             :key="item.ID"
-                            class="flex w-full items-center justify-between gap-2"
+                            class="grid grid-cols-[minmax(0,1fr)_9rem_11rem_2.5rem] items-center gap-x-3 gap-y-1 border-b border-secondBg py-2.5 last:border-b-0"
                         >
-                            <button
-                                class="shrink-0 rounded bg-secondBg p-1.5 text-textPrimary hover:bg-thirdBg"
-                                type="button"
-                                @click="amountPlusMinus(item, 'minus')"
-                            >
-                                <Minus />
-                            </button>
                             <span
-                                class="min-w-0 flex-1 text-lg text-textPrimary"
-                                >{{ formatFoodLabel(item) }}</span
+                                class="min-w-0 truncate text-base font-medium text-textPrimary"
+                                :title="item.food?.name"
+                                >{{ item.food?.name ?? "" }}</span
                             >
+                            <div
+                                class="flex items-center justify-center gap-1 tabular-nums"
+                            >
+                                <button
+                                    class="flex h-9 w-9 shrink-0 items-center justify-center rounded border border-secondBg bg-secondBg text-textPrimary transition-colors hover:border-thirdBg hover:bg-thirdBg"
+                                    type="button"
+                                    @click="amountPlusMinus(item, 'minus')"
+                                >
+                                    <Minus :size="18" />
+                                </button>
+                                <span
+                                    class="min-w-11 shrink-0 text-center text-sm text-textPrimary"
+                                    >{{ formatNum(itemServingAmount(item)
+                                    ) }}<span
+                                        v-if="item.food?.serving_type === 'g'"
+                                        class="text-textSecondary"
+                                        >g</span
+                                    ></span
+                                >
+                                <button
+                                    class="flex h-9 w-9 shrink-0 items-center justify-center rounded border border-secondBg bg-secondBg text-textPrimary transition-colors hover:border-thirdBg hover:bg-thirdBg"
+                                    type="button"
+                                    @click="amountPlusMinus(item, 'plus')"
+                                >
+                                    <Plus :size="18" />
+                                </button>
+                            </div>
                             <span
-                                v-if="item.food!.serving_type === 'g'"
-                                class="shrink-0 text-textSecondary"
-                                >g</span
+                                class="min-w-0 text-right text-sm tabular-nums text-textSecondary"
                             >
-                            <button
-                                class="shrink-0 rounded bg-secondBg p-1.5 text-textPrimary hover:bg-thirdBg"
-                                type="button"
-                                @click="amountPlusMinus(item, 'plus')"
-                            >
-                                <Plus />
-                            </button>
-                            <span class="shrink-0 text-sm text-textSecondary">
-                                {{
-                                    formatNum(
-                                        item.amount * item.food!.calories,
-                                    )
+                                {{ formatNum(item.amount * item.food!.calories)
                                 }}C /
-                                {{
-                                    formatNum(item.amount * item.food!.protein)
+                                {{ formatNum(item.amount * item.food!.protein)
                                 }}P /
                                 {{ formatNum(item.amount * item.food!.fiber) }}F
                             </span>
                             <button
-                                class="shrink-0 rounded p-1 text-textSecondary hover:bg-secondBg hover:text-cfRed"
+                                class="flex h-9 w-9 shrink-0 items-center justify-center justify-self-end rounded text-textSecondary transition-colors hover:bg-secondBg hover:text-cfRed"
                                 type="button"
+                                aria-label="Remove item"
                                 @click="removeFood(i)"
                             >
                                 <Trash2 :size="20" />
