@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { useRoute } from "vue-router";
 import type { Food, Meal, MealItem, SavedMeal } from "~/types/diet";
-import type { Food, Meal, MealItem, SavedMeal } from "~/types/diet";
 import SearchList from "~/shared/SearchList.vue";
 import { Plus, Trash2, Minus } from "lucide-vue-next";
 import FoodDisplay from "~/shared/FoodDisplay.vue";
@@ -15,20 +14,11 @@ import { useDietLogsToday } from "./queries/useDietLogsToday";
 import {
     useCreateMeal,
     useCreateSavedMeal,
-    useCreateSavedMeal,
     useLogEditedMeal,
     useUpdateLoggedMeal,
 } from "./queries/useMealMutations";
 import MacroBars from "~/pages/diet/components/MacroBars.vue";
 import SimpleMacros from "~/shared/SimpleMacros.vue";
-import { savedMealToMeal } from "~/utils/savedMealToMeal";
-import {
-    EDIT_VARIANT,
-    PAGE_MODE,
-    parseEditMealVariant,
-    parseLogMealPageMode,
-    type LogMealPageMode,
-} from "./logmealMode";
 import { savedMealToMeal } from "~/utils/savedMealToMeal";
 import {
     EDIT_VARIANT,
@@ -70,18 +60,6 @@ const backTo = computed(() =>
 );
 const backLabel = computed(() =>
     route.name === "diet-log" ? "← Diet" : "← Home",
-);
-const queryType = computed(() => {
-    const t = route.query.type;
-    return Array.isArray(t) ? t[0] : t;
-});
-const pageMode = computed(
-    (): LogMealPageMode => parseLogMealPageMode(queryType.value),
-);
-const editVariant = computed(() =>
-    pageMode.value === PAGE_MODE.edit
-        ? parseEditMealVariant(queryType.value)
-        : null,
 );
 const queryType = computed(() => {
     const t = route.query.type;
@@ -138,12 +116,6 @@ watch(
             (mode === PAGE_MODE.log || mode === PAGE_MODE.create) &&
             newId === 0
         ) {
-    [pageMode, id, mealData],
-    ([mode, newId, newMealData]) => {
-        if (
-            (mode === PAGE_MODE.log || mode === PAGE_MODE.create) &&
-            newId === 0
-        ) {
             meal.value = {
                 ID: 0,
                 created_at: "",
@@ -151,10 +123,6 @@ watch(
                 name: "",
                 items: [],
             };
-            return;
-        }
-        if (newMealData?.meal) {
-            meal.value = newMealData.meal;
             return;
         }
         if (newMealData?.meal) {
@@ -244,23 +212,15 @@ const setMeal = async (item: Meal | SavedMeal): Promise<boolean> => {
         first && "saved_meal_id" in first
             ? savedMealToMeal(item as SavedMeal)
             : (item as Meal);
-const setMeal = async (item: Meal | SavedMeal): Promise<boolean> => {
-    const first = item.items[0];
-    meal.value =
-        first && "saved_meal_id" in first
-            ? savedMealToMeal(item as SavedMeal)
-            : (item as Meal);
     return true;
 };
 
 // Mutations
 const createMealMutation = useCreateMeal();
 const createSavedMealMutation = useCreateSavedMeal();
-const createSavedMealMutation = useCreateSavedMeal();
 const logEditedMealMutation = useLogEditedMeal();
 const updateLoggedMealMutation = useUpdateLoggedMeal();
 
-const logMealToDay = async (saveToLibrary: boolean) => {
 const logMealToDay = async (saveToLibrary: boolean) => {
     const mealToCreate = { ...meal.value, ID: 0 };
     try {
@@ -300,44 +260,7 @@ const saveSavedMealTemplate = async () => {
             name: "",
             items: [],
         };
-        await createMealMutation.mutateAsync({
-            meal: mealToCreate,
-            log: true,
-            saveToLibrary,
-        });
-        toast.push(
-            saveToLibrary ? "Meal logged and saved for later!" : "Meal logged!",
-            "success",
-        );
     } catch (error: any) {
-        toast.push("Log meal failed! " + (error.message || ""), "error");
-    }
-};
-
-const saveSavedMealTemplate = async () => {
-    const name = meal.value.name.trim();
-    if (!name || meal.value.items.length === 0) {
-        toast.push("Add a name and at least one food.", "error");
-        return;
-    }
-    try {
-        await createSavedMealMutation.mutateAsync({
-            name,
-            items: meal.value.items.map((i) => ({
-                food_id: i.food_id,
-                amount: i.amount,
-            })),
-        });
-        toast.push("Saved meal created!", "success");
-        meal.value = {
-            ID: 0,
-            created_at: "",
-            updated_at: "",
-            name: "",
-            items: [],
-        };
-    } catch (error: any) {
-        toast.push("Could not save meal. " + (error?.message || ""), "error");
         toast.push("Could not save meal. " + (error?.message || ""), "error");
     }
 };
@@ -369,22 +292,10 @@ const updateLoggedMeal = async () => {
 
 <template>
     <div class="flex flex-col items-center py-4">
-    <div class="flex flex-col items-center py-4">
         <router-link
             :to="backTo"
             class="mb-2 w-[80%] max-w-[80%] text-left text-sm text-textSecondary hover:text-textPrimary"
-            class="mb-2 w-[80%] max-w-[80%] text-left text-sm text-textSecondary hover:text-textPrimary"
             >{{ backLabel }}</router-link
-        >
-        <div
-            v-if="editMissingId"
-            class="flex h-[60dvh] items-center justify-center p-8 text-cfRed"
-        >
-            <span>Missing meal id for this edit.</span>
-        </div>
-        <div
-            v-else-if="mealError && id !== 0"
-            class="flex h-[60dvh] items-center justify-center p-8 text-cfRed"
         >
         <div
             v-if="editMissingId"
@@ -401,20 +312,6 @@ const updateLoggedMeal = async () => {
                 {{ mealError?.message || "Unknown error" }}</span
             >
         </div>
-        <div
-            v-else-if="meal"
-            class="grid h-[calc(100dvh-7rem)] w-full grid-cols-[2fr_1fr] grid-rows-2 gap-4 pb-8"
-        >
-            <article
-                class="row-span-2 flex min-h-0 flex-col overflow-hidden rounded-lg bg-firstBg"
-            >
-                <header
-                    class="shrink-0 border-b border-secondBg p-4 text-textPrimary"
-                >
-                    <div class="mb-4">
-                        <h1 class="m-0 text-xl font-semibold">
-                            {{ pageTitle }}
-                        </h1>
         <div
             v-else-if="meal"
             class="grid h-[calc(100dvh-7rem)] w-full grid-cols-[2fr_1fr] grid-rows-2 gap-4 pb-8"
@@ -450,28 +347,11 @@ const updateLoggedMeal = async () => {
                     <div
                         class="flex min-h-0 flex-1 flex-col gap-2.5 overflow-y-auto px-4"
                     >
-                <section
-                    class="flex min-h-0 flex-1 flex-col overflow-hidden text-textPrimary"
-                >
-                    <h3
-                        class="m-0 shrink-0 px-4 pb-3 pt-4 text-base font-medium"
-                    >
-                        Meal Items
-                    </h3>
-                    <div
-                        class="flex min-h-0 flex-1 flex-col gap-2.5 overflow-y-auto px-4"
-                    >
                         <div
                             v-for="(item, i) in meal.items"
                             :key="item.ID"
                             class="flex w-full items-center justify-between gap-2"
-                            class="flex w-full items-center justify-between gap-2"
                         >
-                            <button
-                                class="shrink-0 rounded bg-secondBg p-1.5 text-textPrimary hover:bg-thirdBg"
-                                type="button"
-                                @click="amountPlusMinus(item, 'minus')"
-                            >
                             <button
                                 class="shrink-0 rounded bg-secondBg p-1.5 text-textPrimary hover:bg-thirdBg"
                                 type="button"
@@ -493,23 +373,8 @@ const updateLoggedMeal = async () => {
                                 type="button"
                                 @click="amountPlusMinus(item, 'plus')"
                             >
-                            <span
-                                class="min-w-0 flex-1 text-lg text-textPrimary"
-                                >{{ formatFoodLabel(item) }}</span
-                            >
-                            <span
-                                v-if="item.food!.serving_type === 'g'"
-                                class="shrink-0 text-textSecondary"
-                                >g</span
-                            >
-                            <button
-                                class="shrink-0 rounded bg-secondBg p-1.5 text-textPrimary hover:bg-thirdBg"
-                                type="button"
-                                @click="amountPlusMinus(item, 'plus')"
-                            >
                                 <Plus />
                             </button>
-                            <span class="shrink-0 text-sm text-textSecondary">
                             <span class="shrink-0 text-sm text-textSecondary">
                                 {{
                                     formatNum(
@@ -522,8 +387,6 @@ const updateLoggedMeal = async () => {
                                 {{ formatNum(item.amount * item.food!.fiber) }}F
                             </span>
                             <button
-                                class="shrink-0 rounded p-1 text-textSecondary hover:bg-secondBg hover:text-cfRed"
-                                type="button"
                                 class="shrink-0 rounded p-1 text-textSecondary hover:bg-secondBg hover:text-cfRed"
                                 type="button"
                                 @click="removeFood(i)"
@@ -561,41 +424,7 @@ const updateLoggedMeal = async () => {
                         >
                             Log and Save Meal
                         </button>
-                <footer
-                    class="flex shrink-0 flex-col gap-4 border-t border-secondBg p-4"
-                >
-                    <div class="flex w-full flex-row gap-3">
                         <button
-                            v-if="pageMode === PAGE_MODE.create"
-                            class="flex-1 cursor-pointer rounded bg-secondBg px-5 py-2.5 text-sm text-textPrimary hover:bg-thirdBg"
-                            type="button"
-                            @click="saveSavedMealTemplate"
-                        >
-                            Save Meal
-                        </button>
-                        <button
-                            v-if="pageMode === PAGE_MODE.log"
-                            class="flex-1 cursor-pointer rounded bg-secondBg px-5 py-2.5 text-sm text-textPrimary hover:bg-thirdBg"
-                            type="button"
-                            @click="logMealToDay(false)"
-                        >
-                            Log Meal
-                        </button>
-                        <button
-                            v-if="pageMode === PAGE_MODE.log"
-                            class="flex-1 cursor-pointer rounded bg-secondBg px-5 py-2.5 text-sm text-textPrimary hover:bg-thirdBg"
-                            type="button"
-                            @click="logMealToDay(true)"
-                        >
-                            Log and Save Meal
-                        </button>
-                        <button
-                            v-if="
-                                pageMode === PAGE_MODE.edit &&
-                                editVariant === EDIT_VARIANT.logged
-                            "
-                            class="flex-1 cursor-pointer rounded bg-secondBg px-5 py-2.5 text-sm text-textPrimary hover:bg-thirdBg"
-                            type="button"
                             v-if="
                                 pageMode === PAGE_MODE.edit &&
                                 editVariant === EDIT_VARIANT.logged
@@ -607,12 +436,6 @@ const updateLoggedMeal = async () => {
                             Update
                         </button>
                         <button
-                            v-if="
-                                pageMode === PAGE_MODE.edit &&
-                                editVariant === EDIT_VARIANT.planned
-                            "
-                            class="flex-1 cursor-pointer rounded bg-secondBg px-5 py-2.5 text-sm text-textPrimary hover:bg-thirdBg"
-                            type="button"
                             v-if="
                                 pageMode === PAGE_MODE.edit &&
                                 editVariant === EDIT_VARIANT.planned
@@ -648,10 +471,6 @@ const updateLoggedMeal = async () => {
                 class="flex min-h-0 flex-col overflow-hidden rounded-lg bg-firstBg p-4 text-textPrimary"
             >
                 <h2 class="mt-0 text-lg font-semibold">Add Foods</h2>
-            <aside
-                class="flex min-h-0 flex-col overflow-hidden rounded-lg bg-firstBg p-4 text-textPrimary"
-            >
-                <h2 class="mt-0 text-lg font-semibold">Add Foods</h2>
                 <SearchList
                     :route="'diet/meals/food/all'"
                     :onSelect="addFood"
@@ -663,13 +482,8 @@ const updateLoggedMeal = async () => {
                 class="flex min-h-0 flex-col overflow-hidden rounded-lg bg-firstBg p-4 text-textPrimary"
             >
                 <h2 class="mt-0 text-lg font-semibold">Select Saved Meal</h2>
-            <aside
-                class="flex min-h-0 flex-col overflow-hidden rounded-lg bg-firstBg p-4 text-textPrimary"
-            >
-                <h2 class="mt-0 text-lg font-semibold">Select Saved Meal</h2>
                 <SearchList
                     :key="meal.ID"
-                    :route="'diet/meals/saved-meal/all'"
                     :route="'diet/meals/saved-meal/all'"
                     :on-select="setMeal"
                 />
