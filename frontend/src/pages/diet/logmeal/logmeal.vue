@@ -8,7 +8,7 @@ import Input from "~/shared/input/Input.vue";
 import { dialogManager } from "~/composables/dialog/useDialog";
 import { toast } from "~/composables/toast/useToast";
 import CreateFoodDialog from "./dialog/CreateFoodDialog.vue";
-import { computed, ref, watch } from "vue";
+import { computed, ref, toRaw, watch } from "vue";
 import { useMeal } from "./queries/useMeal";
 import { useDietLogsToday } from "./queries/useDietLogsToday";
 import {
@@ -27,20 +27,78 @@ import {
     type LogMealPageMode,
 } from "./logmealMode";
 
+type MealMacroTotals = {
+    calories: number;
+    protein: number;
+    fiber: number;
+    carbs: number;
+};
+
+function macrosForMeal(m: Meal): MealMacroTotals {
+    return {
+        calories: formatNum(
+            m.items.reduce(
+                (total, item) =>
+                    total +
+                    Number(item.amount) * (item.food?.calories ?? 0),
+                0,
+            ),
+        ),
+        protein: formatNum(
+            m.items.reduce(
+                (total, item) =>
+                    total + Number(item.amount) * (item.food?.protein ?? 0),
+                0,
+            ),
+        ),
+        fiber: formatNum(
+            m.items.reduce(
+                (total, item) =>
+                    total + Number(item.amount) * (item.food?.fiber ?? 0),
+                0,
+            ),
+        ),
+        carbs: formatNum(
+            m.items.reduce(
+                (total, item) =>
+                    total + Number(item.amount) * (item.food?.carbs ?? 0),
+                0,
+            ),
+        ),
+    };
+}
+
 function formatNum(n: number): number {
     const s = n.toFixed(2); // always 2 decimals
     return Number(s.replace(/\.?0+$/, "")); // drop trailing zeros and optional dot
 }
 
-function amountPlusMinus(item: MealItem, direction: "plus" | "minus") {
+/** Vue Query wraps API data in readonly proxies; clone so we can edit amounts. */
+function cloneMeal(m: Meal): Meal {
+    return JSON.parse(JSON.stringify(toRaw(m))) as Meal;
+}
+
+function amountPlusMinus(index: number, direction: "plus" | "minus") {
+    const items = meal.value.items;
+    const item = items[index];
+    if (!item?.food) return;
+    const step = 1 / (item.food.serving_amount || 1);
+    const amount = Number(item.amount);
     if (direction === "plus") {
-        item.amount += 1 / (item.food?.serving_amount || 1);
-    } else {
-        item.amount = Math.max(
-            item.amount - 1 / (item.food?.serving_amount || 1),
-            0,
+        const newAmount = amount + step;
+        meal.value.items = items.map((it, i) =>
+            i === index ? { ...it, amount: newAmount } : it,
         );
+        return;
     }
+    const next = amount - step;
+    if (next <= 0) {
+        meal.value.items = items.filter((_, i) => i !== index);
+        return;
+    }
+    meal.value.items = items.map((it, i) =>
+        i === index ? { ...it, amount: next } : it,
+    );
 }
 
 function itemServingAmount(item: MealItem): number {
@@ -104,9 +162,12 @@ const meal = ref<Meal>({
     items: [],
 });
 
+/** Snapshot when opening "edit logged meal"; today totals already include this meal. */
+const baselineMealMacros = ref<MealMacroTotals | null>(null);
+
 watch(
-    [pageMode, id, mealData],
-    ([mode, newId, newMealData]) => {
+    [pageMode, id, mealData, queryType],
+    ([mode, newId, newMealData, qType]) => {
         if (
             (mode === PAGE_MODE.log || mode === PAGE_MODE.create) &&
             newId === 0
@@ -118,57 +179,78 @@ watch(
                 name: "",
                 items: [],
             };
+            baselineMealMacros.value = null;
             return;
         }
         if (newMealData?.meal) {
-            meal.value = newMealData.meal;
+            meal.value = cloneMeal(newMealData.meal);
+            if (
+                mode === PAGE_MODE.edit &&
+                parseEditMealVariant(qType) === EDIT_VARIANT.logged
+            ) {
+                baselineMealMacros.value = macrosForMeal(meal.value);
+            } else {
+                baselineMealMacros.value = null;
+            }
         }
     },
     { immediate: true },
 );
 
-const totalMacros = computed(() => {
+const totalMacros = computed(() => macrosForMeal(meal.value));
+
+/** Day preview for MacroBars: add draft meal to today, except edit-logged replace baseline. */
+const macroBarsDayTotals = computed(() => {
+    const t = today.value;
+    const tm = totalMacros.value;
+    const dayCal = t?.totalCalories ?? 0;
+    const dayProtein = t?.totalProtein ?? 0;
+    const dayFiber = t?.totalFiber ?? 0;
+    const dayCarbs = t?.totalCarbs ?? 0;
+
+    if (
+        pageMode.value === PAGE_MODE.edit &&
+        editVariant.value === EDIT_VARIANT.logged &&
+        baselineMealMacros.value
+    ) {
+        const b = baselineMealMacros.value;
+        return {
+            totalCalories: dayCal - b.calories + tm.calories,
+            totalProtein: dayProtein - b.protein + tm.protein,
+            totalFiber: dayFiber - b.fiber + tm.fiber,
+            totalCarbs: dayCarbs - b.carbs + tm.carbs,
+        };
+    }
     return {
-        calories: formatNum(
-            meal.value.items.reduce(
-                (total, item) => total + item.amount * item.food!.calories,
-                0,
-            ),
-        ),
-        protein: formatNum(
-            meal.value.items.reduce(
-                (total, item) => total + item.amount * item.food!.protein,
-                0,
-            ),
-        ),
-        fiber: formatNum(
-            meal.value.items.reduce(
-                (total, item) => total + item.amount * item.food!.fiber,
-                0,
-            ),
-        ),
-        carbs: formatNum(
-            meal.value.items.reduce(
-                (total, item) => total + item.amount * item.food!.carbs,
-                0,
-            ),
-        ),
+        totalCalories: dayCal + tm.calories,
+        totalProtein: dayProtein + tm.protein,
+        totalFiber: dayFiber + tm.fiber,
+        totalCarbs: dayCarbs + tm.carbs,
     };
 });
 
 const addFood = async (food: Food): Promise<boolean> => {
-    const existing = meal.value.items.find((i) => i?.food?.ID === food.ID);
-    if (existing) {
-        existing.amount++;
+    const existingIndex = meal.value.items.findIndex(
+        (i) => i?.food?.ID === food.ID,
+    );
+    if (existingIndex !== -1) {
+        meal.value.items = meal.value.items.map((it, i) =>
+            i === existingIndex
+                ? { ...it, amount: Number(it.amount) + 1 }
+                : it,
+        );
         return true;
     }
 
-    meal.value.items.push({
-        meal_id: meal.value.ID,
-        food_id: food.ID,
-        food: food,
-        amount: 1,
-    } as MealItem);
+    meal.value.items = [
+        ...meal.value.items,
+        {
+            meal_id: meal.value.ID,
+            food_id: food.ID,
+            food: food,
+            amount: 1,
+        } as MealItem,
+    ];
     return true;
 };
 
@@ -198,7 +280,7 @@ const createFood = async (name: string): Promise<boolean> => {
 };
 
 const removeFood = async (index: number) => {
-    meal.value.items.splice(index, 1);
+    meal.value.items = meal.value.items.filter((_, i) => i !== index);
 };
 
 const setMeal = async (item: Meal | SavedMeal): Promise<boolean> => {
@@ -206,7 +288,7 @@ const setMeal = async (item: Meal | SavedMeal): Promise<boolean> => {
     meal.value =
         first && "saved_meal_id" in first
             ? savedMealToMeal(item as SavedMeal)
-            : (item as Meal);
+            : cloneMeal(item as Meal);
     return true;
 };
 
@@ -356,7 +438,7 @@ const updateLoggedMeal = async () => {
                         </div>
                         <div
                             v-for="(item, i) in meal.items"
-                            :key="item.ID"
+                            :key="`${item.food_id}-${i}`"
                             class="grid grid-cols-[minmax(0,1fr)_9rem_11rem_2.5rem] items-center gap-x-3 gap-y-1 border-b border-secondBg py-2.5 last:border-b-0"
                         >
                             <span
@@ -370,14 +452,14 @@ const updateLoggedMeal = async () => {
                                 <button
                                     class="flex h-9 w-9 shrink-0 items-center justify-center rounded border border-secondBg bg-secondBg text-textPrimary transition-colors hover:border-thirdBg hover:bg-thirdBg"
                                     type="button"
-                                    @click="amountPlusMinus(item, 'minus')"
+                                    @click="amountPlusMinus(i, 'minus')"
                                 >
                                     <Minus :size="18" />
                                 </button>
                                 <span
                                     class="min-w-11 shrink-0 text-center text-sm text-textPrimary"
-                                    >{{ formatNum(itemServingAmount(item)
-                                    ) }}<span
+                                    >{{ formatNum(itemServingAmount(item))
+                                    }}<span
                                         v-if="item.food?.serving_type === 'g'"
                                         class="text-textSecondary"
                                         >g</span
@@ -386,7 +468,7 @@ const updateLoggedMeal = async () => {
                                 <button
                                     class="flex h-9 w-9 shrink-0 items-center justify-center rounded border border-secondBg bg-secondBg text-textPrimary transition-colors hover:border-thirdBg hover:bg-thirdBg"
                                     type="button"
-                                    @click="amountPlusMinus(item, 'plus')"
+                                    @click="amountPlusMinus(i, 'plus')"
                                 >
                                     <Plus :size="18" />
                                 </button>
@@ -394,9 +476,13 @@ const updateLoggedMeal = async () => {
                             <span
                                 class="min-w-0 text-right text-sm tabular-nums text-textSecondary"
                             >
-                                {{ formatNum(item.amount * item.food!.calories)
+                                {{
+                                    formatNum(
+                                        item.amount * item.food!.calories,
+                                    )
                                 }}C /
-                                {{ formatNum(item.amount * item.food!.protein)
+                                {{
+                                    formatNum(item.amount * item.food!.protein)
                                 }}P /
                                 {{ formatNum(item.amount * item.food!.fiber) }}F
                             </span>
@@ -463,18 +549,11 @@ const updateLoggedMeal = async () => {
                         </button>
                     </div>
                     <MacroBars
-                        :totalCalories="
-                            totalMacros.calories + (today?.totalCalories ?? 0)
-                        "
-                        :totalProtein="
-                            totalMacros.protein + (today?.totalProtein ?? 0)
-                        "
-                        :totalFiber="
-                            totalMacros.fiber + (today?.totalFiber ?? 0)
-                        "
-                        :totalCarbs="
-                            totalMacros.carbs + (today?.totalCarbs ?? 0)
-                        "
+                        v-if="pageMode !== PAGE_MODE.create"
+                        :totalCalories="macroBarsDayTotals.totalCalories"
+                        :totalProtein="macroBarsDayTotals.totalProtein"
+                        :totalFiber="macroBarsDayTotals.totalFiber"
+                        :totalCarbs="macroBarsDayTotals.totalCarbs"
                         :planned-calories="today?.day.plan.calories ?? 0"
                         :planned-protein="today?.day.plan.protein ?? 0"
                         :planned-fiber="today?.day.plan.fiber ?? 0"

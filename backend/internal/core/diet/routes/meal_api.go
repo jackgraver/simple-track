@@ -294,7 +294,18 @@ func (h *MealHandler) postEditLogged(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Day not found"})
 		return
 	}
-	if err := services.UpdateDayLogMeal(h.db, day.ID, req.OldMealID, req.Meal.ID); err != nil {
+	// Client sends meal with ID 0 (same as postNewMeal): persist edited meal, then point day_log at the new row.
+	var newMealID uint
+	err = h.db.Transaction(func(tx *gorm.DB) error {
+		req.Meal.ID = 0
+		var createErr error
+		newMealID, createErr = services.CreateMeal(tx, &req.Meal)
+		if createErr != nil {
+			return createErr
+		}
+		return services.UpdateDayLogMeal(tx, day.ID, req.OldMealID, newMealID)
+	})
+	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}

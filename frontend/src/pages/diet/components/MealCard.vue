@@ -2,33 +2,32 @@
 import type { Meal } from "~/types/diet";
 import { EDIT_LOGGED_TYPE, EDIT_TYPE } from "~/pages/diet/logmeal/logmealMode";
 import { Trash2, SquarePen, Check } from "lucide-vue-next";
-import { h } from "vue";
+import SimpleMacros from "~/shared/SimpleMacros.vue";
+import { computed } from "vue";
 
 function formatNum(n: number) {
     const s = n.toFixed(2);
     return s.replace(/\.?0+$/, "");
 }
 
-function mealMacros(meal: Meal) {
-    let calories = 0,
-        protein = 0,
-        fiber = 0;
-    for (const item of meal.items) {
-        calories += (item.food?.calories ?? 0) * item.amount;
-        protein += (item.food?.protein ?? 0) * item.amount;
-        fiber += (item.food?.fiber ?? 0) * item.amount;
-    }
-
-    return h("span", { class: "details" }, [
-        h("span", { class: "cal" }, `${formatNum(calories)}C`),
-        " / ",
-        h("span", { class: "pro" }, `${formatNum(protein)}P`),
-        " / ",
-        h("span", { class: "fib" }, `${formatNum(fiber)}F`),
-    ]);
+function itemServingAmount(item: Meal["items"][number]): number {
+    return (item.food?.serving_amount || 1) * Number(item.amount);
 }
 
-defineProps<{
+function macroTotalsForMeal(meal: Meal) {
+    let calories = 0;
+    let protein = 0;
+    let fiber = 0;
+    for (const item of meal.items) {
+        const a = Number(item.amount);
+        calories += (item.food?.calories ?? 0) * a;
+        protein += (item.food?.protein ?? 0) * a;
+        fiber += (item.food?.fiber ?? 0) * a;
+    }
+    return { calories, protein, fiber };
+}
+
+const props = defineProps<{
     meal: Meal;
     type: "planned" | "logged";
     onLogPlanned: (meal: Meal) => void;
@@ -39,41 +38,64 @@ defineProps<{
     onDelete: (meal: Meal) => void;
     onEdit: (meal: Meal) => void;
 }>();
+
+const mealMacroTotals = computed(() => macroTotalsForMeal(props.meal));
 </script>
 
 <template>
     <div class="card">
-        <h3>{{ meal.name }} <component :is="mealMacros(meal)" /></h3>
+        <h3 class="meal-title">
+            {{ meal.name }}
+            <SimpleMacros
+                class="title-macros"
+                :calories="mealMacroTotals.calories"
+                :protein="mealMacroTotals.protein"
+                :fiber="mealMacroTotals.fiber"
+                font-size="0.9rem"
+            />
+        </h3>
         <div class="meal">
             <div class="left">
                 <div class="foods">
                     <span
-                        v-for="food in meal.items"
-                        :key="food.ID"
+                        v-for="(food, i) in meal.items"
+                        :key="`${food.food_id}-${i}`"
                         class="food"
                     >
                         <span
-                            >{{ food.amount }}{{ food.food?.serving_amount }}
-                            {{
-                                `${food.food?.name}${food.amount > 1 ? "s" : ""}`
+                            >({{ formatNum(itemServingAmount(food))
+                            }}{{
+                                food.food?.serving_type === "g" ? "g" : ""
+                            }}) {{ food.food?.name
+                            }}{{
+                                Number(food.amount) > 1 ? "s" : ""
                             }}</span
                         >
                         <span class="details">
                             <span class="cal"
                                 >{{
-                                    food.food?.calories ?? 0 * food.amount
+                                    formatNum(
+                                        (food.food?.calories ?? 0) *
+                                            Number(food.amount),
+                                    )
                                 }}C</span
                             >
                             /
                             <span class="pro"
                                 >{{
-                                    food.food?.protein ?? 0 * food.amount
+                                    formatNum(
+                                        (food.food?.protein ?? 0) *
+                                            Number(food.amount),
+                                    )
                                 }}P</span
                             >
                             /
                             <span class="fib"
                                 >{{
-                                    food.food?.fiber ?? 0 * food.amount
+                                    formatNum(
+                                        (food.food?.fiber ?? 0) *
+                                            Number(food.amount),
+                                    )
                                 }}F</span
                             >
                         </span>
@@ -119,10 +141,22 @@ defineProps<{
     flex-direction: row;
 }
 
-.card h3 {
+.card h3,
+.meal-title {
     margin-top: 0;
     margin-bottom: 0.5rem;
     width: 100%;
+}
+
+.meal-title {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.35rem 0.75rem;
+}
+
+.meal-title :deep(.macros) {
+    margin-top: 0;
 }
 
 .left {
