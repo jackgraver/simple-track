@@ -206,11 +206,18 @@ export function useExerciseLoggingSession(options: {
             }));
             currentSetNumber.value = loggedSets.value.length + 1;
 
-            const lastSet = group.logged.sets[group.logged.sets.length - 1];
-            if (lastSet) {
-                currentWeight.value = lastSet.weight;
-                currentReps.value = lastSet.reps;
-                currentWeightSetup.value = lastSet.weight_setup || "";
+            // const lastSet = group.logged.sets[group.logged.sets.length - 1];
+            const maxSet = group.logged.sets.reduce((max, set) => {
+                if (!max) return set;
+                if (set.weight > max.weight) return set;
+                if (set.weight === max.weight && set.reps > max.reps) return set;
+                return max;
+            }, null as typeof group.logged.sets[number] | null);
+
+            if (maxSet) {
+                currentWeight.value = maxSet.weight;
+                currentReps.value = maxSet.reps;
+                currentWeightSetup.value = maxSet.weight_setup || "";
             } else {
                 currentWeight.value = 0;
                 currentReps.value = 0;
