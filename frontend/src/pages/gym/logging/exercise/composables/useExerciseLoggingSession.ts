@@ -6,6 +6,7 @@ import type { ExerciseGroup, LoggedSetWithStatus } from "../../store/useWorkoutS
 import type { LoggedExercise } from "~/types/workout";
 import { toast } from "~/composables/toast/useToast";
 import { useGlobalRestTimer } from "~/composables/useGlobalRestTimer";
+import { useWebStorageJsonSync } from "~/composables/useWebStorageJsonSync";
 import {
     buildAllSetsForSave,
     buildExerciseToLog,
@@ -112,32 +113,28 @@ export function useExerciseLoggingSession(options: {
         () => `gym-draft:v1:day:${dayId.value}:exercise:${exerciseIdentity.value}`,
     );
 
-    let draftSaveEnabled = false;
-
-    const saveDraft = () => {
-        if (!draftSaveEnabled) return;
-        const key = draftStorageKey.value;
-        if (!key || exerciseIdentity.value === 0) return;
-        const payload: StoredDraft = {
+    const draftStorage = useWebStorageJsonSync<StoredDraft>({
+        storage: window.sessionStorage,
+        key: draftStorageKey,
+        watchSources: [
+            currentWeight,
+            currentReps,
+            currentWeightSetup,
+            notes,
+            draftDirty,
+        ],
+        getSnapshot: () => ({
             weight: currentWeight.value,
             reps: currentReps.value,
             weightSetup: currentWeightSetup.value,
             notes: notes.value,
             dirty: draftDirty.value,
-        };
-        window.sessionStorage.setItem(key, JSON.stringify(payload));
-    };
-
-    const restoreDraft = (): boolean => {
-        const key = draftStorageKey.value;
-        if (!key || exerciseIdentity.value === 0) return false;
-        const raw = window.sessionStorage.getItem(key);
-        if (!raw) return false;
-        try {
-            const parsed = JSON.parse(raw) as Partial<StoredDraft>;
+        }),
+        canPersist: () => exerciseIdentity.value !== 0,
+        tryRestore: (parsed, { remove }) => {
             if (typeof parsed.weight !== "number") return false;
             if (parsed.dirty !== true) {
-                window.sessionStorage.removeItem(key);
+                remove();
                 return false;
             }
             currentWeight.value = parsed.weight;
@@ -146,22 +143,8 @@ export function useExerciseLoggingSession(options: {
             notes.value = parsed.notes ?? "";
             draftDirty.value = true;
             return true;
-        } catch {
-            window.sessionStorage.removeItem(key);
-            return false;
-        }
-    };
-
-    const clearDraft = () => {
-        const key = draftStorageKey.value;
-        if (key) window.sessionStorage.removeItem(key);
-    };
-
-    watch(
-        [currentWeight, currentReps, currentWeightSetup, notes, draftDirty],
-        () => saveDraft(),
-        { flush: "post" },
-    );
+        },
+    });
 
     const hasDraftSet = () =>
         currentWeight.value > 0 || currentReps.value > 0;
@@ -217,8 +200,8 @@ export function useExerciseLoggingSession(options: {
 
         draftDirty.value = false;
 
-        restoreDraft();
-        draftSaveEnabled = true;
+        draftStorage.restore();
+        draftStorage.setSaveEnabled(true);
     };
 
     watch(
@@ -355,7 +338,7 @@ export function useExerciseLoggingSession(options: {
             return;
         }
 
-        clearDraft();
+        draftStorage.clear();
         router.push(loggingRoute());
     };
 
