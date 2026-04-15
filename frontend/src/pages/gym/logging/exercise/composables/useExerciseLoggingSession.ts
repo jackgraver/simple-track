@@ -191,10 +191,7 @@ export function useExerciseLoggingSession(options: {
         }
 
         if (
-            group.logged &&
-            group.logged.sets &&
-            Array.isArray(group.logged.sets) &&
-            group.logged.sets.length > 0
+            group?.logged?.sets
         ) {
             loggedSets.value = group.logged.sets.map((set) => ({
                 weight: set.weight,
@@ -217,24 +214,17 @@ export function useExerciseLoggingSession(options: {
             loggedSets.value = [];
             currentSetNumber.value = 1;
 
-            if (
-                group.previous &&
-                group.previous.sets &&
-                Array.isArray(group.previous.sets) &&
-                group.previous.sets.length > 0
-            ) {
-                const prevSets = group.previous.sets;
-                const lastPrev = prevSets[prevSets.length - 1];
-                currentWeight.value = lastPrev ? lastPrev.weight : 0;
-                currentReps.value = lastPrev ? lastPrev.reps : 0;
-                currentWeightSetup.value = lastPrev
-                    ? lastPrev.weight_setup || ""
-                    : "";
-            } else {
-                currentWeight.value = 0;
-                currentReps.value = 0;
-                currentWeightSetup.value = "";
-            }
+            const rawPrev = group.previous?.sets;
+            const prevSets =
+                rawPrev &&
+                    Array.isArray(rawPrev) &&
+                    rawPrev.length > 0
+                    ? rawPrev
+                    : [];
+            const dPrev = defaultsFromLoggedSets(prevSets);
+            currentWeight.value = dPrev.weight;
+            currentReps.value = dPrev.reps;
+            currentWeightSetup.value = dPrev.weight_setup;
 
             notes.value = group.previous?.notes || "";
         }
