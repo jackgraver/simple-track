@@ -30,19 +30,11 @@ export type ExerciseLoggingSessionViewModel = {
     currentWeight: number;
     currentReps: number;
     currentWeightSetup: string;
-    weightEditMode: boolean;
-    repsEditMode: boolean;
-    weightInputValue: string;
-    repsInputValue: string;
     notes: string;
-    incrementWeight: () => void;
-    decrementWeight: () => void;
-    incrementReps: () => void;
-    decrementReps: () => void;
-    enterWeightEditMode: () => void;
-    exitWeightEditMode: () => void;
-    enterRepsEditMode: () => void;
-    exitRepsEditMode: () => void;
+    stepWeight: (direction: "plus" | "minus") => void;
+    stepReps: (direction: "plus" | "minus") => void;
+    commitWeightFromInput: (value: number) => void;
+    commitRepsFromInput: (value: number) => void;
     addNextSet: () => Promise<void>;
     finishLogging: () => Promise<void>;
     retrySet: (setIndex: number) => Promise<void>;
@@ -51,8 +43,6 @@ export type ExerciseLoggingSessionViewModel = {
     goBackToList: () => void;
     updateNotes: (value: string) => void;
     updateWeightSetup: (value: string) => void;
-    updateWeightInputValue: (value: string) => void;
-    updateRepsInputValue: (value: string) => void;
 };
 
 type LogExerciseFn = (
@@ -94,10 +84,6 @@ export function useExerciseLoggingSession(options: {
     const loggedSets = ref<LoggedSetWithStatus[]>([]);
     let tempIdCounter = 0;
 
-    const weightEditMode = ref(false);
-    const repsEditMode = ref(false);
-    const weightInputValue = ref("");
-    const repsInputValue = ref("");
     const draftDirty = ref(false);
     const notes = ref("");
     const globalTimer = useGlobalRestTimer();
@@ -229,8 +215,6 @@ export function useExerciseLoggingSession(options: {
             notes.value = group.previous?.notes || "";
         }
 
-        weightEditMode.value = false;
-        repsEditMode.value = false;
         draftDirty.value = false;
 
         restoreDraft();
@@ -295,58 +279,32 @@ export function useExerciseLoggingSession(options: {
         return false;
     };
 
-    const incrementWeight = () => {
+    const stepWeight = (direction: "plus" | "minus") => {
         draftDirty.value = true;
-        currentWeight.value = (currentWeight.value || 0) + 2.5;
-    };
-
-    const decrementWeight = () => {
-        draftDirty.value = true;
-        currentWeight.value = Math.max(0, (currentWeight.value || 0) - 2.5);
-    };
-
-    const incrementReps = () => {
-        draftDirty.value = true;
-        currentReps.value = (currentReps.value || 0) + 1;
-    };
-
-    const decrementReps = () => {
-        draftDirty.value = true;
-        currentReps.value = Math.max(0, (currentReps.value || 0) - 1);
-    };
-
-    const enterWeightEditMode = () => {
-        weightEditMode.value = true;
-        weightInputValue.value = currentWeight.value.toString();
-    };
-
-    const exitWeightEditMode = () => {
-        const trimmedValue = weightInputValue.value.trim();
-        if (trimmedValue !== "") {
-            const n = Number(trimmedValue);
-            if (Number.isFinite(n) && n >= 0) {
-                currentWeight.value = n;
-                draftDirty.value = true;
-            }
+        if (direction === "plus") {
+            currentWeight.value = (currentWeight.value || 0) + 2.5;
+        } else {
+            currentWeight.value = Math.max(0, (currentWeight.value || 0) - 2.5);
         }
-        weightEditMode.value = false;
     };
 
-    const enterRepsEditMode = () => {
-        repsEditMode.value = true;
-        repsInputValue.value = currentReps.value.toString();
-    };
-
-    const exitRepsEditMode = () => {
-        const trimmedValue = repsInputValue.value.trim();
-        if (trimmedValue !== "") {
-            const n = Number(trimmedValue);
-            if (Number.isInteger(n) && n >= 0) {
-                currentReps.value = n;
-                draftDirty.value = true;
-            }
+    const stepReps = (direction: "plus" | "minus") => {
+        draftDirty.value = true;
+        if (direction === "plus") {
+            currentReps.value = (currentReps.value || 0) + 1;
+        } else {
+            currentReps.value = Math.max(0, (currentReps.value || 0) - 1);
         }
-        repsEditMode.value = false;
+    };
+
+    const commitWeightFromInput = (value: number) => {
+        draftDirty.value = true;
+        currentWeight.value = value;
+    };
+
+    const commitRepsFromInput = (value: number) => {
+        draftDirty.value = true;
+        currentReps.value = value;
     };
 
     const addNextSet = async () => {
@@ -473,14 +431,6 @@ export function useExerciseLoggingSession(options: {
         draftDirty.value = true;
     };
 
-    const updateWeightInputValue = (value: string) => {
-        weightInputValue.value = value;
-    };
-
-    const updateRepsInputValue = (value: string) => {
-        repsInputValue.value = value;
-    };
-
     return reactive({
         exerciseGroup,
         currentSetNumber,
@@ -488,19 +438,11 @@ export function useExerciseLoggingSession(options: {
         currentWeight,
         currentReps,
         currentWeightSetup,
-        weightEditMode,
-        repsEditMode,
-        weightInputValue,
-        repsInputValue,
         notes,
-        incrementWeight,
-        decrementWeight,
-        incrementReps,
-        decrementReps,
-        enterWeightEditMode,
-        exitWeightEditMode,
-        enterRepsEditMode,
-        exitRepsEditMode,
+        stepWeight,
+        stepReps,
+        commitWeightFromInput,
+        commitRepsFromInput,
         addNextSet,
         finishLogging,
         retrySet,
@@ -509,7 +451,5 @@ export function useExerciseLoggingSession(options: {
         goBackToList,
         updateNotes,
         updateWeightSetup,
-        updateWeightInputValue,
-        updateRepsInputValue,
     }) as ExerciseLoggingSessionViewModel;
 }

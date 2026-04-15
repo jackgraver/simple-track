@@ -1,28 +1,54 @@
 <script setup lang="ts">
-import { nextTick, useId } from "vue";
+import { computed, nextTick, ref, useId, watch } from "vue";
 import { Minus, Plus } from "lucide-vue-next";
 
-defineProps<{
-    label: string;
-    modelValue: number;
-    editMode: boolean;
-    inputValue: string;
-    hint?: string;
-    inputStep?: string;
-}>();
+export type StepDirection = "plus" | "minus";
 
-const emit = defineEmits<{
-    increment: [];
-    decrement: [];
-    "update:inputValue": [value: string];
-    "enter-edit": [];
-    "exit-edit": [];
-}>();
+const props = withDefaults(
+    defineProps<{
+        label: string;
+        hint?: string;
+        inputStep?: string;
+        /** Reps-style: only whole numbers commit. */
+        integerOnly?: boolean;
+        /** Cardio-style: finite values are rounded on commit. */
+        roundToInteger?: boolean;
+        /** Shown with commit errors (e.g. save validation). */
+        error?: string;
+        /**
+         * Override +/- behavior; parent is responsible for updating the bound value.
+         * If omitted, +/- adjust by 1 (minus clamps at 0).
+         */
+        stepWith?: (direction: StepDirection) => void;
+    }>(),
+    { integerOnly: false, roundToInteger: false },
+);
+
+const model = defineModel<number>({ required: true });
+
+const editMode = ref(false);
+const draft = ref("");
+const commitError = ref("");
 
 const inputId = useId();
 
+const displayError = computed(() => props.error || commitError.value);
+
+watch(
+    () => model.value,
+    () => {
+        editMode.value = false;
+    },
+);
+
+const clearCommitError = () => {
+    commitError.value = "";
+};
+
 const enterEdit = () => {
-    emit("enter-edit");
+    clearCommitError();
+    draft.value = model.value.toString();
+    editMode.value = true;
     nextTick(() => {
         const input = document.getElementById(
             inputId,
@@ -34,8 +60,53 @@ const enterEdit = () => {
     });
 };
 
+const exitEdit = () => {
+    const trimmed = draft.value.trim();
+    clearCommitError();
+    if (trimmed === "") {
+        editMode.value = false;
+        return;
+    }
+    const n = Number(trimmed);
+    if (!Number.isFinite(n) || n < 0) {
+        if (props.roundToInteger) {
+            commitError.value = "Enter a valid number of minutes.";
+        }
+        editMode.value = false;
+        return;
+    }
+    if (props.integerOnly && !Number.isInteger(n)) {
+        editMode.value = false;
+        return;
+    }
+    const next = props.roundToInteger ? Math.round(n) : n;
+    model.value = next;
+    editMode.value = false;
+};
+
 const onInput = (e: Event) => {
-    emit("update:inputValue", (e.target as HTMLInputElement).value);
+    draft.value = (e.target as HTMLInputElement).value;
+};
+
+const applyDefaultStep = (direction: StepDirection) => {
+    const v = model.value || 0;
+    if (direction === "plus") {
+        model.value = v + 1;
+    } else {
+        model.value = Math.max(0, v - 1);
+    }
+};
+
+const onIncrement = () => {
+    clearCommitError();
+    if (props.stepWith) props.stepWith("plus");
+    else applyDefaultStep("plus");
+};
+
+const onDecrement = () => {
+    clearCommitError();
+    if (props.stepWith) props.stepWith("minus");
+    else applyDefaultStep("minus");
 };
 </script>
 
@@ -47,31 +118,31 @@ const onInput = (e: Event) => {
                 v-if="!editMode"
                 class="stepper-button"
                 type="button"
-                @click="emit('decrement')"
+                @click="onDecrement"
             >
                 <Minus :size="20" />
             </button>
             <div v-if="!editMode" class="stepper-display" @click="enterEdit">
-                {{ modelValue || 0 }}
+                {{ model || 0 }}
             </div>
             <input
                 v-else
                 :id="inputId"
                 type="number"
                 class="stepper-input"
-                :value="inputValue"
+                :value="draft"
                 min="0"
                 :step="inputStep ?? '1'"
                 @input="onInput"
-                @blur="emit('exit-edit')"
-                @keyup.enter="emit('exit-edit')"
-                @keyup.escape="emit('exit-edit')"
+                @blur="exitEdit"
+                @keyup.enter="exitEdit"
+                @keyup.escape="exitEdit"
             />
             <button
                 v-if="!editMode"
                 class="stepper-button"
                 type="button"
-                @click="emit('increment')"
+                @click="onIncrement"
             >
                 <Plus :size="20" />
             </button>
@@ -81,6 +152,12 @@ const onInput = (e: Event) => {
             class="mt-1 mb-0 text-[0.85rem] leading-snug text-amber-200/90"
         >
             {{ hint }}
+        </p>
+        <p
+            v-if="displayError"
+            class="mt-1 mb-0 text-[0.85rem] leading-snug text-red-400"
+        >
+            {{ displayError }}
         </p>
     </div>
 </template>

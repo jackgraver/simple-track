@@ -2,7 +2,7 @@
 import type { Cardio, PlannedCardio } from "~/types/workout";
 import LoggingHeader from "./LoggingHeader.vue";
 import NumericStepper from "./NumericStepper.vue";
-import { ref, watch, computed, nextTick, useId } from "vue";
+import { ref, watch, computed } from "vue";
 import { useWorkoutStore } from "../../store/useWorkoutStore";
 import { useLoggingRouteContext } from "../../composables/useLoggingRouteContext";
 import { toast } from "~/composables/toast/useToast";
@@ -23,10 +23,7 @@ const isLogged = computed(() => (props.loggedCardio?.minutes ?? 0) > 0);
 const currentMinutes = ref(0);
 const notes = ref("");
 
-const editMode = ref(false);
-const inputValue = ref("");
 const error = ref("");
-const inputId = useId();
 
 watch(
     () => props.loggedCardio,
@@ -37,44 +34,8 @@ watch(
     { immediate: true },
 );
 
-const increment = () => {
-    error.value = "";
-    currentMinutes.value = (currentMinutes.value || 0) + 1;
-};
-
-const decrement = () => {
-    error.value = "";
-    currentMinutes.value = Math.max(0, (currentMinutes.value || 0) - 1);
-};
-
-const enterEdit = () => {
-    editMode.value = true;
-    inputValue.value = currentMinutes.value.toString();
-    nextTick(() => {
-        const el = document.getElementById(inputId) as HTMLInputElement | null;
-        if (el) {
-            el.focus();
-            el.select();
-        }
-    });
-};
-
-const exitEdit = () => {
-    const trimmed = inputValue.value.trim();
-    if (trimmed !== "") {
-        const n = Number(trimmed);
-        if (Number.isFinite(n) && n >= 0) {
-            currentMinutes.value = Math.round(n);
-            error.value = "";
-        } else {
-            error.value = "Enter a valid number of minutes.";
-        }
-    }
-    editMode.value = false;
-};
-
-const updateInputValue = (v: string) => {
-    inputValue.value = v;
+const onMinutesUpdate = (v: number) => {
+    currentMinutes.value = v;
     error.value = "";
 };
 
@@ -104,14 +65,9 @@ const finish = async () => {
             <NumericStepper
                 label="Time (minutes)"
                 :model-value="currentMinutes"
-                :edit-mode="editMode"
-                :input-value="inputValue"
+                round-to-integer
                 :error="error"
-                @increment="increment"
-                @decrement="decrement"
-                @update:input-value="updateInputValue"
-                @enter-edit="enterEdit"
-                @exit-edit="exitEdit"
+                @update:model-value="onMinutesUpdate"
             />
         </div>
         <div class="input-container">

@@ -71,26 +71,17 @@ const repRolloverWeightHint = computed(() => {
             <NumericStepper
                 label="Weight (lbs)"
                 :model-value="session.currentWeight"
-                :edit-mode="session.weightEditMode"
-                :input-value="session.weightInputValue"
                 :hint="repRolloverWeightHint"
                 input-step="0.5"
-                @increment="session.incrementWeight"
-                @decrement="session.decrementWeight"
-                @update:input-value="session.updateWeightInputValue"
-                @enter-edit="session.enterWeightEditMode"
-                @exit-edit="session.exitWeightEditMode"
+                :step-with="session.stepWeight"
+                @update:model-value="session.commitWeightFromInput"
             />
             <NumericStepper
                 label="Reps"
                 :model-value="session.currentReps"
-                :edit-mode="session.repsEditMode"
-                :input-value="session.repsInputValue"
-                @increment="session.incrementReps"
-                @decrement="session.decrementReps"
-                @update:input-value="session.updateRepsInputValue"
-                @enter-edit="session.enterRepsEditMode"
-                @exit-edit="session.exitRepsEditMode"
+                integer-only
+                :step-with="session.stepReps"
+                @update:model-value="session.commitRepsFromInput"
             />
             <div class="input-container">
                 <label>Weight Setup</label>
