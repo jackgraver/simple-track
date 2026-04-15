@@ -12,6 +12,7 @@ import {
     mergeSavedExerciseIntoLoggedSets,
     markPendingSetsAsExerciseError,
 } from "../domain/exerciseLoggingPayload";
+import { defaultsFromLoggedSets } from "../domain/loggedSetDefaults";
 
 type StoredDraft = {
     weight: number;
@@ -206,23 +207,10 @@ export function useExerciseLoggingSession(options: {
             }));
             currentSetNumber.value = loggedSets.value.length + 1;
 
-            // const lastSet = group.logged.sets[group.logged.sets.length - 1];
-            const maxSet = group.logged.sets.reduce((max, set) => {
-                if (!max) return set;
-                if (set.weight > max.weight) return set;
-                if (set.weight === max.weight && set.reps > max.reps) return set;
-                return max;
-            }, null as typeof group.logged.sets[number] | null);
-
-            if (maxSet) {
-                currentWeight.value = maxSet.weight;
-                currentReps.value = maxSet.reps;
-                currentWeightSetup.value = maxSet.weight_setup || "";
-            } else {
-                currentWeight.value = 0;
-                currentReps.value = 0;
-                currentWeightSetup.value = "";
-            }
+            const d = defaultsFromLoggedSets(group.logged.sets);
+            currentWeight.value = d.weight;
+            currentReps.value = d.reps;
+            currentWeightSetup.value = d.weight_setup;
 
             notes.value = group.logged.notes || "";
         } else {
