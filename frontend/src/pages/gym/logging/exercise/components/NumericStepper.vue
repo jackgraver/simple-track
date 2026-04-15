@@ -44,6 +44,7 @@ const onInput = (e: Event) => {
         <label :for="inputId">{{ label }}</label>
         <div class="stepper">
             <button
+                v-if="!editMode"
                 class="stepper-button"
                 type="button"
                 @click="emit('decrement')"
@@ -67,6 +68,7 @@ const onInput = (e: Event) => {
                 @keyup.escape="emit('exit-edit')"
             />
             <button
+                v-if="!editMode"
                 class="stepper-button"
                 type="button"
                 @click="emit('increment')"
@@ -169,5 +171,4 @@ const onInput = (e: Event) => {
     border-color: rgb(100, 100, 100);
     background: rgb(35, 35, 35);
 }
-
 </style>
