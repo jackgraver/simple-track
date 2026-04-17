@@ -13,7 +13,7 @@ import {
     mergeSavedExerciseIntoLoggedSets,
     markPendingSetsAsExerciseError,
 } from "../domain/exerciseLoggingPayload";
-import { defaultsFromLoggedSets } from "../domain/loggedSetDefaults";
+import { initializeWeightAndReps } from "../domain/loggedSetDefaults";
 
 type StoredDraft = {
     weight: number;
@@ -60,7 +60,6 @@ export function useExerciseLoggingSession(options: {
     logExercise: LogExerciseFn;
     deleteLoggedSet: DeleteLoggedSetFn;
     router: Router;
-    enabled?: ComputedRef<boolean> | Ref<boolean>;
 }): ExerciseLoggingSessionViewModel {
     const {
         exerciseGroup,
@@ -70,7 +69,6 @@ export function useExerciseLoggingSession(options: {
         logExercise,
         deleteLoggedSet,
         router,
-        enabled = computed(() => true),
     } = options;
     const loggingRoute = () => ({
         name: "logging" as const,
@@ -150,7 +148,6 @@ export function useExerciseLoggingSession(options: {
         currentWeight.value > 0 || currentReps.value > 0;
 
     const initializeExercise = () => {
-        if (!enabled.value) return;
         if (pending.value) return;
 
         const group = exerciseGroup.value;
@@ -159,44 +156,10 @@ export function useExerciseLoggingSession(options: {
             return;
         }
 
-        if (
-            group?.logged?.sets
-        ) {
-            loggedSets.value = group.logged.sets.map((set) => ({
-                weight: set.weight,
-                reps: set.reps,
-                weight_setup: set.weight_setup || "",
-                status: "success" as const,
-                id: set.ID,
-                error: null,
-                tempId: `existing-${set.ID}`,
-            }));
-            currentSetNumber.value = loggedSets.value.length + 1;
-
-            const d = defaultsFromLoggedSets(group.logged.sets);
-            currentWeight.value = d.weight;
-            currentReps.value = d.reps;
-            currentWeightSetup.value = d.weight_setup;
-
-            notes.value = group.logged.notes || "";
-        } else {
-            loggedSets.value = [];
-            currentSetNumber.value = 1;
-
-            const rawPrev = group.previous?.sets;
-            const prevSets =
-                rawPrev &&
-                    Array.isArray(rawPrev) &&
-                    rawPrev.length > 0
-                    ? rawPrev
-                    : [];
-            const dPrev = defaultsFromLoggedSets(prevSets);
-            currentWeight.value = dPrev.weight;
-            currentReps.value = dPrev.reps;
-            currentWeightSetup.value = dPrev.weight_setup;
-
-            notes.value = group.previous?.notes || "";
-        }
+        const { weight, reps, weightSetup } = initializeWeightAndReps(group.logged?.sets, group.previous?.sets);
+        currentWeight.value = weight;
+        currentReps.value = reps;
+        currentWeightSetup.value = weightSetup;
 
         draftDirty.value = false;
 
@@ -204,13 +167,16 @@ export function useExerciseLoggingSession(options: {
         draftStorage.setSaveEnabled(true);
     };
 
+    // React to async load + route param resolution: pending until data arrives;
+    // exerciseGroup null when id is invalid or missing from the log. Then hydrate
+    // or send the user back to the day’s exercise list.
     watch(
-        [() => enabled.value, () => exerciseGroup.value, () => pending.value],
-        ([isEnabled, group, isPending]) => {
-            if (!isEnabled) return;
-            if (!isPending && group) {
+        [() => exerciseGroup.value, () => pending.value],
+        ([group, isPending]) => {
+            if (isPending) return;
+            if (group) {
                 initializeExercise();
-            } else if (!isPending && !group) {
+            } else {
                 router.push(loggingRoute());
             }
         },

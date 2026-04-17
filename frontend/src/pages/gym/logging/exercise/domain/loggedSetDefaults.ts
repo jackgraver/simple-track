@@ -1,8 +1,34 @@
+import { LoggedSet } from "~/types/workout";
+
 export type LoggedSetForDefaults = {
     weight: number;
     reps: number;
     weight_setup?: string;
 };
+
+
+export function initializeWeightAndReps(loggedSets: readonly LoggedSet[] | undefined, previousSets: readonly LoggedSet[] | undefined): { weight: number; reps: number; weightSetup: string; notes: string } {
+    let weight = 0;
+    let reps = 0;
+    let weightSetup = "";
+    let notes = "";
+
+    if (
+        loggedSets &&
+        loggedSets.length > 0
+    ) {
+        weight = loggedSets[loggedSets.length - 1].weight;
+        reps = loggedSets[loggedSets.length - 1].reps;
+        weightSetup = loggedSets[loggedSets.length - 1].weight_setup || "";
+    } else if (previousSets) {
+        const dPrev = defaultsFromLoggedSets(previousSets);
+        weight = dPrev.weight;
+        reps = dPrev.reps;
+        weightSetup = dPrev.weight_setup;
+    }
+
+    return { weight, reps, weightSetup, notes };
+}
 
 /**
  * Picks the set with the highest weight; on a tie, the higher rep count wins.

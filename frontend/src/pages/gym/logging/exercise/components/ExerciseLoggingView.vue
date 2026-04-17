@@ -1,24 +1,53 @@
 <script setup lang="ts">
-import type { ExerciseLoggingSessionViewModel } from "../composables/useExerciseLoggingSession";
+import type { ExerciseGroup } from "../../store/useWorkoutStore";
+import { useWorkoutStore } from "../../store/useWorkoutStore";
+import { useExerciseLoggingSession } from "../composables/useExerciseLoggingSession";
+import { useLoggingRouteContext } from "../../composables/useLoggingRouteContext";
+import {
+    findExerciseGroupByExerciseId,
+    parseExerciseIdParam,
+} from "../domain/exerciseRouteGroup";
 import LoggingHeader from "./LoggingHeader.vue";
 import LoggedSetsList from "./LoggedSetsList.vue";
 import NumericStepper from "./NumericStepper.vue";
 import { useGlobalRestTimer } from "~/composables/useGlobalRestTimer";
 import { computed } from "vue";
+import { useRoute, useRouter } from "vue-router";
 
-const props = defineProps<{
-    session: ExerciseLoggingSessionViewModel;
-}>();
+const route = useRoute();
+const router = useRouter();
+const { offset } = useLoggingRouteContext();
+const { log, data, pending, logExercise, deleteLoggedSet } =
+    useWorkoutStore(offset);
+
+const exerciseId = computed(() => parseExerciseIdParam(route));
+
+const exerciseGroup = computed<ExerciseGroup | null>(() => {
+    if (exerciseId.value == null || pending.value) return null;
+    return findExerciseGroupByExerciseId(log.value, exerciseId.value);
+});
+
+const dayId = computed(() => data.value?.day.ID ?? 0);
+
+const session = useExerciseLoggingSession({
+    exerciseGroup,
+    pending,
+    dayId,
+    offset,
+    logExercise,
+    deleteLoggedSet,
+    router,
+});
 
 const cuesText = computed(() => {
-    const g = props.session.exerciseGroup;
+    const g = session.exerciseGroup;
     if (!g) return "";
     const raw = g.planned?.cues ?? g.logged?.exercise?.cues ?? "";
     return typeof raw === "string" ? raw.trim() : "";
 });
 
 const previousPerformanceText = computed(() => {
-    const sets = props.session.exerciseGroup?.previous?.sets ?? [];
+    const sets = session.exerciseGroup?.previous?.sets ?? [];
     if (sets.length === 0) return "";
 
     return sets.map((set) => `${set.weight}x${set.reps}`).join(", ");
@@ -26,8 +55,8 @@ const previousPerformanceText = computed(() => {
 
 const exerciseName = computed(
     () =>
-        props.session.exerciseGroup?.planned?.name ||
-        props.session.exerciseGroup?.logged?.exercise?.name ||
+        session.exerciseGroup?.planned?.name ||
+        session.exerciseGroup?.logged?.exercise?.name ||
         "",
 );
 
@@ -38,7 +67,7 @@ const headerText = computed(() =>
 );
 
 const repRolloverWeightHint = computed(() => {
-    const g = props.session.exerciseGroup;
+    const g = session.exerciseGroup;
     const repRollover = g?.previous?.exercise?.rep_rollover;
     if (typeof repRollover !== "number") return "";
     const previousReps = (g?.previous?.sets ?? [])

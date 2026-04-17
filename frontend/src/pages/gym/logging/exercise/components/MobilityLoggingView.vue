@@ -2,29 +2,45 @@
 import type { MobilityLogged } from "~/types/workout";
 import LoggingHeader from "./LoggingHeader.vue";
 import { ref, watch, computed } from "vue";
-import { useWorkoutStore } from "../../store/useWorkoutStore";
 import { useLoggingRouteContext } from "../../composables/useLoggingRouteContext";
 import { toast } from "~/composables/toast/useToast";
+import { useRoute } from "vue-router";
 
 const props = defineProps<{
-    loggedMobility: MobilityLogged;
-    slot: "pre" | "post";
+    loggedPreMobility: MobilityLogged | null;
+    loggedPostMobility: MobilityLogged | null;
+    savePreMobility: (checked: string[]) => Promise<void>;
+    savePostMobility: (checked: string[]) => Promise<void>;
 }>();
-const { offset, goBackToLogging } = useLoggingRouteContext();
-const { savePreMobility, savePostMobility } = useWorkoutStore(offset);
+
+const route = useRoute();
+const { goBackToLogging } = useLoggingRouteContext();
+
+const mobilitySlot = computed<"pre" | "post" | null>(() => {
+    const raw = route.params.slot;
+    const value = typeof raw === "string" ? raw : "";
+    if (value === "pre" || value === "post") return value;
+    return null;
+});
+
+const effectiveLogged = computed(() =>
+    mobilitySlot.value === "post"
+        ? props.loggedPostMobility
+        : props.loggedPreMobility,
+);
 
 const localChecked = ref<Set<string>>(new Set());
 
 watch(
-    () => props.loggedMobility,
+    effectiveLogged,
     (m) => {
-        localChecked.value = new Set(m.checked ?? []);
+        localChecked.value = new Set(m?.checked ?? []);
     },
     { immediate: true },
 );
 
-const items = computed(() => props.loggedMobility.items);
-const title = computed(() => props.loggedMobility.title);
+const items = computed(() => effectiveLogged.value?.items ?? []);
+const title = computed(() => effectiveLogged.value?.title ?? "");
 
 const doneCount = computed(
     () => items.value.filter((name) => localChecked.value.has(name)).length,
@@ -45,10 +61,10 @@ const toggle = async (name: string) => {
     const previous = new Set(localChecked.value);
     localChecked.value = next;
     try {
-        if (props.slot === "post") {
-            await savePostMobility([...next]);
+        if (mobilitySlot.value === "post") {
+            await props.savePostMobility([...next]);
         } else {
-            await savePreMobility([...next]);
+            await props.savePreMobility([...next]);
         }
     } catch (err: any) {
         localChecked.value = previous;
