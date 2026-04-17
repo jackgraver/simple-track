@@ -12,6 +12,22 @@ export function setsMatchLocalToSaved(
     );
 }
 
+/** Hydrate the session list from API `LoggedSet` rows when opening an exercise with prior saves. */
+export function loggedSetsFromServer(
+    sets: readonly LoggedSet[] | undefined,
+): LoggedSetWithStatus[] {
+    if (!sets?.length) return [];
+    return sets.map((s, i) => ({
+        weight: s.weight,
+        reps: s.reps,
+        weight_setup: s.weight_setup || "",
+        status: "success" as const,
+        id: s.ID > 0 ? s.ID : null,
+        error: null,
+        tempId: s.ID > 0 ? `saved-${s.ID}` : `saved-row-${i}`,
+    }));
+}
+
 /** Combines committed rows with an optional in-progress row for a save request. */
 export function buildAllSetsForSave(
     loggedSets: LoggedSetWithStatus[],

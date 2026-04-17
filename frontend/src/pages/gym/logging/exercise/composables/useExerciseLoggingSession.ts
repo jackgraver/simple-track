@@ -10,6 +10,7 @@ import { useWebStorageJsonSync } from "~/composables/useWebStorageJsonSync";
 import {
     buildAllSetsForSave,
     buildExerciseToLog,
+    loggedSetsFromServer,
     mergeSavedExerciseIntoLoggedSets,
     markPendingSetsAsExerciseError,
 } from "../domain/exerciseLoggingPayload";
@@ -155,6 +156,10 @@ export function useExerciseLoggingSession(options: {
             router.push(loggingRoute());
             return;
         }
+
+        loggedSets.value = loggedSetsFromServer(group.logged?.sets);
+        notes.value = group.logged?.notes ?? "";
+        currentSetNumber.value = loggedSets.value.length + 1;
 
         const { weight, reps, weightSetup } = initializeWeightAndReps(group.logged?.sets, group.previous?.sets);
         currentWeight.value = weight;
