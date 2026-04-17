@@ -5,6 +5,7 @@ import (
 	diet "be-simpletracker/internal/core/diet"
 	workout "be-simpletracker/internal/core/workout"
 	"be-simpletracker/internal/database"
+	"be-simpletracker/internal/utils"
 	"fmt"
 	"os"
 	"strings"
@@ -27,7 +28,7 @@ func main() {
 	gin.SetMode(gin.ReleaseMode)
 	router := gin.Default()
 
-	// router.Use(utils.BenchmarkMiddleware(router))
+	router.Use(utils.BenchmarkMiddleware(router))
 
 	corsOrigins := getEnv("CORS_ORIGINS", "http://localhost:5173,http://localhost:3000,http://192.168.4.78:3000,http://192.168.4.64:3000")
 	origins := splitString(corsOrigins, ",")
