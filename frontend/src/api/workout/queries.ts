@@ -12,6 +12,35 @@ export type WorkoutActivityQueryOpts = {
     days: number | null;
 };
 
+export const workoutExercisesAllQueryKey = ['workout', 'exercises', 'all'] as const;
+
+export function normalizeExercisesListPayload(value: unknown): Exercise[] {
+    if (!value) return [];
+    if (Array.isArray(value)) return value as Exercise[];
+    if (
+        typeof value === 'object' &&
+        value !== null &&
+        'exercises' in value &&
+        Array.isArray((value as { exercises: unknown }).exercises)
+    ) {
+        return (value as { exercises: Exercise[] }).exercises;
+    }
+    const firstArray = Object.values(value as object).find((v) => Array.isArray(v));
+    return (firstArray as Exercise[]) ?? [];
+}
+
+export async function fetchWorkoutExercisesAll(): Promise<unknown> {
+    return apiGET<unknown>('/workout/exercises/all');
+}
+
+export function useWorkoutExercisesAllQuery(enabled: MaybeRefOrGetter<boolean> = true) {
+    return useQuery({
+        queryKey: workoutExercisesAllQueryKey,
+        queryFn: fetchWorkoutExercisesAll,
+        enabled: computed(() => toValue(enabled)),
+    });
+}
+
 function invalidateWorkoutActivityQueries(queryClient: ReturnType<typeof useQueryClient>) {
     queryClient.invalidateQueries({ queryKey: liveworkoutKeys.workouts.activityPrefix() });
 }

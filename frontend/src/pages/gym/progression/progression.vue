@@ -1,55 +1,61 @@
 <script setup lang="ts">
 import type { Exercise } from "~/types/workout";
-import SearchList from "~/shared/SearchList.vue";
+import Chart from "primevue/chart";
+import Select from "primevue/select";
 import { computed, ref, watch } from "vue";
 import { useQuery } from "@tanstack/vue-query";
 import { apiClient } from "~/api/client";
+import {
+    normalizeExercisesListPayload,
+    useWorkoutExercisesAllQuery,
+} from "~/api/workout/queries";
+import {
+    useProgressionCharts,
+    type ProgressionEntry,
+    type ProgressionRange,
+} from "~/pages/gym/progression/useProgressionCharts";
 
-type ProgressionEntry = {
-    date: string;
-    weight: number;
-    reps: number;
-};
-
-const selectedExercise = ref<Exercise | null>(null);
 const exerciseId = ref<number | null>(null);
+const range = ref<ProgressionRange>("6m");
 
-const { data: exercisesPayload } = useQuery({
-    queryKey: ["workout", "exercises", "all", "progression"],
-    queryFn: async () => {
-        const res = await apiClient.get<{ exercises: Exercise[] } | Exercise[]>(
-            "/workout/exercises/all",
-        );
-        return res.data;
-    },
-});
+const rangeOptions: { id: ProgressionRange; label: string }[] = [
+    { id: "3m", label: "3 mo" },
+    { id: "6m", label: "6 mo" },
+    { id: "1y", label: "1 yr" },
+    { id: "all", label: "All" },
+];
 
-const exercises = computed(() => {
-    const value = exercisesPayload.value;
-    if (!value) return [];
-    if (Array.isArray(value)) return value;
-    if (
-        typeof value === "object" &&
-        "exercises" in value &&
-        Array.isArray(value.exercises)
-    ) {
-        return value.exercises;
-    }
-    const firstArray = Object.values(value as object).find((v) =>
-        Array.isArray(v),
-    );
-    return (firstArray as Exercise[]) ?? [];
+const { data: exercisesPayload, isPending: exercisesLoading } =
+    useWorkoutExercisesAllQuery();
+
+const exercises = computed(() =>
+    normalizeExercisesListPayload(exercisesPayload.value),
+);
+
+const exerciseOptions = computed(() =>
+    [...exercises.value]
+        .sort((a, b) =>
+            a.name.localeCompare(b.name, undefined, { sensitivity: "base" }),
+        )
+        .map((e: Exercise) => ({ label: e.name, value: e.ID })),
+);
+
+const selectedExercise = computed(() => {
+    const id = exerciseId.value;
+    if (id == null) return null;
+    return exercises.value.find((e) => e.ID === id) ?? null;
 });
 
 watch(
     exercises,
-    (newExercises) => {
-        if (
-            newExercises.length > 0 &&
-            exerciseId.value === null &&
-            newExercises[0]
-        ) {
-            selectExercise(newExercises[0]);
+    (list) => {
+        if (list.length === 0) {
+            exerciseId.value = null;
+            return;
+        }
+        const cur = exerciseId.value;
+        if (cur == null || !list.some((e) => e.ID === cur)) {
+            exerciseId.value = list[0]!.ID;
         }
     },
     { immediate: true },
@@ -85,113 +91,93 @@ const error = computed(() => {
     return fetchError.value?.message || null;
 });
 
-const selectExercise = async (exercise: Exercise): Promise<boolean> => {
-    selectedExercise.value = exercise;
-    exerciseId.value = exercise.ID;
-    return true;
-};
-
-const formatProgressionDate = (dateStr: string): string => {
-    const date = new Date(dateStr);
-    const month = date.toLocaleString("en-US", { month: "short" });
-    const day = date.getDate();
-    return `${month} ${day}`;
-};
+const {
+    progressionChartData,
+    progressionChartOptions,
+    hasProgressionChartData,
+} = useProgressionCharts(progression, range);
 </script>
 
 <template>
-    <div class="container">
-        <h1>Exercise Progression</h1>
-        <div class="content">
-            <div class="exercise-selector">
-                <h2>Select Exercise</h2>
-                <SearchList
-                    :route="'workout/exercises/all'"
-                    :on-select="selectExercise"
-                />
+    <div class="flex flex-col gap-6 p-4">
+        <h1 class="m-0 text-2xl font-semibold text-textPrimary">
+            Exercise Progression
+        </h1>
+        <div class="flex min-w-0 flex-col gap-2">
+            <label
+                class="text-sm font-medium text-textPrimary"
+                for="progression-exercise"
+                >Exercise</label
+            >
+            <Select
+                id="progression-exercise"
+                v-model="exerciseId"
+                :options="exerciseOptions"
+                option-label="label"
+                option-value="value"
+                placeholder="Choose an exercise"
+                class="w-full max-w-2xl"
+                :loading="exercisesLoading"
+            />
+        </div>
+        <div v-if="selectedExercise" class="flex min-w-0 flex-col gap-4">
+            <div
+                v-if="loading"
+                class="py-4 text-center text-sm text-textSecondary"
+            >
+                Loading…
             </div>
-            <div class="progression-display">
-                <div v-if="selectedExercise" class="exercise-header">
-                    <h2>{{ selectedExercise.name }}:</h2>
-                </div>
-                <div v-if="loading" class="loading">Loading...</div>
-                <div v-else-if="error" class="error">{{ error }}</div>
-                <div
-                    v-else-if="progression.length === 0 && selectedExercise"
-                    class="no-data"
-                >
+            <div
+                v-else-if="error"
+                class="py-4 text-center text-sm text-(--color-cf-red)"
+            >
+                {{ error }}
+            </div>
+            <template v-else-if="progression.length === 0">
+                <p class="m-0 py-4 text-center text-sm text-textSecondary">
                     No progression data available for this exercise.
-                </div>
-                <div
-                    v-else-if="progression.length > 0"
-                    class="progression-list"
-                >
-                    <div
-                        v-for="(entry, index) in progression"
-                        :key="index"
-                        class="progression-entry"
-                    >
-                        {{ formatProgressionDate(entry.date) }} -
-                        {{ entry.weight }} lbs for {{ entry.reps }} reps
+                </p>
+            </template>
+            <template v-else>
+                <div class="flex min-w-0 flex-col gap-2">
+                    <p class="m-0 text-sm text-textSecondary">Range</p>
+                    <div class="flex flex-wrap gap-1">
+                        <button
+                            v-for="opt in rangeOptions"
+                            :key="opt.id"
+                            type="button"
+                            class="rounded px-2 py-0.5 text-xs transition-colors"
+                            :class="
+                                range === opt.id
+                                    ? 'bg-secondBg text-textPrimary'
+                                    : 'text-textSecondary hover:bg-firstBg hover:text-textPrimary'
+                            "
+                            @click="range = opt.id"
+                        >
+                            {{ opt.label }}
+                        </button>
                     </div>
                 </div>
-            </div>
+                <div class="flex min-h-0 min-w-0 flex-col gap-2">
+                    <h2 class="m-0 text-base font-semibold text-textPrimary">
+                        Top set and volume
+                    </h2>
+                    <div
+                        v-if="hasProgressionChartData"
+                        class="h-80 min-h-80 w-full min-w-0 lg:h-112 lg:min-h-112"
+                    >
+                        <Chart
+                            type="line"
+                            :data="progressionChartData"
+                            :options="progressionChartOptions"
+                            class="h-full w-full"
+                        />
+                    </div>
+                    <p v-else class="m-0 text-sm text-textSecondary">
+                        No data in this range.
+                    </p>
+                </div>
+            </template>
         </div>
     </div>
 </template>
-
-<style scoped>
-.container {
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-    padding: 1rem;
-}
-
-.content {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 2rem;
-}
-
-.exercise-selector,
-.progression-display {
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-}
-
-.exercise-header h2 {
-    margin: 0;
-}
-
-.progression-list {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-}
-
-.progression-entry {
-    font-family: monospace;
-    padding: 0.5rem;
-    background-color: rgb(48, 48, 48);
-    border-radius: 4px;
-}
-
-.loading,
-.error,
-.no-data {
-    padding: 1rem;
-    text-align: center;
-}
-
-.error {
-    color: rgb(255, 100, 100);
-}
-
-@media (max-width: 767px) {
-    .content {
-        grid-template-columns: 1fr;
-    }
-}
-</style>

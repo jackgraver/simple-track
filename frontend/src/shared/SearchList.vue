@@ -11,6 +11,8 @@ const props = defineProps<{
     onCreate?: (name: string) => Promise<boolean>;
     displayComponent?: Component;
     prefilter?: any[];
+    /** When set, TanStack Query uses this key (e.g. share cache with useWorkoutExercisesAllQuery). */
+    queryKey?: readonly unknown[];
 }>();
 
 const search = ref("");
@@ -29,7 +31,11 @@ const requestPath = computed(() => {
 });
 
 const { data, isPending, error, refetch } = useQuery({
-    queryKey: computed(() => ["searchList", requestPath.value]),
+    queryKey: computed(() =>
+        props.queryKey !== undefined
+            ? [...props.queryKey]
+            : (["searchList", requestPath.value] as const),
+    ),
     queryFn: async () => {
         const res = await apiClient.get<unknown>(requestPath.value);
         return res.data;
