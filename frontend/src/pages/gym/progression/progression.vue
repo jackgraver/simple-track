@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import type { Exercise } from "~/types/workout";
 import Chart from "primevue/chart";
-import Select from "primevue/select";
+import Dropdown from "~/shared/input/Dropdown.vue";
+import type { DropdownOption } from "~/shared/input/Dropdown.vue";
 import { computed, ref, watch } from "vue";
 import { useQuery } from "@tanstack/vue-query";
 import { apiClient } from "~/api/client";
@@ -32,13 +33,17 @@ const exercises = computed(() =>
     normalizeExercisesListPayload(exercisesPayload.value),
 );
 
-const exerciseOptions = computed(() =>
+const exerciseOptions = computed<DropdownOption[]>(() =>
     [...exercises.value]
         .sort((a, b) =>
             a.name.localeCompare(b.name, undefined, { sensitivity: "base" }),
         )
         .map((e: Exercise) => ({ label: e.name, value: e.ID })),
 );
+
+const onExerciseSelect = (option: DropdownOption) => {
+    exerciseId.value = option.value as number;
+};
 
 const selectedExercise = computed(() => {
     const id = exerciseId.value;
@@ -103,21 +108,19 @@ const {
         <h1 class="m-0 text-2xl font-semibold text-textPrimary">
             Exercise Progression
         </h1>
-        <div class="flex min-w-0 flex-col gap-2">
-            <label
-                class="text-sm font-medium text-textPrimary"
-                for="progression-exercise"
-                >Exercise</label
+        <div class="flex min-w-0 max-w-2xl flex-col gap-2">
+            <span class="text-sm font-medium text-textPrimary">Exercise</span>
+            <p
+                v-if="selectedExercise"
+                class="m-0 text-base font-medium text-textPrimary"
             >
-            <Select
-                id="progression-exercise"
-                v-model="exerciseId"
+                {{ selectedExercise.name }}
+            </p>
+            <Dropdown
                 :options="exerciseOptions"
-                option-label="label"
-                option-value="value"
-                placeholder="Choose an exercise"
-                class="w-full max-w-2xl"
-                :loading="exercisesLoading"
+                placeholder="Search exercises…"
+                :loading="exercisesLoading && exerciseOptions.length === 0"
+                :on-select="onExerciseSelect"
             />
         </div>
         <div v-if="selectedExercise" class="flex min-w-0 flex-col gap-4">
@@ -160,8 +163,13 @@ const {
                 </div>
                 <div class="flex min-h-0 min-w-0 flex-col gap-2">
                     <h2 class="m-0 text-base font-semibold text-textPrimary">
-                        Top set and volume
+                        Top set weight and reps
                     </h2>
+                    <p class="m-0 max-w-3xl text-sm leading-relaxed text-textSecondary">
+                        Green: heaviest load that day (0.5 lb rounding). Blue:
+                        reps on that same top set—handy for seeing reps climb,
+                        then dip when you move the weight up.
+                    </p>
                     <div
                         v-if="hasProgressionChartData"
                         class="h-80 min-h-80 w-full min-w-0 lg:h-112 lg:min-h-112"

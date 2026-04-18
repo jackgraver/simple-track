@@ -135,7 +135,6 @@ export function useProgressionCharts(
         const labels: string[] = [];
         const weights: number[] = [];
         const topReps: number[] = [];
-        const topSetVolumes: number[] = [];
         for (const day of sortedDayKeys) {
             const sets = dayMap.get(day)!;
             let maxW = -Infinity;
@@ -149,9 +148,8 @@ export function useProgressionCharts(
             labels.push(formatShortDayLabel(day));
             weights.push(maxW);
             topReps.push(bestReps);
-            topSetVolumes.push(maxW * bestReps);
         }
-        return { labels, weights, topReps, topSetVolumes, sortedDayKeys };
+        return { labels, weights, topReps, sortedDayKeys };
     });
 
     const hasProgressionChartData = computed(
@@ -177,8 +175,8 @@ export function useProgressionCharts(
                     borderWidth: 2,
                 },
                 {
-                    label: "Top-set volume (lb×reps)",
-                    data: s.topSetVolumes,
+                    label: "Top set reps",
+                    data: s.topReps,
                     yAxisID: "y1",
                     borderColor: t.lineVolume,
                     backgroundColor: t.lineVolume,
@@ -209,13 +207,12 @@ export function useProgressionCharts(
                             const i = ctx.dataIndex;
                             const w = s.weights[i];
                             const r = s.topReps[i];
-                            const v = s.topSetVolumes[i];
                             if (ctx.datasetIndex === 0) {
                                 if (w === undefined || r === undefined) return "";
                                 return `Weight: ${w} lbs × ${r} reps`;
                             }
-                            if (v === undefined) return "";
-                            return `Top-set volume: ${v.toLocaleString()} (lb×reps)`;
+                            if (r === undefined || w === undefined) return "";
+                            return `Reps: ${r} (${w} lbs top set)`;
                         },
                     },
                 },
@@ -241,7 +238,7 @@ export function useProgressionCharts(
                     grid: { drawOnChartArea: false },
                     title: {
                         display: true,
-                        text: "Top-set volume",
+                        text: "Top set (reps)",
                         color: t.textMuted,
                     },
                 },
