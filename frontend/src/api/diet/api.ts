@@ -59,6 +59,36 @@ export async function deleteLoggedMeal(
     return response.data;
 }
 
+export async function deletePlannedMeal(
+    plannedMealId: number,
+    offset = 0
+): Promise<DietLogsTodayResponse> {
+    const response = await apiClient.delete<DietLogsTodayResponse>(
+        '/diet/meals/planned',
+        {
+            data: {
+                planned_meal_id: plannedMealId,
+                offset,
+            },
+        }
+    );
+    return response.data;
+}
+
+export async function addPlannedMealFromSaved(
+    savedMealId: number,
+    offset = 0
+): Promise<DietLogsTodayResponse> {
+    const response = await apiClient.post<DietLogsTodayResponse>(
+        '/diet/meals/planned/from-saved',
+        {
+            saved_meal_id: savedMealId,
+            offset,
+        }
+    );
+    return response.data;
+}
+
 export async function editLoggedMeal(
     meal: Meal,
     oldMealId: number

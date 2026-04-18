@@ -3,7 +3,7 @@ import type { Meal } from "~/types/diet";
 import LogEditedDialog from "~/pages/home/dialog/LogEditedDialog.vue";
 import { toast } from "~/composables/toast/useToast";
 import { dialogManager } from "~/composables/dialog/useDialog";
-import { ChevronDown, ChevronUp } from "lucide-vue-next";
+import { ChevronDown, ChevronUp, Pencil } from "lucide-vue-next";
 import { useRouter } from "vue-router";
 import { useDietLogsToday } from "~/pages/home/queries/useDietLogsToday";
 import {
@@ -81,6 +81,13 @@ const deleteLoggedMeal = async (meal: Meal) => {
     } catch {
         toast.push("Delete Failed!", "error");
     }
+};
+
+const editPlannedMeal = () => {
+    router.push({
+        name: "diet-edit-planned",
+        query: { offset: String(props.dateOffset) },
+    });
 };
 
 const editLogMeal = (meal: Meal) => {
@@ -163,10 +170,22 @@ function prev() {
                     />
                 </div>
                 <div class="flex min-w-0 flex-1 flex-col gap-2 pt-2">
-                    <div class="flex flex-row items-end gap-2">
-                        <h2 class="mb-0 flex-1 text-lg font-semibold">
-                            Planned
-                        </h2>
+                    <div
+                        class="flex flex-row items-center justify-between gap-2"
+                    >
+                        <div class="flex items-center gap-2 w-full">
+                            <h2 class="mb-0 text-lg font-semibold flex-1">
+                                Planned
+                            </h2>
+                            <button
+                                type="button"
+                                class="rounded-md border px-2 py-1 text-sm font-medium text-zinc-200 flex items-center gap-1"
+                                @click="editPlannedMeal"
+                            >
+                                <Pencil :size="15" />
+                                Edit
+                            </button>
+                        </div>
                         <template v-if="data.day.plannedMeals.length > 2">
                             <button
                                 type="button"

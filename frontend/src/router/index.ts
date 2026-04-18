@@ -23,6 +23,11 @@ const routes: RouteRecordRaw[] = [
         name: 'diet-log',
         component: () => import('~/pages/diet/logmeal/logmeal.vue'),
       },
+      {
+        path: 'edit-planned',
+        name: 'diet-edit-planned',
+        component: () => import('~/pages/diet/edit-planned/index.vue'),
+      },
     ]
   },
   {

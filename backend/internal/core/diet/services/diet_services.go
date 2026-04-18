@@ -76,6 +76,52 @@ func SetPlannedMealLogged(db *gorm.DB, dayID uint, mealID uint) error {
 	return dietrepo.New(db).SetPlannedMealLogged(dayID, mealID)
 }
 
+func mealFromSaved(sm *models.SavedMeal) *models.Meal {
+	m := &models.Meal{Name: sm.Name}
+	for _, it := range sm.Items {
+		m.Items = append(m.Items, models.MealItem{
+			FoodID: it.FoodID,
+			Amount: float32(it.Amount),
+		})
+	}
+	return m
+}
+
+// AddPlannedMealFromSavedMeal creates a new meal from a saved template and attaches it as planned for the calendar day at offset.
+func AddPlannedMealFromSavedMeal(db *gorm.DB, offset int, savedMealID uint) error {
+	return db.Transaction(func(tx *gorm.DB) error {
+		r := dietrepo.New(tx)
+		day, err := r.FindDayByDate(utils.ZerodTime(offset))
+		if err != nil {
+			return err
+		}
+		sm, err := r.SavedMealByID(savedMealID)
+		if err != nil {
+			return err
+		}
+		meal := mealFromSaved(sm)
+		mealID, err := r.MealCreate(meal)
+		if err != nil {
+			return err
+		}
+		return r.PlannedMealCreate(&models.PlannedMeal{
+			DayID:  day.ID,
+			MealID: mealID,
+			Logged: false,
+		})
+	})
+}
+
+// DeletePlannedMeal removes a planned meal row for the calendar day at offset.
+func DeletePlannedMeal(db *gorm.DB, offset int, plannedMealID uint) error {
+	r := dietrepo.New(db)
+	day, err := r.FindDayByDate(utils.ZerodTime(offset))
+	if err != nil {
+		return err
+	}
+	return r.PlannedMealDelete(plannedMealID, day.ID)
+}
+
 func DeleteLoggedMeal(db *gorm.DB, dayID uint, mealID uint) error {
 	return dietrepo.New(db).DeleteLoggedMeal(dayID, mealID)
 }

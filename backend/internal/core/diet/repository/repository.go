@@ -72,6 +72,27 @@ func (r *Repository) SavedMealCreate(sm *models.SavedMeal) (uint, error) {
 	return sm.ID, nil
 }
 
+func (r *Repository) SavedMealByID(id uint) (*models.SavedMeal, error) {
+	var sm models.SavedMeal
+	if err := r.db.Preload("Items.Food").First(&sm, id).Error; err != nil {
+		return nil, err
+	}
+	return &sm, nil
+}
+
+func (r *Repository) PlannedMealCreate(pm *models.PlannedMeal) error {
+	pm.ID = 0
+	return r.db.Create(pm).Error
+}
+
+func (r *Repository) PlannedMealDelete(plannedMealID uint, dayID uint) error {
+	var pm models.PlannedMeal
+	if err := r.db.Where("id = ? AND day_id = ?", plannedMealID, dayID).First(&pm).Error; err != nil {
+		return err
+	}
+	return r.db.Delete(&pm).Error
+}
+
 func (r *Repository) MealByID(id uint) (*models.Meal, error) {
 	var meal models.Meal
 	if err := r.db.Preload("Items.Food").First(&meal, id).Error; err != nil {
