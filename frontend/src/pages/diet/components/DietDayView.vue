@@ -8,6 +8,14 @@ const props = defineProps<{
     dateOffset: number;
 }>();
 
+function getTotalNumber(
+    pending: boolean,
+    error: unknown,
+    num: number | undefined,
+): number {
+    return pending || error ? 0 : (num ?? 0);
+}
+
 const {
     data,
     isPending: pending,
@@ -16,20 +24,31 @@ const {
 </script>
 
 <template>
-    <div v-if="pending">Loading...</div>
-    <div v-else-if="error">Error: {{ error.message }}</div>
-    <div v-else class="flex w-full flex-col gap-4">
-        <div v-if="data" class="w-full">
+    <div class="flex w-full flex-col gap-4">
+        <div class="w-full">
             <MacroBars
-                :totalCalories="data?.totalCalories ?? 0"
-                :totalProtein="data?.totalProtein ?? 0"
-                :totalFiber="data?.totalFiber ?? 0"
-                :totalCarbs="data?.totalCarbs ?? 0"
-                :plannedCalories="data?.day.plan.calories ?? 0"
-                :plannedProtein="data?.day.plan.protein ?? 0"
-                :plannedFiber="data?.day.plan.fiber ?? 0"
-                :plannedCarbs="data?.day.plan.carbs ?? 0"
+                :totalCalories="
+                    getTotalNumber(pending, error, data?.totalCalories)
+                "
+                :totalProtein="
+                    getTotalNumber(pending, error, data?.totalProtein)
+                "
+                :totalFiber="getTotalNumber(pending, error, data?.totalFiber)"
+                :totalCarbs="getTotalNumber(pending, error, data?.totalCarbs)"
+                :plannedCalories="
+                    getTotalNumber(pending, error, data?.day.plan.calories)
+                "
+                :plannedProtein="
+                    getTotalNumber(pending, error, data?.day.plan.protein)
+                "
+                :plannedFiber="
+                    getTotalNumber(pending, error, data?.day.plan.fiber)
+                "
+                :plannedCarbs="
+                    getTotalNumber(pending, error, data?.day.plan.carbs)
+                "
             />
+
             <div class="flex w-full flex-col gap-8 sm:flex-row sm:gap-6">
                 <LoggedMealsDisplay :date-offset="dateOffset" />
                 <PlannedMealsDisplay :date-offset="dateOffset" />

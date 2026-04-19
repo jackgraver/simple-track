@@ -6,6 +6,9 @@ function formatInt(n: number): string {
 }
 
 function calcWidth(total: number, planned: number): number {
+    if (planned <= 0) {
+        return total > 0 ? 100 : 0;
+    }
     return Math.min(100, (total / planned) * 100);
 }
 
@@ -68,7 +71,7 @@ watch(
     () => [props.total ?? 0, props.planned ?? 0] as const,
     ([t, p]) => {
         animateTo(t, p);
-    }
+    },
 );
 
 onBeforeUnmount(() => {
@@ -85,9 +88,18 @@ onBeforeUnmount(() => {
                 width: `${calcWidth(displayTotal, displayPlanned)}%`,
             }"
         >
-            <span class="tabular-nums" :class="determineOverflow(Math.round(displayTotal), Math.round(displayPlanned))">{{
-                formatInt(displayTotal) + " / " + formatInt(displayPlanned)
-            }}</span>
+            <span
+                class="tabular-nums"
+                :class="
+                    determineOverflow(
+                        Math.round(displayTotal),
+                        Math.round(displayPlanned),
+                    )
+                "
+                >{{
+                    formatInt(displayTotal) + " / " + formatInt(displayPlanned)
+                }}</span
+            >
         </div>
     </div>
 </template>
