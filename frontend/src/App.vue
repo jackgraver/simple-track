@@ -1,14 +1,7 @@
 <script setup lang="ts">
-import { onMounted } from "vue";
 import ToastContainer from "./composables/toast/ToastContainer.vue";
 import DialogContainer from "./composables/dialog/DialogContainer.vue";
-import { useAuth } from "./composables/auth/useAuth";
-
-const { getUsername } = useAuth();
-
-onMounted(() => {
-    document.documentElement.classList.add("dark");
-});
+import NavBar from "./shared/NavBar.vue";
 </script>
 
 <template>
@@ -18,24 +11,7 @@ onMounted(() => {
         <div
             class="flex w-full flex-col items-stretch gap-4 px-4 lg:px-0 lg:mx-auto lg:max-w-8/12"
         >
-            <div
-                v-if="getUsername()"
-                class="flex items-center justify-end lg:pr-16 pb-2 lg:max-w-8/12"
-            >
-                <div class="flex items-center gap-2 pt-2">
-                    <router-link :to="{ name: 'gym' }">
-                        <p class="bg-firstBg hover:bg-secondBg rounded-md p-2">
-                            Gym
-                        </p>
-                    </router-link>
-                    <router-link :to="{ name: 'diet' }">
-                        <p class="bg-firstBg hover:bg-secondBg rounded-md p-2">
-                            Diet
-                        </p>
-                    </router-link>
-                    <p>{{ getUsername() }}</p>
-                </div>
-            </div>
+            <NavBar />
             <RouterView />
         </div>
     </main>

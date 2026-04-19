@@ -18,19 +18,6 @@
 :root {
     --color-cf-red: hsl(0, 100%, 49%);
     --color-cf-red-dark: hsl(0, 100%, 42%);
-    --color-main-bg: hsl(0, 0%, 95%);
-    --color-first-bg: hsl(0, 0%, 90%);
-    --color-main-bg-transparent: hsla(0, 0%, 100%, 0.6);
-    --color-second-bg: hsl(0, 0%, 85%);
-    --color-third-bg: hsl(0, 0%, 75%);
-    --color-text-primary: hsl(0, 0%, 0%);
-    --color-text-secondary: hsl(0, 0%, 50%);
-    --color-border: hsl(0, 0%, 80%);
-}
-
-.dark {
-    --color-cf-red: hsl(0, 100%, 49%);
-    --color-cf-red-dark: hsl(0, 100%, 42%);
     --color-main-bg: hsl(0, 0%, 5%);
     --color-main-bg-transparent: hsla(0, 0%, 0%, 0.6);
     --color-first-bg: hsl(0, 0%, 15%);
@@ -39,4 +26,17 @@
     --color-text-primary: hsl(0, 0%, 95%);
     --color-text-secondary: hsl(0, 0%, 70%);
     --color-border: hsl(0, 0%, 30%);
+}
+
+.light {
+    --color-cf-red: hsl(0, 100%, 49%);
+    --color-cf-red-dark: hsl(0, 100%, 42%);
+    --color-main-bg: hsl(0, 0%, 95%);
+    --color-first-bg: hsl(0, 0%, 90%);
+    --color-main-bg-transparent: hsla(0, 0%, 100%, 0.6);
+    --color-second-bg: hsl(0, 0%, 85%);
+    --color-third-bg: hsl(0, 0%, 75%);
+    --color-text-primary: hsl(0, 0%, 0%);
+    --color-text-secondary: hsl(0, 0%, 50%);
+    --color-border: hsl(0, 0%, 80%);
 }
