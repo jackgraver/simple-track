@@ -150,7 +150,7 @@ function prev() {
                 :plannedFiber="data?.day.plan.fiber ?? 0"
                 :plannedCarbs="data?.day.plan.carbs ?? 0"
             />
-            <div class="flex w-full flex-col gap-2 sm:flex-row sm:gap-2">
+            <div class="flex w-full flex-col gap-8 sm:flex-row sm:gap-6">
                 <div class="flex min-w-0 flex-1 flex-col gap-2 pt-2">
                     <h2 class="mb-0 text-lg font-semibold">Logged</h2>
                     <span

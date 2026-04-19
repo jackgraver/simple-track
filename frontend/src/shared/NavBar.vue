@@ -10,16 +10,18 @@ const { getUsername } = useAuth();
             simpletrack
         </div>
         <div class="flex items-center gap-2 pt-2">
-            <router-link :to="{ name: 'gym' }">
-                <span class="hover:bg-secondBg rounded-md p-2 text-sm"
-                    >Gym</span
-                >
-            </router-link>
-            <router-link :to="{ name: 'diet' }">
-                <span class="hover:bg-secondBg rounded-md p-2 text-sm"
-                    >Diet</span
-                >
-            </router-link>
+            <router-link
+                :to="{ name: 'gym' }"
+                class="hover:bg-secondBg rounded-md p-2 text-sm"
+                active-class="underline underline-offset-4"
+                >Gym</router-link
+            >
+            <router-link
+                :to="{ name: 'diet' }"
+                class="hover:bg-secondBg rounded-md p-2 text-sm"
+                active-class="underline underline-offset-4"
+                >Diet</router-link
+            >
         </div>
         <div
             class="pr-2 lg:pr-0 min-w-[90px] text-right flex items-center justify-end"

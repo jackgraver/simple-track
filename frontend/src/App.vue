@@ -116,17 +116,19 @@ body {
     }
 }
 
-a,
-.router-link {
-    all: unset;
-    cursor: pointer;
-}
+@layer base {
+    a,
+    .router-link {
+        all: unset;
+        cursor: pointer;
+    }
 
-a,
-.router-link {
-    text-decoration: none;
-    color: inherit;
-    font: inherit;
+    a,
+    .router-link {
+        text-decoration: none;
+        color: inherit;
+        font: inherit;
+    }
 }
 
 button {

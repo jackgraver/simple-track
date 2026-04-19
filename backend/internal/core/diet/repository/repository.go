@@ -278,6 +278,17 @@ func (r *Repository) CreateDayMeal(dayMeal *models.DayLog) error {
 	return r.db.Create(dayMeal).Error
 }
 
+func (r *Repository) DayLogExists(dayID uint, mealID uint) (bool, error) {
+	var count int64
+	err := r.db.Model(&models.DayLog{}).
+		Where("day_id = ? AND meal_id = ?", dayID, mealID).
+		Count(&count).Error
+	if err != nil {
+		return false, err
+	}
+	return count > 0, nil
+}
+
 func (r *Repository) SetPlannedMealLogged(dayID uint, mealID uint) error {
 	var pm models.PlannedMeal
 	if err := r.db.Where("day_id = ? AND meal_id = ?", dayID, mealID).First(&pm).Error; err != nil {

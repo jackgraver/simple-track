@@ -216,6 +216,20 @@ func (h *MealHandler) postLogPlanned(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
+	exists, err := services.DayLogExistsForMeal(h.db, day.ID, req.MealID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	if !exists {
+		if err := services.CreateDayMeal(h.db, &models.DayLog{
+			DayID:  day.ID,
+			MealID: req.MealID,
+		}); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+	}
 	day, err = services.MealPlanDayByID(h.db, int(day.ID))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})

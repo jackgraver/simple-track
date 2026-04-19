@@ -60,6 +60,10 @@ func CreateDayMeal(db *gorm.DB, dayMeal *models.DayLog) error {
 	return dietrepo.New(db).CreateDayMeal(dayMeal)
 }
 
+func DayLogExistsForMeal(db *gorm.DB, dayID uint, mealID uint) (bool, error) {
+	return dietrepo.New(db).DayLogExists(dayID, mealID)
+}
+
 func CreateMeal(db *gorm.DB, meal *models.Meal) (uint, error) {
 	return dietrepo.New(db).MealCreate(meal)
 }

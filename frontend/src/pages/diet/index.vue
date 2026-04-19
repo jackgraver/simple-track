@@ -9,10 +9,7 @@ const isDietHome = computed(() => route.name === "diet");
 </script>
 
 <template>
-    <div
-        v-if="isDietHome"
-        class="mx-auto flex max-w-3xl flex-col gap-4 pb-8 pt-2"
-    >
+    <div v-if="isDietHome" class="flex flex-col gap-4 pb-8 pt-2">
         <div class="flex flex-wrap items-center gap-3">
             <h1 class="m-0 text-xl font-semibold tracking-tight text-zinc-100">
                 Diet
