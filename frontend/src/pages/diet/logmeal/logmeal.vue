@@ -8,6 +8,7 @@ import Input from "~/shared/input/Input.vue";
 import { dialogManager } from "~/composables/dialog/useDialog";
 import { toast } from "~/composables/toast/useToast";
 import CreateFoodDialog from "./dialog/CreateFoodDialog.vue";
+import SearchFoodDialog from "./dialog/SearchFoodDialog.vue";
 import { computed, ref, toRaw, watch } from "vue";
 import { useMeal } from "./queries/useMeal";
 import { useDietLogsToday } from "./queries/useDietLogsToday";
@@ -273,6 +274,18 @@ const createFood = async (name: string): Promise<boolean> => {
         console.error("Dialog error:", err);
         toast.push("Dialog Error", "error");
         return false;
+    }
+};
+
+const openUsdaFoodSearch = async () => {
+    try {
+        const food = await dialogManager.custom<Food>({
+            title: "Search food database",
+            component: SearchFoodDialog,
+        });
+        if (food) await addFood(food);
+    } catch (err) {
+        console.error("Dialog error:", err);
     }
 };
 
@@ -561,7 +574,16 @@ const updateLoggedMeal = async () => {
             <aside
                 class="flex min-h-0 flex-col overflow-hidden rounded-lg bg-firstBg p-4 text-textPrimary"
             >
-                <h2 class="mt-0 text-lg font-semibold">Add Foods</h2>
+                <div class="mb-3 flex shrink-0 flex-col gap-2">
+                    <h2 class="m-0 text-lg font-semibold">Add Foods</h2>
+                    <button
+                        type="button"
+                        class="w-full cursor-pointer rounded border border-secondBg bg-secondBg px-3 py-2 text-left text-sm text-textPrimary hover:bg-thirdBg"
+                        @click="openUsdaFoodSearch"
+                    >
+                        Search USDA database…
+                    </button>
+                </div>
                 <SearchList
                     :route="'diet/meals/food/all'"
                     :onSelect="addFood"
