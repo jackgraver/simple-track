@@ -19,6 +19,7 @@ import { dialogManager } from "~/composables/dialog/useDialog";
 import { toast } from "~/composables/toast/useToast";
 import { useWebStorageJsonSync } from "~/composables/useWebStorageJsonSync";
 import CreateFoodDialog from "./dialog/CreateFoodDialog.vue";
+import SearchFoodDialog from "./dialog/SearchFoodDialog.vue";
 import { computed, nextTick, ref, toRaw, watch } from "vue";
 import { mealItemsToDisplayBlocks } from "~/utils/mealItemGroups";
 import { useMeal } from "./queries/useMeal";
@@ -324,7 +325,9 @@ const logMealDraftSync = useWebStorageJsonSync<LogMealDraftSnapshot>({
     canPersist: () => logMealDraftStorageKey.value !== "",
     getSnapshot: () => ({
         name: meal.value.name,
-        items: JSON.parse(JSON.stringify(toRaw(meal.value.items))) as MealItem[],
+        items: JSON.parse(
+            JSON.stringify(toRaw(meal.value.items)),
+        ) as MealItem[],
     }),
     tryRestore: (parsed, { remove }) => {
         if (typeof parsed.name !== "string") {
@@ -551,6 +554,18 @@ const createFood = async (name: string): Promise<boolean> => {
     } catch (err) {
         toast.push("Dialog Error", "error");
         return false;
+    }
+};
+
+const openUsdaFoodSearch = async () => {
+    try {
+        const food = await dialogManager.custom<Food>({
+            title: "Search food database",
+            component: SearchFoodDialog,
+        });
+        if (food) await addFood(food);
+    } catch (err) {
+        console.error("Dialog error:", err);
     }
 };
 
@@ -936,7 +951,16 @@ const saveEditedSavedMeal = async () => {
             <aside
                 class="flex min-h-[min(20rem,45dvh)] flex-col overflow-hidden rounded-lg bg-firstBg p-4 text-textPrimary md:min-h-0"
             >
-                <h2 class="mt-0 text-lg font-semibold">Add Foods</h2>
+                <div class="mb-3 flex shrink-0 flex-col gap-2">
+                    <h2 class="m-0 text-lg font-semibold">Add Foods</h2>
+                    <button
+                        type="button"
+                        class="w-full cursor-pointer rounded border border-secondBg bg-secondBg px-3 py-2 text-left text-sm text-textPrimary hover:bg-thirdBg"
+                        @click="openUsdaFoodSearch"
+                    >
+                        Search USDA database…
+                    </button>
+                </div>
                 <SearchList
                     :route="'diet/meals/food/all'"
                     :onSelect="pickFoodOrComposite"
