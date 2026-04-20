@@ -4,19 +4,26 @@ import (
 	"be-simpletracker/internal/core/diet/models"
 	"be-simpletracker/internal/core/diet/services"
 	"be-simpletracker/internal/utils"
+	"context"
+	"errors"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
 
 type MealHandler struct {
-	db *gorm.DB
+	db      *gorm.DB
+	foodAPI *utils.FoodAPIClient
 }
 
 func NewMealHandler(db *gorm.DB) *MealHandler {
-	return &MealHandler{db: db}
+	return &MealHandler{
+		db:      db,
+		foodAPI: utils.NewFoodAPIClient(),
+	}
 }
 
 func RegisterMealRoutes(group *gin.RouterGroup, db *gorm.DB) {
@@ -24,6 +31,7 @@ func RegisterMealRoutes(group *gin.RouterGroup, db *gorm.DB) {
 	foods := group.Group("/foods")
 	{
 		foods.POST("", h.postFood)
+		foods.GET("/search", h.searchExternalFoods)
 	}
 	meals := group.Group("/meals")
 	{
@@ -54,6 +62,46 @@ func (h *MealHandler) postFood(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusCreated, gin.H{"food": createdFood})
+}
+
+// searchExternalFoods proxies a query to USDA FDC, returning the top short-form
+// matches (name + brand + per-serving macros). The handler enforces a per-caller
+// rate limit on top of the upstream limiter / cache inside FoodAPIClient.
+func (h *MealHandler) searchExternalFoods(c *gin.Context) {
+	query := c.Query("q")
+	if query == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "missing q"})
+		return
+	}
+
+	callerKey := c.GetString("username")
+	if callerKey == "" {
+		callerKey = c.ClientIP()
+	}
+	if !h.foodAPI.AllowCaller(callerKey) {
+		c.Header("Retry-After", "1")
+		c.JSON(http.StatusTooManyRequests, gin.H{"error": "too many requests"})
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 10*time.Second)
+	defer cancel()
+
+	foods, err := h.foodAPI.SearchFoods(ctx, query)
+	if err != nil {
+		switch {
+		case errors.Is(err, utils.ErrQueryTooShort):
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		case errors.Is(err, utils.ErrUpstreamSaturated):
+			c.Header("Retry-After", "2")
+			c.JSON(http.StatusTooManyRequests, gin.H{"error": err.Error()})
+		default:
+			c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
+		}
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"foods": foods})
 }
 
 func (h *MealHandler) getAllFoods(c *gin.Context) {
