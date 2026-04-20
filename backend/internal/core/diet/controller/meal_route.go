@@ -6,6 +6,7 @@ import (
 	"be-simpletracker/internal/core/diet/services"
 	"be-simpletracker/internal/utils"
 	"be-simpletracker/internal/utils/apierr"
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -650,4 +651,46 @@ func DeletePlannedMeal(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, dayWithTotalsResponse(result))
+}
+
+// searchExternalFoods proxies a query to USDA FDC, returning the top short-form
+// matches (name + brand + per-serving macros). The handler enforces a per-caller
+// rate limit on top of the upstream limiter / cache inside FoodAPIClient.
+func SearchExternalFoods(c *gin.Context) {
+	foodAPI := utils.NewFoodAPIClient()
+
+	query := c.Query("q")
+	if query == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "missing q"})
+		return
+	}
+
+	callerKey := c.GetString("username")
+	if callerKey == "" {
+		callerKey = c.ClientIP()
+	}
+	if foodAPI.AllowCaller(callerKey) {
+		c.Header("Retry-After", "1")
+		c.JSON(http.StatusTooManyRequests, gin.H{"error": "too many requests"})
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 10*time.Second)
+	defer cancel()
+
+	foods, err := foodAPI.SearchFoods(ctx, query)
+	if err != nil {
+		switch {
+		case errors.Is(err, utils.ErrQueryTooShort):
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		case errors.Is(err, utils.ErrUpstreamSaturated):
+			c.Header("Retry-After", "2")
+			c.JSON(http.StatusTooManyRequests, gin.H{"error": err.Error()})
+		default:
+			c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
+		}
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"foods": foods})
 }

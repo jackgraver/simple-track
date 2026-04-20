@@ -50,6 +50,8 @@ func RegisterRoutes(router *gin.Engine, authMiddleware gin.HandlerFunc) {
 			meals.POST("/planned/from-saved", controller.PostPlannedFromSaved)
 			meals.POST("/planned/reorder", controller.PostPlannedReorder)
 			meals.DELETE("/planned", controller.DeletePlannedMeal)
+
+			foods.GET("/search", controller.SearchExternalFoods)
 		}
 	}
 }
