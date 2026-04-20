@@ -22,12 +22,14 @@ const fdcSearchURL = "https://api.nal.usda.gov/fdc/v1/foods/search"
 
 // USDA nutrient ids we surface to clients (USDA "nutrientId" values).
 const (
-	nutrientCalories = 1008
-	nutrientProtein  = 1003
-	nutrientCarbs    = 1005
-	nutrientFat      = 1004
-	nutrientFiber    = 1079
-	nutrientSugar    = 2000
+	nutrientEnergyKcal        = 1008 // Energy
+	nutrientEnergyAtwaterGen  = 2047 // Energy (Atwater General Factors)
+	nutrientEnergyAtwaterSpec = 2048 // Energy (Atwater Specific Factors)
+	nutrientProtein           = 1003
+	nutrientCarbs             = 1005
+	nutrientFat               = 1004
+	nutrientFiber             = 1079
+	nutrientSugar             = 2000
 )
 
 const (
@@ -42,7 +44,8 @@ const (
 )
 
 // FoodSummary is the trimmed-down food row returned to clients.
-// Macros are reported per the food's serving_size (in serving_size_unit).
+// Macros are reported per serving_size (serving_size_unit). When FDC omits
+// serving size or unit, we assume 100 g (common for non-branded / legacy rows).
 type FoodSummary struct {
 	FdcID       int     `json:"fdc_id"`
 	Name        string  `json:"name"`
@@ -183,7 +186,7 @@ func (c *FoodAPIClient) SearchFoods(ctx context.Context, rawQuery string) ([]Foo
 func (c *FoodAPIClient) fetchUpstream(ctx context.Context, query string) ([]FoodSummary, error) {
 	body, err := json.Marshal(fdcSearchRequest{
 		Query:           query,
-		DataType:        []string{"Branded"},
+		DataType:        []string{"Foundation", "SR Legacy"},
 		PageSize:        defaultPageSize,
 		SortBy:          "dataType.keyword",
 		SortOrder:       "asc",
@@ -290,17 +293,30 @@ func summarizeFood(f fdcFood) FoodSummary {
 	if brand == "" {
 		brand = strings.TrimSpace(f.BrandOwner)
 	}
+
+	servingSize := f.ServingSize
+	servingUnit := strings.ToLower(strings.TrimSpace(f.ServingSizeUnit))
+	if servingSize <= 0 || servingUnit == "" {
+		servingSize = 100
+		servingUnit = "g"
+	}
+
+	var kcal1008, kcal2047, kcal2048 float64
 	sum := FoodSummary{
 		FdcID:       f.FdcID,
 		Name:        strings.TrimSpace(f.Description),
 		Brand:       brand,
-		ServingSize: f.ServingSize,
-		ServingUnit: strings.ToLower(strings.TrimSpace(f.ServingSizeUnit)),
+		ServingSize: servingSize,
+		ServingUnit: servingUnit,
 	}
 	for _, n := range f.FoodNutrients {
 		switch n.NutrientID {
-		case nutrientCalories:
-			sum.Calories = n.Value
+		case nutrientEnergyKcal:
+			kcal1008 = n.Value
+		case nutrientEnergyAtwaterGen:
+			kcal2047 = n.Value
+		case nutrientEnergyAtwaterSpec:
+			kcal2048 = n.Value
 		case nutrientProtein:
 			sum.Protein = n.Value
 		case nutrientCarbs:
@@ -313,7 +329,33 @@ func summarizeFood(f fdcFood) FoodSummary {
 			sum.Sugar = n.Value
 		}
 	}
+	sum.Calories = pickEnergyKcal(kcal1008, kcal2047, kcal2048)
 	return sum
+}
+
+// pickEnergyKcal prefers label Energy (1008), then Atwater Specific (2048),
+// then Atwater General (2047). If the preferred id is absent or zero, falls
+// through so rows that only report Atwater energy still get calories.
+func pickEnergyKcal(kcal1008, kcal2047, kcal2048 float64) float64 {
+	if kcal1008 > 0 {
+		return kcal1008
+	}
+	if kcal2048 > 0 {
+		return kcal2048
+	}
+	if kcal2047 > 0 {
+		return kcal2047
+	}
+	if kcal1008 != 0 {
+		return kcal1008
+	}
+	if kcal2048 != 0 {
+		return kcal2048
+	}
+	if kcal2047 != 0 {
+		return kcal2047
+	}
+	return 0
 }
 
 // --- USDA wire types (only the fields we read) ---
