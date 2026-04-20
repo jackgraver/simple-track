@@ -45,7 +45,7 @@ function prev() {
                 <h2 class="mb-0 flex-1 text-lg font-semibold">Planned</h2>
                 <button
                     type="button"
-                    class="flex items-center gap-1 rounded-md border px-2 py-1 text-sm font-medium text-zinc-200"
+                    class="flex items-center gap-1 rounded-md border px-2 py-1 m-0! text-sm font-medium text-zinc-200"
                     @click="editPlannedMeal"
                 >
                     <Pencil :size="15" />
@@ -62,9 +62,7 @@ function prev() {
             </template>
         </div>
         <template v-if="data">
-            <span
-                v-if="visibleItems?.length === 0"
-                class="text-zinc-500"
+            <span v-if="visibleItems?.length === 0" class="text-zinc-500"
                 >Nothing else planned.</span
             >
             <MealCard
