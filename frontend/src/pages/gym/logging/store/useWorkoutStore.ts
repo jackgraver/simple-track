@@ -8,8 +8,13 @@ import {
     useUpsertMobilityPre,
     useUpsertMobilityPost,
 } from "~/api/workout/queries";
+import { useWebStorageJsonSync } from "~/composables/useWebStorageJsonSync";
 import { sortExerciseGroupsByLogOrder } from "./sortExerciseGroupsByLogOrder";
-import { computed, ref, type MaybeRefOrGetter } from "vue";
+import { computed, ref, watch, type MaybeRefOrGetter } from "vue";
+
+const HIDDEN_EXERCISES_STORAGE_PREFIX = "simpletracker:workout:hidden-exercises:";
+
+type HiddenExercisesSnapshot = { ids: number[] };
 
 export type ExerciseGroup = {
     planned?: Exercise;
@@ -36,8 +41,59 @@ export function useWorkoutStore(offset: MaybeRefOrGetter<number> = 0) {
     const upsertMobilityPreMutation = useUpsertMobilityPre(offset);
     const upsertMobilityPostMutation = useUpsertMobilityPost(offset);
 
-    /** Catalog exercise IDs skipped on the log list for this session only (not persisted). */
+    /** Catalog exercise IDs hidden from the log list; persisted per workout log in localStorage. */
     const skippedExerciseIds = ref<Set<number>>(new Set());
+
+    const hiddenExercisesStorageKey = computed(() => {
+        const id = workoutLogsQuery.data.value?.day?.ID;
+        if (id == null) return "";
+        return `${HIDDEN_EXERCISES_STORAGE_PREFIX}${id}`;
+    });
+
+    const hiddenExercisesSync = useWebStorageJsonSync<HiddenExercisesSnapshot>({
+        key: hiddenExercisesStorageKey,
+        watchSources: [skippedExerciseIds],
+        getSnapshot: () => ({ ids: [...skippedExerciseIds.value] }),
+        canPersist: () => hiddenExercisesStorageKey.value !== "",
+        tryRestore: (parsed, ctx) => {
+            const raw = parsed as unknown;
+            let ids: unknown;
+            if (Array.isArray(raw)) {
+                ids = raw;
+            } else if (raw && typeof raw === "object" && "ids" in raw) {
+                ids = (raw as { ids?: unknown }).ids;
+            } else {
+                ctx.remove();
+                return false;
+            }
+            if (!Array.isArray(ids)) {
+                ctx.remove();
+                return false;
+            }
+            skippedExerciseIds.value = new Set(
+                ids.filter(
+                    (x): x is number =>
+                        typeof x === "number" && Number.isFinite(x),
+                ),
+            );
+            return true;
+        },
+    });
+
+    watch(
+        () => workoutLogsQuery.data.value?.day?.ID,
+        (workoutLogId) => {
+            hiddenExercisesSync.setSaveEnabled(false);
+            skippedExerciseIds.value = new Set();
+            if (workoutLogId == null) {
+                hiddenExercisesSync.setSaveEnabled(true);
+                return;
+            }
+            hiddenExercisesSync.restore();
+            hiddenExercisesSync.setSaveEnabled(true);
+        },
+        { immediate: true },
+    );
 
     const hideExerciseLocally = (exerciseId: number) => {
         const next = new Set(skippedExerciseIds.value);
