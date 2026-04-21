@@ -88,14 +88,16 @@ const goToNextDay = () => {
     updateOffset(dayOffset.value - 1);
 };
 
+const isToday = computed(() => dayOffset.value === 0);
+
+const goToToday = () => {
+    if (!isToday.value) updateOffset(0);
+};
+
 const dateLabel = computed(() => {
     const d = data.value?.date;
     return d ? formatDateLong(d) : "";
 });
-
-const splitLabel = computed(
-    () => data.value?.workout_plan?.name ?? "No split assigned",
-);
 
 const switchingPlan = computed(() => switchPlanMutation.isPending.value);
 
@@ -106,128 +108,48 @@ const loggingRoute = computed(() => ({
 </script>
 
 <template>
-    <div class="gym">
+    <div class="flex w-full flex-col gap-6 max-w-3xl">
         <template v-if="isGymHome">
-            <div v-if="isPending" class="state">Loading...</div>
-            <div v-else-if="isError" class="state">
+            <div v-if="isPending" class="text-sm text-textSecondary">Loading...</div>
+            <div v-else-if="isError" class="text-sm text-(--color-cf-red)">
                 Error: {{ error?.message ?? "Failed to load" }}
             </div>
             <template v-else>
-                <div class="flex items-center gap-2 pt-2">
-                    <router-link :to="{ name: 'gym-plans' }">
-                        <p class="bg-firstBg hover:bg-secondBg rounded-md p-2">
-                            Manage Plans
-                        </p>
-                    </router-link>
-                    <router-link :to="{ name: 'progression' }">
-                        <p class="bg-firstBg hover:bg-secondBg rounded-md p-2">
-                            Progression
-                        </p>
-                    </router-link>
+                <div class="flex items-center justify-between gap-4 border-b border-(--color-border) pb-3">
+                    <h1 class="m-0 text-lg font-semibold text-textPrimary">Gym</h1>
+                    <nav class="flex items-center gap-3 text-sm text-textSecondary">
+                        <router-link :to="{ name: 'gym-plans' }" class="transition-colors hover:text-textPrimary">Manage plans</router-link>
+                        <span aria-hidden="true" class="text-textSecondary/50">·</span>
+                        <router-link :to="{ name: 'progression' }" class="transition-colors hover:text-textPrimary">Progression</router-link>
+                    </nav>
                 </div>
-                <div class="date-nav">
-                    <button
-                        type="button"
-                        class="date-nav-button"
-                        @click="goToPreviousDay"
-                    >
-                        <ChevronLeftIcon />
-                    </button>
-                    <p class="date">{{ dateLabel }}</p>
-                    <button
-                        type="button"
-                        class="date-nav-button"
-                        @click="goToNextDay"
-                    >
-                        <ChevronRightIcon />
-                    </button>
-                </div>
-                <div
-                    v-if="planOptions.length"
-                    class="flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-3"
-                >
-                    <label
-                        for="gym-plan-switch"
-                        class="text-sm font-medium text-zinc-400"
-                        >Today's plan</label
-                    >
-                    <select
-                        id="gym-plan-switch"
-                        class="w-full max-w-md rounded border border-zinc-600 bg-zinc-900 px-2 py-1.5 text-sm text-inherit disabled:opacity-50 sm:w-auto"
-                        :value="planSelectValue"
-                        :disabled="switchingPlan"
-                        @change="handleSwitchPlan"
-                    >
+                <section class="flex flex-col gap-2">
+                    <div class="flex items-center justify-between gap-3">
+                        <button type="button" aria-label="Previous day" class="rounded-md border border-(--color-border) bg-firstBg p-2 text-textPrimary transition-colors hover:bg-secondBg" @click="goToPreviousDay">
+                            <ChevronLeftIcon class="size-4" />
+                        </button>
+                        <p class="m-0 text-base font-medium text-textPrimary">{{ dateLabel }}</p>
+                        <button type="button" aria-label="Next day" class="rounded-md border border-(--color-border) bg-firstBg p-2 text-textPrimary transition-colors hover:bg-secondBg" @click="goToNextDay">
+                            <ChevronRightIcon class="size-4" />
+                        </button>
+                    </div>
+                    <button v-if="!isToday" type="button" class="self-center text-xs text-textSecondary underline-offset-2 transition-colors hover:text-textPrimary hover:underline" @click="goToToday">Jump to today</button>
+                </section>
+                <section class="flex flex-col gap-2">
+                    <label for="gym-plan-switch" class="text-xs font-medium uppercase tracking-wide text-textSecondary">Today's plan</label>
+                    <select v-if="planOptions.length" id="gym-plan-switch" class="w-full rounded-md border border-(--color-border) bg-firstBg px-3 py-2 text-sm text-textPrimary transition-colors hover:bg-secondBg disabled:opacity-50" :value="planSelectValue" :disabled="switchingPlan" @change="handleSwitchPlan">
                         <option value="">No plan</option>
-                        <option
-                            v-for="p in planOptions"
-                            :key="p.id"
-                            :value="String(p.id)"
-                        >
-                            {{ p.name }}
-                        </option>
+                        <option v-for="p in planOptions" :key="p.id" :value="String(p.id)">{{ p.name }}</option>
                     </select>
-                </div>
-                <h1 class="split">{{ splitLabel }}</h1>
+                    <p v-else class="m-0 text-sm text-textSecondary">
+                        No plans yet.
+                        <router-link :to="{ name: 'gym-plans' }" class="text-textPrimary underline underline-offset-2 hover:no-underline">Create one</router-link>
+                    </p>
+                </section>
+                <router-link :to="loggingRoute" class="flex items-center justify-center rounded-md bg-secondBg px-4 py-3 text-sm font-semibold text-textPrimary transition-colors hover:bg-thirdBg">Log workout</router-link>
                 <WorkoutActivityGraph />
-                <router-link :to="loggingRoute" class="gym-cta"
-                    >Log workout</router-link
-                >
             </template>
         </template>
         <router-view v-else />
     </div>
 </template>
-
-<style scoped>
-.gym {
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-    max-width: 44rem;
-}
-.state {
-    color: #aaa;
-}
-.date-nav {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-}
-.date {
-    margin: 0;
-    font-size: 0.95rem;
-    color: #b0b0b0;
-}
-.date-nav-button {
-    padding: 0.35rem 0.7rem;
-    border: 1px solid #666;
-    border-radius: 6px;
-    background: #2d2d2d;
-    color: #fff;
-    font: inherit;
-    cursor: pointer;
-}
-.date-nav-button:hover {
-    background: #3a3a3a;
-}
-.split {
-    margin: 0;
-    font-size: 1.5rem;
-    font-weight: 600;
-}
-.gym-cta {
-    display: inline-block;
-    margin-top: 0.5rem;
-    padding: 10px 18px;
-    border-radius: 6px;
-    background: #3a3a3a;
-    color: #fff;
-    text-decoration: none;
-    font-weight: 500;
-    border: 1px solid #666;
-}
-.gym-cta:hover {
-    background: #4a4a4a;
-}
-</style>
