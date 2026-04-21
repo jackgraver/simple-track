@@ -3,7 +3,7 @@ import { useRoute } from "vue-router";
 import type { Food, Meal, MealItem, SavedMeal } from "~/types/diet";
 import SearchList from "~/shared/SearchList.vue";
 import { Plus, Trash2, Minus } from "lucide-vue-next";
-import FoodDisplay from "~/shared/FoodDisplay.vue";
+import FoodDisplay from "~/pages/diet/logmeal/components/FoodDisplay.vue";
 import Input from "~/shared/input/Input.vue";
 import { dialogManager } from "~/composables/dialog/useDialog";
 import { toast } from "~/composables/toast/useToast";

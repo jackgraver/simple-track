@@ -2,9 +2,9 @@
 import type { WorkoutPlan, Exercise } from "~/types/workout";
 import { toast } from "~/composables/toast/useToast";
 import { dialogManager } from "~/composables/dialog/useDialog";
-import AddExerciseDialog from "~/shared/AddExerciseDialog.vue";
-import CreateExerciseForPlanDialog from "~/shared/CreateExerciseForPlanDialog.vue";
-import EditExerciseDialog from "~/shared/EditExerciseDialog.vue";
+import AddExerciseDialog from "~/pages/gym/plans/components/AddExerciseDialog.vue";
+import CreateExerciseForPlanDialog from "~/pages/gym/plans/components/CreateExerciseForPlanDialog.vue";
+import EditExerciseDialog from "~/pages/gym/plans/components/EditExerciseDialog.vue";
 import { X, Plus, ChevronUp, ChevronDown, Pencil } from "lucide-vue-next";
 import { computed, ref, watch } from "vue";
 import { apiPUT } from "~/api/client";

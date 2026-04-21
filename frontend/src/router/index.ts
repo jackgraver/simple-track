@@ -11,7 +11,7 @@ const routes: RouteRecordRaw[] = [
   {
     path: '/home',
     name: 'home',
-    component: () => import('~/pages/home/home.vue'),
+    component: () => import('~/pages/home/index.vue'),
   },
   {
     path: '/diet',
