@@ -65,6 +65,16 @@ const routes: RouteRecordRaw[] = [
         name: 'progression',
         component: () => import('~/pages/gym/progression/progression.vue'),
       },
+      {
+        path: 'weight',
+        name: 'gym-weight',
+        component: () => import('~/pages/gym/weight/index.vue'),
+      },
+      {
+        path: 'steps',
+        name: 'gym-steps',
+        component: () => import('~/pages/gym/steps/index.vue'),
+      },
     ],
   },
   {

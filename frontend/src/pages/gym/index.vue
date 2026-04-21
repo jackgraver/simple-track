@@ -136,6 +136,22 @@ const loggingRoute = computed(() => ({
                             class="transition-colors hover:text-textPrimary"
                             >Progression</router-link
                         >
+                        <span aria-hidden="true" class="text-textSecondary/50"
+                            >·</span
+                        >
+                        <router-link
+                            :to="{ name: 'gym-weight' }"
+                            class="transition-colors hover:text-textPrimary"
+                            >Weight</router-link
+                        >
+                        <span aria-hidden="true" class="text-textSecondary/50"
+                            >·</span
+                        >
+                        <router-link
+                            :to="{ name: 'gym-steps' }"
+                            class="transition-colors hover:text-textPrimary"
+                            >Steps</router-link
+                        >
                     </nav>
                 </div>
                 <section class="flex flex-col gap-2">
