@@ -17,6 +17,7 @@ import Input from "~/shared/input/Input.vue";
 import { dialogManager } from "~/composables/dialog/useDialog";
 import { toast } from "~/composables/toast/useToast";
 import CreateFoodDialog from "./dialog/CreateFoodDialog.vue";
+import CreateCompositeDialog from "./dialog/CreateCompositeDialog.vue";
 import { computed, ref, toRaw, watch } from "vue";
 import { mealItemsToDisplayBlocks } from "~/utils/mealItemGroups";
 import { useMeal } from "./queries/useMeal";

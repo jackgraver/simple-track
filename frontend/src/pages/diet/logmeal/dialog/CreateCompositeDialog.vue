@@ -16,7 +16,9 @@ const lines = ref<{ food_id: number; food: Food; amount: number }[]>([]);
 
 const createMutation = useCreateCompositeFood();
 
-const addFood = async (item: Food & { entry_kind?: string }): Promise<boolean> => {
+const addFood = async (
+    item: Food & { entry_kind?: string },
+): Promise<boolean> => {
     if (item.entry_kind === "composite") return false;
     const food = item as Food;
     const existing = lines.value.findIndex((l) => l.food_id === food.ID);
@@ -54,7 +56,10 @@ const submit = async () => {
 
 <template>
     <div class="composite-form">
-        <p class="hint">Search and add foods, set amounts, then enter a name and save in the panel below.</p>
+        <p class="hint">
+            Search and add foods, set amounts, then enter a name and save in the
+            panel below.
+        </p>
         <div class="composite-dropdown">
             <div class="picker">
                 <SearchList
@@ -73,7 +78,12 @@ const submit = async () => {
                         step="any"
                         v-model.number="line.amount"
                     />
-                    <button type="button" class="rm" aria-label="Remove" @click="removeLine(i)">
+                    <button
+                        type="button"
+                        class="rm"
+                        aria-label="Remove"
+                        @click="removeLine(i)"
+                    >
                         <Trash2 :size="18" />
                     </button>
                 </li>
@@ -81,7 +91,12 @@ const submit = async () => {
             <div class="dropdown-footer">
                 <div class="field name-field">
                     <label for="recname">Recipe name</label>
-                    <input id="recname" type="text" v-model="name" placeholder="e.g. Caesar Sauce" />
+                    <input
+                        id="recname"
+                        type="text"
+                        v-model="name"
+                        placeholder="e.g. Caesar Sauce"
+                    />
                 </div>
                 <button
                     type="button"
