@@ -41,6 +41,9 @@ export interface MealItem extends BaseModel {
     food_id: number;
     food?: Food;
     amount: number;
+    group_id?: string;
+    group_label?: string;
+    composite_food_id?: number | null;
 }
 
 export interface Food extends BaseModel {
@@ -63,4 +66,25 @@ export interface SavedMealItem extends BaseModel {
     food_id: number;
     food?: Food;
     amount: number;
+    group_id?: string;
+    group_label?: string;
+    composite_food_id?: number | null;
+}
+
+export interface CompositeFoodItem extends BaseModel {
+    composite_food_id: number;
+    food_id: number;
+    food?: Food;
+    amount: number;
+}
+
+/** Recipe template; API adds entry_kind, aggregate macros for the food picker. */
+export interface CompositeFood extends BaseModel {
+    name: string;
+    items: CompositeFoodItem[];
+    entry_kind?: "composite";
+    calories?: number;
+    protein?: number;
+    fiber?: number;
+    carbs?: number;
 }

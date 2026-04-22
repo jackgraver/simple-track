@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import type { Meal } from "~/types/diet";
 import { EDIT_LOGGED_TYPE, EDIT_TYPE } from "~/pages/diet/logmeal/logmealMode";
-import { Trash2, SquarePen, Check } from "lucide-vue-next";
+import { Trash2, SquarePen, Check, ChevronRight, ChevronDown } from "lucide-vue-next";
 import SimpleMacros from "~/shared/SimpleMacros.vue";
-import { computed } from "vue";
+import { computed, ref } from "vue";
+import { blockMacros, mealItemsToDisplayBlocks } from "~/utils/mealItemGroups";
 
 function formatNum(n: number) {
     const s = n.toFixed(2);
@@ -40,6 +41,18 @@ const props = defineProps<{
 }>();
 
 const mealMacroTotals = computed(() => macroTotalsForMeal(props.meal));
+
+const mealBlocks = computed(() => mealItemsToDisplayBlocks(props.meal.items));
+const collapsedGroups = ref<Record<string, boolean>>({});
+function isGroupExpanded(groupId: string): boolean {
+    return !collapsedGroups.value[groupId];
+}
+function toggleGroupCollapse(groupId: string) {
+    collapsedGroups.value = {
+        ...collapsedGroups.value,
+        [groupId]: !collapsedGroups.value[groupId],
+    };
+}
 </script>
 
 <template>
@@ -57,49 +70,165 @@ const mealMacroTotals = computed(() => macroTotalsForMeal(props.meal));
         <div class="meal">
             <div class="left">
                 <div class="foods">
-                    <span
-                        v-for="(food, i) in meal.items"
-                        :key="`${food.food_id}-${i}`"
-                        class="food"
+                    <template
+                        v-for="(block, bi) in mealBlocks"
+                        :key="'mb-' + bi"
                     >
-                        <span
-                            >({{ formatNum(itemServingAmount(food))
-                            }}{{
-                                food.food?.serving_type === "g" ? "g" : ""
-                            }}) {{ food.food?.name
-                            }}{{
-                                Number(food.amount) > 1 ? "s" : ""
-                            }}</span
-                        >
-                        <span class="details">
-                            <span class="cal"
-                                >{{
-                                    formatNum(
-                                        (food.food?.calories ?? 0) *
-                                            Number(food.amount),
-                                    )
-                                }}C</span
+                        <template v-if="block.kind === 'ungrouped'">
+                            <span
+                                v-for="{ item: food, index: i } in block.rows"
+                                :key="'u-' + i"
+                                class="food"
                             >
-                            /
-                            <span class="pro"
-                                >{{
-                                    formatNum(
-                                        (food.food?.protein ?? 0) *
-                                            Number(food.amount),
-                                    )
-                                }}P</span
-                            >
-                            /
-                            <span class="fib"
-                                >{{
-                                    formatNum(
-                                        (food.food?.fiber ?? 0) *
-                                            Number(food.amount),
-                                    )
-                                }}F</span
-                            >
-                        </span>
-                    </span>
+                                <span
+                                    >({{ formatNum(itemServingAmount(food))
+                                    }}{{
+                                        food.food?.serving_type === "g"
+                                            ? "g"
+                                            : ""
+                                    }}) {{ food.food?.name
+                                    }}{{
+                                        Number(food.amount) > 1 ? "s" : ""
+                                    }}</span
+                                >
+                                <span class="details">
+                                    <span class="cal"
+                                        >{{
+                                            formatNum(
+                                                (food.food?.calories ?? 0) *
+                                                    Number(food.amount),
+                                            )
+                                        }}C</span
+                                    >
+                                    /
+                                    <span class="pro"
+                                        >{{
+                                            formatNum(
+                                                (food.food?.protein ?? 0) *
+                                                    Number(food.amount),
+                                            )
+                                        }}P</span
+                                    >
+                                    /
+                                    <span class="fib"
+                                        >{{
+                                            formatNum(
+                                                (food.food?.fiber ?? 0) *
+                                                    Number(food.amount),
+                                            )
+                                        }}F</span
+                                    >
+                                </span>
+                            </span>
+                        </template>
+                        <template v-else>
+                            <div class="food-group">
+                                <button
+                                    type="button"
+                                    class="group-header food"
+                                    @click="toggleGroupCollapse(block.groupId)"
+                                >
+                                    <ChevronRight
+                                        v-if="!isGroupExpanded(block.groupId)"
+                                        :size="16"
+                                        class="chev"
+                                    />
+                                    <ChevronDown
+                                        v-else
+                                        :size="16"
+                                        class="chev"
+                                    />
+                                    <span class="group-title">{{
+                                        block.label || "Group"
+                                    }}</span>
+                                    <span class="details group-roll">
+                                        <span class="cal"
+                                            >{{
+                                                formatNum(
+                                                    blockMacros(block.rows)
+                                                        .calories,
+                                                )
+                                            }}C</span
+                                        >
+                                        /
+                                        <span class="pro"
+                                            >{{
+                                                formatNum(
+                                                    blockMacros(block.rows)
+                                                        .protein,
+                                                )
+                                            }}P</span
+                                        >
+                                        /
+                                        <span class="fib"
+                                            >{{
+                                                formatNum(
+                                                    blockMacros(block.rows)
+                                                        .fiber,
+                                                )
+                                            }}F</span
+                                        >
+                                    </span>
+                                </button>
+                                <div
+                                    v-if="isGroupExpanded(block.groupId)"
+                                    class="group-children"
+                                >
+                                    <span
+                                        v-for="{ item: food, index: i } in block.rows"
+                                        :key="'g-' + i"
+                                        class="food food-child"
+                                    >
+                                        <span
+                                            >({{
+                                                formatNum(itemServingAmount(food))
+                                            }}{{
+                                                food.food?.serving_type === "g"
+                                                    ? "g"
+                                                    : ""
+                                            }}) {{ food.food?.name
+                                            }}{{
+                                                Number(food.amount) > 1
+                                                    ? "s"
+                                                    : ""
+                                            }}</span
+                                        >
+                                        <span class="details">
+                                            <span class="cal"
+                                                >{{
+                                                    formatNum(
+                                                        (food.food?.calories ??
+                                                            0) *
+                                                            Number(food.amount),
+                                                    )
+                                                }}C</span
+                                            >
+                                            /
+                                            <span class="pro"
+                                                >{{
+                                                    formatNum(
+                                                        (food.food?.protein ??
+                                                            0) *
+                                                            Number(food.amount),
+                                                    )
+                                                }}P</span
+                                            >
+                                            /
+                                            <span class="fib"
+                                                >{{
+                                                    formatNum(
+                                                        (food.food?.fiber ??
+                                                            0) *
+                                                            Number(food.amount),
+                                                    )
+                                                }}F</span
+                                            >
+                                        </span>
+                                    </span>
+                                </div>
+                            </div>
+                        </template>
+                    </template>
                 </div>
             </div>
             <div class="right">
@@ -169,6 +298,55 @@ const mealMacroTotals = computed(() => macroTotalsForMeal(props.meal));
     display: flex;
     flex-direction: column;
     gap: 0.25rem;
+}
+
+.food-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+}
+
+.group-header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.25rem 0.5rem;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    text-align: left;
+    color: inherit;
+    font: inherit;
+}
+
+.group-header .chev {
+    flex-shrink: 0;
+    color: #888;
+}
+
+.group-title {
+    font-weight: 600;
+    color: #ccc;
+}
+
+.group-children {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    padding-left: 1.25rem;
+    border-left: 2px solid #333;
+    margin-left: 0.35rem;
+}
+
+.food-child {
+    font-size: 0.92em;
+}
+
+.group-roll {
+    margin-left: auto;
 }
 
 .right {
