@@ -54,36 +54,45 @@ const submit = async () => {
 
 <template>
     <div class="composite-form">
-        <div class="field">
-            <label for="recname">Recipe name</label>
-            <input id="recname" type="text" v-model="name" placeholder="e.g. Caesar Sauce" />
-        </div>
-        <p class="hint">Add foods below (same search as log meal).</p>
-        <div class="picker">
-            <SearchList
-                route="diet/meals/food/all"
-                :on-select="addFood"
-                :display-component="FoodDisplay"
-            />
-        </div>
-        <ul v-if="lines.length" class="lines">
-            <li v-for="(line, i) in lines" :key="line.food_id" class="line">
-                <span class="line-name">{{ line.food.name }}</span>
-                <input
-                    class="amt"
-                    type="number"
-                    min="0.01"
-                    step="any"
-                    v-model.number="line.amount"
+        <p class="hint">Search and add foods, set amounts, then enter a name and save in the panel below.</p>
+        <div class="composite-dropdown">
+            <div class="picker">
+                <SearchList
+                    route="diet/meals/food/all"
+                    :on-select="addFood"
+                    :display-component="FoodDisplay"
                 />
-                <button type="button" class="rm" aria-label="Remove" @click="removeLine(i)">
-                    <Trash2 :size="18" />
+            </div>
+            <ul v-if="lines.length" class="lines">
+                <li v-for="(line, i) in lines" :key="line.food_id" class="line">
+                    <span class="line-name">{{ line.food.name }}</span>
+                    <input
+                        class="amt"
+                        type="number"
+                        min="0.01"
+                        step="any"
+                        v-model.number="line.amount"
+                    />
+                    <button type="button" class="rm" aria-label="Remove" @click="removeLine(i)">
+                        <Trash2 :size="18" />
+                    </button>
+                </li>
+            </ul>
+            <div class="dropdown-footer">
+                <div class="field name-field">
+                    <label for="recname">Recipe name</label>
+                    <input id="recname" type="text" v-model="name" placeholder="e.g. Caesar Sauce" />
+                </div>
+                <button
+                    type="button"
+                    class="submit"
+                    :disabled="!name.trim() || lines.length === 0"
+                    @click="submit"
+                >
+                    Save
                 </button>
-            </li>
-        </ul>
-        <button type="button" class="submit" :disabled="!name.trim() || lines.length === 0" @click="submit">
-            Save recipe
-        </button>
+            </div>
+        </div>
     </div>
 </template>
 
@@ -96,10 +105,24 @@ const submit = async () => {
     padding: 1rem 0.5rem;
     max-height: 70dvh;
 }
+.composite-dropdown {
+    display: flex;
+    flex-direction: column;
+    border: 1px solid rgb(82, 82, 82);
+    border-radius: 8px;
+    background: rgb(36, 36, 36);
+    overflow: hidden;
+    min-height: 12rem;
+    max-height: min(58dvh, 32rem);
+}
 .field {
     display: flex;
     flex-direction: column;
     gap: 0.25rem;
+}
+.name-field {
+    flex: 1;
+    min-width: 0;
 }
 .hint {
     margin: 0;
@@ -107,21 +130,35 @@ const submit = async () => {
     color: #aaa;
 }
 .picker {
-    min-height: 8rem;
-    max-height: 14rem;
+    min-height: 7rem;
+    max-height: 12rem;
     display: flex;
     flex-direction: column;
     overflow: hidden;
+    border-bottom: 1px solid rgb(55, 55, 55);
+}
+.dropdown-footer {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 0.75rem;
+    padding: 0.75rem;
+    background: rgb(42, 42, 42);
+    border-top: 1px solid rgb(55, 55, 55);
+}
+.submit {
+    flex-shrink: 0;
 }
 .lines {
     list-style: none;
     margin: 0;
-    padding: 0;
+    padding: 0.5rem 0.75rem;
     display: flex;
     flex-direction: column;
     gap: 0.35rem;
-    max-height: 10rem;
+    max-height: 9rem;
     overflow-y: auto;
+    border-bottom: 1px solid rgb(55, 55, 55);
 }
 .line {
     display: flex;
@@ -154,8 +191,7 @@ const submit = async () => {
     color: #f87171;
 }
 .submit {
-    margin-top: 0.5rem;
-    padding: 0.5rem 1rem;
+    padding: 0.5rem 1.1rem;
     border-radius: 6px;
     border: none;
     background: #3b82f6;
