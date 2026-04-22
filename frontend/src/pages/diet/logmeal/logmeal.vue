@@ -8,7 +8,6 @@ import Input from "~/shared/input/Input.vue";
 import { dialogManager } from "~/composables/dialog/useDialog";
 import { toast } from "~/composables/toast/useToast";
 import CreateFoodDialog from "./dialog/CreateFoodDialog.vue";
-import CreateCompositeDialog from "./dialog/CreateCompositeDialog.vue";
 import { computed, ref, toRaw, watch } from "vue";
 import { blockMacros, mealItemsToDisplayBlocks } from "~/utils/mealItemGroups";
 import { useMeal } from "./queries/useMeal";
@@ -137,21 +136,27 @@ function selectedIndices(): number[] {
         .filter((k) => selectedForGroup.value[k]);
 }
 
+function setGroupLabel(groupId: string, label: string) {
+    const gid = groupId.trim();
+    if (!gid) return;
+    meal.value.items = meal.value.items.map((it) =>
+        (it.group_id ?? "").trim() === gid ? { ...it, group_label: label } : it,
+    );
+}
+
 const groupSelectedRows = () => {
     const idxs = selectedIndices().sort((a, b) => a - b);
     if (idxs.length < 2) {
         toast.push("Select at least two items to group.", "error");
         return;
     }
-    const label = window.prompt("Group label (e.g. Caesar Sauce)");
-    if (!label?.trim()) return;
     const gid = crypto.randomUUID();
     meal.value.items = meal.value.items.map((it, i) =>
         idxs.includes(i)
             ? {
                   ...it,
                   group_id: gid,
-                  group_label: label.trim(),
+                  group_label: "",
                   composite_food_id: null,
               }
             : it,
@@ -181,19 +186,6 @@ const removeGroupLines = (indices: number[]) => {
     }
     meal.value.items = items;
     selectedForGroup.value = {};
-};
-
-const openNewRecipeDialog = async () => {
-    try {
-        const res = await dialogManager.custom<CompositeFood | null>({
-            title: "New recipe",
-            component: CreateCompositeDialog,
-            props: {},
-        });
-        if (res) toast.push("Recipe saved — find it in Add Foods.", "success");
-    } catch {
-        /* dismissed */
-    }
 };
 
 const route = useRoute();
@@ -555,15 +547,8 @@ const updateLoggedMeal = async () => {
                         Meal Items
                     </h3>
                     <div
-                        class="flex shrink-0 flex-wrap gap-2 px-4 pb-2 text-textPrimary"
+                        class="flex shrink-0 flex-wrap items-center gap-2 px-4 pb-2 text-textPrimary"
                     >
-                        <button
-                            type="button"
-                            class="rounded border border-secondBg bg-secondBg px-3 py-1.5 text-sm hover:bg-thirdBg"
-                            @click="openNewRecipeDialog"
-                        >
-                            New recipe
-                        </button>
                         <button
                             type="button"
                             class="rounded border border-secondBg bg-secondBg px-3 py-1.5 text-sm hover:bg-thirdBg"
@@ -684,28 +669,40 @@ const updateLoggedMeal = async () => {
                                     class="grid grid-cols-[2rem_minmax(0,1fr)_9rem_11rem_2.5rem] items-center gap-x-3 gap-y-1 border-b border-secondBg py-2.5"
                                 >
                                     <span
-                                        class="w-4 shrink-0"
+                                        class="w-8 max-w-8 shrink-0"
                                         aria-hidden="true"
                                     ></span>
-                                    <button
-                                        type="button"
-                                        class="flex min-w-0 items-center gap-1 text-left text-base font-medium text-textPrimary"
-                                        @click="toggleGroupCollapse(block.groupId)"
+                                    <div
+                                        class="flex min-w-0 w-full max-w-full items-center justify-start gap-2 self-stretch"
                                     >
-                                        <ChevronRight
-                                            v-if="!isGroupExpanded(block.groupId)"
-                                            :size="20"
-                                            class="shrink-0"
+                                        <button
+                                            type="button"
+                                            class="flex h-9 w-9 shrink-0 items-center justify-center rounded border border-secondBg bg-secondBg text-textPrimary transition-colors hover:border-thirdBg hover:bg-thirdBg"
+                                            @click="toggleGroupCollapse(block.groupId)"
+                                        >
+                                            <ChevronRight
+                                                v-if="!isGroupExpanded(block.groupId)"
+                                                :size="18"
+                                            />
+                                            <ChevronDown
+                                                v-else
+                                                :size="18"
+                                            />
+                                        </button>
+                                        <input
+                                            type="text"
+                                            class="min-w-0 flex-1 basis-0 rounded border border-secondBg bg-secondBg px-2 py-1 text-left text-base font-medium text-textPrimary placeholder:text-textSecondary focus:border-thirdBg focus:outline-none"
+                                            :value="block.label"
+                                            placeholder="Name this group"
+                                            @input="
+                                                setGroupLabel(
+                                                    block.groupId,
+                                                    ($event.target as HTMLInputElement).value,
+                                                )
+                                            "
+                                            @click.stop
                                         />
-                                        <ChevronDown
-                                            v-else
-                                            :size="20"
-                                            class="shrink-0"
-                                        />
-                                        <span class="truncate">{{
-                                            block.label || "Group"
-                                        }}</span>
-                                    </button>
+                                    </div>
                                     <span
                                         class="text-center text-xs text-textSecondary"
                                         >—</span
@@ -742,7 +739,10 @@ const updateLoggedMeal = async () => {
                                         <Trash2 :size="20" />
                                     </button>
                                 </div>
-                                <template v-if="isGroupExpanded(block.groupId)">
+                                <div
+                                    v-if="isGroupExpanded(block.groupId)"
+                                    class="border-l-2 border-secondBg pl-3 sm:ml-1 sm:pl-5"
+                                >
                                     <div
                                         v-for="{ item, index: i } in block.rows"
                                         :key="`g-${i}`"
@@ -755,7 +755,7 @@ const updateLoggedMeal = async () => {
                                             @change="toggleSelectRow(i)"
                                         />
                                         <span
-                                            class="min-w-0 truncate pl-2 text-sm font-medium text-textPrimary sm:pl-3"
+                                            class="min-w-0 truncate text-sm font-medium text-textPrimary"
                                             :title="item.food?.name"
                                             >{{ item.food?.name ?? "" }}</span
                                         >
@@ -830,7 +830,7 @@ const updateLoggedMeal = async () => {
                                             <Trash2 :size="20" />
                                         </button>
                                     </div>
-                                </template>
+                                </div>
                             </template>
                         </template>
                     </div>
