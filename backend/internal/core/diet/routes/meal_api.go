@@ -6,6 +6,7 @@ import (
 	"be-simpletracker/internal/utils"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -28,6 +29,7 @@ func RegisterMealRoutes(group *gin.RouterGroup, db *gorm.DB) {
 	meals := group.Group("/meals")
 	{
 		meals.GET("/food/all", h.getAllFoods)
+		meals.POST("/composite-food/new", h.postNewCompositeFood)
 		meals.GET("/meal/all", h.getAllMeals)
 		meals.GET("/saved-meal/all", h.getAllSavedMeals)
 		meals.POST("/saved-meal/new", h.postNewSavedMeal)
@@ -56,6 +58,46 @@ func (h *MealHandler) postFood(c *gin.Context) {
 	c.JSON(http.StatusCreated, gin.H{"food": createdFood})
 }
 
+type compositeFoodWithMacros struct {
+	ID        uint                       `json:"ID"`
+	CreatedAt time.Time                  `json:"created_at"`
+	UpdatedAt time.Time                  `json:"updated_at"`
+	Name      string                     `json:"name"`
+	Items     []models.CompositeFoodItem `json:"items"`
+	EntryKind string                     `json:"entry_kind"`
+	Calories  float32                    `json:"calories"`
+	Protein   float32                    `json:"protein"`
+	Fiber     float32                    `json:"fiber"`
+	Carbs     float32                    `json:"carbs"`
+}
+
+func sumCompositeMacros(cf models.CompositeFood) (cal, pro, fib, carb float32) {
+	for _, it := range cf.Items {
+		a := it.Amount
+		cal += it.Food.Calories * a
+		pro += it.Food.Protein * a
+		fib += it.Food.Fiber * a
+		carb += it.Food.Carbs * a
+	}
+	return cal, pro, fib, carb
+}
+
+func compositeToResponse(cf models.CompositeFood) compositeFoodWithMacros {
+	cal, pro, fib, carb := sumCompositeMacros(cf)
+	return compositeFoodWithMacros{
+		ID:        cf.ID,
+		CreatedAt: cf.CreatedAt,
+		UpdatedAt: cf.UpdatedAt,
+		Name:      cf.Name,
+		Items:     cf.Items,
+		EntryKind: "composite",
+		Calories:  cal,
+		Protein:   pro,
+		Fiber:     fib,
+		Carbs:     carb,
+	}
+}
+
 func (h *MealHandler) getAllFoods(c *gin.Context) {
 	excludeIDsStr := c.Query("exclude")
 	var excludeIDs []uint
@@ -69,7 +111,43 @@ func (h *MealHandler) getAllFoods(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"foods": foods})
+	composites, err := services.AllCompositeFoods(h.db)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	compositeDTOs := make([]compositeFoodWithMacros, 0, len(composites))
+	for _, cf := range composites {
+		compositeDTOs = append(compositeDTOs, compositeToResponse(cf))
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"foods":           foods,
+		"composite_foods": compositeDTOs,
+	})
+}
+
+func (h *MealHandler) postNewCompositeFood(c *gin.Context) {
+	var cf models.CompositeFood
+	if err := c.ShouldBindJSON(&cf); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	cf.ID = 0
+	if cf.Name == "" || len(cf.Items) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "name and at least one item required"})
+		return
+	}
+	id, err := services.CreateCompositeFood(h.db, &cf)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	var loaded models.CompositeFood
+	if err := h.db.Preload("Items.Food").First(&loaded, id).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusCreated, gin.H{"composite_food": compositeToResponse(loaded)})
 }
 
 func (h *MealHandler) getAllMeals(c *gin.Context) {
@@ -123,8 +201,11 @@ func savedMealFromMealTemplate(m *models.Meal) *models.SavedMeal {
 	s := &models.SavedMeal{Name: m.Name}
 	for _, it := range m.Items {
 		s.Items = append(s.Items, models.SavedMealItem{
-			FoodID: it.FoodID,
-			Amount: float64(it.Amount),
+			FoodID:            it.FoodID,
+			Amount:            float64(it.Amount),
+			GroupID:           it.GroupID,
+			GroupLabel:        it.GroupLabel,
+			CompositeFoodID:   it.CompositeFoodID,
 		})
 	}
 	return s

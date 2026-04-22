@@ -38,6 +38,25 @@ func (r *Repository) FoodCreate(food *models.Food) error {
 	return r.db.Create(food).Error
 }
 
+func (r *Repository) CompositeFoodsAll() ([]models.CompositeFood, error) {
+	var list []models.CompositeFood
+	if err := r.db.Preload("Items.Food").Order("name ASC").Find(&list).Error; err != nil {
+		return nil, err
+	}
+	return list, nil
+}
+
+func (r *Repository) CompositeFoodCreate(cf *models.CompositeFood) (uint, error) {
+	cf.ID = 0
+	for i := range cf.Items {
+		cf.Items[i].ID = 0
+	}
+	if err := r.db.Create(cf).Error; err != nil {
+		return 0, err
+	}
+	return cf.ID, nil
+}
+
 func (r *Repository) MealsAll(excludeIDs []uint) ([]models.Meal, error) {
 	var meals []models.Meal
 	query := r.db.Model(&models.Meal{})

@@ -1,5 +1,5 @@
 import { apiClient } from '~/api/client';
-import type { DietDay, Meal } from '~/types/diet';
+import type { CompositeFood, DietDay, Meal } from '~/types/diet';
 
 export type DietLogsTodayResponse = {
     day: DietDay;
@@ -19,6 +19,10 @@ export type CreateMealResponse = {
 
 export type CreateSavedMealResponse = {
     saved_meal_id: number;
+};
+
+export type CreateCompositeFoodResponse = {
+    composite_food: CompositeFood;
 };
 
 export type LogMealResponse = {
@@ -108,13 +112,32 @@ export async function getMealById(id: number): Promise<MealResponse> {
     return { meal: response.data };
 }
 
+export type SavedMealItemPayload = {
+    food_id: number;
+    amount: number;
+    group_id?: string;
+    group_label?: string;
+    composite_food_id?: number | null;
+};
+
 export async function createSavedMeal(payload: {
     name: string;
-    items: { food_id: number; amount: number }[];
+    items: SavedMealItemPayload[];
 }): Promise<CreateSavedMealResponse> {
     const response = await apiClient.post<CreateSavedMealResponse>(
         "/diet/meals/saved-meal/new",
         payload,
+    );
+    return response.data;
+}
+
+export async function createCompositeFood(body: {
+    name: string;
+    items: { food_id: number; amount: number }[];
+}): Promise<CreateCompositeFoodResponse> {
+    const response = await apiClient.post<CreateCompositeFoodResponse>(
+        "/diet/meals/composite-food/new",
+        body,
     );
     return response.data;
 }

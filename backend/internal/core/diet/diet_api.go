@@ -19,6 +19,23 @@ func NewHandler(db *gorm.DB) *Handler {
 	return &Handler{db: db}
 }
 
+// Migrate runs GORM AutoMigrate for all diet models.
+func (h *Handler) Migrate() error {
+	return h.db.AutoMigrate(
+		&models.Plan{},
+		&models.DietDay{},
+		&models.Meal{},
+		&models.MealItem{},
+		&models.SavedMeal{},
+		&models.SavedMealItem{},
+		&models.PlannedMeal{},
+		&models.DayLog{},
+		&models.Food{},
+		&models.CompositeFood{},
+		&models.CompositeFoodItem{},
+	)
+}
+
 // RegisterRoutes registers all diet feature routes (requires authMiddleware).
 func (h *Handler) RegisterRoutes(router *gin.Engine, authMiddleware gin.HandlerFunc) {
 	group := router.Group("/diet", authMiddleware)
@@ -57,6 +74,8 @@ func seedDatabase(db *gorm.DB) error {
 		&models.PlannedMeal{},
 		&models.DayLog{},
 		&models.Food{},
+		&models.CompositeFood{},
+		&models.CompositeFoodItem{},
 	); err != nil {
 		fmt.Printf("Failed to migrate meal plan database: %v\n", err)
 	}
