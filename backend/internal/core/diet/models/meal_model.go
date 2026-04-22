@@ -16,11 +16,14 @@ func (m Meal) Preloads() []string { return []string{"Items.Food"} }
 // MealItem represents an item in a meal
 type MealItem struct {
 	gorm.Model
-	MealID uint    `json:"meal_id" gorm:"not null;index"`
-	FoodID uint    `json:"food_id" gorm:"not null;index"`
-	Amount float32 `json:"amount"`
-	Meal   Meal    `json:"meal"`
-	Food   Food    `json:"food"`
+	MealID            uint    `json:"meal_id" gorm:"not null;index"`
+	FoodID            uint    `json:"food_id" gorm:"not null;index"`
+	Amount            float32 `json:"amount"`
+	GroupID           string  `json:"group_id" gorm:"index"`
+	GroupLabel        string  `json:"group_label"`
+	CompositeFoodID   *uint   `json:"composite_food_id"`
+	Meal              Meal    `json:"meal"`
+	Food              Food    `json:"food"`
 }
 
 func (m MealItem) GetID() uint        { return m.ID }
@@ -41,11 +44,14 @@ func (s SavedMeal) Preloads() []string { return []string{"Items.Food"} }
 // SavedMealItem represents an item in a saved meal
 type SavedMealItem struct {
 	gorm.Model
-	SavedMealID uint    `json:"saved_meal_id" gorm:"not null;index"`
-	FoodID      uint    `json:"food_id" gorm:"not null;index"`
-	Amount      float64 `json:"amount"`
-	SavedMeal   SavedMeal `json:"-"`
-	Food        Food      `json:"food"`
+	SavedMealID     uint    `json:"saved_meal_id" gorm:"not null;index"`
+	FoodID          uint    `json:"food_id" gorm:"not null;index"`
+	Amount          float64 `json:"amount"`
+	GroupID         string  `json:"group_id" gorm:"index"`
+	GroupLabel      string  `json:"group_label"`
+	CompositeFoodID *uint   `json:"composite_food_id"`
+	SavedMeal       SavedMeal `json:"-"`
+	Food            Food      `json:"food"`
 }
 
 func (s SavedMealItem) GetID() uint       { return s.ID }
@@ -65,3 +71,28 @@ type Food struct {
 
 func (f Food) GetID() uint       { return f.ID }
 func (f Food) TableName() string { return "foods" }
+
+// CompositeFood is a reusable recipe (multiple foods + amounts); logging expands to grouped meal items.
+type CompositeFood struct {
+	gorm.Model
+	Name  string              `json:"name" gorm:"not null;uniqueIndex"`
+	Items []CompositeFoodItem `json:"items" gorm:"constraint:OnDelete:CASCADE;"`
+}
+
+func (c CompositeFood) GetID() uint        { return c.ID }
+func (c CompositeFood) TableName() string { return "composite_foods" }
+func (c CompositeFood) Preloads() []string { return []string{"Items.Food"} }
+
+// CompositeFoodItem is one ingredient line in a composite food.
+type CompositeFoodItem struct {
+	gorm.Model
+	CompositeFoodID uint          `json:"composite_food_id" gorm:"not null;index"`
+	FoodID          uint          `json:"food_id" gorm:"not null;index"`
+	Amount          float32       `json:"amount"`
+	CompositeFood   CompositeFood `json:"-"`
+	Food            Food          `json:"food"`
+}
+
+func (c CompositeFoodItem) GetID() uint       { return c.ID }
+func (c CompositeFoodItem) TableName() string { return "composite_food_items" }
+func (c CompositeFoodItem) Preloads() []string { return []string{"Food"} }

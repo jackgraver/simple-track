@@ -1,14 +1,16 @@
 <script setup lang="ts">
 import { useRoute } from "vue-router";
-import type { Food, Meal, MealItem, SavedMeal } from "~/types/diet";
+import type { CompositeFood, Food, Meal, MealItem, SavedMeal } from "~/types/diet";
 import SearchList from "~/shared/SearchList.vue";
-import { Plus, Trash2, Minus } from "lucide-vue-next";
+import { Plus, Trash2, Minus, ChevronRight, ChevronDown } from "lucide-vue-next";
 import FoodDisplay from "~/pages/diet/logmeal/components/FoodDisplay.vue";
 import Input from "~/shared/input/Input.vue";
 import { dialogManager } from "~/composables/dialog/useDialog";
 import { toast } from "~/composables/toast/useToast";
 import CreateFoodDialog from "./dialog/CreateFoodDialog.vue";
+import CreateCompositeDialog from "./dialog/CreateCompositeDialog.vue";
 import { computed, ref, toRaw, watch } from "vue";
+import { blockMacros, mealItemsToDisplayBlocks } from "~/utils/mealItemGroups";
 import { useMeal } from "./queries/useMeal";
 import { useDietLogsToday } from "./queries/useDietLogsToday";
 import {
@@ -93,6 +95,7 @@ function amountPlusMinus(index: number, direction: "plus" | "minus") {
     const next = amount - step;
     if (next <= 0) {
         meal.value.items = items.filter((_, i) => i !== index);
+        selectedForGroup.value = {};
         return;
     }
     meal.value.items = items.map((it, i) =>
@@ -103,6 +106,95 @@ function amountPlusMinus(index: number, direction: "plus" | "minus") {
 function itemServingAmount(item: MealItem): number {
     return (item.food?.serving_amount || 1) * item.amount;
 }
+
+function mealItemGroupKey(item: MealItem): string {
+    return (item.group_id ?? "").trim();
+}
+
+const mealItemBlocks = computed(() => mealItemsToDisplayBlocks(meal.value.items));
+
+const collapsedGroups = ref<Record<string, boolean>>({});
+function isGroupExpanded(groupId: string): boolean {
+    return !collapsedGroups.value[groupId];
+}
+function toggleGroupCollapse(groupId: string) {
+    collapsedGroups.value = {
+        ...collapsedGroups.value,
+        [groupId]: !collapsedGroups.value[groupId],
+    };
+}
+
+const selectedForGroup = ref<Record<number, boolean>>({});
+function toggleSelectRow(index: number) {
+    const next = { ...selectedForGroup.value };
+    if (next[index]) delete next[index];
+    else next[index] = true;
+    selectedForGroup.value = next;
+}
+function selectedIndices(): number[] {
+    return Object.keys(selectedForGroup.value)
+        .map(Number)
+        .filter((k) => selectedForGroup.value[k]);
+}
+
+const groupSelectedRows = () => {
+    const idxs = selectedIndices().sort((a, b) => a - b);
+    if (idxs.length < 2) {
+        toast.push("Select at least two items to group.", "error");
+        return;
+    }
+    const label = window.prompt("Group label (e.g. Caesar Sauce)");
+    if (!label?.trim()) return;
+    const gid = crypto.randomUUID();
+    meal.value.items = meal.value.items.map((it, i) =>
+        idxs.includes(i)
+            ? {
+                  ...it,
+                  group_id: gid,
+                  group_label: label.trim(),
+                  composite_food_id: null,
+              }
+            : it,
+    );
+    selectedForGroup.value = {};
+};
+
+const ungroupSelectedRows = () => {
+    const idxs = selectedIndices();
+    if (idxs.length === 0) {
+        toast.push("Select items to ungroup.", "error");
+        return;
+    }
+    meal.value.items = meal.value.items.map((it, i) =>
+        idxs.includes(i)
+            ? { ...it, group_id: "", group_label: "", composite_food_id: null }
+            : it,
+    );
+    selectedForGroup.value = {};
+};
+
+const removeGroupLines = (indices: number[]) => {
+    const sorted = [...new Set(indices)].sort((a, b) => b - a);
+    const items = [...meal.value.items];
+    for (const i of sorted) {
+        items.splice(i, 1);
+    }
+    meal.value.items = items;
+    selectedForGroup.value = {};
+};
+
+const openNewRecipeDialog = async () => {
+    try {
+        const res = await dialogManager.custom<CompositeFood | null>({
+            title: "New recipe",
+            component: CreateCompositeDialog,
+            props: {},
+        });
+        if (res) toast.push("Recipe saved — find it in Add Foods.", "success");
+    } catch {
+        /* dismissed */
+    }
+};
 
 const route = useRoute();
 const backTo = computed(() =>
@@ -229,8 +321,9 @@ const macroBarsDayTotals = computed(() => {
 });
 
 const addFood = async (food: Food): Promise<boolean> => {
+    const g = "";
     const existingIndex = meal.value.items.findIndex(
-        (i) => i?.food?.ID === food.ID,
+        (i) => i?.food?.ID === food.ID && mealItemGroupKey(i) === g,
     );
     if (existingIndex !== -1) {
         meal.value.items = meal.value.items.map((it, i) =>
@@ -242,13 +335,52 @@ const addFood = async (food: Food): Promise<boolean> => {
     meal.value.items = [
         ...meal.value.items,
         {
+            ID: 0,
+            created_at: "",
+            updated_at: "",
             meal_id: meal.value.ID,
             food_id: food.ID,
             food: food,
             amount: 1,
+            group_id: "",
+            group_label: "",
+            composite_food_id: null,
         } as MealItem,
     ];
     return true;
+};
+
+const addComposite = async (cf: CompositeFood): Promise<boolean> => {
+    const gid = crypto.randomUUID();
+    const label = cf.name;
+    const cfid = cf.ID;
+    const newItems: MealItem[] = [];
+    for (const line of cf.items) {
+        const food = line.food;
+        if (!food) continue;
+        newItems.push({
+            ID: 0,
+            created_at: "",
+            updated_at: "",
+            meal_id: meal.value.ID,
+            food_id: line.food_id,
+            food,
+            amount: line.amount,
+            group_id: gid,
+            group_label: label,
+            composite_food_id: cfid,
+        } as MealItem);
+    }
+    if (newItems.length === 0) return false;
+    meal.value.items = [...meal.value.items, ...newItems];
+    return true;
+};
+
+const pickFoodOrComposite = async (row: Food & { entry_kind?: string } & Partial<CompositeFood>): Promise<boolean> => {
+    if (row.entry_kind === "composite") {
+        return addComposite(row as CompositeFood);
+    }
+    return addFood(row as Food);
 };
 
 const createFood = async (name: string): Promise<boolean> => {
@@ -278,6 +410,7 @@ const createFood = async (name: string): Promise<boolean> => {
 
 const removeFood = async (index: number) => {
     meal.value.items = meal.value.items.filter((_, i) => i !== index);
+    selectedForGroup.value = {};
 };
 
 const setMeal = async (item: Meal | SavedMeal): Promise<boolean> => {
@@ -324,6 +457,9 @@ const saveSavedMealTemplate = async () => {
             items: meal.value.items.map((i) => ({
                 food_id: i.food_id,
                 amount: i.amount,
+                group_id: i.group_id ?? "",
+                group_label: i.group_label ?? "",
+                composite_food_id: i.composite_food_id ?? null,
             })),
         });
         toast.push("Saved meal created!", "success");
@@ -414,17 +550,43 @@ const updateLoggedMeal = async () => {
                     class="flex min-h-0 flex-1 flex-col overflow-hidden text-textPrimary"
                 >
                     <h3
-                        class="m-0 shrink-0 px-4 pb-3 pt-4 text-base font-medium"
+                        class="m-0 shrink-0 px-4 pb-2 pt-4 text-base font-medium"
                     >
                         Meal Items
                     </h3>
+                    <div
+                        class="flex shrink-0 flex-wrap gap-2 px-4 pb-2 text-textPrimary"
+                    >
+                        <button
+                            type="button"
+                            class="rounded border border-secondBg bg-secondBg px-3 py-1.5 text-sm hover:bg-thirdBg"
+                            @click="openNewRecipeDialog"
+                        >
+                            New recipe
+                        </button>
+                        <button
+                            type="button"
+                            class="rounded border border-secondBg bg-secondBg px-3 py-1.5 text-sm hover:bg-thirdBg"
+                            @click="groupSelectedRows"
+                        >
+                            Group selected
+                        </button>
+                        <button
+                            type="button"
+                            class="rounded border border-secondBg bg-secondBg px-3 py-1.5 text-sm hover:bg-thirdBg"
+                            @click="ungroupSelectedRows"
+                        >
+                            Ungroup
+                        </button>
+                    </div>
                     <div
                         class="flex min-h-0 flex-1 flex-col overflow-y-auto px-4 pb-1"
                     >
                         <div
                             v-if="meal.items.length"
-                            class="mb-1 hidden grid-cols-[minmax(0,1fr)_9rem_11rem_2.5rem] gap-x-3 border-b border-secondBg pb-2 text-xs font-medium text-textSecondary sm:grid"
+                            class="mb-1 hidden grid-cols-[2rem_minmax(0,1fr)_9rem_11rem_2.5rem] gap-x-3 border-b border-secondBg pb-2 text-xs font-medium text-textSecondary sm:grid"
                         >
+                            <span class="sr-only">Select</span>
                             <span>Item</span>
                             <span class="text-center">Qty</span>
                             <span class="text-right">Macros</span>
@@ -433,65 +595,244 @@ const updateLoggedMeal = async () => {
                                 aria-hidden="true"
                             ></span>
                         </div>
-                        <div
-                            v-for="(item, i) in meal.items"
-                            :key="`${item.food_id}-${i}`"
-                            class="grid grid-cols-[minmax(0,1fr)_9rem_11rem_2.5rem] items-center gap-x-3 gap-y-1 border-b border-secondBg py-2.5 last:border-b-0"
+                        <template
+                            v-for="(block, bi) in mealItemBlocks"
+                            :key="'b-' + bi"
                         >
-                            <span
-                                class="min-w-0 truncate text-base font-medium text-textPrimary"
-                                :title="item.food?.name"
-                                >{{ item.food?.name ?? "" }}</span
-                            >
-                            <div
-                                class="flex items-center justify-center gap-1 tabular-nums"
-                            >
-                                <button
-                                    class="flex h-9 w-9 shrink-0 items-center justify-center rounded border border-secondBg bg-secondBg text-textPrimary transition-colors hover:border-thirdBg hover:bg-thirdBg"
-                                    type="button"
-                                    @click="amountPlusMinus(i, 'minus')"
+                            <template v-if="block.kind === 'ungrouped'">
+                                <div
+                                    v-for="{ item, index: i } in block.rows"
+                                    :key="`u-${i}`"
+                                    class="grid grid-cols-[2rem_minmax(0,1fr)_9rem_11rem_2.5rem] items-center gap-x-3 gap-y-1 border-b border-secondBg py-2.5 last:border-b-0"
                                 >
-                                    <Minus :size="18" />
-                                </button>
-                                <span
-                                    class="min-w-11 shrink-0 text-center text-sm text-textPrimary"
-                                    >{{ formatNum(itemServingAmount(item))
-                                    }}<span
-                                        v-if="item.food?.serving_type === 'g'"
-                                        class="text-textSecondary"
-                                        >g</span
-                                    ></span
+                                    <input
+                                        type="checkbox"
+                                        class="h-4 w-4 accent-thirdBg"
+                                        :checked="!!selectedForGroup[i]"
+                                        @change="toggleSelectRow(i)"
+                                    />
+                                    <span
+                                        class="min-w-0 truncate text-base font-medium text-textPrimary"
+                                        :title="item.food?.name"
+                                        >{{ item.food?.name ?? "" }}</span
+                                    >
+                                    <div
+                                        class="flex items-center justify-center gap-1 tabular-nums"
+                                    >
+                                        <button
+                                            class="flex h-9 w-9 shrink-0 items-center justify-center rounded border border-secondBg bg-secondBg text-textPrimary transition-colors hover:border-thirdBg hover:bg-thirdBg"
+                                            type="button"
+                                            @click="amountPlusMinus(i, 'minus')"
+                                        >
+                                            <Minus :size="18" />
+                                        </button>
+                                        <span
+                                            class="min-w-11 shrink-0 text-center text-sm text-textPrimary"
+                                            >{{
+                                                formatNum(itemServingAmount(item))
+                                            }}<span
+                                                v-if="
+                                                    item.food?.serving_type ===
+                                                    'g'
+                                                "
+                                                class="text-textSecondary"
+                                                >g</span
+                                            ></span
+                                        >
+                                        <button
+                                            class="flex h-9 w-9 shrink-0 items-center justify-center rounded border border-secondBg bg-secondBg text-textPrimary transition-colors hover:border-thirdBg hover:bg-thirdBg"
+                                            type="button"
+                                            @click="amountPlusMinus(i, 'plus')"
+                                        >
+                                            <Plus :size="18" />
+                                        </button>
+                                    </div>
+                                    <span
+                                        class="min-w-0 text-right text-sm tabular-nums text-textSecondary"
+                                    >
+                                        {{
+                                            formatNum(
+                                                item.amount *
+                                                    (item.food?.calories ?? 0),
+                                            )
+                                        }}C /
+                                        {{
+                                            formatNum(
+                                                item.amount *
+                                                    (item.food?.protein ?? 0),
+                                            )
+                                        }}P /
+                                        {{
+                                            formatNum(
+                                                item.amount *
+                                                    (item.food?.fiber ?? 0),
+                                            )
+                                        }}F
+                                    </span>
+                                    <button
+                                        class="flex h-9 w-9 shrink-0 items-center justify-center justify-self-end rounded text-textSecondary transition-colors hover:bg-secondBg hover:text-cfRed"
+                                        type="button"
+                                        aria-label="Remove item"
+                                        @click="removeFood(i)"
+                                    >
+                                        <Trash2 :size="20" />
+                                    </button>
+                                </div>
+                            </template>
+                            <template v-else>
+                                <div
+                                    class="grid grid-cols-[2rem_minmax(0,1fr)_9rem_11rem_2.5rem] items-center gap-x-3 gap-y-1 border-b border-secondBg py-2.5"
                                 >
-                                <button
-                                    class="flex h-9 w-9 shrink-0 items-center justify-center rounded border border-secondBg bg-secondBg text-textPrimary transition-colors hover:border-thirdBg hover:bg-thirdBg"
-                                    type="button"
-                                    @click="amountPlusMinus(i, 'plus')"
-                                >
-                                    <Plus :size="18" />
-                                </button>
-                            </div>
-                            <span
-                                class="min-w-0 text-right text-sm tabular-nums text-textSecondary"
-                            >
-                                {{
-                                    formatNum(
-                                        item.amount * item.food!.calories,
-                                    )
-                                }}C /
-                                {{
-                                    formatNum(item.amount * item.food!.protein)
-                                }}P /
-                                {{ formatNum(item.amount * item.food!.fiber) }}F
-                            </span>
-                            <button
-                                class="flex h-9 w-9 shrink-0 items-center justify-center justify-self-end rounded text-textSecondary transition-colors hover:bg-secondBg hover:text-cfRed"
-                                type="button"
-                                aria-label="Remove item"
-                                @click="removeFood(i)"
-                            >
-                                <Trash2 :size="20" />
-                            </button>
-                        </div>
+                                    <span
+                                        class="w-4 shrink-0"
+                                        aria-hidden="true"
+                                    ></span>
+                                    <button
+                                        type="button"
+                                        class="flex min-w-0 items-center gap-1 text-left text-base font-medium text-textPrimary"
+                                        @click="toggleGroupCollapse(block.groupId)"
+                                    >
+                                        <ChevronRight
+                                            v-if="!isGroupExpanded(block.groupId)"
+                                            :size="20"
+                                            class="shrink-0"
+                                        />
+                                        <ChevronDown
+                                            v-else
+                                            :size="20"
+                                            class="shrink-0"
+                                        />
+                                        <span class="truncate">{{
+                                            block.label || "Group"
+                                        }}</span>
+                                    </button>
+                                    <span
+                                        class="text-center text-xs text-textSecondary"
+                                        >—</span
+                                    >
+                                    <span
+                                        class="min-w-0 text-right text-sm tabular-nums text-textSecondary"
+                                    >
+                                        {{
+                                            formatNum(
+                                                blockMacros(block.rows).calories,
+                                            )
+                                        }}C /
+                                        {{
+                                            formatNum(
+                                                blockMacros(block.rows).protein,
+                                            )
+                                        }}P /
+                                        {{
+                                            formatNum(
+                                                blockMacros(block.rows).fiber,
+                                            )
+                                        }}F
+                                    </span>
+                                    <button
+                                        class="flex h-9 w-9 shrink-0 items-center justify-center justify-self-end rounded text-textSecondary transition-colors hover:bg-secondBg hover:text-cfRed"
+                                        type="button"
+                                        aria-label="Remove group"
+                                        @click="
+                                            removeGroupLines(
+                                                block.rows.map((r) => r.index),
+                                            )
+                                        "
+                                    >
+                                        <Trash2 :size="20" />
+                                    </button>
+                                </div>
+                                <template v-if="isGroupExpanded(block.groupId)">
+                                    <div
+                                        v-for="{ item, index: i } in block.rows"
+                                        :key="`g-${i}`"
+                                        class="grid grid-cols-[2rem_minmax(0,1fr)_9rem_11rem_2.5rem] items-center gap-x-3 gap-y-1 border-b border-secondBg py-2.5 last:border-b-0"
+                                    >
+                                        <input
+                                            type="checkbox"
+                                            class="h-4 w-4 accent-thirdBg"
+                                            :checked="!!selectedForGroup[i]"
+                                            @change="toggleSelectRow(i)"
+                                        />
+                                        <span
+                                            class="min-w-0 truncate pl-2 text-sm font-medium text-textPrimary sm:pl-3"
+                                            :title="item.food?.name"
+                                            >{{ item.food?.name ?? "" }}</span
+                                        >
+                                        <div
+                                            class="flex items-center justify-center gap-1 tabular-nums"
+                                        >
+                                            <button
+                                                class="flex h-9 w-9 shrink-0 items-center justify-center rounded border border-secondBg bg-secondBg text-textPrimary transition-colors hover:border-thirdBg hover:bg-thirdBg"
+                                                type="button"
+                                                @click="
+                                                    amountPlusMinus(i, 'minus')
+                                                "
+                                            >
+                                                <Minus :size="18" />
+                                            </button>
+                                            <span
+                                                class="min-w-11 shrink-0 text-center text-sm text-textPrimary"
+                                                >{{
+                                                    formatNum(
+                                                        itemServingAmount(item),
+                                                    )
+                                                }}<span
+                                                    v-if="
+                                                        item.food
+                                                            ?.serving_type ===
+                                                        'g'
+                                                    "
+                                                    class="text-textSecondary"
+                                                    >g</span
+                                                ></span
+                                            >
+                                            <button
+                                                class="flex h-9 w-9 shrink-0 items-center justify-center rounded border border-secondBg bg-secondBg text-textPrimary transition-colors hover:border-thirdBg hover:bg-thirdBg"
+                                                type="button"
+                                                @click="
+                                                    amountPlusMinus(i, 'plus')
+                                                "
+                                            >
+                                                <Plus :size="18" />
+                                            </button>
+                                        </div>
+                                        <span
+                                            class="min-w-0 text-right text-sm tabular-nums text-textSecondary"
+                                        >
+                                            {{
+                                                formatNum(
+                                                    item.amount *
+                                                        (item.food?.calories ??
+                                                            0),
+                                                )
+                                            }}C /
+                                            {{
+                                                formatNum(
+                                                    item.amount *
+                                                        (item.food?.protein ??
+                                                            0),
+                                                )
+                                            }}P /
+                                            {{
+                                                formatNum(
+                                                    item.amount *
+                                                        (item.food?.fiber ?? 0),
+                                                )
+                                            }}F
+                                        </span>
+                                        <button
+                                            class="flex h-9 w-9 shrink-0 items-center justify-center justify-self-end rounded text-textSecondary transition-colors hover:bg-secondBg hover:text-cfRed"
+                                            type="button"
+                                            aria-label="Remove item"
+                                            @click="removeFood(i)"
+                                        >
+                                            <Trash2 :size="20" />
+                                        </button>
+                                    </div>
+                                </template>
+                            </template>
+                        </template>
                     </div>
                 </section>
                 <footer
@@ -564,7 +905,7 @@ const updateLoggedMeal = async () => {
                 <h2 class="mt-0 text-lg font-semibold">Add Foods</h2>
                 <SearchList
                     :route="'diet/meals/food/all'"
-                    :onSelect="addFood"
+                    :onSelect="pickFoodOrComposite"
                     :onCreate="createFood"
                     :displayComponent="FoodDisplay"
                 />

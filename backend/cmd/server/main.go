@@ -66,6 +66,9 @@ func CreateFeatures(db *gorm.DB, router *gin.Engine) {
 
 	authMW := auth.AuthMiddleware()
 	dietHandler := diet.NewHandler(db)
+	if err := dietHandler.Migrate(); err != nil {
+		panic(err)
+	}
 	dietHandler.RegisterRoutes(router, authMW)
 
 	workoutHandler := workout.NewHandler(db)

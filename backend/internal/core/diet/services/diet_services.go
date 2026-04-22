@@ -44,6 +44,14 @@ func CreateFood(db *gorm.DB, food *models.Food) (*models.Food, error) {
 	return food, nil
 }
 
+func AllCompositeFoods(db *gorm.DB) ([]models.CompositeFood, error) {
+	return dietrepo.New(db).CompositeFoodsAll()
+}
+
+func CreateCompositeFood(db *gorm.DB, cf *models.CompositeFood) (uint, error) {
+	return dietrepo.New(db).CompositeFoodCreate(cf)
+}
+
 func AllMeals(db *gorm.DB, excludeIDs []uint) ([]models.Meal, error) {
 	return dietrepo.New(db).MealsAll(excludeIDs)
 }
@@ -84,8 +92,11 @@ func mealFromSaved(sm *models.SavedMeal) *models.Meal {
 	m := &models.Meal{Name: sm.Name}
 	for _, it := range sm.Items {
 		m.Items = append(m.Items, models.MealItem{
-			FoodID: it.FoodID,
-			Amount: float32(it.Amount),
+			FoodID:            it.FoodID,
+			Amount:            float32(it.Amount),
+			GroupID:           it.GroupID,
+			GroupLabel:        it.GroupLabel,
+			CompositeFoodID:   it.CompositeFoodID,
 		})
 	}
 	return m

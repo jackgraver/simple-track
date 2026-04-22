@@ -53,6 +53,28 @@ const list = computed(() => {
         );
     }
 
+    const obj = value as Record<string, unknown>;
+    const hasFoodsKey = Object.prototype.hasOwnProperty.call(obj, "foods");
+    const hasCompositeKey = Object.prototype.hasOwnProperty.call(
+        obj,
+        "composite_foods",
+    );
+    if (hasFoodsKey || hasCompositeKey) {
+        const foods = Array.isArray(obj.foods) ? obj.foods : [];
+        const composites = Array.isArray(obj.composite_foods)
+            ? obj.composite_foods
+            : [];
+        const withKindFood = foods.map((f: Record<string, unknown>) => ({
+            ...f,
+            entry_kind: f.entry_kind ?? "food",
+        }));
+        const merged = [...withKindFood, ...composites];
+        return merged.filter(
+            (item: { id?: number; ID?: number }) =>
+                !excludedIds.value.has(item.id ?? item.ID),
+        );
+    }
+
     const firstArray = Object.values(value as object).find((v) =>
         Array.isArray(v),
     );
@@ -103,7 +125,7 @@ const refresh = () => {
             <template v-else-if="filteredList?.length">
                 <button
                     v-for="(item, index) in filteredList"
-                    :key="item.id ?? item.ID ?? index"
+                    :key="`${item.entry_kind ?? 'food'}-${item.id ?? item.ID ?? index}`"
                     @click="handleFunctionCall(onSelect, item)"
                     class="item"
                     role="option"
