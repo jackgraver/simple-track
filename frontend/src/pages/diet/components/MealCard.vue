@@ -1,7 +1,13 @@
 <script setup lang="ts">
 import type { Meal } from "~/types/diet";
 import { EDIT_LOGGED_TYPE, EDIT_TYPE } from "~/pages/diet/logmeal/logmealMode";
-import { Trash2, SquarePen, Check, ChevronRight, ChevronDown } from "lucide-vue-next";
+import {
+    Trash2,
+    SquarePen,
+    Check,
+    ChevronRight,
+    ChevronDown,
+} from "lucide-vue-next";
 import SimpleMacros from "~/shared/SimpleMacros.vue";
 import { computed, ref } from "vue";
 import { blockMacros, mealItemsToDisplayBlocks } from "~/utils/mealItemGroups";
@@ -175,13 +181,18 @@ function toggleGroupCollapse(groupId: string) {
                                     class="group-children"
                                 >
                                     <span
-                                        v-for="{ item: food, index: i } in block.rows"
+                                        v-for="{
+                                            item: food,
+                                            index: i,
+                                        } in block.rows"
                                         :key="'g-' + i"
                                         class="food food-child"
                                     >
                                         <span
                                             >({{
-                                                formatNum(itemServingAmount(food))
+                                                formatNum(
+                                                    itemServingAmount(food),
+                                                )
                                             }}{{
                                                 food.food?.serving_type === "g"
                                                     ? "g"
@@ -314,12 +325,11 @@ function toggleGroupCollapse(groupId: string) {
     width: 100%;
     margin: 0;
     padding: 0;
-    border: none;
-    background: transparent;
     cursor: pointer;
     text-align: left;
     color: inherit;
     font: inherit;
+    box-shadow: none;
 }
 
 .group-header .chev {

@@ -1,6 +1,12 @@
 <script setup lang="ts">
 import { useRoute } from "vue-router";
-import type { CompositeFood, Food, Meal, MealItem, SavedMeal } from "~/types/diet";
+import type {
+    CompositeFood,
+    Food,
+    Meal,
+    MealItem,
+    SavedMeal,
+} from "~/types/diet";
 import SearchList from "~/shared/SearchList.vue";
 import LogMealGroupBlock from "./LogMealGroupBlock.vue";
 import LogMealItemRow from "./LogMealItemRow.vue";
@@ -104,7 +110,9 @@ function mealItemGroupKey(item: MealItem): string {
     return (item.group_id ?? "").trim();
 }
 
-const mealItemBlocks = computed(() => mealItemsToDisplayBlocks(meal.value.items));
+const mealItemBlocks = computed(() =>
+    mealItemsToDisplayBlocks(meal.value.items),
+);
 
 const collapsedGroups = ref<Record<string, boolean>>({});
 function isGroupExpanded(groupId: string): boolean {
@@ -362,7 +370,9 @@ const addComposite = async (cf: CompositeFood): Promise<boolean> => {
     return true;
 };
 
-const pickFoodOrComposite = async (row: Food & { entry_kind?: string } & Partial<CompositeFood>): Promise<boolean> => {
+const pickFoodOrComposite = async (
+    row: Food & { entry_kind?: string } & Partial<CompositeFood>,
+): Promise<boolean> => {
     if (row.entry_kind === "composite") {
         return addComposite(row as CompositeFood);
     }
@@ -535,28 +545,32 @@ const updateLoggedMeal = async () => {
                 <section
                     class="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden text-textPrimary"
                 >
-                    <h3
-                        class="m-0 shrink-0 px-4 pb-2 pt-4 text-base font-medium"
-                    >
-                        Meal Items
-                    </h3>
                     <div
-                        class="flex shrink-0 flex-wrap items-center gap-2 px-4 pb-2 text-textPrimary"
+                        class="flex shrink-0 items-center justify-between gap-3 px-4 py-2.5"
                     >
-                        <button
-                            type="button"
-                            class="rounded border border-secondBg bg-secondBg px-3 py-1.5 text-sm hover:bg-thirdBg"
-                            @click="groupSelectedRows"
+                        <h3
+                            class="m-0 min-w-0 text-base font-medium leading-tight"
                         >
-                            Group selected
-                        </button>
-                        <button
-                            type="button"
-                            class="rounded border border-secondBg bg-secondBg px-3 py-1.5 text-sm hover:bg-thirdBg"
-                            @click="ungroupSelectedRows"
+                            Meal Items
+                        </h3>
+                        <div
+                            class="flex shrink-0 flex-wrap items-center justify-end gap-2"
                         >
-                            Ungroup
-                        </button>
+                            <button
+                                type="button"
+                                class="rounded border border-secondBg bg-secondBg px-3 py-1.5 text-sm hover:bg-thirdBg"
+                                @click="groupSelectedRows"
+                            >
+                                Group selected
+                            </button>
+                            <button
+                                type="button"
+                                class="rounded border border-secondBg bg-secondBg px-3 py-1.5 text-sm hover:bg-thirdBg"
+                                @click="ungroupSelectedRows"
+                            >
+                                Ungroup
+                            </button>
+                        </div>
                     </div>
                     <div
                         class="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto px-4 pb-1"
