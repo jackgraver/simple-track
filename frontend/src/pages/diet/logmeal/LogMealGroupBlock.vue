@@ -21,6 +21,7 @@ const emit = defineEmits<{
     removeGroup: [indices: number[]];
     toggleSelect: [index: number];
     amountPlusMinus: [index: number, direction: "plus" | "minus"];
+    setItemAmount: [index: number, amount: number];
     removeItem: [index: number];
 }>();
 
@@ -169,6 +170,9 @@ async function saveAsCompositeFood() {
                 @amount-plus-minus="
                     (rowI, direction) =>
                         emit('amountPlusMinus', rowI, direction)
+                "
+                @set-item-amount="
+                    (rowI, amt) => emit('setItemAmount', rowI, amt)
                 "
                 @remove="emit('removeItem', $event)"
             />
