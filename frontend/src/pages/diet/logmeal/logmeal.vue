@@ -8,7 +8,7 @@ import Input from "~/shared/input/Input.vue";
 import { dialogManager } from "~/composables/dialog/useDialog";
 import { toast } from "~/composables/toast/useToast";
 import CreateFoodDialog from "./dialog/CreateFoodDialog.vue";
-import { computed, ref, toRaw, watch } from "vue";
+import { computed, nextTick, ref, toRaw, watch } from "vue";
 import { useMeal } from "./queries/useMeal";
 import { useDietLogsToday } from "./queries/useDietLogsToday";
 import {
@@ -102,6 +102,62 @@ function amountPlusMinus(index: number, direction: "plus" | "minus") {
 
 function itemServingAmount(item: MealItem): number {
     return (item.food?.serving_amount || 1) * item.amount;
+}
+
+const qtyEditIndex = ref<number | null>(null);
+const qtyDraft = ref("");
+
+function enterQtyEdit(index: number) {
+    const item = meal.value.items[index];
+    if (!item?.food) return;
+    qtyDraft.value = String(itemServingAmount(item));
+    qtyEditIndex.value = index;
+    nextTick(() => {
+        const el = document.getElementById(
+            `meal-item-qty-${index}`,
+        ) as HTMLInputElement | null;
+        el?.focus();
+        el?.select();
+    });
+}
+
+function onQtyDraftInput(e: Event) {
+    qtyDraft.value = (e.target as HTMLInputElement).value;
+}
+
+function cancelQtyEdit() {
+    qtyEditIndex.value = null;
+    qtyDraft.value = "";
+}
+
+function commitQtyEdit(index: number) {
+    if (qtyEditIndex.value !== index) return;
+    const trimmed = qtyDraft.value.trim();
+    const items = meal.value.items;
+    const item = items[index];
+    if (!item?.food) {
+        cancelQtyEdit();
+        return;
+    }
+    if (trimmed === "") {
+        cancelQtyEdit();
+        return;
+    }
+    const n = Number(trimmed);
+    if (!Number.isFinite(n) || n < 0) {
+        cancelQtyEdit();
+        return;
+    }
+    const serving = item.food.serving_amount || 1;
+    cancelQtyEdit();
+    if (n <= 0) {
+        meal.value.items = items.filter((_, i) => i !== index);
+        return;
+    }
+    const newAmount = n / serving;
+    meal.value.items = items.map((it, i) =>
+        i === index ? { ...it, amount: newAmount } : it,
+    );
 }
 
 const route = useRoute();
@@ -447,22 +503,58 @@ const updateLoggedMeal = async () => {
                                 class="flex items-center justify-center gap-1 tabular-nums"
                             >
                                 <button
+                                    v-if="qtyEditIndex !== i"
                                     class="flex h-9 w-9 shrink-0 items-center justify-center rounded border border-secondBg bg-secondBg text-textPrimary transition-colors hover:border-thirdBg hover:bg-thirdBg"
                                     type="button"
                                     @click="amountPlusMinus(i, 'minus')"
                                 >
                                     <Minus :size="18" />
                                 </button>
-                                <span
-                                    class="min-w-11 shrink-0 text-center text-sm text-textPrimary"
-                                    >{{ formatNum(itemServingAmount(item))
+                                <div
+                                    v-if="qtyEditIndex !== i"
+                                    class="flex min-w-11 shrink-0 cursor-pointer select-none items-center justify-center gap-0 text-center text-sm text-textPrimary hover:opacity-90"
+                                    role="button"
+                                    tabindex="0"
+                                    @click="enterQtyEdit(i)"
+                                    @keydown.enter.prevent="enterQtyEdit(i)"
+                                    @keydown.space.prevent="enterQtyEdit(i)"
+                                >
+                                    {{ formatNum(itemServingAmount(item))
                                     }}<span
                                         v-if="item.food?.serving_type === 'g'"
                                         class="text-textSecondary"
                                         >g</span
-                                    ></span
+                                    >
+                                </div>
+                                <div
+                                    v-else
+                                    class="flex shrink-0 items-center justify-center gap-0.5"
                                 >
+                                    <input
+                                        :id="`meal-item-qty-${i}`"
+                                        type="number"
+                                        class="h-9 w-32 min-w-11 shrink-0 rounded border border-secondBg bg-secondBg px-1 text-center text-sm tabular-nums text-textPrimary focus:border-thirdBg focus:outline-none"
+                                        :value="qtyDraft"
+                                        min="0"
+                                        step="any"
+                                        inputmode="decimal"
+                                        @input="onQtyDraftInput"
+                                        @blur="commitQtyEdit(i)"
+                                        @keydown.enter.prevent="
+                                            commitQtyEdit(i)
+                                        "
+                                        @keydown.escape.prevent="
+                                            cancelQtyEdit()
+                                        "
+                                    />
+                                    <span
+                                        v-if="item.food?.serving_type === 'g'"
+                                        class="text-sm text-textSecondary"
+                                        >g</span
+                                    >
+                                </div>
                                 <button
+                                    v-if="qtyEditIndex !== i"
                                     class="flex h-9 w-9 shrink-0 items-center justify-center rounded border border-secondBg bg-secondBg text-textPrimary transition-colors hover:border-thirdBg hover:bg-thirdBg"
                                     type="button"
                                     @click="amountPlusMinus(i, 'plus')"

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { Food } from "~/types/diet";
-import SimpleMacros from "./SimpleMacros.vue";
+import SimpleMacros from "~/shared/SimpleMacros.vue";
 
 const props = defineProps<{
     item: Food;
