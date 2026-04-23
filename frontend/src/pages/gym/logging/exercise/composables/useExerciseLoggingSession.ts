@@ -158,7 +158,7 @@ export function useExerciseLoggingSession(options: {
         }
 
         loggedSets.value = loggedSetsFromServer(group.logged?.sets);
-        notes.value = group.logged?.notes ?? "";
+        notes.value = group.previous?.notes ?? group.logged?.notes ?? "";
         currentSetNumber.value = loggedSets.value.length + 1;
 
         const { weight, reps, weightSetup } = initializeWeightAndReps(group.logged?.sets, group.previous?.sets);
