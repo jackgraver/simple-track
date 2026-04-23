@@ -106,6 +106,12 @@ function amountPlusMinus(index: number, direction: "plus" | "minus") {
     );
 }
 
+function setMealItemAmount(index: number, amount: number) {
+    meal.value.items = meal.value.items.map((it, i) =>
+        i === index ? { ...it, amount } : it,
+    );
+}
+
 function mealItemGroupKey(item: MealItem): string {
     return (item.group_id ?? "").trim();
 }
@@ -604,6 +610,7 @@ const updateLoggedMeal = async () => {
                                     :selected="!!selectedForGroup[i]"
                                     @toggle-select="toggleSelectRow"
                                     @amount-plus-minus="amountPlusMinus"
+                                    @set-item-amount="setMealItemAmount"
                                     @remove="removeFood"
                                 />
                             </template>
@@ -617,6 +624,7 @@ const updateLoggedMeal = async () => {
                                 @remove-group="removeGroupLines"
                                 @toggle-select="toggleSelectRow"
                                 @amount-plus-minus="amountPlusMinus"
+                                @set-item-amount="setMealItemAmount"
                                 @remove-item="removeFood"
                             />
                         </template>
