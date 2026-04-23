@@ -7,10 +7,21 @@ import type {
     MealItem,
     SavedMeal,
 } from "~/types/diet";
+import type {
+    CompositeFood,
+    Food,
+    Meal,
+    MealItem,
+    SavedMeal,
+} from "~/types/diet";
 import SearchList from "~/shared/SearchList.vue";
 import LogMealGroupBlock from "./LogMealGroupBlock.vue";
 import LogMealItemRow from "./LogMealItemRow.vue";
+import LogMealGroupBlock from "./LogMealGroupBlock.vue";
+import LogMealItemRow from "./LogMealItemRow.vue";
 import FoodDisplay from "~/pages/diet/logmeal/components/FoodDisplay.vue";
+import { formatNum } from "./logmealItemFormat";
+import { mealItemsListGridClass } from "./mealItemsListGrid";
 import { formatNum } from "./logmealItemFormat";
 import { mealItemsListGridClass } from "./mealItemsListGrid";
 import Input from "~/shared/input/Input.vue";
@@ -18,6 +29,7 @@ import { dialogManager } from "~/composables/dialog/useDialog";
 import { toast } from "~/composables/toast/useToast";
 import CreateFoodDialog from "./dialog/CreateFoodDialog.vue";
 import { computed, ref, toRaw, watch } from "vue";
+import { mealItemsToDisplayBlocks } from "~/utils/mealItemGroups";
 import { mealItemsToDisplayBlocks } from "~/utils/mealItemGroups";
 import { useMeal } from "./queries/useMeal";
 import { useDietLogsToday } from "./queries/useDietLogsToday";
@@ -98,6 +110,7 @@ function amountPlusMinus(index: number, direction: "plus" | "minus") {
     const next = amount - step;
     if (next <= 0) {
         meal.value.items = items.filter((_, i) => i !== index);
+        selectedForGroup.value = {};
         selectedForGroup.value = {};
         return;
     }
@@ -322,7 +335,9 @@ const macroBarsDayTotals = computed(() => {
 
 const addFood = async (food: Food): Promise<boolean> => {
     const g = "";
+    const g = "";
     const existingIndex = meal.value.items.findIndex(
+        (i) => i?.food?.ID === food.ID && mealItemGroupKey(i) === g,
         (i) => i?.food?.ID === food.ID && mealItemGroupKey(i) === g,
     );
     if (existingIndex !== -1) {
@@ -338,6 +353,9 @@ const addFood = async (food: Food): Promise<boolean> => {
             ID: 0,
             created_at: "",
             updated_at: "",
+            ID: 0,
+            created_at: "",
+            updated_at: "",
             meal_id: meal.value.ID,
             food_id: food.ID,
             food: food,
@@ -345,9 +363,47 @@ const addFood = async (food: Food): Promise<boolean> => {
             group_id: "",
             group_label: "",
             composite_food_id: null,
+            group_id: "",
+            group_label: "",
+            composite_food_id: null,
         } as MealItem,
     ];
     return true;
+};
+
+const addComposite = async (cf: CompositeFood): Promise<boolean> => {
+    const gid = crypto.randomUUID();
+    const label = cf.name;
+    const cfid = cf.ID;
+    const newItems: MealItem[] = [];
+    for (const line of cf.items) {
+        const food = line.food;
+        if (!food) continue;
+        newItems.push({
+            ID: 0,
+            created_at: "",
+            updated_at: "",
+            meal_id: meal.value.ID,
+            food_id: line.food_id,
+            food,
+            amount: line.amount,
+            group_id: gid,
+            group_label: label,
+            composite_food_id: cfid,
+        } as MealItem);
+    }
+    if (newItems.length === 0) return false;
+    meal.value.items = [...meal.value.items, ...newItems];
+    return true;
+};
+
+const pickFoodOrComposite = async (
+    row: Food & { entry_kind?: string } & Partial<CompositeFood>,
+): Promise<boolean> => {
+    if (row.entry_kind === "composite") {
+        return addComposite(row as CompositeFood);
+    }
+    return addFood(row as Food);
 };
 
 const addComposite = async (cf: CompositeFood): Promise<boolean> => {
@@ -413,6 +469,7 @@ const createFood = async (name: string): Promise<boolean> => {
 const removeFood = async (index: number) => {
     meal.value.items = meal.value.items.filter((_, i) => i !== index);
     selectedForGroup.value = {};
+    selectedForGroup.value = {};
 };
 
 const setMeal = async (item: Meal | SavedMeal): Promise<boolean> => {
@@ -459,6 +516,9 @@ const saveSavedMealTemplate = async () => {
             items: meal.value.items.map((i) => ({
                 food_id: i.food_id,
                 amount: i.amount,
+                group_id: i.group_id ?? "",
+                group_label: i.group_label ?? "",
+                composite_food_id: i.composite_food_id ?? null,
                 group_id: i.group_id ?? "",
                 group_label: i.group_label ?? "",
                 composite_food_id: i.composite_food_id ?? null,
@@ -550,7 +610,37 @@ const updateLoggedMeal = async () => {
                 </header>
                 <section
                     class="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden text-textPrimary"
+                    class="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden text-textPrimary"
                 >
+                    <div
+                        class="flex shrink-0 items-center justify-between gap-3 px-4 py-2.5"
+                    >
+                        <h3
+                            class="m-0 min-w-0 text-base font-medium leading-tight"
+                        >
+                            Meal Items
+                        </h3>
+                        <div
+                            class="flex shrink-0 flex-wrap items-center justify-end gap-2"
+                        >
+                            <button
+                                type="button"
+                                class="rounded border border-secondBg bg-secondBg px-3 py-1.5 text-sm hover:bg-thirdBg"
+                                @click="groupSelectedRows"
+                            >
+                                Group selected
+                            </button>
+                            <button
+                                type="button"
+                                class="rounded border border-secondBg bg-secondBg px-3 py-1.5 text-sm hover:bg-thirdBg"
+                                @click="ungroupSelectedRows"
+                            >
+                                Ungroup
+                            </button>
+                        </div>
+                    </div>
+                    <div
+                        class="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto px-4 pb-1"
                     <div
                         class="flex shrink-0 items-center justify-between gap-3 px-4 py-2.5"
                     >
@@ -587,16 +677,28 @@ const updateLoggedMeal = async () => {
                                 mealItemsListGridClass,
                                 'mb-1 hidden border-b border-secondBg pb-2 text-xs font-medium text-textSecondary sm:grid',
                             ]"
+                            :class="[
+                                mealItemsListGridClass,
+                                'mb-1 hidden border-b border-secondBg pb-2 text-xs font-medium text-textSecondary sm:grid',
+                            ]"
                         >
+                            <span><span class="sr-only">Select</span></span>
+                            <span class="min-w-0">Item</span>
+                            <span class="min-w-0 text-center">Qty</span>
+                            <span class="min-w-0 text-right">Macros</span>
                             <span><span class="sr-only">Select</span></span>
                             <span class="min-w-0">Item</span>
                             <span class="min-w-0 text-center">Qty</span>
                             <span class="min-w-0 text-right">Macros</span>
                             <span
                                 class="flex h-9 w-9 shrink-0 justify-self-end"
+                                class="flex h-9 w-9 shrink-0 justify-self-end"
                                 aria-hidden="true"
                             ></span>
                         </div>
+                        <template
+                            v-for="(block, bi) in mealItemBlocks"
+                            :key="'b-' + bi"
                         <template
                             v-for="(block, bi) in mealItemBlocks"
                             :key="'b-' + bi"
@@ -700,6 +802,7 @@ const updateLoggedMeal = async () => {
                 <h2 class="mt-0 text-lg font-semibold">Add Foods</h2>
                 <SearchList
                     :route="'diet/meals/food/all'"
+                    :onSelect="pickFoodOrComposite"
                     :onSelect="pickFoodOrComposite"
                     :onCreate="createFood"
                     :displayComponent="FoodDisplay"
