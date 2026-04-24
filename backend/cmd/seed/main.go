@@ -4,8 +4,7 @@
 package main
 
 import (
-	// "be-simpletracker/internal/core/auth/models"
-
+	dietmodels "be-simpletracker/internal/core/diet/models"
 	"be-simpletracker/internal/core/tracking/models"
 	"be-simpletracker/internal/database"
 	"fmt"
@@ -26,19 +25,22 @@ func main() {
 	// db.AutoMigrate(&models.User{})
 
 	if err := db.AutoMigrate(
-		// &models.Plan{},
-		// &models.DietDay{},
-		// &models.Meal{},
-		// &models.MealItem{},
-		// &models.SavedMeal{},
-		// &models.SavedMealItem{},
-		// &models.PlannedMeal{},
-		// &models.DayLog{},
-		// &models.Food{},
+		&dietmodels.Plan{},
+		&dietmodels.DietDay{},
+		&dietmodels.Meal{},
+		&dietmodels.MealItem{},
+		&dietmodels.SavedMeal{},
+		&dietmodels.SavedMealItem{},
+		&dietmodels.PlannedMeal{},
+		&dietmodels.DayLog{},
+		&dietmodels.Food{},
+		&dietmodels.CompositeFood{},
+		&dietmodels.CompositeFoodItem{},
 		&models.StepLog{},
 		&models.BodyWeightLog{},
 	); err != nil {
-		fmt.Printf("Failed to migrate meal plan database: %v\n", err)
+		fmt.Fprintf(os.Stderr, "AutoMigrate: %v\n", err)
+		os.Exit(1)
 	}
 
 	fmt.Println("Workout seed completed.")

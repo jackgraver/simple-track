@@ -1,14 +1,24 @@
 <script setup lang="ts">
 import { useRoute } from "vue-router";
-import type { Food, Meal, MealItem, SavedMeal } from "~/types/diet";
+import type {
+    CompositeFood,
+    Food,
+    Meal,
+    MealItem,
+    SavedMeal,
+} from "~/types/diet";
 import SearchList from "~/shared/SearchList.vue";
-import { Plus, Trash2, Minus } from "lucide-vue-next";
+import LogMealGroupBlock from "./LogMealGroupBlock.vue";
+import LogMealItemRow from "./LogMealItemRow.vue";
 import FoodDisplay from "~/pages/diet/logmeal/components/FoodDisplay.vue";
+import { formatNum } from "./logmealItemFormat";
+import { mealItemsListGridClass } from "./mealItemsListGrid";
 import Input from "~/shared/input/Input.vue";
 import { dialogManager } from "~/composables/dialog/useDialog";
 import { toast } from "~/composables/toast/useToast";
 import CreateFoodDialog from "./dialog/CreateFoodDialog.vue";
-import { computed, nextTick, ref, toRaw, watch } from "vue";
+import { computed, ref, toRaw, watch } from "vue";
+import { mealItemsToDisplayBlocks } from "~/utils/mealItemGroups";
 import { useMeal } from "./queries/useMeal";
 import { useDietLogsToday } from "./queries/useDietLogsToday";
 import {
@@ -67,11 +77,6 @@ function macrosForMeal(m: Meal): MealMacroTotals {
     };
 }
 
-function formatNum(n: number): number {
-    const s = n.toFixed(2); // always 2 decimals
-    return Number(s.replace(/\.?0+$/, "")); // drop trailing zeros and optional dot
-}
-
 /** Vue Query wraps API data in readonly proxies; clone so we can edit amounts. */
 function cloneMeal(m: Meal): Meal {
     return JSON.parse(JSON.stringify(toRaw(m))) as Meal;
@@ -93,6 +98,7 @@ function amountPlusMinus(index: number, direction: "plus" | "minus") {
     const next = amount - step;
     if (next <= 0) {
         meal.value.items = items.filter((_, i) => i !== index);
+        selectedForGroup.value = {};
         return;
     }
     meal.value.items = items.map((it, i) =>
@@ -100,65 +106,95 @@ function amountPlusMinus(index: number, direction: "plus" | "minus") {
     );
 }
 
-function itemServingAmount(item: MealItem): number {
-    return (item.food?.serving_amount || 1) * item.amount;
-}
-
-const qtyEditIndex = ref<number | null>(null);
-const qtyDraft = ref("");
-
-function enterQtyEdit(index: number) {
-    const item = meal.value.items[index];
-    if (!item?.food) return;
-    qtyDraft.value = String(itemServingAmount(item));
-    qtyEditIndex.value = index;
-    nextTick(() => {
-        const el = document.getElementById(
-            `meal-item-qty-${index}`,
-        ) as HTMLInputElement | null;
-        el?.focus();
-        el?.select();
-    });
-}
-
-function onQtyDraftInput(e: Event) {
-    qtyDraft.value = (e.target as HTMLInputElement).value;
-}
-
-function cancelQtyEdit() {
-    qtyEditIndex.value = null;
-    qtyDraft.value = "";
-}
-
-function commitQtyEdit(index: number) {
-    if (qtyEditIndex.value !== index) return;
-    const trimmed = qtyDraft.value.trim();
-    const items = meal.value.items;
-    const item = items[index];
-    if (!item?.food) {
-        cancelQtyEdit();
-        return;
-    }
-    if (trimmed === "") {
-        cancelQtyEdit();
-        return;
-    }
-    const n = Number(trimmed);
-    if (!Number.isFinite(n) || n < 0) {
-        cancelQtyEdit();
-        return;
-    }
-    const serving = item.food.serving_amount || 1;
-    cancelQtyEdit();
-    if (n <= 0) {
-        meal.value.items = items.filter((_, i) => i !== index);
-        return;
-    }
-    const newAmount = n / serving;
-    meal.value.items = items.map((it, i) =>
-        i === index ? { ...it, amount: newAmount } : it,
+function setMealItemAmount(index: number, amount: number) {
+    meal.value.items = meal.value.items.map((it, i) =>
+        i === index ? { ...it, amount } : it,
     );
 }
+
+function mealItemGroupKey(item: MealItem): string {
+    return (item.group_id ?? "").trim();
+}
+
+const mealItemBlocks = computed(() =>
+    mealItemsToDisplayBlocks(meal.value.items),
+);
+
+const collapsedGroups = ref<Record<string, boolean>>({});
+function isGroupExpanded(groupId: string): boolean {
+    return !collapsedGroups.value[groupId];
+}
+function toggleGroupCollapse(groupId: string) {
+    collapsedGroups.value = {
+        ...collapsedGroups.value,
+        [groupId]: !collapsedGroups.value[groupId],
+    };
+}
+
+const selectedForGroup = ref<Record<number, boolean>>({});
+function toggleSelectRow(index: number) {
+    const next = { ...selectedForGroup.value };
+    if (next[index]) delete next[index];
+    else next[index] = true;
+    selectedForGroup.value = next;
+}
+function selectedIndices(): number[] {
+    return Object.keys(selectedForGroup.value)
+        .map(Number)
+        .filter((k) => selectedForGroup.value[k]);
+}
+
+function setGroupLabel(groupId: string, label: string) {
+    const gid = groupId.trim();
+    if (!gid) return;
+    meal.value.items = meal.value.items.map((it) =>
+        (it.group_id ?? "").trim() === gid ? { ...it, group_label: label } : it,
+    );
+}
+
+const groupSelectedRows = () => {
+    const idxs = selectedIndices().sort((a, b) => a - b);
+    if (idxs.length < 2) {
+        toast.push("Select at least two items to group.", "error");
+        return;
+    }
+    const gid = crypto.randomUUID();
+    meal.value.items = meal.value.items.map((it, i) =>
+        idxs.includes(i)
+            ? {
+                  ...it,
+                  group_id: gid,
+                  group_label: "",
+                  composite_food_id: null,
+              }
+            : it,
+    );
+    selectedForGroup.value = {};
+};
+
+const ungroupSelectedRows = () => {
+    const idxs = selectedIndices();
+    if (idxs.length === 0) {
+        toast.push("Select items to ungroup.", "error");
+        return;
+    }
+    meal.value.items = meal.value.items.map((it, i) =>
+        idxs.includes(i)
+            ? { ...it, group_id: "", group_label: "", composite_food_id: null }
+            : it,
+    );
+    selectedForGroup.value = {};
+};
+
+const removeGroupLines = (indices: number[]) => {
+    const sorted = [...new Set(indices)].sort((a, b) => b - a);
+    const items = [...meal.value.items];
+    for (const i of sorted) {
+        items.splice(i, 1);
+    }
+    meal.value.items = items;
+    selectedForGroup.value = {};
+};
 
 const route = useRoute();
 const backTo = computed(() =>
@@ -285,8 +321,9 @@ const macroBarsDayTotals = computed(() => {
 });
 
 const addFood = async (food: Food): Promise<boolean> => {
+    const g = "";
     const existingIndex = meal.value.items.findIndex(
-        (i) => i?.food?.ID === food.ID,
+        (i) => i?.food?.ID === food.ID && mealItemGroupKey(i) === g,
     );
     if (existingIndex !== -1) {
         meal.value.items = meal.value.items.map((it, i) =>
@@ -298,13 +335,54 @@ const addFood = async (food: Food): Promise<boolean> => {
     meal.value.items = [
         ...meal.value.items,
         {
+            ID: 0,
+            created_at: "",
+            updated_at: "",
             meal_id: meal.value.ID,
             food_id: food.ID,
             food: food,
             amount: 1,
+            group_id: "",
+            group_label: "",
+            composite_food_id: null,
         } as MealItem,
     ];
     return true;
+};
+
+const addComposite = async (cf: CompositeFood): Promise<boolean> => {
+    const gid = crypto.randomUUID();
+    const label = cf.name;
+    const cfid = cf.ID;
+    const newItems: MealItem[] = [];
+    for (const line of cf.items) {
+        const food = line.food;
+        if (!food) continue;
+        newItems.push({
+            ID: 0,
+            created_at: "",
+            updated_at: "",
+            meal_id: meal.value.ID,
+            food_id: line.food_id,
+            food,
+            amount: line.amount,
+            group_id: gid,
+            group_label: label,
+            composite_food_id: cfid,
+        } as MealItem);
+    }
+    if (newItems.length === 0) return false;
+    meal.value.items = [...meal.value.items, ...newItems];
+    return true;
+};
+
+const pickFoodOrComposite = async (
+    row: Food & { entry_kind?: string } & Partial<CompositeFood>,
+): Promise<boolean> => {
+    if (row.entry_kind === "composite") {
+        return addComposite(row as CompositeFood);
+    }
+    return addFood(row as Food);
 };
 
 const createFood = async (name: string): Promise<boolean> => {
@@ -334,6 +412,7 @@ const createFood = async (name: string): Promise<boolean> => {
 
 const removeFood = async (index: number) => {
     meal.value.items = meal.value.items.filter((_, i) => i !== index);
+    selectedForGroup.value = {};
 };
 
 const setMeal = async (item: Meal | SavedMeal): Promise<boolean> => {
@@ -380,6 +459,9 @@ const saveSavedMealTemplate = async () => {
             items: meal.value.items.map((i) => ({
                 food_id: i.food_id,
                 amount: i.amount,
+                group_id: i.group_id ?? "",
+                group_label: i.group_label ?? "",
+                composite_food_id: i.composite_food_id ?? null,
             })),
         });
         toast.push("Saved meal created!", "success");
@@ -467,123 +549,85 @@ const updateLoggedMeal = async () => {
                     </div>
                 </header>
                 <section
-                    class="flex min-h-0 flex-1 flex-col overflow-hidden text-textPrimary"
+                    class="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden text-textPrimary"
                 >
-                    <h3
-                        class="m-0 shrink-0 px-4 pb-3 pt-4 text-base font-medium"
-                    >
-                        Meal Items
-                    </h3>
                     <div
-                        class="flex min-h-0 flex-1 flex-col overflow-y-auto px-4 pb-1"
+                        class="flex shrink-0 items-center justify-between gap-3 px-4 py-2.5"
+                    >
+                        <h3
+                            class="m-0 min-w-0 text-base font-medium leading-tight"
+                        >
+                            Meal Items
+                        </h3>
+                        <div
+                            class="flex shrink-0 flex-wrap items-center justify-end gap-2"
+                        >
+                            <button
+                                type="button"
+                                class="rounded border border-secondBg bg-secondBg px-3 py-1.5 text-sm hover:bg-thirdBg"
+                                @click="groupSelectedRows"
+                            >
+                                Group selected
+                            </button>
+                            <button
+                                type="button"
+                                class="rounded border border-secondBg bg-secondBg px-3 py-1.5 text-sm hover:bg-thirdBg"
+                                @click="ungroupSelectedRows"
+                            >
+                                Ungroup
+                            </button>
+                        </div>
+                    </div>
+                    <div
+                        class="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto px-4 pb-1"
                     >
                         <div
                             v-if="meal.items.length"
-                            class="mb-1 hidden grid-cols-[minmax(0,1fr)_9rem_11rem_2.5rem] gap-x-3 border-b border-secondBg pb-2 text-xs font-medium text-textSecondary sm:grid"
+                            :class="[
+                                mealItemsListGridClass,
+                                'mb-1 hidden border-b border-secondBg pb-2 text-xs font-medium text-textSecondary sm:grid',
+                            ]"
                         >
-                            <span>Item</span>
-                            <span class="text-center">Qty</span>
-                            <span class="text-right">Macros</span>
+                            <span><span class="sr-only">Select</span></span>
+                            <span class="min-w-0">Item</span>
+                            <span class="min-w-0 text-center">Qty</span>
+                            <span class="min-w-0 text-right">Macros</span>
                             <span
-                                class="w-9 shrink-0"
+                                class="flex h-9 w-9 shrink-0 justify-self-end"
                                 aria-hidden="true"
                             ></span>
                         </div>
-                        <div
-                            v-for="(item, i) in meal.items"
-                            :key="`${item.food_id}-${i}`"
-                            class="grid grid-cols-[minmax(0,1fr)_9rem_11rem_2.5rem] items-center gap-x-3 gap-y-1 border-b border-secondBg py-2.5 last:border-b-0"
+                        <template
+                            v-for="(block, bi) in mealItemBlocks"
+                            :key="'b-' + bi"
                         >
-                            <span
-                                class="min-w-0 truncate text-base font-medium text-textPrimary"
-                                :title="item.food?.name"
-                                >{{ item.food?.name ?? "" }}</span
-                            >
-                            <div
-                                class="flex items-center justify-center gap-1 tabular-nums"
-                            >
-                                <button
-                                    v-if="qtyEditIndex !== i"
-                                    class="flex h-9 w-9 shrink-0 items-center justify-center rounded border border-secondBg bg-secondBg text-textPrimary transition-colors hover:border-thirdBg hover:bg-thirdBg"
-                                    type="button"
-                                    @click="amountPlusMinus(i, 'minus')"
-                                >
-                                    <Minus :size="18" />
-                                </button>
-                                <div
-                                    v-if="qtyEditIndex !== i"
-                                    class="flex min-w-11 shrink-0 cursor-pointer select-none items-center justify-center gap-0 text-center text-sm text-textPrimary hover:opacity-90"
-                                    role="button"
-                                    tabindex="0"
-                                    @click="enterQtyEdit(i)"
-                                    @keydown.enter.prevent="enterQtyEdit(i)"
-                                    @keydown.space.prevent="enterQtyEdit(i)"
-                                >
-                                    {{ formatNum(itemServingAmount(item))
-                                    }}<span
-                                        v-if="item.food?.serving_type === 'g'"
-                                        class="text-textSecondary"
-                                        >g</span
-                                    >
-                                </div>
-                                <div
-                                    v-else
-                                    class="flex shrink-0 items-center justify-center gap-0.5"
-                                >
-                                    <input
-                                        :id="`meal-item-qty-${i}`"
-                                        type="number"
-                                        class="h-9 w-32 min-w-11 shrink-0 rounded border border-secondBg bg-secondBg px-1 text-center text-sm tabular-nums text-textPrimary focus:border-thirdBg focus:outline-none"
-                                        :value="qtyDraft"
-                                        min="0"
-                                        step="any"
-                                        inputmode="decimal"
-                                        @input="onQtyDraftInput"
-                                        @blur="commitQtyEdit(i)"
-                                        @keydown.enter.prevent="
-                                            commitQtyEdit(i)
-                                        "
-                                        @keydown.escape.prevent="
-                                            cancelQtyEdit()
-                                        "
-                                    />
-                                    <span
-                                        v-if="item.food?.serving_type === 'g'"
-                                        class="text-sm text-textSecondary"
-                                        >g</span
-                                    >
-                                </div>
-                                <button
-                                    v-if="qtyEditIndex !== i"
-                                    class="flex h-9 w-9 shrink-0 items-center justify-center rounded border border-secondBg bg-secondBg text-textPrimary transition-colors hover:border-thirdBg hover:bg-thirdBg"
-                                    type="button"
-                                    @click="amountPlusMinus(i, 'plus')"
-                                >
-                                    <Plus :size="18" />
-                                </button>
-                            </div>
-                            <span
-                                class="min-w-0 text-right text-sm tabular-nums text-textSecondary"
-                            >
-                                {{
-                                    formatNum(
-                                        item.amount * item.food!.calories,
-                                    )
-                                }}C /
-                                {{
-                                    formatNum(item.amount * item.food!.protein)
-                                }}P /
-                                {{ formatNum(item.amount * item.food!.fiber) }}F
-                            </span>
-                            <button
-                                class="flex h-9 w-9 shrink-0 items-center justify-center justify-self-end rounded text-textSecondary transition-colors hover:bg-secondBg hover:text-cfRed"
-                                type="button"
-                                aria-label="Remove item"
-                                @click="removeFood(i)"
-                            >
-                                <Trash2 :size="20" />
-                            </button>
-                        </div>
+                            <template v-if="block.kind === 'ungrouped'">
+                                <LogMealItemRow
+                                    v-for="{ item, index: i } in block.rows"
+                                    :key="`u-${i}`"
+                                    :item="item"
+                                    :row-index="i"
+                                    :selected="!!selectedForGroup[i]"
+                                    @toggle-select="toggleSelectRow"
+                                    @amount-plus-minus="amountPlusMinus"
+                                    @set-item-amount="setMealItemAmount"
+                                    @remove="removeFood"
+                                />
+                            </template>
+                            <LogMealGroupBlock
+                                v-else
+                                :block="block"
+                                :expanded="isGroupExpanded(block.groupId)"
+                                :selected-for-group="selectedForGroup"
+                                @toggle-collapse="toggleGroupCollapse"
+                                @set-group-label="setGroupLabel"
+                                @remove-group="removeGroupLines"
+                                @toggle-select="toggleSelectRow"
+                                @amount-plus-minus="amountPlusMinus"
+                                @set-item-amount="setMealItemAmount"
+                                @remove-item="removeFood"
+                            />
+                        </template>
                     </div>
                 </section>
                 <footer
@@ -656,7 +700,7 @@ const updateLoggedMeal = async () => {
                 <h2 class="mt-0 text-lg font-semibold">Add Foods</h2>
                 <SearchList
                     :route="'diet/meals/food/all'"
-                    :onSelect="addFood"
+                    :onSelect="pickFoodOrComposite"
                     :onCreate="createFood"
                     :displayComponent="FoodDisplay"
                 />
