@@ -27,8 +27,8 @@ defineProps<{
             type="protein"
             :indicate-overflow="true"
         />
-        <MacroBar :total="totalFiber" :planned="plannedFiber" type="fiber" />
         <MacroBar :total="totalCarbs" :planned="plannedCarbs" type="carbs" />
+        <MacroBar :total="totalFiber" :planned="plannedFiber" type="fiber" />
     </div>
 </template>
 

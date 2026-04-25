@@ -25,13 +25,15 @@ function macroTotalsForMeal(meal: Meal) {
     let calories = 0;
     let protein = 0;
     let fiber = 0;
+    let carbs = 0;
     for (const item of meal.items) {
         const a = Number(item.amount);
         calories += (item.food?.calories ?? 0) * a;
         protein += (item.food?.protein ?? 0) * a;
         fiber += (item.food?.fiber ?? 0) * a;
+        carbs += (item.food?.carbs ?? 0) * a;
     }
-    return { calories, protein, fiber };
+    return { calories, protein, fiber, carbs };
 }
 
 const props = defineProps<{
@@ -70,6 +72,7 @@ function toggleGroupCollapse(groupId: string) {
                 :calories="mealMacroTotals.calories"
                 :protein="mealMacroTotals.protein"
                 :fiber="mealMacroTotals.fiber"
+                :carbs="mealMacroTotals.carbs"
                 font-size="0.9rem"
             />
         </h3>

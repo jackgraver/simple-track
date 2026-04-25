@@ -3,7 +3,12 @@ import { computed } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useQuery } from "@tanstack/vue-query";
 import { apiClient } from "~/api/client";
-import type { MealItem, PlannedMeal, SavedMeal, SavedMealItem } from "~/types/diet";
+import type {
+    MealItem,
+    PlannedMeal,
+    SavedMeal,
+    SavedMealItem,
+} from "~/types/diet";
 import { useDietLogsToday } from "~/pages/home/queries/useDietLogsToday";
 import {
     useAddPlannedFromSaved,
@@ -12,17 +17,21 @@ import {
 import { toast } from "~/composables/toast/useToast";
 import SimpleMacros from "~/shared/SimpleMacros.vue";
 
-function macroTotals(
-    items: (MealItem | SavedMealItem)[] | undefined,
-): { calories: number; protein: number; fiber: number } {
-    if (!items?.length) return { calories: 0, protein: 0, fiber: 0 };
+function macroTotals(items: (MealItem | SavedMealItem)[] | undefined): {
+    calories: number;
+    protein: number;
+    fiber: number;
+    carbs: number;
+} {
+    if (!items?.length) return { calories: 0, protein: 0, fiber: 0, carbs: 0 };
     return items.reduce(
         (acc, i) => ({
             calories: acc.calories + (i.food?.calories ?? 0) * i.amount,
             protein: acc.protein + (i.food?.protein ?? 0) * i.amount,
             fiber: acc.fiber + (i.food?.fiber ?? 0) * i.amount,
+            carbs: acc.carbs + (i.food?.carbs ?? 0) * i.amount,
         }),
-        { calories: 0, protein: 0, fiber: 0 },
+        { calories: 0, protein: 0, fiber: 0, carbs: 0 },
     );
 }
 

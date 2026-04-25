@@ -20,6 +20,7 @@ const isComposite = computed(() => props.item.entry_kind === "composite");
             :calories="item.calories"
             :protein="item.protein"
             :fiber="item.fiber"
+            :carbs="item.carbs"
         />
     </div>
 </template>

@@ -36,6 +36,7 @@ import {
     parseLogMealPageMode,
     type LogMealPageMode,
 } from "./logmealMode";
+import SimpleMacros from "~/shared/SimpleMacros.vue";
 
 type MealMacroTotals = {
     calories: number;
@@ -534,10 +535,18 @@ const updateLoggedMeal = async () => {
                 <header
                     class="shrink-0 border-b border-secondBg p-4 text-textPrimary"
                 >
-                    <div class="mb-4">
+                    <div
+                        class="mb-4 flex flex-row items-center justify-between"
+                    >
                         <h1 class="m-0 text-xl font-semibold">
                             {{ pageTitle }}
                         </h1>
+                        <SimpleMacros
+                            :calories="totalMacros.calories"
+                            :protein="totalMacros.protein"
+                            :fiber="totalMacros.fiber"
+                            :carbs="totalMacros.carbs"
+                        />
                     </div>
                     <div class="flex min-w-0 flex-1 flex-col gap-2">
                         <Input

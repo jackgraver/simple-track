@@ -2,6 +2,7 @@
 defineProps<{
     calories: number;
     protein: number;
+    carbs: number;
     fiber: number;
     fontSize?: string;
 }>();
@@ -13,8 +14,9 @@ defineProps<{
             >{{ calories }}C</span
         >
         <span class="macro protein" :style="{ fontSize }">{{ protein }}P</span>
+        <span class="macro carbs" :style="{ fontSize }">{{ carbs }}C</span>
         <span class="macro fiber" :style="{ fontSize }">{{ fiber }}F</span>
-    </div> 
+    </div>
 </template>
 
 <style scoped>
@@ -34,6 +36,9 @@ defineProps<{
 }
 .protein {
     color: #60a5fa;
+}
+.carbs {
+    color: red;
 }
 .fiber {
     color: #34d399;
