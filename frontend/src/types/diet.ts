@@ -54,6 +54,8 @@ export interface Food extends BaseModel {
     protein: number;
     fiber: number;
     carbs: number;
+    variant_group_id?: number | null;
+    variants?: Food[];
 }
 
 export interface SavedMeal extends BaseModel {

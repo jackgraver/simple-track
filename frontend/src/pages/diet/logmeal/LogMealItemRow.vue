@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import type { MealItem } from "~/types/diet";
-import { Minus, Plus, Trash2 } from "lucide-vue-next";
-import { nextTick, ref, watch } from "vue";
+import type { Food, MealItem } from "~/types/diet";
+import { ChevronDown, Minus, Plus, Trash2 } from "lucide-vue-next";
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
 import { formatNum, itemServingAmount } from "./logmealItemFormat";
 import { mealItemsListGridClass } from "./mealItemsListGrid";
 
@@ -20,7 +20,31 @@ const emit = defineEmits<{
     amountPlusMinus: [index: number, direction: "plus" | "minus"];
     remove: [index: number];
     setItemAmount: [index: number, amount: number];
+    swapVariant: [index: number, variant: Food];
 }>();
+
+const hasVariants = computed(
+    () =>
+        !!props.item.food?.variant_group_id &&
+        (props.item.food.variants?.length ?? 0) > 0,
+);
+
+const variantOpen = ref(false);
+const variantRoot = ref<HTMLElement | null>(null);
+
+function onDocClick(ev: MouseEvent) {
+    const el = variantRoot.value;
+    if (!el || el.contains(ev.target as Node)) return;
+    variantOpen.value = false;
+}
+
+onMounted(() => document.addEventListener("click", onDocClick));
+onUnmounted(() => document.removeEventListener("click", onDocClick));
+
+function pickVariant(v: Food) {
+    variantOpen.value = false;
+    emit("swapVariant", props.rowIndex, v);
+}
 
 const qtyEditing = ref(false);
 const qtyDraft = ref("");
@@ -95,12 +119,44 @@ function commitQtyEdit() {
             :checked="selected"
             @change="emit('toggleSelect', rowIndex)"
         />
-        <span
-            class="min-w-0 truncate font-medium text-textPrimary"
+        <div
+            class="flex min-w-0 items-center gap-1 font-medium text-textPrimary"
             :class="compactName ? 'text-sm' : 'text-base'"
-            :title="item.food?.name"
-            >{{ item.food?.name ?? "" }}</span
         >
+            <span class="min-w-0 truncate" :title="item.food?.name">{{
+                item.food?.name ?? ""
+            }}</span>
+            <div v-if="hasVariants" ref="variantRoot" class="relative shrink-0">
+                <button
+                    type="button"
+                    class="flex h-8 w-8 items-center justify-center rounded border border-secondBg bg-secondBg text-textSecondary hover:border-thirdBg hover:bg-thirdBg hover:text-textPrimary"
+                    :aria-expanded="variantOpen"
+                    aria-haspopup="listbox"
+                    aria-label="Swap variant"
+                    @click.stop="variantOpen = !variantOpen"
+                >
+                    <ChevronDown :size="16" />
+                </button>
+                <div
+                    v-if="variantOpen"
+                    class="absolute left-0 top-full z-30 mt-0.5 max-h-48 min-w-48 overflow-y-auto rounded-md border border-secondBg bg-firstBg py-1 shadow-lg"
+                    role="listbox"
+                    @click.stop
+                >
+                    <button
+                        v-for="v in item.food!.variants"
+                        :key="v.ID"
+                        type="button"
+                        class="flex w-full flex-col items-stretch gap-0 px-3 py-2 text-left text-sm text-textPrimary hover:bg-secondBg"
+                        role="option"
+                        @click="pickVariant(v)"
+                    >
+                        <span class="font-medium">{{ v.name }}</span>
+                        <span class="text-xs tabular-nums text-textSecondary">{{ formatNum(v.calories) }}C / {{ formatNum(v.protein) }}P / {{ formatNum(v.fiber) }}F</span>
+                    </button>
+                </div>
+            </div>
+        </div>
         <div class="flex items-center justify-center gap-1 tabular-nums">
             <button
                 v-if="!qtyEditing"

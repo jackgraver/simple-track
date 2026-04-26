@@ -60,17 +60,25 @@ func (s SavedMealItem) TableName() string { return "saved_meal_items" }
 // Food represents a food item
 type Food struct {
 	gorm.Model
-	Name          string  `json:"name" gorm:"not null;uniqueIndex"`
-	ServingType   string  `json:"serving_type" gorm:"not null"`
-	ServingAmount float32 `json:"serving_amount" gorm:"not null"`
-	Calories      float32 `json:"calories" gorm:"not null"`
-	Protein       float32 `json:"protein"`
-	Fiber         float32 `json:"fiber"`
-	Carbs         float32 `json:"carbs"`
+	Name             string  `json:"name" gorm:"not null;uniqueIndex"`
+	ServingType      string  `json:"serving_type" gorm:"not null"`
+	ServingAmount    float32 `json:"serving_amount" gorm:"not null"`
+	Calories         float32 `json:"calories" gorm:"not null"`
+	Protein          float32 `json:"protein"`
+	Fiber            float32 `json:"fiber"`
+	Carbs            float32 `json:"carbs"`
+	VariantGroupID   *uint   `json:"variant_group_id" gorm:"index"`
+	Variants         []Food  `json:"variants,omitempty" gorm:"-"`
 }
 
 func (f Food) GetID() uint       { return f.ID }
 func (f Food) TableName() string { return "foods" }
+
+// FoodWithVariants is one food row for the food picker, including optional sibling variant foods.
+type FoodWithVariants struct {
+	Food
+	Variants []Food `json:"variants,omitempty"`
+}
 
 // CompositeFood is a reusable recipe (multiple foods + amounts); logging expands to grouped meal items.
 type CompositeFood struct {

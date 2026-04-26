@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ChevronDown, ChevronRight, MoreVertical } from "lucide-vue-next";
 import { onMounted, onUnmounted, ref } from "vue";
+import type { Food } from "~/types/diet";
 import type { MealItemDisplayBlock } from "~/utils/mealItemGroups";
 import { blockMacros } from "~/utils/mealItemGroups";
 import { toast } from "~/composables/toast/useToast";
@@ -23,6 +24,7 @@ const emit = defineEmits<{
     amountPlusMinus: [index: number, direction: "plus" | "minus"];
     setItemAmount: [index: number, amount: number];
     removeItem: [index: number];
+    swapVariant: [index: number, variant: Food];
 }>();
 
 const menuOpen = ref(false);
@@ -173,6 +175,9 @@ async function saveAsCompositeFood() {
                 "
                 @set-item-amount="
                     (rowI, amt) => emit('setItemAmount', rowI, amt)
+                "
+                @swap-variant="
+                    (rowI, v) => emit('swapVariant', rowI, v)
                 "
                 @remove="emit('removeItem', $event)"
             />

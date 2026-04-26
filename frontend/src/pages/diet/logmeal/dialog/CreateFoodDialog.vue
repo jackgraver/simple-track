@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { ref } from "vue";
 import type { Food } from "~/types/diet";
+import SearchList from "~/shared/SearchList.vue";
+import FoodDisplay from "~/pages/diet/logmeal/components/FoodDisplay.vue";
 import { useCreateFood } from "../queries/useFoodMutations";
 
 const props = defineProps<{
@@ -22,14 +24,31 @@ const meal = ref<Food>({
     serving_amount: 0,
 });
 
+const relatedFood = ref<Food | null>(null);
+
 const createFoodMutation = useCreateFood();
+
+function clearRelated() {
+    relatedFood.value = null;
+}
+
+async function onPickRelated(
+    row: Food & { entry_kind?: string },
+): Promise<boolean> {
+    if (row.entry_kind === "composite") return false;
+    relatedFood.value = row as Food;
+    return true;
+}
 
 const createFood = async () => {
     if (meal.value.serving_type === "Grams") meal.value.serving_type = "g";
     if (meal.value.serving_type === "Unit") meal.value.serving_type = "";
 
     try {
-        const response = await createFoodMutation.mutateAsync(meal.value);
+        const response = await createFoodMutation.mutateAsync({
+            food: meal.value,
+            relatedFoodId: relatedFood.value?.ID,
+        });
         if (response?.food) {
             props.onResolve(response.food);
         }
@@ -100,6 +119,25 @@ const createFood = async () => {
                 v-model="meal.serving_amount"
             />
         </div>
+        <div class="field related-field">
+            <label>Related to existing food (optional)</label>
+            <div
+                v-if="relatedFood"
+                class="related-chip"
+            >
+                <span class="related-name">{{ relatedFood.name }}</span>
+                <button type="button" class="related-clear" @click="clearRelated">
+                    Clear
+                </button>
+            </div>
+            <div class="related-search">
+                <SearchList
+                    route="diet/meals/food/all"
+                    :on-select="onPickRelated"
+                    :display-component="FoodDisplay"
+                />
+            </div>
+        </div>
         <button @click="createFood">Create</button>
     </div>
 </template>
@@ -137,5 +175,47 @@ input {
 label {
     font-size: 0.9rem;
     color: #ccc;
+}
+
+.related-field {
+    gap: 0.5rem;
+}
+
+.related-chip {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding: 0.45rem 0.6rem;
+    border-radius: 4px;
+    background: rgb(55, 55, 55);
+}
+
+.related-name {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: 0.9rem;
+}
+
+.related-clear {
+    flex-shrink: 0;
+    cursor: pointer;
+    border: none;
+    border-radius: 4px;
+    padding: 0.25rem 0.5rem;
+    background: rgb(70, 70, 70);
+    color: white;
+    font-size: 0.8rem;
+}
+
+.related-search {
+    max-height: 14rem;
+    min-height: 6rem;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    border-radius: 4px;
+    border: 1px solid rgb(60, 60, 60);
 }
 </style>
