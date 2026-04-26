@@ -36,18 +36,16 @@ function easeOutCubic(t: number): number {
 
 const DURATION_MS = 380;
 const displayTotal = ref(props.total ?? 0);
-const displayPlanned = ref(props.planned ?? 0);
 
 let rafId: number | null = null;
 
-function animateTo(targetTotal: number, targetPlanned: number) {
+function animateTo(targetTotal: number) {
     if (rafId != null) {
         cancelAnimationFrame(rafId);
         rafId = null;
     }
     const fromTotal = displayTotal.value;
-    const fromPlanned = displayPlanned.value;
-    if (fromTotal === targetTotal && fromPlanned === targetPlanned) return;
+    if (fromTotal === targetTotal) return;
 
     const start = performance.now();
     const step = (now: number) => {
@@ -55,12 +53,10 @@ function animateTo(targetTotal: number, targetPlanned: number) {
         const t = Math.min(1, elapsed / DURATION_MS);
         const e = easeOutCubic(t);
         displayTotal.value = fromTotal + (targetTotal - fromTotal) * e;
-        displayPlanned.value = fromPlanned + (targetPlanned - fromPlanned) * e;
         if (t < 1) {
             rafId = requestAnimationFrame(step);
         } else {
             displayTotal.value = targetTotal;
-            displayPlanned.value = targetPlanned;
             rafId = null;
         }
     };
@@ -68,9 +64,9 @@ function animateTo(targetTotal: number, targetPlanned: number) {
 }
 
 watch(
-    () => [props.total ?? 0, props.planned ?? 0] as const,
-    ([t, p]) => {
-        animateTo(t, p);
+    () => props.total ?? 0,
+    (t) => {
+        animateTo(t);
     },
 );
 
@@ -85,7 +81,7 @@ onBeforeUnmount(() => {
             class="fill"
             :class="type"
             :style="{
-                width: `${calcWidth(displayTotal, displayPlanned)}%`,
+                width: `${calcWidth(displayTotal, props.planned)}%`,
             }"
         >
             <span
@@ -93,11 +89,11 @@ onBeforeUnmount(() => {
                 :class="
                     determineOverflow(
                         Math.round(displayTotal),
-                        Math.round(displayPlanned),
+                        Math.round(props.planned),
                     )
                 "
                 >{{
-                    formatInt(displayTotal) + " / " + formatInt(displayPlanned)
+                    formatInt(displayTotal) + " / " + formatInt(props.planned)
                 }}</span
             >
         </div>
