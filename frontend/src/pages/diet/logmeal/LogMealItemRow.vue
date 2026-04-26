@@ -4,6 +4,7 @@ import { ChevronDown, Minus, Plus, Trash2 } from "lucide-vue-next";
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
 import { formatNum, itemServingAmount } from "./logmealItemFormat";
 import { mealItemsListGridClass } from "./mealItemsListGrid";
+import SimpleMacros from "~/shared/SimpleMacros.vue";
 
 const props = withDefaults(
     defineProps<{
@@ -127,19 +128,9 @@ function commitQtyEdit() {
                 item.food?.name ?? ""
             }}</span>
             <div v-if="hasVariants" ref="variantRoot" class="relative shrink-0">
-                <button
-                    type="button"
-                    class="flex h-8 w-8 items-center justify-center rounded border border-secondBg bg-secondBg text-textSecondary hover:border-thirdBg hover:bg-thirdBg hover:text-textPrimary"
-                    :aria-expanded="variantOpen"
-                    aria-haspopup="listbox"
-                    aria-label="Swap variant"
-                    @click.stop="variantOpen = !variantOpen"
-                >
-                    <ChevronDown :size="16" />
-                </button>
                 <div
                     v-if="variantOpen"
-                    class="absolute left-0 top-full z-30 mt-0.5 max-h-48 min-w-48 overflow-y-auto rounded-md border border-secondBg bg-firstBg py-1 shadow-lg"
+                    class="absolute right-0 top-full z-30 mt-1 max-h-56 min-w-56 overflow-y-auto rounded-md border border-thirdBg bg-secondBg shadow-lg"
                     role="listbox"
                     @click.stop
                 >
@@ -147,14 +138,30 @@ function commitQtyEdit() {
                         v-for="v in item.food!.variants"
                         :key="v.ID"
                         type="button"
-                        class="flex w-full flex-col items-stretch gap-0 px-3 py-2 text-left text-sm text-textPrimary hover:bg-secondBg"
+                        class="flex w-full flex-col px-3 py-2 m-0! text-left text-sm text-textPrimary shadow-none! rounded-none! hover:bg-thirdBg"
                         role="option"
                         @click="pickVariant(v)"
                     >
                         <span class="font-medium">{{ v.name }}</span>
-                        <span class="text-xs tabular-nums text-textSecondary">{{ formatNum(v.calories) }}C / {{ formatNum(v.protein) }}P / {{ formatNum(v.fiber) }}F</span>
+                        <SimpleMacros
+                            :calories="v.calories"
+                            :protein="v.protein"
+                            :fiber="v.fiber"
+                            :carbs="v.carbs"
+                            font-size="0.75rem"
+                        />
                     </button>
                 </div>
+                <button
+                    type="button"
+                    class="ml-2 flex h-9 w-9 items-center justify-center rounded-md text-textSecondary transition-colors hover:bg-secondBg hover:text-textPrimary shadow-none!"
+                    :aria-expanded="variantOpen"
+                    aria-haspopup="listbox"
+                    aria-label="Swap variant"
+                    @click.stop="variantOpen = !variantOpen"
+                >
+                    <ChevronDown :size="28" :stroke-width="2.25" />
+                </button>
             </div>
         </div>
         <div class="flex items-center justify-center gap-1 tabular-nums">
