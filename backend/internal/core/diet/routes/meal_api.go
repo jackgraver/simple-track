@@ -44,13 +44,18 @@ func RegisterMealRoutes(group *gin.RouterGroup, db *gorm.DB) {
 	}
 }
 
+type CreateFoodRequest struct {
+	models.Food
+	RelatedFoodID *uint `json:"related_food_id,omitempty"`
+}
+
 func (h *MealHandler) postFood(c *gin.Context) {
-	var food models.Food
-	if err := c.ShouldBindJSON(&food); err != nil {
+	var req CreateFoodRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	createdFood, err := services.CreateFood(h.db, &food)
+	createdFood, err := services.CreateFood(h.db, &req.Food, req.RelatedFoodID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -106,7 +111,7 @@ func (h *MealHandler) getAllFoods(c *gin.Context) {
 			excludeIDs = append(excludeIDs, uint(id))
 		}
 	}
-	foods, err := services.AllFoods(h.db, excludeIDs)
+	foods, err := services.AllFoodsForPicker(h.db, excludeIDs)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

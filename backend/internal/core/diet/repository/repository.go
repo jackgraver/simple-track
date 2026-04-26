@@ -22,6 +22,55 @@ func New(db *gorm.DB) *Repository {
 	return &Repository{db: db}
 }
 
+func (r *Repository) EnrichFoodVariants(f *models.Food) {
+	if f == nil || f.VariantGroupID == nil {
+		return
+	}
+	var sibs []models.Food
+	if err := r.db.Where("variant_group_id = ? AND id != ?", *f.VariantGroupID, f.ID).Order("name ASC").Find(&sibs).Error; err != nil {
+		return
+	}
+	f.Variants = sibs
+}
+
+func (r *Repository) enrichMealFoodVariants(m *models.Meal) {
+	if m == nil {
+		return
+	}
+	for i := range m.Items {
+		if m.Items[i].Food.ID != 0 {
+			r.EnrichFoodVariants(&m.Items[i].Food)
+		}
+	}
+}
+
+func (r *Repository) enrichSavedMealFoodVariants(sm *models.SavedMeal) {
+	if sm == nil {
+		return
+	}
+	for i := range sm.Items {
+		if sm.Items[i].Food.ID != 0 {
+			r.EnrichFoodVariants(&sm.Items[i].Food)
+		}
+	}
+}
+
+func (r *Repository) enrichDietDayFoodVariants(d *models.DietDay) {
+	if d == nil {
+		return
+	}
+	for i := range d.PlannedMeals {
+		if d.PlannedMeals[i].Meal.ID != 0 {
+			r.enrichMealFoodVariants(&d.PlannedMeals[i].Meal)
+		}
+	}
+	for i := range d.Logs {
+		if d.Logs[i].Meal.ID != 0 {
+			r.enrichMealFoodVariants(&d.Logs[i].Meal)
+		}
+	}
+}
+
 func (r *Repository) FoodsAll(excludeIDs []uint) ([]models.Food, error) {
 	var foods []models.Food
 	query := r.db.Model(&models.Food{})
@@ -36,6 +85,92 @@ func (r *Repository) FoodsAll(excludeIDs []uint) ([]models.Food, error) {
 
 func (r *Repository) FoodCreate(food *models.Food) error {
 	return r.db.Create(food).Error
+}
+
+// FoodCreateWithOptionalRelated inserts a food and, if set, links it to a related food's variant group.
+func (r *Repository) FoodCreateWithOptionalRelated(food *models.Food, relatedFoodID *uint) error {
+	return r.db.Transaction(func(tx *gorm.DB) error {
+		food.ID = 0
+		if err := tx.Create(food).Error; err != nil {
+			return err
+		}
+		if relatedFoodID == nil || *relatedFoodID == 0 {
+			return nil
+		}
+		return r.linkNewFoodToRelatedInTx(tx, food, *relatedFoodID)
+	})
+}
+
+func (r *Repository) linkNewFoodToRelatedInTx(tx *gorm.DB, food *models.Food, relatedFoodID uint) error {
+	if food.ID == 0 {
+		return errors.New("food must be persisted before linking")
+	}
+	if food.ID == relatedFoodID {
+		return nil
+	}
+	var related models.Food
+	if err := tx.First(&related, relatedFoodID).Error; err != nil {
+		return err
+	}
+	var gid uint
+	if related.VariantGroupID != nil {
+		gid = *related.VariantGroupID
+	} else {
+		var m uint
+		if err := tx.Model(&models.Food{}).Select("COALESCE(MAX(variant_group_id), 0)").Scan(&m).Error; err != nil {
+			return err
+		}
+		gid = m + 1
+		if err := tx.Model(&related).Update("variant_group_id", gid).Error; err != nil {
+			return err
+		}
+	}
+	if err := tx.Model(food).Update("variant_group_id", gid).Error; err != nil {
+		return err
+	}
+	food.VariantGroupID = &gid
+	return nil
+}
+
+func (r *Repository) foodsByVariantGroup() (map[uint][]models.Food, error) {
+	var list []models.Food
+	if err := r.db.Model(&models.Food{}).Where("variant_group_id IS NOT NULL").Order("name ASC").Find(&list).Error; err != nil {
+		return nil, err
+	}
+	m := make(map[uint][]models.Food)
+	for _, f := range list {
+		if f.VariantGroupID == nil {
+			continue
+		}
+		g := *f.VariantGroupID
+		m[g] = append(m[g], f)
+	}
+	return m, nil
+}
+
+// FoodsAllWithVariantSiblings returns all foods (with excludes) and attaches sibling rows per variant group.
+func (r *Repository) FoodsAllWithVariantSiblings(excludeIDs []uint) ([]models.FoodWithVariants, error) {
+	foods, err := r.FoodsAll(excludeIDs)
+	if err != nil {
+		return nil, err
+	}
+	byGroup, err := r.foodsByVariantGroup()
+	if err != nil {
+		return nil, err
+	}
+	out := make([]models.FoodWithVariants, 0, len(foods))
+	for _, f := range foods {
+		row := models.FoodWithVariants{Food: f}
+		if f.VariantGroupID != nil {
+			for _, s := range byGroup[*f.VariantGroupID] {
+				if s.ID != f.ID {
+					row.Variants = append(row.Variants, s)
+				}
+			}
+		}
+		out = append(out, row)
+	}
+	return out, nil
 }
 
 func (r *Repository) CompositeFoodsAll() ([]models.CompositeFood, error) {
@@ -78,6 +213,11 @@ func (r *Repository) SavedMealsAll(excludeIDs []uint) ([]models.SavedMeal, error
 	if err := query.Preload("Items.Food").Find(&meals).Distinct("name").Error; err != nil {
 		return nil, err
 	}
+	for i := range meals {
+		if meals[i].Items != nil {
+			r.enrichSavedMealFoodVariants(&meals[i])
+		}
+	}
 	return meals, nil
 }
 
@@ -96,6 +236,7 @@ func (r *Repository) SavedMealByID(id uint) (*models.SavedMeal, error) {
 	if err := r.db.Preload("Items.Food").First(&sm, id).Error; err != nil {
 		return nil, err
 	}
+	r.enrichSavedMealFoodVariants(&sm)
 	return &sm, nil
 }
 
@@ -117,6 +258,7 @@ func (r *Repository) MealByID(id uint) (*models.Meal, error) {
 	if err := r.db.Preload("Items.Food").First(&meal, id).Error; err != nil {
 		return nil, err
 	}
+	r.enrichMealFoodVariants(&meal)
 	return &meal, nil
 }
 
@@ -213,6 +355,7 @@ func (r *Repository) loadDietDayWithPreloads(id uint) (models.DietDay, error) {
 		First(&day, id).Error; err != nil {
 		return models.DietDay{}, err
 	}
+	r.enrichDietDayFoodVariants(&day)
 	return day, nil
 }
 

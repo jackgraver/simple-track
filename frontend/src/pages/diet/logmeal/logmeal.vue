@@ -416,6 +416,30 @@ const removeFood = async (index: number) => {
     selectedForGroup.value = {};
 };
 
+function variantSiblings(f: Food): Food[] {
+    const base = [f, ...(f.variants ?? [])];
+    const byId = new Map<number, Food>();
+    for (const x of base) {
+        if (x?.ID) byId.set(x.ID, x);
+    }
+    return [...byId.values()].sort((a, b) => a.name.localeCompare(b.name));
+}
+
+function swapVariant(index: number, v: Food) {
+    const it = meal.value.items[index];
+    const cur = it?.food;
+    if (!cur) return;
+    const others = variantSiblings(cur).filter((x) => x.ID !== v.ID);
+    const enriched: Food = {
+        ...v,
+        variant_group_id: v.variant_group_id ?? cur.variant_group_id ?? null,
+        variants: others,
+    };
+    meal.value.items = meal.value.items.map((row, i) =>
+        i === index ? { ...row, food_id: v.ID, food: enriched } : row,
+    );
+}
+
 const setMeal = async (item: Meal | SavedMeal): Promise<boolean> => {
     const first = item.items[0];
     meal.value =
@@ -620,6 +644,7 @@ const updateLoggedMeal = async () => {
                                     @toggle-select="toggleSelectRow"
                                     @amount-plus-minus="amountPlusMinus"
                                     @set-item-amount="setMealItemAmount"
+                                    @swap-variant="swapVariant"
                                     @remove="removeFood"
                                 />
                             </template>
@@ -634,6 +659,7 @@ const updateLoggedMeal = async () => {
                                 @toggle-select="toggleSelectRow"
                                 @amount-plus-minus="amountPlusMinus"
                                 @set-item-amount="setMealItemAmount"
+                                @swap-variant="swapVariant"
                                 @remove-item="removeFood"
                             />
                         </template>

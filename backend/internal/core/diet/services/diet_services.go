@@ -36,11 +36,19 @@ func AllFoods(db *gorm.DB, excludeIDs []uint) ([]models.Food, error) {
 	return dietrepo.New(db).FoodsAll(excludeIDs)
 }
 
-func CreateFood(db *gorm.DB, food *models.Food) (*models.Food, error) {
+// AllFoodsForPicker returns foods with sibling variants for the add-foods list.
+func AllFoodsForPicker(db *gorm.DB, excludeIDs []uint) ([]models.FoodWithVariants, error) {
+	return dietrepo.New(db).FoodsAllWithVariantSiblings(excludeIDs)
+}
+
+func CreateFood(db *gorm.DB, food *models.Food, relatedFoodID *uint) (*models.Food, error) {
 	r := dietrepo.New(db)
-	if err := r.FoodCreate(food); err != nil {
+	food.ID = 0
+	food.VariantGroupID = nil
+	if err := r.FoodCreateWithOptionalRelated(food, relatedFoodID); err != nil {
 		return nil, err
 	}
+	r.EnrichFoodVariants(food)
 	return food, nil
 }
 
