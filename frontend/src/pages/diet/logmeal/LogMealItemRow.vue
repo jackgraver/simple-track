@@ -154,7 +154,7 @@ function commitQtyEdit() {
                 </div>
                 <button
                     type="button"
-                    class="ml-2 flex h-9 w-9 items-center justify-center rounded-md text-textSecondary transition-colors hover:bg-secondBg hover:text-textPrimary shadow-none!"
+                    class="m-2! flex h-9 w-9 items-center justify-center rounded-md text-textSecondary transition-colors hover:bg-secondBg hover:text-textPrimary shadow-none!"
                     :aria-expanded="variantOpen"
                     aria-haspopup="listbox"
                     aria-label="Swap variant"
@@ -222,11 +222,15 @@ function commitQtyEdit() {
             </button>
         </div>
         <span
-            class="min-w-0 text-right text-sm tabular-nums text-textSecondary"
+            class="flex min-w-0 justify-end text-sm tabular-nums text-textSecondary"
         >
-            {{ formatNum(item.amount * (item.food?.calories ?? 0)) }}C /
-            {{ formatNum(item.amount * (item.food?.protein ?? 0)) }}P /
-            {{ formatNum(item.amount * (item.food?.fiber ?? 0)) }}F
+            <SimpleMacros
+                :calories="item.amount * (item.food?.calories ?? 0)"
+                :protein="item.amount * (item.food?.protein ?? 0)"
+                :fiber="item.amount * (item.food?.fiber ?? 0)"
+                :carbs="item.amount * (item.food?.carbs ?? 0)"
+                font-size="0.75rem"
+            />
         </span>
         <button
             class="flex h-9 w-9 shrink-0 items-center justify-center justify-self-end rounded text-textSecondary transition-colors hover:bg-secondBg hover:text-cfRed"
