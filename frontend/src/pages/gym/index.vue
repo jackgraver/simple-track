@@ -108,7 +108,7 @@ const loggingRoute = computed(() => ({
 </script>
 
 <template>
-    <div class="flex w-full flex-col gap-6 max-w-3xl">
+    <div class="flex w-full flex-col gap-6 max-w-3xl mx-auto">
         <template v-if="isGymHome">
             <div v-if="isError" class="text-sm text-(--color-cf-red)">
                 Error: {{ error?.message ?? "Failed to load" }}

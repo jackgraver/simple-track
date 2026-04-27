@@ -87,3 +87,18 @@ func ListSteps(db *gorm.DB, limit int) ([]models.StepLog, error) {
 	err := db.Order("date DESC").Limit(limit).Find(&rows).Error
 	return rows, err
 }
+
+func GetMissedYesterday(db *gorm.DB) (date time.Time, missingWeight bool, missingSteps bool, err error) {
+	date = utils.ZerodTime(1)
+	var weightCount int64
+	if err = db.Model(&models.BodyWeightLog{}).Where("date = ?", date).Count(&weightCount).Error; err != nil {
+		return time.Time{}, false, false, err
+	}
+	var stepsCount int64
+	if err = db.Model(&models.StepLog{}).Where("date = ?", date).Count(&stepsCount).Error; err != nil {
+		return time.Time{}, false, false, err
+	}
+	missingWeight = weightCount == 0
+	missingSteps = stepsCount == 0
+	return date, missingWeight, missingSteps, nil
+}

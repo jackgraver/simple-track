@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useAuth } from "~/composables/auth/useAuth";
+import TrackingNotifications from "~/shared/TrackingNotifications.vue";
 
 const { getUsername } = useAuth();
 </script>
@@ -24,8 +25,9 @@ const { getUsername } = useAuth();
             >
         </div>
         <div
-            class="pr-2 lg:pr-0 min-w-[90px] text-right flex items-center justify-end"
+            class="pr-2 lg:pr-0 min-w-[90px] flex items-center justify-end gap-2 text-right"
         >
+            <TrackingNotifications />
             <span v-if="getUsername()">{{ getUsername() }}</span>
         </div>
     </nav>

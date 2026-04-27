@@ -9,3 +9,9 @@ export type StepLog = {
     date: string;
     steps: number;
 };
+
+export type MissedTracking = {
+    date: string;
+    weight: boolean;
+    steps: boolean;
+};

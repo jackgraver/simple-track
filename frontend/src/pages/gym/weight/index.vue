@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, ref, watch } from "vue";
+import { useRoute } from "vue-router";
 import { useWeightLogs, useSaveWeight } from "~/api/tracking/queries";
-import { formatDateLong } from "~/utils/dateUtil";
+import { formatDateLong, parseYmdDateQuery } from "~/utils/dateUtil";
 import { toast } from "~/composables/toast/useToast";
 import axios from "axios";
 
@@ -12,7 +13,17 @@ function localDateInputValue(d = new Date()) {
     return `${y}-${m}-${day}`;
 }
 
-const dateStr = ref(localDateInputValue());
+const route = useRoute();
+const dateStr = ref(
+    parseYmdDateQuery(route.query.date) ?? localDateInputValue(),
+);
+watch(
+    () => route.query.date,
+    (d) => {
+        const p = parseYmdDateQuery(d);
+        if (p) dateStr.value = p;
+    },
+);
 const weightInput = ref("");
 const { data: logs, isPending, isError, error } = useWeightLogs();
 const saveMutation = useSaveWeight();
