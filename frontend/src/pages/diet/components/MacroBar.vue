@@ -16,9 +16,9 @@ function determineOverflow(total: number, planned: number): string {
     if (planned <= 0 || !props.indicateOverflow) return "";
     const overflow = (total / planned) * 100 - 100;
 
-    if (overflow > 20) return "num30";
-    if (overflow > 10) return "num20";
-    if (overflow > 0) return "num10";
+    if (overflow > 20) return "large-overflow";
+    if (overflow > 10) return "medium-overflow";
+    if (overflow > 0) return "small-overflow";
     return "";
 }
 
@@ -103,23 +103,22 @@ onBeforeUnmount(() => {
 <style scoped>
 .fill-container {
     flex: 1;
-    height: 20px;
-    width: 250px;
     border-radius: 4px;
-    background-color: #252525;
+    border: 1px solid;
+    border-color: var(--color-secondBg);
 }
 
 .fill {
     height: 100%;
-    color: #ffffff;
-    font-weight: bold;
-    text-align: right;
-    white-space: nowrap;
+    text-align: center;
     line-height: 20px;
     border-radius: 4px;
 }
 
 .fill span {
+    color: #ffffff;
+    font-weight: bold;
+    white-space: nowrap;
     padding: 0 8px;
 }
 
@@ -136,13 +135,13 @@ onBeforeUnmount(() => {
     background-color: red;
 }
 
-.num10 {
+.small-overflow {
     color: yellow;
 }
-.num20 {
+.medium-overflow {
     color: orange;
 }
-.num30 {
+.large-overflow {
     color: red;
 }
 </style>
