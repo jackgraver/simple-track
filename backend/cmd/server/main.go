@@ -3,12 +3,13 @@ package main
 import (
 	"be-simpletracker/internal/core/auth"
 	diet "be-simpletracker/internal/core/diet"
+	"be-simpletracker/internal/env"
 	tracking "be-simpletracker/internal/core/tracking"
 	workout "be-simpletracker/internal/core/workout"
 	"be-simpletracker/internal/database"
 	"be-simpletracker/internal/utils"
 	"fmt"
-	"os"
+	"log"
 	"strings"
 	"time"
 
@@ -17,21 +18,20 @@ import (
 	"gorm.io/gorm"
 )
 
-func getEnv(key, fallback string) string {
-	if value, ok := os.LookupEnv(key); ok {
-		return value
-	}
-	return fallback
-}
-
 func main() {
-	utils.LoadEnvIfNeeded()
+	if err := env.Load(); err != nil {
+		log.Fatal(err)
+	}
+	if _, err := env.String("JWT_SECRET"); err != nil {
+		log.Fatalf("config: %v", err)
+	}
 	gin.SetMode(gin.ReleaseMode)
 	router := gin.Default()
 
 	router.Use(utils.BenchmarkMiddleware(router))
 
-	corsOrigins := getEnv("CORS_ORIGINS", "http://localhost:5173,http://localhost:3000,http://192.168.4.78:3000,http://192.168.4.64:3000")
+	defaultCORS := "http://localhost:5173,http://localhost:3000,http://192.168.4.78:3000,http://192.168.4.64:3000"
+	corsOrigins := env.StringOr("CORS_ORIGINS", defaultCORS)
 	origins := splitString(corsOrigins, ",")
 
 	router.Use(cors.New(cors.Config{
@@ -55,9 +55,20 @@ func main() {
 
 	CreateFeatures(db, router)
 
-	addr := getEnv("LISTEN_ADDR", "0.0.0.0:8080")
+	addr := env.StringOr("LISTEN_ADDR", "0.0.0.0:8080")
 	fmt.Println("Server is running on port", addr)
 	router.Run(addr)
+}
+
+func splitString(s, sep string) []string {
+	var result []string
+	for _, part := range strings.Split(s, sep) {
+		trimmed := strings.TrimSpace(part)
+		if trimmed != "" {
+			result = append(result, trimmed)
+		}
+	}
+	return result
 }
 
 func CreateFeatures(db *gorm.DB, router *gin.Engine) {
@@ -79,15 +90,4 @@ func CreateFeatures(db *gorm.DB, router *gin.Engine) {
 		panic(err)
 	}
 	trackingHandler.RegisterRoutes(router, authMW)
-}
-
-func splitString(s, sep string) []string {
-	var result []string
-	for _, part := range strings.Split(s, sep) {
-		trimmed := strings.TrimSpace(part)
-		if trimmed != "" {
-			result = append(result, trimmed)
-		}
-	}
-	return result
 }

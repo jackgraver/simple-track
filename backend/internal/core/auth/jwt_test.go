@@ -67,6 +67,16 @@ func mustSignedJWT(tb testing.TB, claims Claims) string {
 	}
 	he := base64.RawURLEncoding.EncodeToString(hj)
 	ce := base64.RawURLEncoding.EncodeToString(cj)
-	sig := createSignature(he + "." + ce)
+	sig, err := createSignature(he + "." + ce)
+	if err != nil {
+		tb.Fatal(err)
+	}
 	return he + "." + ce + "." + sig
+}
+
+func TestGenerateToken_missingSecretReturnsError(t *testing.T) {
+	t.Setenv("JWT_SECRET", "")
+	if _, err := GenerateToken("u"); err == nil {
+		t.Fatal("expected error when JWT_SECRET is empty")
+	}
 }

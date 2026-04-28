@@ -9,17 +9,17 @@ import (
 	"os/exec"
 	"strings"
 
-	"be-simpletracker/internal/utils"
+	"be-simpletracker/internal/env"
 
 	"github.com/glebarez/sqlite"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
 
-// Initializes a new database connection to a PostgreSQL database.
 func ConnectToPostgres() (*gorm.DB, error) {
-	utils.LoadEnvIfNeeded()
-
+	if err := env.Load(); err != nil {
+		return nil, err
+	}
 	dsn := resolvePostgresDSN()
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
 	if err != nil {
@@ -29,24 +29,15 @@ func ConnectToPostgres() (*gorm.DB, error) {
 	return db, nil
 }
 
-func getEnv(key, fallback string) string {
-	if value, ok := os.LookupEnv(key); ok {
-		return value
-	}
-	return fallback
-}
-
 func resolvePostgresDSN() string {
-	if dsn, ok := os.LookupEnv("DATABASE_URL"); ok && strings.TrimSpace(dsn) != "" {
-		return dsn
+	if d := env.OptionalString("DATABASE_URL"); d != "" {
+		return d
 	}
-
-	appEnv := normalizeEnv(getEnv("APP_ENV", getEnv("GO_ENV", "development")))
+	appEnv := normalizeEnv(env.StringOr("APP_ENV", env.StringOr("GO_ENV", "development")))
 	if appEnv == "production" {
-		return getEnv("DATABASE_URL_PRODUCTION", "postgres://postgres:postgres@localhost:5433/simpletracker_prod?sslmode=disable")
+		return env.StringOr("DATABASE_URL_PRODUCTION", "postgres://postgres:postgres@localhost:5433/simpletracker_prod?sslmode=disable")
 	}
-
-	return getEnv("DATABASE_URL_DEVELOPMENT", "postgres://postgres:postgres@localhost:5432/simpletracker_dev?sslmode=disable")
+	return env.StringOr("DATABASE_URL_DEVELOPMENT", "postgres://postgres:postgres@localhost:5432/simpletracker_dev?sslmode=disable")
 }
 
 func normalizeEnv(value string) string {
