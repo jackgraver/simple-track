@@ -2,35 +2,19 @@ package auth
 
 import (
 	"net/http"
-	"strings"
 
 	"github.com/gin-gonic/gin"
 )
 
-// AuthMiddleware validates JWT tokens from Authorization header or httpOnly cookie
+// AuthMiddleware validates the JWT stored in the httpOnly auth_token cookie from the SPA.
 func AuthMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		var token string
-
-		// Try to get token from Authorization header first
-		authHeader := c.GetHeader("Authorization")
-		if authHeader != "" {
-			parts := strings.Split(authHeader, " ")
-			if len(parts) == 2 && parts[0] == "Bearer" {
-				token = parts[1]
-			}
+		token := ""
+		if ct, err := c.Cookie(AuthTokenCookieName); err == nil {
+			token = ct
 		}
-
-		// Fallback to httpOnly cookie if no Authorization header
 		if token == "" {
-			cookieToken, err := c.Cookie("auth_token")
-			if err == nil && cookieToken != "" {
-				token = cookieToken
-			}
-		}
-
-		if token == "" {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Authorization required"})
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Authentication required"})
 			c.Abort()
 			return
 		}

@@ -9,6 +9,9 @@ import (
 	"gorm.io/gorm"
 )
 
+// authCookieName matches auth.AuthTokenCookieName — routes cannot import the auth package without a cycle with auth.RegisterRoutes callers.
+const authCookieName = "auth_token"
+
 type AuthHandler struct {
 	db             *gorm.DB
 	generateToken  func(string) (string, error)
@@ -84,7 +87,7 @@ func (h *AuthHandler) Register(c *gin.Context) {
 	user.Password = ""
 
 	c.SetSameSite(h.cookieSameSite)
-	c.SetCookie("auth_token", token, h.cookieMaxAge, "/", "", h.cookieSecure, true)
+	c.SetCookie(authCookieName, token, h.cookieMaxAge, "/", "", h.cookieSecure, true)
 
 	c.JSON(http.StatusCreated, AuthResponse{
 		Token:    token,
@@ -125,7 +128,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	user.Password = ""
 
 	c.SetSameSite(h.cookieSameSite)
-	c.SetCookie("auth_token", token, h.cookieMaxAge, "/", "", h.cookieSecure, true)
+	c.SetCookie(authCookieName, token, h.cookieMaxAge, "/", "", h.cookieSecure, true)
 
 	c.JSON(http.StatusOK, AuthResponse{
 		Token:    token,
@@ -156,7 +159,7 @@ func (h *AuthHandler) GetCurrentUser(c *gin.Context) {
 // Logout clears the authentication cookie
 func (h *AuthHandler) Logout(c *gin.Context) {
 	c.SetSameSite(h.cookieSameSite)
-	c.SetCookie("auth_token", "", -1, "/", "", h.cookieSecure, true)
+	c.SetCookie(authCookieName, "", -1, "/", "", h.cookieSecure, true)
 	c.JSON(http.StatusOK, gin.H{"message": "Logged out successfully"})
 }
 

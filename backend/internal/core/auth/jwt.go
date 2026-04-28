@@ -9,17 +9,24 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"sync"
 	"time"
 )
 
-var secretKey string
+var (
+	jwtSecretOnce sync.Once
+	jwtSecretKey  string
+)
 
-func init() {
-	utils.LoadEnvIfNeeded()
-	secretKey = os.Getenv("JWT_SECRET")
-	if secretKey == "" {
-		panic("JWT_SECRET environment variable is required but not set")
-	}
+func getJWTSecret() string {
+	jwtSecretOnce.Do(func() {
+		utils.LoadEnvIfNeeded()
+		jwtSecretKey = os.Getenv("JWT_SECRET")
+		if jwtSecretKey == "" {
+			panic("JWT_SECRET environment variable is required but not set")
+		}
+	})
+	return jwtSecretKey
 }
 
 type Claims struct {
@@ -98,7 +105,7 @@ func VerifyToken(token string) (*Claims, error) {
 }
 
 func createSignature(data string) string {
-	h := hmac.New(sha256.New, []byte(secretKey))
+	h := hmac.New(sha256.New, []byte(getJWTSecret()))
 	h.Write([]byte(data))
 	return base64.RawURLEncoding.EncodeToString(h.Sum(nil))
 }
