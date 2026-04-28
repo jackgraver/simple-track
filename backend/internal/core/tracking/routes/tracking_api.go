@@ -20,6 +20,7 @@ func NewTrackingHandler(db *gorm.DB) *TrackingHandler {
 
 func RegisterTrackingRoutes(group *gin.RouterGroup, db *gorm.DB) {
 	h := NewTrackingHandler(db)
+	group.GET("/missed", h.getMissed)
 	w := group.Group("/weight")
 	{
 		w.GET("", h.getWeights)
@@ -76,6 +77,19 @@ func (h *TrackingHandler) postWeight(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"log": row})
+}
+
+func (h *TrackingHandler) getMissed(c *gin.Context) {
+	date, missingWeight, missingSteps, err := services.GetMissedYesterday(h.db)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"date":   date.Format("2006-01-02"),
+		"weight": missingWeight,
+		"steps":  missingSteps,
+	})
 }
 
 func (h *TrackingHandler) getSteps(c *gin.Context) {

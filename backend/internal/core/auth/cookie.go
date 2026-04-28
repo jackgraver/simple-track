@@ -7,6 +7,9 @@ import (
 	"strings"
 )
 
+// AuthTokenCookieName is the SPA httpOnly cookie; routes use the same name (routes cannot import auth without a cycle).
+const AuthTokenCookieName = "auth_token"
+
 const defaultCookieMaxAgeSec = 365 * 24 * 3600
 
 // CookieMaxAgeSeconds returns AUTH_COOKIE_MAX_AGE_SEC or a long default (1 year).
@@ -21,7 +24,6 @@ func CookieMaxAgeSeconds() int {
 	}
 	return v
 }
-
 // CookieSameSite returns AUTH_COOKIE_SAMESITE: lax (default), strict, or none.
 // Use "none" when the SPA and API are on different sites (cross-origin XHR); browsers require Secure with none.
 func CookieSameSite() http.SameSite {

@@ -64,3 +64,10 @@ export function dayOfWeek(dateStr: string): string {
     const date = new Date(dateStr);
     return date.toLocaleDateString("en-US", { weekday: "long" }); // local
 }
+
+export function parseYmdDateQuery(raw: unknown): string | null {
+    if (typeof raw !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+        return null;
+    }
+    return raw;
+}

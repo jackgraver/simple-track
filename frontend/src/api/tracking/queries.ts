@@ -1,5 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query';
+import { computed } from 'vue';
+import { isAuthenticated } from '~/composables/auth/session';
 import {
+    fetchMissedTracking,
     fetchStepLogs,
     fetchWeightLogs,
     saveSteps,
@@ -14,6 +17,15 @@ export function useWeightLogs() {
     });
 }
 
+export function useMissedTracking() {
+    return useQuery({
+        queryKey: trackingKeys.missed,
+        queryFn: () => fetchMissedTracking(),
+        staleTime: 5 * 60_000,
+        enabled: computed(() => isAuthenticated.value),
+    });
+}
+
 export function useSaveWeight() {
     const queryClient = useQueryClient();
     return useMutation({
@@ -21,6 +33,7 @@ export function useSaveWeight() {
             saveWeight(date, weightLbs),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: trackingKeys.weight });
+            queryClient.invalidateQueries({ queryKey: trackingKeys.missed });
         },
     });
 }
@@ -39,6 +52,7 @@ export function useSaveSteps() {
             saveSteps(date, steps),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: trackingKeys.steps });
+            queryClient.invalidateQueries({ queryKey: trackingKeys.missed });
         },
     });
 }
