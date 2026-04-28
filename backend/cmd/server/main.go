@@ -25,7 +25,7 @@ func getEnv(key, fallback string) string {
 }
 
 func main() {
-	// Set the mode to release mode (stops DEBUG logging like all defined routes)
+	utils.LoadEnvIfNeeded()
 	gin.SetMode(gin.ReleaseMode)
 	router := gin.Default()
 
