@@ -41,6 +41,11 @@ const routes: RouteRecordRaw[] = [
         component: () => import('~/pages/gym/plans/index.vue'),
       },
       {
+        path: 'plans/:id(\\d+)',
+        name: 'gym-plan-detail',
+        component: () => import('~/pages/gym/plans/[id].vue'),
+      },
+      {
         path: 'logging',
         name: 'logging',
         component: () => import('~/pages/gym/logging/index.vue'),
