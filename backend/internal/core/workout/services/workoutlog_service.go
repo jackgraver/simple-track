@@ -792,3 +792,14 @@ func GetPlanByDay(db *gorm.DB, dayOfWeek int) (*models.WorkoutPlan, error) {
 
 	return LoadPlanWithOrderedExercises(db, plan.ID)
 }
+
+func UpdateExerciseCues(db *gorm.DB, exerciseID uint, cues string) (*models.Exercise, error) {
+	var exercise models.Exercise
+	if err := db.First(&exercise, exerciseID).Error; err != nil {
+		return nil, err
+	}
+	if err := db.Model(&exercise).Update("cues", cues).Error; err != nil {
+		return nil, err
+	}
+	return &exercise, nil
+}

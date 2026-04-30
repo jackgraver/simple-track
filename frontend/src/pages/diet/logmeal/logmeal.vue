@@ -391,7 +391,7 @@ const createFood = async (name: string): Promise<boolean> => {
         const food = await dialogManager.custom<Food>({
             title: "Create " + name,
             component: CreateFoodDialog,
-            props: { foodName: name },
+            componentProps: { foodName: name },
         });
 
         if (food === null) return false;

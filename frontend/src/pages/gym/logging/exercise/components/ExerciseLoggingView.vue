@@ -11,8 +11,12 @@ import LoggingHeader from "./LoggingHeader.vue";
 import LoggedSetsList from "./LoggedSetsList.vue";
 import NumericStepper from "./NumericStepper.vue";
 import { useGlobalRestTimer } from "~/composables/useGlobalRestTimer";
-import { computed } from "vue";
+import { computed, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
+import { Pencil } from "lucide-vue-next";
+import { dialogManager } from "~/composables/dialog/useDialog";
+import EditCuesDialog from "../dialog/EditCuesDialog.vue";
+import { toast } from "~/composables/toast/useToast";
 
 const route = useRoute();
 const router = useRouter();
@@ -39,11 +43,32 @@ const session = useExerciseLoggingSession({
     router,
 });
 
-const cuesText = computed(() => {
-    const g = session.exerciseGroup;
-    if (!g) return "";
-    const raw = g.planned?.cues ?? g.logged?.exercise?.cues ?? "";
+const cuesExercise = computed(
+    () =>
+        session.exerciseGroup?.planned ??
+        session.exerciseGroup?.logged?.exercise ??
+        null,
+);
+
+const pendingCuesFromSave = ref<string | null>(null);
+
+const cuesTextFromSession = computed(() => {
+    const raw = cuesExercise.value?.cues ?? "";
     return typeof raw === "string" ? raw.trim() : "";
+});
+
+const cuesText = computed(
+    () => pendingCuesFromSave.value ?? cuesTextFromSession.value,
+);
+
+watch(exerciseId, () => {
+    pendingCuesFromSave.value = null;
+});
+
+watch(cuesTextFromSession, (fromSession) => {
+    if (pendingCuesFromSave.value === fromSession) {
+        pendingCuesFromSave.value = null;
+    }
 });
 
 const previousPerformanceText = computed(() => {
@@ -78,6 +103,25 @@ const repRolloverWeightHint = computed(() => {
     if (minPreviousReps < repRollover) return "";
     return `Previously did ${minPreviousReps} reps, consider increase the weight`;
 });
+
+const editCues = async () => {
+    const exercise = cuesExercise.value;
+    if (!exercise) {
+        toast.push("Exercise not found", "error");
+        return;
+    }
+
+    const saved = await dialogManager.custom<string>({
+        title: `Edit ${exercise.name} Cues`,
+        component: EditCuesDialog,
+        componentProps: {
+            exercise,
+            currentCues: cuesText.value,
+        },
+    });
+    if (saved === null) return;
+    pendingCuesFromSave.value = saved;
+};
 </script>
 
 <template>
@@ -143,9 +187,16 @@ const repRolloverWeightHint = computed(() => {
                 <span>Finish Exercise</span>
             </button>
         </div>
-        <div v-if="cuesText" class="exercise-cues-wrap">
+        <div v-if="cuesExercise" class="exercise-cues-wrap">
             <span class="exercise-cues-label">Cues</span>
-            <p class="exercise-cues">{{ cuesText }}</p>
+            <button
+                type="button"
+                class="exercise-cues-edit hover:bg-secondBg rounded-md"
+                @click="editCues()"
+            >
+                <Pencil :size="16" class="my-0.5" />
+            </button>
+            <p v-if="cuesText" class="exercise-cues">{{ cuesText }}</p>
         </div>
         <LoggedSetsList
             :logged-sets="session.loggedSets"
@@ -226,9 +277,10 @@ const repRolloverWeightHint = computed(() => {
 }
 
 .exercise-cues-wrap {
+    position: relative;
     display: flex;
     flex-direction: column;
-    gap: 0.35rem;
+    gap: 0.2rem;
     padding: 0.75rem 0.25rem 0;
     border-bottom: 1px solid rgb(56, 56, 56);
     margin-bottom: -0.25rem;
@@ -240,6 +292,16 @@ const repRolloverWeightHint = computed(() => {
     text-transform: uppercase;
     letter-spacing: 0.04em;
     color: rgb(130, 130, 130);
+    padding-right: 2.75rem;
+}
+
+.exercise-cues-edit {
+    position: absolute;
+    top: 0.75rem;
+    right: 0.25rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .exercise-cues {
@@ -247,6 +309,7 @@ const repRolloverWeightHint = computed(() => {
     font-size: 0.95rem;
     line-height: 1.45;
     color: rgb(210, 210, 210);
+    padding-bottom: 0.5rem;
     white-space: pre-wrap;
 }
 

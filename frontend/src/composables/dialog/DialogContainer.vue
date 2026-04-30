@@ -55,8 +55,8 @@ function isConfirmDialog(
                             class="cancel-btn"
                         >
                             {{
-                                dialogManager.dialog.value.options
-                                    .cancelText || "Cancel"
+                                dialogManager.dialog.value.options.cancelText ||
+                                "Cancel"
                             }}
                         </button>
                     </div>
@@ -67,7 +67,8 @@ function isConfirmDialog(
                     <component
                         :is="dialogManager.dialog.value.options.component"
                         v-bind="{
-                            ...dialogManager.dialog.value.options.props,
+                            ...(dialogManager.dialog.value.options
+                                .componentProps ?? {}),
                             onResolve: dialogManager.resolve,
                             onCancel: dialogManager.cancel,
                         }"

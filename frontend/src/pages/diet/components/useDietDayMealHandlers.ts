@@ -76,7 +76,7 @@ export function useDietDayMealHandlers(getOffset: () => number) {
             .custom<Meal>({
                 title: "Log Edited Meal",
                 component: LogEditedDialog,
-                props: { meal },
+                componentProps: { meal },
             })
             .then(async (editedMeal) => {
                 if (!editedMeal) return;

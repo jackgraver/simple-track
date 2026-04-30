@@ -29,6 +29,7 @@ func RegisterExercisesRoutes(group *gin.RouterGroup, db *gorm.DB) {
 		exercises.GET("/all", h.getAllExercises)
 		exercises.POST("", h.createExercise)
 		exercises.PUT("/:id", h.updateExercise)
+		exercises.PUT("/:id/cues", h.updateExerciseCues)
 		exercises.POST("/log", h.logExercise)
 		exercises.POST("/add", dayOffsetMiddleware, h.addExerciseToWorkout)
 		exercises.DELETE("/remove", dayOffsetMiddleware, h.removeExerciseFromWorkout)
@@ -315,6 +316,34 @@ func (h *ExercisesHandler) updateExercise(c *gin.Context) {
 		req.RepRollover = 10
 	}
 	exercise, err := services.UpdateExercise(h.db, uint(id64), req.Name, req.RepRollover, req.Cues)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Exercise not found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"exercise": exercise})
+}
+
+type updateExerciseCuesRequest struct {
+	Cues string `json:"cues"`
+}
+
+func (h *ExercisesHandler) updateExerciseCues(c *gin.Context) {
+	idStr := c.Param("id")
+	id64, err := strconv.ParseUint(idStr, 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid exercise ID"})
+		return
+	}
+	var req updateExerciseCuesRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	exercise, err := services.UpdateExerciseCues(h.db, uint(id64), req.Cues)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Exercise not found"})

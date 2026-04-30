@@ -154,7 +154,7 @@ const openAddExerciseToPlanDialog = () => {
         .custom<boolean>({
             title: `Add exercise to ${plan.name}`,
             component: AddExerciseDialog,
-            props: {
+            componentProps: {
                 plan,
             },
         })
@@ -185,7 +185,7 @@ const openEditExerciseDialog = (exercise: Exercise) => {
         .custom<boolean>({
             title: `Edit ${exercise.name}`,
             component: EditExerciseDialog,
-            props: { exercise },
+            componentProps: { exercise },
         })
         .then((result) => {
             if (result !== null) {
