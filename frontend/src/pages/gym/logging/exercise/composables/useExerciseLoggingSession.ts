@@ -37,7 +37,7 @@ export type ExerciseLoggingSessionViewModel = {
     stepReps: (direction: "plus" | "minus") => void;
     commitWeightFromInput: (value: number) => void;
     commitRepsFromInput: (value: number) => void;
-    addNextSet: () => Promise<void>;
+    addNextSet: () => Promise<boolean>;
     finishLogging: () => Promise<void>;
     retrySet: (setIndex: number) => Promise<void>;
     deleteSet: (setIndex: number) => Promise<void>;
@@ -261,10 +261,10 @@ export function useExerciseLoggingSession(options: {
         currentReps.value = value;
     };
 
-    const addNextSet = async () => {
+    const addNextSet = async (): Promise<boolean> => {
         if (currentReps.value <= 0) {
             toast.push("Enter reps before logging the set", "error");
-            return;
+            return false;
         }
         globalTimer.start(REST_DURATION_MS, exerciseDisplayName.value);
 
@@ -286,6 +286,7 @@ export function useExerciseLoggingSession(options: {
         if (success) {
             draftDirty.value = false;
         }
+        return success;
     };
 
     const finishLogging = async () => {

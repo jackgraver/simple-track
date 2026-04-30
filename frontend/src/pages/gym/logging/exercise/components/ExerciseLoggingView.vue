@@ -7,6 +7,7 @@ import {
     findExerciseGroupByExerciseId,
     parseExerciseIdParam,
 } from "../domain/exerciseRouteGroup";
+import { pickBestLoggedSet } from "../domain/loggedSetDefaults";
 import LoggingHeader from "./LoggingHeader.vue";
 import LoggedSetsList from "./LoggedSetsList.vue";
 import NumericStepper from "./NumericStepper.vue";
@@ -61,8 +62,11 @@ const cuesText = computed(
     () => pendingCuesFromSave.value ?? cuesTextFromSession.value,
 );
 
+const repRolloverHintDismissed = ref(false);
+
 watch(exerciseId, () => {
     pendingCuesFromSave.value = null;
+    repRolloverHintDismissed.value = false;
 });
 
 watch(cuesTextFromSession, (fromSession) => {
@@ -91,7 +95,7 @@ const headerText = computed(() =>
     timerActive.value ? timerText.value : exerciseName.value,
 );
 
-const repRolloverWeightHint = computed(() => {
+const repRolloverWeightHintBase = computed(() => {
     const g = session.exerciseGroup;
     const repRollover = g?.previous?.exercise?.rep_rollover;
     if (typeof repRollover !== "number") return "";
@@ -103,6 +107,31 @@ const repRolloverWeightHint = computed(() => {
     if (minPreviousReps < repRollover) return "";
     return `Previously did ${minPreviousReps} reps, consider increase the weight`;
 });
+
+const maxPreviousWorkoutWeight = computed(() => {
+    const sets = session.exerciseGroup?.previous?.sets ?? [];
+    const best = pickBestLoggedSet(sets);
+    return best ? best.weight : null;
+});
+
+const repRolloverWeightHint = computed(() =>
+    repRolloverHintDismissed.value ? "" : repRolloverWeightHintBase.value,
+);
+
+const logSetWithRepRolloverHintDismiss = async () => {
+    const weightLogged = session.currentWeight;
+    const hadHint = repRolloverWeightHintBase.value.length > 0;
+    const maxPrev = maxPreviousWorkoutWeight.value;
+    const ok = await session.addNextSet();
+    if (
+        ok &&
+        hadHint &&
+        maxPrev != null &&
+        weightLogged > maxPrev
+    ) {
+        repRolloverHintDismissed.value = true;
+    }
+};
 
 const editCues = async () => {
     const exercise = cuesExercise.value;
@@ -128,9 +157,7 @@ const editCues = async () => {
     <div class="logging-view">
         <LoggingHeader @back="session.goBackToList()">
             <template #center>
-                <h2
-                    class="logging-title m-0 min-w-0 truncate text-center text-lg font-medium"
-                >
+                <h2 class="logging-title m-0 min-w-0 text-center font-medium">
                     {{ headerText }}
                 </h2>
             </template>
@@ -175,7 +202,7 @@ const editCues = async () => {
             <button
                 class="bg-[#2c2c2c] hover:bg-[#525252] flex-1"
                 type="button"
-                @click="session.addNextSet()"
+                @click="logSetWithRepRolloverHintDismiss()"
             >
                 <span>Log Set</span>
             </button>
@@ -188,15 +215,29 @@ const editCues = async () => {
             </button>
         </div>
         <div v-if="cuesExercise" class="exercise-cues-wrap">
-            <span class="exercise-cues-label">Cues</span>
-            <button
-                type="button"
-                class="exercise-cues-edit hover:bg-secondBg rounded-md"
-                @click="editCues()"
-            >
-                <Pencil :size="16" class="my-0.5" />
-            </button>
-            <p v-if="cuesText" class="exercise-cues">{{ cuesText }}</p>
+            <template v-if="cuesText">
+                <span class="exercise-cues-label exercise-cues-label--tight"
+                    >Cues</span
+                >
+                <button
+                    type="button"
+                    class="exercise-cues-edit exercise-cues-edit--overlay hover:bg-secondBg rounded-md"
+                    @click="editCues()"
+                >
+                    <Pencil :size="16" class="my-0.5" />
+                </button>
+                <p class="exercise-cues">{{ cuesText }}</p>
+            </template>
+            <div v-else class="exercise-cues-heading">
+                <span class="exercise-cues-label">Cues</span>
+                <button
+                    type="button"
+                    class="exercise-cues-edit hover:bg-secondBg rounded-md"
+                    @click="editCues()"
+                >
+                    <Pencil :size="16" class="my-0.5" />
+                </button>
+            </div>
         </div>
         <LoggedSetsList
             :logged-sets="session.loggedSets"
@@ -242,6 +283,7 @@ const editCues = async () => {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    font-size: clamp(0.75rem, 0.55rem + 2.75cqi, 1.125rem);
 }
 
 .set-indicator {
@@ -286,22 +328,38 @@ const editCues = async () => {
     margin-bottom: -0.25rem;
 }
 
+.exercise-cues-heading {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding-bottom: 0.5rem;
+}
+
 .exercise-cues-label {
     font-size: 0.75rem;
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.04em;
     color: rgb(130, 130, 130);
+}
+
+.exercise-cues-label--tight {
     padding-right: 2.75rem;
 }
 
 .exercise-cues-edit {
-    position: absolute;
-    top: 0.75rem;
-    right: 0.25rem;
     display: flex;
     align-items: center;
     justify-content: center;
+    flex-shrink: 0;
+}
+
+.exercise-cues-edit--overlay {
+    position: absolute;
+    top: 0.75rem;
+    right: 0.25rem;
 }
 
 .exercise-cues {
@@ -424,7 +482,7 @@ const editCues = async () => {
     }
 
     .logging-title {
-        font-size: 1.25rem;
+        font-size: clamp(0.8125rem, 0.58rem + 3cqi, 1.25rem);
     }
 
     .set-indicator {
