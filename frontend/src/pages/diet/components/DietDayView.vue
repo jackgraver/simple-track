@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import MacroBars from "~/pages/diet/components/MacroBars.vue";
+import WaterSummaryCard from "~/pages/diet/components/WaterSummaryCard.vue";
 import { useDietLogsToday } from "~/pages/home/queries/useDietLogsToday";
 import LoggedMealsDisplay from "./LoggedMealsDisplay.vue";
 import PlannedMealsDisplay from "./PlannedMealsDisplay.vue";
@@ -48,6 +49,8 @@ const {
                     getTotalNumber(pending, error, data?.day.plan.carbs)
                 "
             />
+
+            <WaterSummaryCard :date-offset="dateOffset" />
 
             <div class="flex w-full flex-col gap-8 sm:flex-row sm:gap-6">
                 <LoggedMealsDisplay :date-offset="dateOffset" />

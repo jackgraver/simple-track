@@ -15,3 +15,17 @@ export type MissedTracking = {
     weight: boolean;
     steps: boolean;
 };
+
+export type DrinkSizePreset = {
+    ID: number;
+    name: string;
+    amount_oz: number;
+};
+
+export type WaterLog = {
+    ID: number;
+    date: string;
+    amount_oz: number;
+    preset_id: number | null;
+    preset?: DrinkSizePreset | null;
+};
