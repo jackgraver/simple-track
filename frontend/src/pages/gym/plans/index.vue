@@ -1,15 +1,13 @@
 <script setup lang="ts">
-import type { WorkoutPlan, Exercise } from "~/types/workout";
+import type { WorkoutPlan } from "~/types/workout";
 import { toast } from "~/composables/toast/useToast";
 import { dialogManager } from "~/composables/dialog/useDialog";
-import AddExerciseDialog from "~/pages/gym/plans/components/AddExerciseDialog.vue";
-import CreateExerciseForPlanDialog from "~/pages/gym/plans/components/CreateExerciseForPlanDialog.vue";
-import EditExerciseDialog from "~/pages/gym/plans/components/EditExerciseDialog.vue";
-import { X, Plus, ChevronUp, ChevronDown, Pencil } from "lucide-vue-next";
-import { computed, ref, watch } from "vue";
-import { apiPUT } from "~/api/client";
+import { computed, ref } from "vue";
+import { useRouter } from "vue-router";
 import { useQuery } from "@tanstack/vue-query";
 import { apiClient } from "~/api/client";
+
+const router = useRouter();
 
 const { data, isPending, refetch } = useQuery({
     queryKey: ["workout", "plans", "all"],
@@ -34,204 +32,65 @@ const dayNames = [
     "Saturday",
 ];
 
+const weekdaysMondayFirst = [
+    { dow: 1, label: "Monday" },
+    { dow: 2, label: "Tuesday" },
+    { dow: 3, label: "Wednesday" },
+    { dow: 4, label: "Thursday" },
+    { dow: 5, label: "Friday" },
+    { dow: 6, label: "Saturday" },
+    { dow: 0, label: "Sunday" },
+];
+
 const getDayName = (dayOfWeek: number | null): string | undefined => {
-    if (dayOfWeek === null) return "Unassigned";
+    if (dayOfWeek === null) return undefined;
     return dayNames[dayOfWeek];
 };
 
-const selectedPlanId = ref<number | null>(null);
-
-const defaultPlanIdForList = (list: WorkoutPlan[]): number | null => {
-    if (list.length === 0) return null;
-    const dow = new Date().getDay();
-    const forToday = list.find((p) => p.day_of_week === dow);
-    return forToday?.ID ?? list[0]!.ID;
-};
-
-watch(
-    plans,
-    (list) => {
-        if (list.length === 0) {
-            selectedPlanId.value = null;
-            return;
+const planByDay = computed(() => {
+    const m: Partial<Record<number, WorkoutPlan>> = {};
+    for (const p of plans.value) {
+        if (p.day_of_week !== null) {
+            m[p.day_of_week] = p;
         }
-        if (
-            selectedPlanId.value === null ||
-            !list.some((p) => p.ID === selectedPlanId.value)
-        ) {
-            selectedPlanId.value = defaultPlanIdForList(list);
-        }
-    },
-    { immediate: true },
-);
-
-const selectedPlan = computed(() => {
-    const id = selectedPlanId.value;
-    if (id === null) return null;
-    return plans.value.find((p) => p.ID === id) ?? null;
+    }
+    return m;
 });
 
-const plannedCardioInput = ref("");
-watch(
-    selectedPlan,
-    (p) => {
-        plannedCardioInput.value = p?.planned_cardio_type?.trim() ?? "";
-    },
-    { immediate: true },
+const unassignedPlans = computed(() =>
+    plans.value.filter((p) => p.day_of_week === null),
 );
 
-const savePlannedCardio = async () => {
-    const plan = selectedPlan.value;
-    if (!plan) return;
-    try {
-        await apiPUT(`workout/plans/${plan.ID}/planned-cardio`, {
-            type: plannedCardioInput.value.trim(),
-        });
-        toast.push("Planned cardio saved", "success");
-        await refresh();
-    } catch (err: unknown) {
-        const message = err instanceof Error ? err.message : String(err);
-        toast.push("Failed to save planned cardio: " + message, "error");
+const draggingPlanId = ref<number | null>(null);
+const dropTargetKey = ref<number | "pool" | null>(null);
+
+const todayDow = () => new Date().getDay();
+
+const goDetail = (id: number) => {
+    router.push({ name: "gym-plan-detail", params: { id: String(id) } });
+};
+
+const onDragStart = (e: DragEvent, plan: WorkoutPlan) => {
+    draggingPlanId.value = plan.ID;
+    e.dataTransfer?.setData("text/plain", String(plan.ID));
+    if (e.dataTransfer) {
+        e.dataTransfer.effectAllowed = "move";
     }
 };
 
-const getAssignedDays = computed(() => {
-    const assigned: number[] = [];
-    plans.value.forEach((plan) => {
-        if (plan.day_of_week !== null) {
-            assigned.push(plan.day_of_week);
-        }
-    });
-    return assigned;
-});
-
-const isDayAssigned = (
-    dayOfWeek: number,
-    currentPlan: WorkoutPlan,
-): boolean => {
-    return (
-        getAssignedDays.value.includes(dayOfWeek) &&
-        plans.value.find((p) => p.day_of_week === dayOfWeek)?.ID !==
-            currentPlan.ID
-    );
+const onDragEnd = () => {
+    draggingPlanId.value = null;
+    dropTargetKey.value = null;
 };
 
-const getAssignedPlanName = (
-    dayOfWeek: number,
-    currentPlan: WorkoutPlan,
-): string => {
-    const assignedPlan = plans.value.find(
-        (p) => p.day_of_week === dayOfWeek && p.ID !== currentPlan.ID,
-    );
-    return assignedPlan?.name || "Assigned";
+const onDragOverDay = (e: DragEvent, dow: number) => {
+    e.preventDefault();
+    dropTargetKey.value = dow;
 };
 
-const planOptionLabel = (plan: WorkoutPlan) => {
-    if (plan.day_of_week === null) return plan.name;
-    return `${plan.name} (${dayNames[plan.day_of_week]})`;
-};
-
-const removeExerciseFromPlan = async (
-    plan: WorkoutPlan,
-    exercise: Exercise,
-) => {
-    try {
-        await apiClient.delete(`workout/plans/${plan.ID}/exercises/remove`, {
-            data: { exercise_id: exercise.ID },
-        });
-        toast.push(`Removed ${exercise.name} from ${plan.name}`, "success");
-        await refresh();
-    } catch (err: unknown) {
-        const message = err instanceof Error ? err.message : String(err);
-        toast.push("Failed to remove exercise: " + message, "error");
-    }
-};
-
-const openAddExerciseToPlanDialog = () => {
-    const plan = selectedPlan.value;
-    if (!plan) return;
-    dialogManager
-        .custom<boolean>({
-            title: `Add exercise to ${plan.name}`,
-            component: AddExerciseDialog,
-            componentProps: {
-                plan,
-            },
-        })
-        .then((result) => {
-            if (result !== null) {
-                refresh();
-            }
-        });
-};
-
-const openCreateExerciseDialog = () => {
-    const plan = selectedPlan.value;
-    if (!plan) return;
-    dialogManager
-        .custom<boolean>({
-            title: "Create exercise",
-            component: CreateExerciseForPlanDialog,
-        })
-        .then((result) => {
-            if (result !== null) {
-                refresh();
-            }
-        });
-};
-
-const openEditExerciseDialog = (exercise: Exercise) => {
-    dialogManager
-        .custom<boolean>({
-            title: `Edit ${exercise.name}`,
-            component: EditExerciseDialog,
-            componentProps: { exercise },
-        })
-        .then((result) => {
-            if (result !== null) {
-                refresh();
-            }
-        });
-};
-
-const handleDayChange = async (plan: WorkoutPlan, event: Event) => {
-    const select = event.target as HTMLSelectElement;
-    const day = parseInt(select.value);
-    const previousValue =
-        plan.day_of_week !== null ? plan.day_of_week.toString() : "";
-
-    if (isNaN(day)) {
-        select.value = previousValue;
-        return;
-    }
-
-    const currentlyAssignedPlan = plans.value.find(
-        (p) => p.day_of_week === day && p.ID !== plan.ID,
-    );
-
-    if (currentlyAssignedPlan) {
-        const confirmed = await dialogManager.confirm({
-            title: "Day Already Assigned",
-            message:
-                dayNames[day] +
-                ' is currently assigned to "' +
-                currentlyAssignedPlan.name +
-                '". Assigning "' +
-                plan.name +
-                '" will unassign "' +
-                currentlyAssignedPlan.name +
-                '". Continue?',
-            confirmText: "Yes, Reassign",
-            cancelText: "Cancel",
-        });
-
-        if (!confirmed) {
-            select.value = previousValue;
-            return;
-        }
-    }
-
-    await assignPlanToDay(plan, day);
+const onDragOverPool = (e: DragEvent) => {
+    e.preventDefault();
+    dropTargetKey.value = "pool";
 };
 
 const assignPlanToDay = async (plan: WorkoutPlan, dayOfWeek: number) => {
@@ -259,7 +118,7 @@ const unassignPlanFromDay = async (plan: WorkoutPlan) => {
             `workout/plans/${plan.ID}/assign-day`,
         );
         toast.push(
-            `Unassigned ${plan.name} from ${getDayName(plan.day_of_week)}`,
+            `Unassigned ${plan.name} from ${getDayName(plan.day_of_week) ?? "day"}`,
             "success",
         );
         await refresh();
@@ -269,512 +128,194 @@ const unassignPlanFromDay = async (plan: WorkoutPlan) => {
     }
 };
 
-const moveExerciseInPlan = async (
-    plan: WorkoutPlan,
-    index: number,
-    delta: number,
-) => {
-    const list = plan.exercises;
-    const next = index + delta;
-    if (next < 0 || next >= list.length) return;
-    const reordered = [...list];
-    const a = reordered[index];
-    const b = reordered[next];
-    if (a === undefined || b === undefined) return;
-    reordered[index] = b;
-    reordered[next] = a;
-    try {
-        await apiPUT(`workout/plans/${plan.ID}/exercises/reorder`, {
-            exercise_ids: reordered.map((e) => e.ID),
+const onDropDay = async (dow: number) => {
+    const rawId = draggingPlanId.value;
+    dropTargetKey.value = null;
+    draggingPlanId.value = null;
+    if (rawId === null) return;
+    const draggedPlan = plans.value.find((p) => p.ID === rawId);
+    if (!draggedPlan || draggedPlan.day_of_week === dow) return;
+    const occupant = plans.value.find(
+        (p) => p.day_of_week === dow && p.ID !== draggedPlan.ID,
+    );
+    if (occupant) {
+        const confirmed = await dialogManager.confirm({
+            title: "Day Already Assigned",
+            message:
+                dayNames[dow] +
+                ' is currently assigned to "' +
+                occupant.name +
+                '". Assigning "' +
+                draggedPlan.name +
+                '" will unassign "' +
+                occupant.name +
+                '". Continue?',
+            confirmText: "Yes, Reassign",
+            cancelText: "Cancel",
         });
-        toast.push("Exercise order updated", "success");
-        await refresh();
-    } catch (err: unknown) {
-        const message = err instanceof Error ? err.message : String(err);
-        toast.push("Failed to reorder: " + message, "error");
+        if (!confirmed) return;
     }
+    await assignPlanToDay(draggedPlan, dow);
 };
+
+const onDropPool = async () => {
+    const rawId = draggingPlanId.value;
+    dropTargetKey.value = null;
+    draggingPlanId.value = null;
+    if (rawId === null) return;
+    const draggedPlan = plans.value.find((p) => p.ID === rawId);
+    if (!draggedPlan || draggedPlan.day_of_week === null) return;
+    await unassignPlanFromDay(draggedPlan);
+};
+
+const planCardClasses =
+    "cursor-grab active:cursor-grabbing rounded-md border border-(--color-border) bg-secondBg px-3 py-2 text-left transition-opacity hover:bg-thirdBg/40";
+const planDraggingClass = (planId: number) =>
+    draggingPlanId.value === planId ? "opacity-60" : "";
+
+const exerciseCountLabel = (n: number) =>
+    `${n} exercise${n === 1 ? "" : "s"}`;
 </script>
 
 <template>
-    <div class="plans-page">
-        <div class="top">
-            <h1 class="title">Workout plans</h1>
-            <div class="toolbar">
-                <label class="plan-pick">
-                    <span class="sr-only">Plan</span>
-                    <select
-                        v-model.number="selectedPlanId"
-                        class="plan-select"
-                        :disabled="!plans.length"
-                    >
-                        <option v-for="p in plans" :key="p.ID" :value="p.ID">
-                            {{ planOptionLabel(p) }}
-                        </option>
-                    </select>
-                </label>
-                <button
-                    type="button"
-                    class="add-button"
-                    :disabled="!selectedPlan"
-                    @click="openAddExerciseToPlanDialog"
-                >
-                    <Plus :size="18" />
-                    Add To Plan
-                </button>
-                <button
-                    type="button"
-                    class="add-button secondary"
-                    :disabled="!selectedPlan"
-                    @click="openCreateExerciseDialog"
-                >
-                    <Plus :size="18" />
-                    Create Exercise
-                </button>
-            </div>
+    <div class="flex w-full max-w-6xl flex-col gap-6 pb-8 pt-2">
+        <div class="flex flex-col gap-1 border-b border-(--color-border) pb-3">
+            <h1 class="m-0 text-xl font-semibold tracking-tight text-textPrimary">
+                Workout schedule
+            </h1>
+            <p class="m-0 text-sm text-textSecondary">
+                Drag plans onto a weekday or into Unassigned. Click a plan to
+                edit exercises.
+            </p>
         </div>
-        <div v-if="isPending" class="loading">Loading...</div>
-        <div v-else-if="!plans.length" class="empty-global">
+        <div v-if="isPending" class="text-center text-sm text-textSecondary">
+            Loading…
+        </div>
+        <div
+            v-else-if="!plans.length"
+            class="rounded-lg border border-(--color-border) bg-firstBg p-8 text-center text-sm text-textSecondary"
+        >
             No workout plans yet.
         </div>
-        <template v-else-if="selectedPlan">
-            <div class="plan-card">
-                <div class="plan-header">
-                    <div class="plan-title-section">
-                        <h2 class="plan-name">{{ selectedPlan.name }}</h2>
-                        <div class="day-assignment">
-                            <span
-                                v-if="selectedPlan.day_of_week !== null"
-                                class="day-badge"
-                            >
-                                {{ getDayName(selectedPlan.day_of_week) }}
-                            </span>
-                            <span v-else class="day-badge unassigned"
-                                >Unassigned</span
-                            >
-                        </div>
+        <template v-else>
+            <div
+                class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-7"
+            >
+                <div
+                    v-for="slot in weekdaysMondayFirst"
+                    :key="slot.dow"
+                    class="flex min-h-[8rem] flex-col gap-2 rounded-lg border border-(--color-border) bg-firstBg p-3 transition-shadow"
+                    :class="
+                        dropTargetKey === slot.dow
+                            ? 'ring-2 ring-(--color-cf-red)/60'
+                            : ''
+                    "
+                    @dragover="onDragOverDay($event, slot.dow)"
+                    @drop.prevent="onDropDay(slot.dow)"
+                >
+                    <div class="flex flex-wrap items-center gap-1.5">
+                        <span class="text-sm font-semibold text-textPrimary">{{
+                            slot.label
+                        }}</span>
+                        <span
+                            v-if="slot.dow === todayDow()"
+                            class="rounded bg-(--color-cf-red)/20 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-(--color-cf-red)"
+                            >Today</span
+                        >
                     </div>
-                </div>
-                <div class="day-selector-section">
-                    <label>Assign to day</label>
-                    <div class="day-selector">
-                        <select
-                            :value="
-                                selectedPlan.day_of_week !== null
-                                    ? selectedPlan.day_of_week
-                                    : ''
+                    <template v-if="planByDay[slot.dow]">
+                        <div
+                            role="button"
+                            tabindex="0"
+                            draggable="true"
+                            :class="[
+                                planCardClasses,
+                                planDraggingClass(planByDay[slot.dow]!.ID),
+                            ]"
+                            @dragstart="
+                                onDragStart($event, planByDay[slot.dow]!)
                             "
-                            class="day-select"
-                            @change="handleDayChange(selectedPlan, $event)"
+                            @dragend="onDragEnd"
+                            @click="goDetail(planByDay[slot.dow]!.ID)"
+                            @keydown.enter="goDetail(planByDay[slot.dow]!.ID)"
                         >
-                            <option value="">— Select day —</option>
-                            <option
-                                v-for="(dayName, index) in dayNames"
-                                :key="index"
-                                :value="index"
+                            <div
+                                class="truncate text-sm font-medium text-textPrimary"
                             >
-                                {{ dayName
-                                }}{{
-                                    isDayAssigned(index, selectedPlan)
-                                        ? ` (${getAssignedPlanName(index, selectedPlan)})`
-                                        : ""
+                                {{ planByDay[slot.dow]!.name }}
+                            </div>
+                            <div class="mt-1 text-xs text-textSecondary">
+                                {{
+                                    exerciseCountLabel(
+                                        planByDay[slot.dow]!.exercises.length,
+                                    )
                                 }}
-                            </option>
-                        </select>
-                        <button
-                            v-if="selectedPlan.day_of_week !== null"
-                            type="button"
-                            class="unassign-button"
-                            @click="unassignPlanFromDay(selectedPlan)"
-                        >
-                            Clear
-                        </button>
-                    </div>
-                </div>
-                <div class="planned-cardio-section">
-                    <label class="planned-cardio-label"
-                        >Planned cardio (type)</label
-                    >
-                    <div class="planned-cardio-row">
-                        <input
-                            v-model="plannedCardioInput"
-                            type="text"
-                            class="planned-cardio-input"
-                            placeholder="e.g. Bike, Run"
-                        />
-                        <button
-                            type="button"
-                            class="planned-cardio-save"
-                            @click="savePlannedCardio"
-                        >
-                            Save
-                        </button>
-                    </div>
-                </div>
-                <div class="exercises-list">
-                    <div
-                        v-for="(
-                            exercise, exerciseIndex
-                        ) in selectedPlan.exercises"
-                        :key="exercise.ID"
-                        class="exercise-item"
-                    >
-                        <div class="exercise-item-main">
-                            <button
-                                type="button"
-                                class="bg-none hover:bg-secondBg p-1"
-                                title="Edit exercise"
-                                @click="openEditExerciseDialog(exercise)"
+                            </div>
+                            <div
+                                v-if="
+                                    planByDay[
+                                        slot.dow
+                                    ]!.planned_cardio_type?.trim()
+                                "
+                                class="mt-1 truncate text-[11px] text-textSecondary"
                             >
-                                <Pencil :size="14" />
-                            </button>
-                            <span class="exercise-name">{{
-                                exercise.name
-                            }}</span>
+                                Cardio:
+                                {{
+                                    planByDay[slot.dow]!.planned_cardio_type
+                                }}
+                            </div>
                         </div>
-                        <div class="exercise-item-actions">
-                            <button
-                                type="button"
-                                class="reorder-button"
-                                :disabled="exerciseIndex === 0"
-                                title="Move up"
-                                @click="
-                                    moveExerciseInPlan(
-                                        selectedPlan,
-                                        exerciseIndex,
-                                        -1,
-                                    )
-                                "
-                            >
-                                <ChevronUp :size="16" />
-                            </button>
-                            <button
-                                type="button"
-                                class="reorder-button"
-                                :disabled="
-                                    exerciseIndex ===
-                                    selectedPlan.exercises.length - 1
-                                "
-                                title="Move down"
-                                @click="
-                                    moveExerciseInPlan(
-                                        selectedPlan,
-                                        exerciseIndex,
-                                        1,
-                                    )
-                                "
-                            >
-                                <ChevronDown :size="16" />
-                            </button>
-                            <button
-                                type="button"
-                                class="remove-button"
-                                @click="
-                                    removeExerciseFromPlan(
-                                        selectedPlan,
-                                        exercise,
-                                    )
-                                "
-                            >
-                                <X :size="16" />
-                            </button>
-                        </div>
-                    </div>
+                    </template>
                     <div
-                        v-if="selectedPlan.exercises.length === 0"
-                        class="empty-state"
+                        v-else
+                        class="flex flex-1 items-center justify-center rounded-md border border-dashed border-(--color-border) px-2 py-6 text-center text-xs text-textSecondary"
                     >
-                        No exercises in this plan
+                        Drop a plan here
                     </div>
                 </div>
             </div>
+            <section class="flex flex-col gap-2">
+                <h2 class="m-0 text-sm font-semibold text-textPrimary">
+                    Unassigned
+                </h2>
+                <div
+                    class="flex min-h-[4.5rem] flex-wrap content-start gap-2 rounded-lg border border-(--color-border) bg-firstBg p-3 transition-shadow"
+                    :class="
+                        dropTargetKey === 'pool'
+                            ? 'ring-2 ring-(--color-cf-red)/60'
+                            : ''
+                    "
+                    @dragover="onDragOverPool($event)"
+                    @drop.prevent="onDropPool()"
+                >
+                    <p
+                        v-if="unassignedPlans.length === 0"
+                        class="m-0 w-full text-center text-xs text-textSecondary"
+                    >
+                        No unassigned plans — drag a scheduled plan here to
+                        remove its weekday.
+                    </p>
+                    <div
+                        v-for="p in unassignedPlans"
+                        :key="p.ID"
+                        role="button"
+                        tabindex="0"
+                        draggable="true"
+                        :class="[planCardClasses, planDraggingClass(p.ID)]"
+                        @dragstart="onDragStart($event, p)"
+                        @dragend="onDragEnd"
+                        @click="goDetail(p.ID)"
+                        @keydown.enter="goDetail(p.ID)"
+                    >
+                        <div class="truncate text-sm font-medium text-textPrimary">
+                            {{ p.name }}
+                        </div>
+                        <div class="mt-1 text-xs text-textSecondary">
+                            {{ exerciseCountLabel(p.exercises.length) }}
+                        </div>
+                    </div>
+                </div>
+            </section>
         </template>
     </div>
 </template>
-
-<style scoped>
-.plans-page {
-    max-width: 28rem;
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-}
-.top {
-    display: flex;
-    flex-direction: column;
-    gap: 0.75rem;
-}
-.title {
-    margin: 0;
-    font-size: 1.5rem;
-    font-weight: 600;
-}
-.toolbar {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.5rem;
-    align-items: center;
-}
-.plan-pick {
-    flex: 1;
-    min-width: 10rem;
-}
-.plan-select {
-    width: 100%;
-    padding: 0.5rem 0.65rem;
-    background: #2a2a2a;
-    color: #fff;
-    border: 1px solid #444;
-    border-radius: 0.25rem;
-    font-size: 0.9rem;
-    cursor: pointer;
-}
-.plan-select:focus {
-    outline: none;
-    border-color: #4a9eff;
-}
-.sr-only {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    padding: 0;
-    margin: -1px;
-    overflow: hidden;
-    clip: rect(0, 0, 0, 0);
-    border: 0;
-}
-.loading,
-.empty-global {
-    text-align: center;
-    padding: 1.5rem;
-    color: #aaa;
-}
-.plan-card {
-    background: #1a1a1a;
-    border: 1px solid #333;
-    border-radius: 0.5rem;
-    padding: 1rem;
-}
-.plan-header {
-    margin-bottom: 0.75rem;
-    padding-bottom: 0.75rem;
-    border-bottom: 1px solid #333;
-}
-.plan-title-section {
-    display: flex;
-    flex-direction: column;
-    gap: 0.35rem;
-}
-.plan-name {
-    margin: 0;
-    font-size: 1.25rem;
-}
-.day-assignment {
-    display: flex;
-    align-items: center;
-}
-.day-badge {
-    display: inline-block;
-    padding: 0.2rem 0.6rem;
-    background: #4a9eff;
-    color: #fff;
-    border-radius: 0.25rem;
-    font-size: 0.8rem;
-    font-weight: 500;
-}
-.day-badge.unassigned {
-    background: #666;
-}
-.day-selector-section {
-    margin-bottom: 0.75rem;
-    padding-bottom: 0.75rem;
-    border-bottom: 1px solid #333;
-}
-.day-selector-section label {
-    display: block;
-    margin-bottom: 0.35rem;
-    font-size: 0.85rem;
-    color: #aaa;
-}
-.day-selector {
-    display: flex;
-    gap: 0.5rem;
-    align-items: center;
-}
-.day-select {
-    flex: 1;
-    padding: 0.5rem;
-    background: #2a2a2a;
-    color: #fff;
-    border: 1px solid #444;
-    border-radius: 0.25rem;
-    font-size: 0.9rem;
-    cursor: pointer;
-}
-.day-select:focus {
-    outline: none;
-    border-color: #4a9eff;
-}
-.unassign-button {
-    padding: 0.5rem 0.75rem;
-    background: #666;
-    color: #fff;
-    border: none;
-    border-radius: 0.25rem;
-    cursor: pointer;
-    font-size: 0.85rem;
-}
-.unassign-button:hover {
-    background: #777;
-}
-.add-button {
-    display: flex;
-    align-items: center;
-    gap: 0.35rem;
-    padding: 0.5rem 0.85rem;
-    background: #4a9eff;
-    color: #fff;
-    border: none;
-    border-radius: 0.25rem;
-    cursor: pointer;
-    font-size: 0.9rem;
-}
-.add-button:hover:not(:disabled) {
-    background: #3a8eef;
-}
-.add-button.secondary {
-    background: #2f2f2f;
-    border: 1px solid #444;
-}
-.add-button.secondary:hover:not(:disabled) {
-    background: #3a3a3a;
-}
-.add-button:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-}
-.planned-cardio-section {
-    margin-bottom: 0.75rem;
-    padding-bottom: 0.75rem;
-    border-bottom: 1px solid #333;
-}
-.planned-cardio-label {
-    display: block;
-    margin-bottom: 0.35rem;
-    font-size: 0.85rem;
-    color: #aaa;
-}
-.planned-cardio-row {
-    display: flex;
-    gap: 0.5rem;
-    align-items: center;
-}
-.planned-cardio-input {
-    flex: 1;
-    padding: 0.5rem 0.65rem;
-    background: #2a2a2a;
-    color: #fff;
-    border: 1px solid #444;
-    border-radius: 0.25rem;
-    font-size: 0.9rem;
-}
-.planned-cardio-save {
-    padding: 0.5rem 0.75rem;
-    background: #4a9eff;
-    color: #fff;
-    border: none;
-    border-radius: 0.25rem;
-    cursor: pointer;
-    font-size: 0.85rem;
-}
-.planned-cardio-save:hover {
-    background: #3a8eef;
-}
-.exercises-list {
-    display: flex;
-    flex-direction: column;
-    gap: 0.35rem;
-}
-.exercise-item {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.65rem 0.75rem;
-    background: #2a2a2a;
-    border-radius: 0.25rem;
-    border: 1px solid #444;
-}
-.exercise-item-main {
-    display: flex;
-    align-items: center;
-    gap: 0.45rem;
-    min-width: 0;
-    flex: 1;
-}
-.edit-exercise-button {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-    padding: 0.25rem;
-    background: transparent;
-    border: none;
-    color: #aaa;
-    cursor: pointer;
-    border-radius: 0.25rem;
-}
-.edit-exercise-button:hover {
-    background: rgba(255, 255, 255, 0.08);
-    color: #4a9eff;
-}
-.exercise-name {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-.exercise-item-actions {
-    display: flex;
-    align-items: center;
-    gap: 0.15rem;
-}
-.reorder-button {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 0.25rem;
-    background: transparent;
-    border: none;
-    color: #aaa;
-    cursor: pointer;
-    border-radius: 0.25rem;
-}
-.reorder-button:hover:not(:disabled) {
-    background: rgba(255, 255, 255, 0.08);
-    color: #fff;
-}
-.reorder-button:disabled {
-    opacity: 0.25;
-    cursor: not-allowed;
-}
-.remove-button {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 0.25rem;
-    background: transparent;
-    border: none;
-    color: #ff6b6b;
-    cursor: pointer;
-    border-radius: 0.25rem;
-}
-.remove-button:hover {
-    background: rgba(255, 107, 107, 0.1);
-}
-.empty-state {
-    padding: 1rem;
-    text-align: center;
-    color: #888;
-    font-style: italic;
-}
-</style>
