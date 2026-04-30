@@ -5,7 +5,9 @@ package main
 
 import (
 	dietmodels "be-simpletracker/internal/core/diet/models"
-	"be-simpletracker/internal/core/tracking/models"
+	"be-simpletracker/internal/core/tracking/steps"
+	"be-simpletracker/internal/core/tracking/water"
+	"be-simpletracker/internal/core/tracking/weight"
 	"be-simpletracker/internal/database"
 	"fmt"
 	"os"
@@ -36,8 +38,10 @@ func main() {
 		&dietmodels.Food{},
 		&dietmodels.CompositeFood{},
 		&dietmodels.CompositeFoodItem{},
-		&models.StepLog{},
-		&models.BodyWeightLog{},
+		&steps.StepLog{},
+		&weight.BodyWeightLog{},
+		&water.WaterLog{},
+		&water.DrinkSizePreset{},
 	); err != nil {
 		fmt.Fprintf(os.Stderr, "AutoMigrate: %v\n", err)
 		os.Exit(1)

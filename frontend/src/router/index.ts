@@ -28,6 +28,11 @@ const routes: RouteRecordRaw[] = [
         name: 'diet-edit-planned',
         component: () => import('~/pages/diet/edit-planned/index.vue'),
       },
+      {
+        path: 'water-presets',
+        name: 'diet-water-presets',
+        component: () => import('~/pages/diet/water-presets/index.vue'),
+      },
     ]
   },
   {
