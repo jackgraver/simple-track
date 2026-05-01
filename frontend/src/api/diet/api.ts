@@ -1,5 +1,23 @@
 import { apiClient } from '~/api/client';
-import type { CompositeFood, DietDay, Meal } from '~/types/diet';
+import type { CompositeFood, DietDay, Meal, Plan } from '~/types/diet';
+
+export type UpdatePlanMacrosPayload = {
+    calories: number;
+    protein: number;
+    fiber: number;
+    carbs: number;
+};
+
+export async function updatePlanMacros(
+    planId: number,
+    payload: UpdatePlanMacrosPayload
+): Promise<{ plan: Plan }> {
+    const response = await apiClient.put<{ plan: Plan }>(
+        `/diet/plans/plan/${planId}`,
+        payload
+    );
+    return response.data;
+}
 
 export type DietLogsTodayResponse = {
     day: DietDay;
