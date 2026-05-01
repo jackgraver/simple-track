@@ -29,18 +29,18 @@ const handleSubmit = async () => {
     isLoading.value = true;
 
     try {
-        if (isLoginMode.value) {
+        if (!isLoginMode.value) {
             await login(username.value, password.value);
             toast.push("Login successful!", "success");
             await router.push(redirectAfterSignIn());
         } else {
-            // await register(
-            //     username.value,
-            //     password.value,
-            //     email.value || undefined,
-            // );
-            // toast.push("Registration successful!", "success");
-            // await router.push(redirectAfterSignIn());
+            await register(
+                username.value,
+                password.value,
+                email.value || undefined,
+            );
+            toast.push("Registration successful!", "success");
+            await router.push(redirectAfterSignIn());
         }
     } catch (err: any) {
         error.value = err.message || "An error occurred";
