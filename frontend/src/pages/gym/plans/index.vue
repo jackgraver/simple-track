@@ -32,14 +32,14 @@ const dayNames = [
     "Saturday",
 ];
 
-const weekdaysMondayFirst = [
+const weekdaysSundayFirst = [
+    { dow: 0, label: "Sunday" },
     { dow: 1, label: "Monday" },
     { dow: 2, label: "Tuesday" },
     { dow: 3, label: "Wednesday" },
     { dow: 4, label: "Thursday" },
     { dow: 5, label: "Friday" },
     { dow: 6, label: "Saturday" },
-    { dow: 0, label: "Sunday" },
 ];
 
 const getDayName = (dayOfWeek: number | null): string | undefined => {
@@ -173,14 +173,15 @@ const planCardClasses =
 const planDraggingClass = (planId: number) =>
     draggingPlanId.value === planId ? "opacity-60" : "";
 
-const exerciseCountLabel = (n: number) =>
-    `${n} exercise${n === 1 ? "" : "s"}`;
+const exerciseCountLabel = (n: number) => `${n} exercise${n === 1 ? "" : "s"}`;
 </script>
 
 <template>
-    <div class="flex w-full max-w-6xl flex-col gap-6 pb-8 pt-2">
+    <div class="flex w-full flex-col gap-6 pb-8 pt-2">
         <div class="flex flex-col gap-1 border-b border-(--color-border) pb-3">
-            <h1 class="m-0 text-xl font-semibold tracking-tight text-textPrimary">
+            <h1
+                class="m-0 text-xl font-semibold tracking-tight text-textPrimary"
+            >
                 Workout schedule
             </h1>
             <p class="m-0 text-sm text-textSecondary">
@@ -198,13 +199,11 @@ const exerciseCountLabel = (n: number) =>
             No workout plans yet.
         </div>
         <template v-else>
-            <div
-                class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-7"
-            >
+            <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-7">
                 <div
-                    v-for="slot in weekdaysMondayFirst"
+                    v-for="slot in weekdaysSundayFirst"
                     :key="slot.dow"
-                    class="flex min-h-[8rem] flex-col gap-2 rounded-lg border border-(--color-border) bg-firstBg p-3 transition-shadow"
+                    class="flex min-h-32 flex-col gap-2 rounded-lg border border-(--color-border) bg-firstBg p-3 transition-shadow"
                     :class="
                         dropTargetKey === slot.dow
                             ? 'ring-2 ring-(--color-cf-red)/60'
@@ -260,9 +259,7 @@ const exerciseCountLabel = (n: number) =>
                                 class="mt-1 truncate text-[11px] text-textSecondary"
                             >
                                 Cardio:
-                                {{
-                                    planByDay[slot.dow]!.planned_cardio_type
-                                }}
+                                {{ planByDay[slot.dow]!.planned_cardio_type }}
                             </div>
                         </div>
                     </template>
@@ -279,7 +276,7 @@ const exerciseCountLabel = (n: number) =>
                     Unassigned
                 </h2>
                 <div
-                    class="flex min-h-[4.5rem] flex-wrap content-start gap-2 rounded-lg border border-(--color-border) bg-firstBg p-3 transition-shadow"
+                    class="flex min-h-18 flex-wrap content-start gap-2 rounded-lg border border-(--color-border) bg-firstBg p-3 transition-shadow"
                     :class="
                         dropTargetKey === 'pool'
                             ? 'ring-2 ring-(--color-cf-red)/60'
@@ -307,7 +304,9 @@ const exerciseCountLabel = (n: number) =>
                         @click="goDetail(p.ID)"
                         @keydown.enter="goDetail(p.ID)"
                     >
-                        <div class="truncate text-sm font-medium text-textPrimary">
+                        <div
+                            class="truncate text-sm font-medium text-textPrimary"
+                        >
                             {{ p.name }}
                         </div>
                         <div class="mt-1 text-xs text-textSecondary">

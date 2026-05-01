@@ -109,10 +109,7 @@ const getAssignedPlanName = (
     return assignedPlan?.name || "Assigned";
 };
 
-const removeExerciseFromPlan = async (
-    p: WorkoutPlan,
-    exercise: Exercise,
-) => {
+const removeExerciseFromPlan = async (p: WorkoutPlan, exercise: Exercise) => {
     try {
         await apiClient.delete(`workout/plans/${p.ID}/exercises/remove`, {
             data: { exercise_id: exercise.ID },
@@ -309,8 +306,12 @@ const moveExerciseInPlan = async (
             >
         </div>
         <template v-else>
-            <div class="flex flex-col gap-2 border-b border-(--color-border) pb-3">
-                <h1 class="m-0 text-xl font-semibold tracking-tight text-textPrimary">
+            <div
+                class="flex flex-col gap-2 border-b border-(--color-border) pb-3"
+            >
+                <h1
+                    class="m-0 text-xl font-semibold tracking-tight text-textPrimary"
+                >
                     {{ plan.name }}
                 </h1>
                 <div class="flex flex-wrap items-center gap-2">
@@ -322,7 +323,7 @@ const moveExerciseInPlan = async (
                     <span
                         v-else
                         class="rounded-md bg-thirdBg/60 px-2 py-0.5 text-xs font-medium text-textSecondary"
-                        >Unassigned</span
+                        >Not Assigned to a Day</span
                     >
                 </div>
             </div>
@@ -333,7 +334,7 @@ const moveExerciseInPlan = async (
                     @click="openAddExerciseToPlanDialog"
                 >
                     <Plus class="size-4 shrink-0" />
-                    Add to plan
+                    Add Exercise to plan
                 </button>
                 <button
                     type="button"
@@ -356,7 +357,7 @@ const moveExerciseInPlan = async (
                         :value="
                             plan.day_of_week !== null ? plan.day_of_week : ''
                         "
-                        class="min-w-[12rem] flex-1 rounded-md border border-(--color-border) bg-firstBg px-3 py-2 text-sm text-textPrimary transition-colors hover:bg-secondBg focus:outline-none focus:ring-2 focus:ring-(--color-cf-red)/40"
+                        class="min-w-48 flex-1 rounded-md border border-(--color-border) bg-firstBg px-3 py-2 text-sm text-textPrimary transition-colors hover:bg-secondBg focus:outline-none focus:ring-2 focus:ring-(--color-cf-red)/40"
                         @change="handleDayChange(plan, $event)"
                     >
                         <option value="">— Select day —</option>
@@ -459,9 +460,7 @@ const moveExerciseInPlan = async (
                                 type="button"
                                 class="rounded p-1 text-(--color-cf-red) transition-colors hover:bg-(--color-cf-red)/10"
                                 title="Remove"
-                                @click="
-                                    removeExerciseFromPlan(plan, exercise)
-                                "
+                                @click="removeExerciseFromPlan(plan, exercise)"
                             >
                                 <X class="size-4" />
                             </button>
