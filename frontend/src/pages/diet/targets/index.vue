@@ -9,11 +9,7 @@ import { useDietLogsToday } from "~/pages/home/queries/useDietLogsToday";
 
 const router = useRouter();
 const queryClient = useQueryClient();
-const {
-    data: dayData,
-    isPending,
-    error: loadError,
-} = useDietLogsToday(0);
+const { data: dayData, isPending, error: loadError } = useDietLogsToday(0);
 
 const calories = ref(0);
 const protein = ref(0);
@@ -34,13 +30,10 @@ watch(
 
 const planId = computed(() => dayData.value?.day.plan.ID);
 const macrosValid = computed(() => {
-    const nums = [
-        calories.value,
-        protein.value,
-        fiber.value,
-        carbs.value,
-    ];
-    return nums.every((n) => typeof n === "number" && !Number.isNaN(n) && n >= 0);
+    const nums = [calories.value, protein.value, fiber.value, carbs.value];
+    return nums.every(
+        (n) => typeof n === "number" && !Number.isNaN(n) && n >= 0,
+    );
 });
 
 const saveMutation = useMutation({
@@ -57,6 +50,7 @@ const saveMutation = useMutation({
     onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: homeKeys.diet.all });
         toast.push("Macro targets saved", "success");
+        router.push({ name: "diet" });
     },
     onError: () => {
         toast.push("Could not save macro targets", "error");
@@ -85,19 +79,21 @@ const goBack = () => {
                 Macro targets
             </h1>
         </div>
+        <section>
+            <input type="text" />
+            <input type="text" />
+            <h1>Suggested targets</h1>
+            <p>Calories - 2000</p>
+            <p>Protein - 100g</p>
+            <p>Carbs - 100g</p>
+            <p>Fiber - 10g</p>
+        </section>
         <div v-if="isPending" class="text-zinc-500">Loading…</div>
         <div v-else-if="loadError" class="text-red-400">
             {{ loadError.message }}
         </div>
-        <form
-            v-else
-            class="flex flex-col gap-4"
-            @submit.prevent="submit"
-        >
-            <p
-                v-if="dayData?.day.plan?.name"
-                class="m-0 text-sm text-zinc-400"
-            >
+        <form v-else class="flex flex-col gap-4" @submit.prevent="submit">
+            <p v-if="dayData?.day.plan?.name" class="m-0 text-sm text-zinc-400">
                 Plan: {{ dayData.day.plan.name }}
             </p>
             <label class="flex flex-col gap-1">
@@ -112,7 +108,9 @@ const goBack = () => {
                 />
             </label>
             <label class="flex flex-col gap-1">
-                <span class="text-sm font-medium text-zinc-300">Protein (g)</span>
+                <span class="text-sm font-medium text-zinc-300"
+                    >Protein (g)</span
+                >
                 <input
                     v-model.number="protein"
                     type="number"
