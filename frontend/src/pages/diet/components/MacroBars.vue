@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import MacroBar from "./MacroBar.vue";
+import MacroBar from "./macrobar/MacroBar.vue";
 
 defineProps<{
     totalCalories: number;
