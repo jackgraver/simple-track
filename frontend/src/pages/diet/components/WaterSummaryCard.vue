@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import MacroBar from "./MacroBar.vue";
+import MacroBar from "./macrobar/MacroBar.vue";
 import LogWaterDialog from "~/pages/diet/components/dialog/LogWaterDialog.vue";
 import { useWaterLogs } from "~/api/tracking/queries";
 import { dialogManager } from "~/composables/dialog/useDialog";
