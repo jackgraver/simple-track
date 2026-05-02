@@ -6,6 +6,11 @@ import { CREATE_TYPE, LOG_TYPE } from "~/pages/diet/logmeal/logmealMode";
 
 const route = useRoute();
 const isDietHome = computed(() => route.name === "diet");
+
+const dateOffset = computed(() => { 
+    const o = Number(route.query.offset);
+    return Number.isFinite(o) ? o : 0;
+});
 </script>
 
 <template>
@@ -27,7 +32,7 @@ const isDietHome = computed(() => route.name === "diet");
                 New saved meal
             </router-link>
         </div>
-        <DietDayView :date-offset="0" />
+        <DietDayView :date-offset="dateOffset" />
     </div>
     <router-view v-else />
 </template>

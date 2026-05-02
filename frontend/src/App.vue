@@ -2,6 +2,7 @@
 import ToastContainer from "./composables/toast/ToastContainer.vue";
 import DialogContainer from "./composables/dialog/DialogContainer.vue";
 import NavBar from "./shared/NavBar.vue";
+import DateAndBreadcrumbs from "./shared/DateAndBreadcrumbs.vue";
 </script>
 
 <template>
@@ -9,9 +10,10 @@ import NavBar from "./shared/NavBar.vue";
         class="dark mx-auto box-border w-full max-w-full min-h-dvh overflow-x-clip"
     >
         <div
-            class="flex w-full flex-col items-stretch gap-4 px-4 lg:px-0 lg:mx-auto lg:max-w-8/12"
+            class="flex w-full flex-col items-stretch px-4 lg:px-0 lg:mx-auto lg:max-w-8/12"
         >
             <NavBar />
+            <DateAndBreadcrumbs />
             <RouterView />
         </div>
     </main>

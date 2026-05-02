@@ -1,19 +1,16 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import { useRoute, useRouter } from "vue-router";
+import { useRoute } from "vue-router";
 import axios from "axios";
 import {
     useWorkoutLogToday,
     useWorkoutPlansAll,
     useSwitchWorkoutPlan,
 } from "~/api/workout/queries";
-import { formatDateLong } from "~/utils/dateUtil";
 import { toast } from "~/composables/toast/useToast";
-import { ChevronLeftIcon, ChevronRightIcon } from "lucide-vue-next";
 import WorkoutActivityGraph from "~/pages/gym/WorkoutActivityGraph.vue";
 
 const route = useRoute();
-const router = useRouter();
 const isGymHome = computed(() => route.name === "gym");
 const dayOffset = computed(() => {
     const raw = route.query.offset;
@@ -65,39 +62,6 @@ const handleSwitchPlan = async (e: Event) => {
         toast.push(msg, "error");
     }
 };
-
-const updateOffset = (nextOffset: number) => {
-    const nextQuery = { ...route.query };
-    if (nextOffset === 0) {
-        delete nextQuery.offset;
-    } else {
-        nextQuery.offset = String(nextOffset);
-    }
-
-    router.push({
-        name: "gym",
-        query: nextQuery,
-    });
-};
-
-const goToPreviousDay = () => {
-    updateOffset(dayOffset.value + 1);
-};
-
-const goToNextDay = () => {
-    updateOffset(dayOffset.value - 1);
-};
-
-const isToday = computed(() => dayOffset.value === 0);
-
-const goToToday = () => {
-    if (!isToday.value) updateOffset(0);
-};
-
-const dateLabel = computed(() => {
-    const d = data.value?.date;
-    return d ? formatDateLong(d) : "";
-});
 
 const switchingPlan = computed(() => switchPlanMutation.isPending.value);
 
@@ -154,37 +118,6 @@ const loggingRoute = computed(() => ({
                         >
                     </nav>
                 </div>
-                <section class="flex flex-col gap-2">
-                    <div class="flex items-center justify-between gap-3">
-                        <button
-                            type="button"
-                            aria-label="Previous day"
-                            class="rounded-md border border-(--color-border) bg-firstBg p-2 text-textPrimary transition-colors hover:bg-secondBg"
-                            @click="goToPreviousDay"
-                        >
-                            <ChevronLeftIcon class="size-4" />
-                        </button>
-                        <p class="m-0 text-base font-medium text-textPrimary">
-                            {{ dateLabel }}
-                        </p>
-                        <button
-                            type="button"
-                            aria-label="Next day"
-                            class="rounded-md border border-(--color-border) bg-firstBg p-2 text-textPrimary transition-colors hover:bg-secondBg"
-                            @click="goToNextDay"
-                        >
-                            <ChevronRightIcon class="size-4" />
-                        </button>
-                    </div>
-                    <button
-                        v-if="!isToday"
-                        type="button"
-                        class="self-center text-xs text-textSecondary underline-offset-2 transition-colors hover:text-textPrimary hover:underline"
-                        @click="goToToday"
-                    >
-                        Jump to today
-                    </button>
-                </section>
                 <section class="flex flex-col gap-2">
                     <label
                         for="gym-plan-switch"
