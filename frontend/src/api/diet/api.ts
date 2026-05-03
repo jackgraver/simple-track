@@ -1,5 +1,5 @@
 import { apiClient } from "~/api/client";
-import type { CompositeFood, DietDay, Meal } from "~/types/diet";
+import type { CompositeFood, DietDay, Meal, Plan } from "~/types/diet";
 
 export type DietLogsTodayResponse = {
     day: DietDay;
@@ -30,6 +30,13 @@ export type LogMealResponse = {
     totalCalories: number;
     totalProtein: number;
     totalFiber: number;
+};
+
+export type UpdatePlanMacrosPayload = {
+    calories: number;
+    protein: number;
+    fiber: number;
+    carbs: number;
 };
 
 export async function getDietLogsToday(
@@ -188,6 +195,17 @@ export async function updateLoggedMeal(
             meal,
             oldMealID: oldMealId,
         },
+    );
+    return response.data;
+}
+
+export async function updatePlanMacros(
+    planId: number,
+    payload: UpdatePlanMacrosPayload,
+): Promise<{ plan: Plan }> {
+    const response = await apiClient.put<{ plan: Plan }>(
+        `/diet/plans/plan/${planId}`,
+        payload,
     );
     return response.data;
 }
