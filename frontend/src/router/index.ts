@@ -3,6 +3,12 @@ import type { RouteRecordRaw } from "vue-router";
 import { authStatus } from "~/composables/auth/session";
 import { resolveAuthSession } from "~/composables/auth/useAuth";
 
+declare module "vue-router" {
+    interface RouteMeta {
+        breadcrumb?: string;
+    }
+}
+
 const routes: RouteRecordRaw[] = [
     {
         path: "/",
@@ -12,31 +18,37 @@ const routes: RouteRecordRaw[] = [
         path: "/home",
         name: "home",
         component: () => import("~/pages/home/index.vue"),
+        meta: { breadcrumb: "Home" },
     },
     {
         path: "/diet",
         name: "diet",
         component: () => import("~/pages/diet/index.vue"),
+        meta: { breadcrumb: "Diet" },
         children: [
             {
                 path: "log",
                 name: "diet-log",
                 component: () => import("~/pages/diet/logmeal/logmeal.vue"),
+                meta: { breadcrumb: "Log meal" },
             },
             {
                 path: "edit-planned",
                 name: "diet-edit-planned",
                 component: () => import("~/pages/diet/edit-planned/index.vue"),
+                meta: { breadcrumb: "Edit planned" },
             },
             {
                 path: "targets",
                 name: "diet-targets",
                 component: () => import("~/pages/diet/targets/index.vue"),
+                meta: { breadcrumb: "Targets" },
             },
             {
                 path: "water-presets",
                 name: "diet-water-presets",
                 component: () => import("~/pages/diet/water-presets/index.vue"),
+                meta: { breadcrumb: "Water presets" },
             },
         ],
     },
@@ -44,50 +56,59 @@ const routes: RouteRecordRaw[] = [
         path: "/gym",
         name: "gym",
         component: () => import("~/pages/gym/index.vue"),
+        meta: { breadcrumb: "Gym" },
         children: [
             {
                 path: "plans",
                 name: "gym-plans",
                 component: () => import("~/pages/gym/plans/index.vue"),
+                meta: { breadcrumb: "Plans" },
             },
             {
                 path: "logging",
                 name: "logging",
                 component: () => import("~/pages/gym/logging/index.vue"),
+                meta: { breadcrumb: "Logging" },
             },
             {
                 path: "logging/:id(\\d+)",
                 name: "logging-exercise",
                 component: () =>
                     import("~/pages/gym/logging/exercise/[id].vue"),
+                meta: { breadcrumb: "Exercise" },
             },
             {
                 path: "logging/cardio",
                 name: "logging-cardio",
                 component: () =>
                     import("~/pages/gym/logging/exercise/[id].vue"),
+                meta: { breadcrumb: "Cardio" },
             },
             {
                 path: "logging/mobility/:slot",
                 name: "logging-mobility",
                 component: () =>
                     import("~/pages/gym/logging/exercise/[id].vue"),
+                meta: { breadcrumb: "Mobility" },
             },
             {
                 path: "progression",
                 name: "progression",
                 component: () =>
                     import("~/pages/gym/progression/progression.vue"),
+                meta: { breadcrumb: "Progression" },
             },
             {
                 path: "weight",
                 name: "gym-weight",
                 component: () => import("~/pages/gym/weight/index.vue"),
+                meta: { breadcrumb: "Weight" },
             },
             {
                 path: "steps",
                 name: "gym-steps",
                 component: () => import("~/pages/gym/steps/index.vue"),
+                meta: { breadcrumb: "Steps" },
             },
         ],
     },
@@ -95,6 +116,7 @@ const routes: RouteRecordRaw[] = [
         path: "/logmeal",
         name: "logmeal",
         component: () => import("~/pages/diet/logmeal/logmeal.vue"),
+        meta: { breadcrumb: "Log meal" },
     },
 
     {
