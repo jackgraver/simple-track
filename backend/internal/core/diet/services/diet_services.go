@@ -20,7 +20,7 @@ func MealPlanDayByID(db *gorm.DB, id int) (*models.DietDay, error) {
 	return dietrepo.New(db).DayByID(id)
 }
 
-func CalculateTotals(db *gorm.DB, dayID uint) (float32, float32, float32, float32) {
+func CalculateTotals(db *gorm.DB, dayID uint) dietrepo.MealDayTotals {
 	return dietrepo.New(db).CalculateTotals(dayID)
 }
 

@@ -7,6 +7,7 @@ export type DietLogsTodayResponse = {
     totalProtein: number;
     totalFiber: number;
     totalCarbs: number;
+    totalFat: number;
 };
 
 export type MealResponse = {
@@ -30,6 +31,8 @@ export type LogMealResponse = {
     totalCalories: number;
     totalProtein: number;
     totalFiber: number;
+    totalCarbs: number;
+    totalFat: number;
 };
 
 export type UpdatePlanMacrosPayload = {
@@ -37,6 +40,7 @@ export type UpdatePlanMacrosPayload = {
     protein: number;
     fiber: number;
     carbs: number;
+    fat: number;
 };
 
 export async function getDietLogsToday(

@@ -3,6 +3,7 @@ export type MacroBarNutrientType =
     | "protein"
     | "fiber"
     | "carbs"
+    | "fat"
     | "water";
 
 export function formatInt(n: number): string {
@@ -35,6 +36,7 @@ export const typeLabels: Record<MacroBarNutrientType, string> = {
     protein: "Protein",
     fiber: "Fiber",
     carbs: "Carbs",
+    fat: "Fat",
     water: "Water",
 };
 
@@ -43,5 +45,6 @@ export const macroFillClass: Record<MacroBarNutrientType, string> = {
     protein: "bg-[#60a5fa]",
     fiber: "bg-[green]",
     carbs: "bg-[red]",
+    fat: "bg-[#a855f7]",
     water: "bg-[blue]",
 };

@@ -21,6 +21,7 @@ const meal = ref<Food>({
     protein: 0,
     fiber: 0,
     carbs: 0,
+    fat: 0,
     serving_type: "",
     serving_amount: 0,
 });
@@ -88,12 +89,16 @@ const createFood = async () => {
                 />
             </div>
             <div class="field">
-                <label for="fiber">Fiber</label>
-                <input type="number" id="fiber" min="0" v-model="meal.fiber" />
-            </div>
-            <div class="field">
                 <label for="carbs">Carbs</label>
                 <input type="number" id="carbs" min="0" v-model="meal.carbs" />
+            </div>
+            <div class="field">
+                <label for="fat">Fat</label>
+                <input type="number" id="fat" min="0" v-model="meal.fat" />
+            </div>
+            <div class="field">
+                <label for="fiber">Fiber</label>
+                <input type="number" id="fiber" min="0" v-model="meal.fiber" />
             </div>
         </div>
         <div class="field">

@@ -19,13 +19,13 @@ func NewDietLogService(db *gorm.DB) *DietLogService {
 	return &DietLogService{repo: dietrepo.New(db)}
 }
 
-func (s *DietLogService) MealPlanToday(_ context.Context, offset int) (models.DietDay, float32, float32, float32, float32, error) {
+func (s *DietLogService) MealPlanToday(_ context.Context, offset int) (models.DietDay, dietrepo.MealDayTotals, error) {
 	day, err := s.repo.DayMealPlanToday(offset)
 	if err != nil {
-		return models.DietDay{}, 0, 0, 0, 0, err
+		return models.DietDay{}, dietrepo.MealDayTotals{}, err
 	}
-	tc, tp, tf, tb := s.repo.CalculateTotals(day.ID)
-	return day, tc, tp, tf, tb, nil
+	tot := s.repo.CalculateTotals(day.ID)
+	return day, tot, nil
 }
 
 func (s *DietLogService) MealPlanWeek(ctx context.Context) ([]models.DietDay, error) {
@@ -47,13 +47,13 @@ func (s *DietLogService) MealPlanMonth(ctx context.Context, offset int) (days []
 	return days, startOfMonth, endOfMonth, target.Month(), nil
 }
 
-func (s *DietLogService) MealPlanDay(ctx context.Context, id uint) (models.DietDay, float32, float32, float32, float32, error) {
+func (s *DietLogService) MealPlanDay(ctx context.Context, id uint) (models.DietDay, dietrepo.MealDayTotals, error) {
 	day, err := s.repo.DayByIDGeneric(ctx, id)
 	if err != nil {
-		return models.DietDay{}, 0, 0, 0, 0, err
+		return models.DietDay{}, dietrepo.MealDayTotals{}, err
 	}
-	tc, tp, tf, tb := s.repo.CalculateTotals(day.ID)
-	return day, tc, tp, tf, tb, nil
+	tot := s.repo.CalculateTotals(day.ID)
+	return day, tot, nil
 }
 
 func (s *DietLogService) GoalsToday() (*models.Plan, error) {

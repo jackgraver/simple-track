@@ -17,6 +17,7 @@ export interface Plan extends BaseModel {
     protein: number;
     fiber: number;
     carbs: number;
+    fat: number;
 }
 
 export interface PlannedMeal extends BaseModel {
@@ -54,6 +55,7 @@ export interface Food extends BaseModel {
     protein: number;
     fiber: number;
     carbs: number;
+    fat: number;
     variant_group_id?: number | null;
     variants?: Food[];
 }
@@ -89,4 +91,5 @@ export interface CompositeFood extends BaseModel {
     protein?: number;
     fiber?: number;
     carbs?: number;
+    fat?: number;
 }

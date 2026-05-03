@@ -33,17 +33,18 @@ func RegisterDietLogRoutes(group *gin.RouterGroup, db *gorm.DB) {
 
 func (h *DietLogHandler) getMealPlanToday(c *gin.Context) {
 	offset := utils.GetDayOffset(c)
-	day, totalCalories, totalProtein, totalFiber, totalCarbs, err := h.svc.MealPlanToday(c.Request.Context(), offset)
+	day, tot, err := h.svc.MealPlanToday(c.Request.Context(), offset)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{
 		"day":           day,
-		"totalCalories": totalCalories,
-		"totalProtein":  totalProtein,
-		"totalFiber":    totalFiber,
-		"totalCarbs":    totalCarbs,
+		"totalCalories": tot.Calories,
+		"totalProtein":  tot.Protein,
+		"totalFiber":    tot.Fiber,
+		"totalCarbs":    tot.Carbs,
+		"totalFat":      tot.Fat,
 		"today":         time.Now(),
 	})
 }
@@ -90,17 +91,18 @@ func (h *DietLogHandler) getMealPlanDay(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid ID"})
 		return
 	}
-	day, totalCalories, totalProtein, totalFiber, totalCarbs, err := h.svc.MealPlanDay(c.Request.Context(), uint(id64))
+	day, tot, err := h.svc.MealPlanDay(c.Request.Context(), uint(id64))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{
 		"day":           day,
-		"totalCalories": totalCalories,
-		"totalProtein":  totalProtein,
-		"totalFiber":    totalFiber,
-		"totalCarbs":    totalCarbs,
+		"totalCalories": tot.Calories,
+		"totalProtein":  tot.Protein,
+		"totalFiber":    tot.Fiber,
+		"totalCarbs":    tot.Carbs,
+		"totalFat":      tot.Fat,
 	})
 }
 

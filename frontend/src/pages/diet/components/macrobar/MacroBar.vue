@@ -14,6 +14,8 @@ const props = defineProps<{
     planned: number;
     type: MacroBarNutrientType;
     indicateOverflow?: boolean;
+    /** Appended after "total / planned" text (e.g. water unit label). */
+    valueSuffix?: string;
 }>();
 
 const { displayTotal } = useMacroBarAnimation(() => props.total ?? 0);
@@ -44,7 +46,10 @@ const { displayTotal } = useMacroBarAnimation(() => props.total ?? 0);
                         )
                     "
                     >{{
-                        formatInt(displayTotal) + " / " + formatInt(props.planned)
+                        formatInt(displayTotal) +
+                        " / " +
+                        formatInt(props.planned) +
+                        (valueSuffix ?? "")
                     }}</span
                 >
             </div>

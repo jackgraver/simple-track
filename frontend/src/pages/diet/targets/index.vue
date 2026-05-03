@@ -13,8 +13,9 @@ const { data: dayData, isPending, error: loadError } = useDietLogsToday(0);
 
 const calories = ref(0);
 const protein = ref(0);
-const fiber = ref(0);
 const carbs = ref(0);
+const fat = ref(0);
+const fiber = ref(0);
 
 watch(
     () => dayData.value?.day.plan,
@@ -22,15 +23,16 @@ watch(
         if (!plan) return;
         calories.value = plan.calories;
         protein.value = plan.protein;
-        fiber.value = plan.fiber;
         carbs.value = plan.carbs;
+        fat.value = plan.fat ?? 0;
+        fiber.value = plan.fiber;
     },
     { immediate: true },
 );
 
 const planId = computed(() => dayData.value?.day.plan.ID);
 const macrosValid = computed(() => {
-    const nums = [calories.value, protein.value, fiber.value, carbs.value];
+    const nums = [calories.value, protein.value, carbs.value, fat.value, fiber.value];
     return nums.every(
         (n) => typeof n === "number" && !Number.isNaN(n) && n >= 0,
     );
@@ -45,6 +47,7 @@ const saveMutation = useMutation({
             protein: protein.value,
             fiber: fiber.value,
             carbs: carbs.value,
+            fat: fat.value,
         });
     },
     onSuccess: () => {
@@ -124,6 +127,17 @@ const goBack = () => {
                 <span class="text-sm font-medium text-zinc-300">Carbs (g)</span>
                 <input
                     v-model.number="carbs"
+                    type="number"
+                    min="0"
+                    step="0.1"
+                    class="rounded-md border border-zinc-600 bg-zinc-900 px-3 py-2 text-zinc-100 outline-none ring-amber-700/40 focus:border-amber-600 focus:ring-2"
+                    required
+                />
+            </label>
+            <label class="flex flex-col gap-1">
+                <span class="text-sm font-medium text-zinc-300">Fat (g)</span>
+                <input
+                    v-model.number="fat"
                     type="number"
                     min="0"
                     step="0.1"
