@@ -10,6 +10,7 @@ type Plan struct {
 	Protein  float32 `json:"protein"`
 	Fiber    float32 `json:"fiber"`
 	Carbs    float32 `json:"carbs"`
+	Fat      float32 `json:"fat"`
 }
 
 func (p Plan) GetID() uint        { return p.ID }

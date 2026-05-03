@@ -87,6 +87,7 @@ func seedDatabase(db *gorm.DB) error {
 		Protein:  150,
 		Fiber:    50,
 		Carbs:    150,
+		Fat:      80,
 	}
 	db.Create(&bulk)
 

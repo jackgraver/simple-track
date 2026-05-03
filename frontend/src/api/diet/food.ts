@@ -17,6 +17,7 @@ export async function createFood(
         protein: food.protein,
         fiber: food.fiber,
         carbs: food.carbs,
+        fat: food.fat ?? 0,
     };
     if (relatedFoodId != null && relatedFoodId > 0) {
         body.related_food_id = relatedFoodId;

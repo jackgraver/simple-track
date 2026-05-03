@@ -4,11 +4,11 @@ import MacroBar from "./macrobar/MacroBar.vue";
 defineProps<{
     totalCalories: number;
     totalProtein: number;
-    totalFiber: number;
+    totalFat: number;
     totalCarbs: number;
     plannedCalories: number;
     plannedProtein: number;
-    plannedFiber: number;
+    plannedFat: number;
     plannedCarbs: number;
 }>();
 </script>
@@ -28,7 +28,7 @@ defineProps<{
             :indicate-overflow="true"
         />
         <MacroBar :total="totalCarbs" :planned="plannedCarbs" type="carbs" />
-        <MacroBar :total="totalFiber" :planned="plannedFiber" type="fiber" />
+        <MacroBar :total="totalFat" :planned="plannedFat" type="fat" />
     </div>
 </template>
 

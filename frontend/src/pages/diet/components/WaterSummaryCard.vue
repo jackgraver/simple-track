@@ -52,7 +52,7 @@ async function openLog() {
                 class="min-w-0 flex-1"
                 :total="totalDisplay"
                 :planned="plannedDisplay"
-                :unit-suffix="unitSuffix"
+                :value-suffix="unitSuffix"
             />
         </div>
         <div class="flex flex-wrap justify-end gap-2">

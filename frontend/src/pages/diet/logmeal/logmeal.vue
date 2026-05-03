@@ -43,6 +43,7 @@ type MealMacroTotals = {
     protein: number;
     fiber: number;
     carbs: number;
+    fat: number;
 };
 
 function macrosForMeal(m: Meal): MealMacroTotals {
@@ -72,6 +73,13 @@ function macrosForMeal(m: Meal): MealMacroTotals {
             m.items.reduce(
                 (total, item) =>
                     total + Number(item.amount) * (item.food?.carbs ?? 0),
+                0,
+            ),
+        ),
+        fat: formatNum(
+            m.items.reduce(
+                (total, item) =>
+                    total + Number(item.amount) * (item.food?.fat ?? 0),
                 0,
             ),
         ),
@@ -299,6 +307,7 @@ const macroBarsDayTotals = computed(() => {
     const dayProtein = t?.totalProtein ?? 0;
     const dayFiber = t?.totalFiber ?? 0;
     const dayCarbs = t?.totalCarbs ?? 0;
+    const dayFat = t?.totalFat ?? 0;
 
     if (
         pageMode.value === PAGE_MODE.edit &&
@@ -311,6 +320,7 @@ const macroBarsDayTotals = computed(() => {
             totalProtein: dayProtein - b.protein + tm.protein,
             totalFiber: dayFiber - b.fiber + tm.fiber,
             totalCarbs: dayCarbs - b.carbs + tm.carbs,
+            totalFat: dayFat - b.fat + tm.fat,
         };
     }
     return {
@@ -318,6 +328,7 @@ const macroBarsDayTotals = computed(() => {
         totalProtein: dayProtein + tm.protein,
         totalFiber: dayFiber + tm.fiber,
         totalCarbs: dayCarbs + tm.carbs,
+        totalFat: dayFat + tm.fat,
     };
 });
 
@@ -720,11 +731,11 @@ const updateLoggedMeal = async () => {
                         v-if="pageMode !== PAGE_MODE.create"
                         :totalCalories="macroBarsDayTotals.totalCalories"
                         :totalProtein="macroBarsDayTotals.totalProtein"
-                        :totalFiber="macroBarsDayTotals.totalFiber"
+                        :totalFat="macroBarsDayTotals.totalFat"
                         :totalCarbs="macroBarsDayTotals.totalCarbs"
                         :planned-calories="today?.day.plan.calories ?? 0"
                         :planned-protein="today?.day.plan.protein ?? 0"
-                        :planned-fiber="today?.day.plan.fiber ?? 0"
+                        :planned-fat="today?.day.plan.fat ?? 0"
                         :planned-carbs="today?.day.plan.carbs ?? 0"
                     />
                 </footer>
