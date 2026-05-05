@@ -225,15 +225,11 @@ const {
     queryKey: ["savedMeals", "all"],
     queryFn: () =>
         apiClient
-            .get<SavedMeal[]>("/diet/meals/saved-meal/all")
-            .then((r) => r.data),
+            .get<{ saved_meals: SavedMeal[] }>("/diet/meals/saved-meal/all")
+            .then((r) => r.data.saved_meals),
 });
 
-const savedMeals = computed((): SavedMeal[] => {
-    const v = savedRaw.value;
-    if (!v) return [];
-    return Array.isArray(v) ? v : [];
-});
+const savedMeals = computed((): SavedMeal[] => savedRaw.value ?? []);
 
 const deletePlanned = useDeletePlannedMeal(dateOffset);
 const isRemoving = computed(() => deletePlanned.isPending.value);
