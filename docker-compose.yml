@@ -49,11 +49,10 @@ services:
             - "8080:8080"
         environment:
             LISTEN_ADDR: 0.0.0.0:8080
-            APP_ENV: ${APP_ENV:-development}
-            DATABASE_URL_DEVELOPMENT: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres-dev:5432/simpletracker_dev?sslmode=disable
-            DATABASE_URL_PRODUCTION: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres-prod:5432/simpletracker_prod?sslmode=disable
+            APP_ENV: prod
+            DATABASE_URL_PRODUCTION: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@postgres-prod:5432/simpletracker_prod?sslmode=disable
             CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173,http://localhost:3000}
-            JWT_SECRET: ${JWT_SECRET:-dev-local-change-me}
+            JWT_SECRET: ${JWT_SECRET}
         depends_on:
             postgres-dev:
                 condition: service_healthy
