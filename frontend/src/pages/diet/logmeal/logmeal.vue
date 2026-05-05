@@ -47,6 +47,7 @@ type MealMacroTotals = {
 };
 
 function macrosForMeal(m: Meal): MealMacroTotals {
+    console.log(m.items);
     return {
         calories: formatNum(
             m.items.reduce(
@@ -206,14 +207,7 @@ const removeGroupLines = (indices: number[]) => {
 };
 
 const route = useRoute();
-const backTo = computed(() =>
-    route.name === "diet-log"
-        ? { name: "diet" as const }
-        : { name: "home" as const },
-);
-const backLabel = computed(() =>
-    route.name === "diet-log" ? "← Diet" : "← Home",
-);
+
 const queryType = computed(() => {
     const t = route.query.type;
     return Array.isArray(t) ? t[0] : t;
@@ -308,6 +302,7 @@ const macroBarsDayTotals = computed(() => {
     const dayFiber = t?.totalFiber ?? 0;
     const dayCarbs = t?.totalCarbs ?? 0;
     const dayFat = t?.totalFat ?? 0;
+    console.log(t);
 
     if (
         pageMode.value === PAGE_MODE.edit &&
@@ -540,11 +535,6 @@ const updateLoggedMeal = async () => {
 
 <template>
     <div class="flex flex-col items-center py-4">
-        <router-link
-            :to="backTo"
-            class="mb-2 w-[80%] max-w-[80%] text-left text-sm text-textSecondary hover:text-textPrimary"
-            >{{ backLabel }}</router-link
-        >
         <div
             v-if="editMissingId"
             class="flex h-[60dvh] items-center justify-center p-8 text-cfRed"
@@ -579,7 +569,7 @@ const updateLoggedMeal = async () => {
                         <SimpleMacros
                             :calories="totalMacros.calories"
                             :protein="totalMacros.protein"
-                            :fiber="totalMacros.fiber"
+                            :fat="totalMacros.fat"
                             :carbs="totalMacros.carbs"
                         />
                     </div>

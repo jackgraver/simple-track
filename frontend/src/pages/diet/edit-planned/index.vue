@@ -26,7 +26,6 @@ import {
 type MacroSummary = {
     calories: number;
     protein: number;
-    fiber: number;
     carbs: number;
 };
 const ZERO_MACROS: MacroSummary = {
@@ -44,8 +43,8 @@ function macroTotals(
         (acc, i) => ({
             calories: acc.calories + (i.food?.calories ?? 0) * i.amount,
             protein: acc.protein + (i.food?.protein ?? 0) * i.amount,
-            fiber: acc.fiber + (i.food?.fiber ?? 0) * i.amount,
             carbs: acc.carbs + (i.food?.carbs ?? 0) * i.amount,
+            fat: acc.fat + (i.food?.fat ?? 0) * i.amount,
         }),
         { ...ZERO_MACROS },
     );

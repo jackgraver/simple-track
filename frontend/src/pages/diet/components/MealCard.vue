@@ -24,16 +24,16 @@ function itemServingAmount(item: Meal["items"][number]): number {
 function macroTotalsForMeal(meal: Meal) {
     let calories = 0;
     let protein = 0;
-    let fiber = 0;
     let carbs = 0;
+    let fat = 0;
     for (const item of meal.items) {
         const a = Number(item.amount);
         calories += (item.food?.calories ?? 0) * a;
         protein += (item.food?.protein ?? 0) * a;
-        fiber += (item.food?.fiber ?? 0) * a;
         carbs += (item.food?.carbs ?? 0) * a;
+        fat += (item.food?.fat ?? 0) * a;
     }
-    return { calories, protein, fiber, carbs };
+    return { calories, protein, carbs, fat };
 }
 
 const props = defineProps<{
@@ -76,7 +76,7 @@ function pluralize(name: string | undefined, amount: number): string {
                 class="title-macros"
                 :calories="mealMacroTotals.calories"
                 :protein="mealMacroTotals.protein"
-                :fiber="mealMacroTotals.fiber"
+                :fat="mealMacroTotals.fat"
                 :carbs="mealMacroTotals.carbs"
                 font-size="0.9rem"
             />
