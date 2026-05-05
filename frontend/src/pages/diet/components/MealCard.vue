@@ -61,6 +61,11 @@ function toggleGroupCollapse(groupId: string) {
         [groupId]: !collapsedGroups.value[groupId],
     };
 }
+
+function pluralize(name: string | undefined, amount: number): string {
+    if (!name) return "";
+    return amount > 1 && name.charAt(name.length - 1) !== "s" ? "s" : "";
+}
 </script>
 
 <template>
@@ -90,14 +95,18 @@ function toggleGroupCollapse(groupId: string) {
                                 class="food"
                             >
                                 <span
-                                    >({{ formatNum(itemServingAmount(food))
+                                    >{{ formatNum(itemServingAmount(food))
                                     }}{{
                                         food.food?.serving_type === "g"
                                             ? "g"
                                             : ""
-                                    }}) {{ food.food?.name
+                                    }}
+                                    {{ food.food?.name
                                     }}{{
-                                        Number(food.amount) > 1 ? "s" : ""
+                                        pluralize(
+                                            food.food?.name,
+                                            Number(food.amount),
+                                        )
                                     }}</span
                                 >
                                 <span class="details">

@@ -4,6 +4,7 @@ import type { Food } from "~/types/diet";
 import SearchList from "~/shared/SearchList.vue";
 import FoodDisplay from "~/pages/diet/logmeal/components/FoodDisplay.vue";
 import { useCreateFood } from "../queries/useFoodMutations";
+import { ChevronDown, ChevronUp } from "lucide-vue-next";
 
 const props = defineProps<{
     foodName?: string;
@@ -24,12 +25,14 @@ const meal = ref<Food>({
     serving_amount: 0,
 });
 
+const relatedOpen = ref(false);
 const relatedFood = ref<Food | null>(null);
 
 const createFoodMutation = useCreateFood();
 
 function clearRelated() {
     relatedFood.value = null;
+    relatedOpen.value = false;
 }
 
 async function onPickRelated(
@@ -37,6 +40,7 @@ async function onPickRelated(
 ): Promise<boolean> {
     if (row.entry_kind === "composite") return false;
     relatedFood.value = row as Food;
+    relatedOpen.value = false;
     return true;
 }
 
@@ -120,17 +124,42 @@ const createFood = async () => {
             />
         </div>
         <div class="field related-field">
-            <label>Related to existing food (optional)</label>
-            <div
-                v-if="relatedFood"
-                class="related-chip"
-            >
+            <div class="related-header">
+                <label class="related-label" for="related-toggle"
+                    >Related to existing food (optional)</label
+                >
+                <button
+                    id="related-toggle"
+                    type="button"
+                    class="related-toggle"
+                    :aria-expanded="relatedOpen"
+                    aria-controls="related-search-panel"
+                    @click="relatedOpen = !relatedOpen"
+                >
+                    <span
+                        class="related-chevron"
+                        :class="{ open: relatedOpen }"
+                    >
+                        <ChevronDown v-if="!relatedOpen" :size="16" />
+                        <ChevronUp v-else :size="16" />
+                    </span>
+                </button>
+            </div>
+            <div v-if="relatedFood" class="related-chip">
                 <span class="related-name">{{ relatedFood.name }}</span>
-                <button type="button" class="related-clear" @click="clearRelated">
+                <button
+                    type="button"
+                    class="related-clear"
+                    @click="clearRelated"
+                >
                     Clear
                 </button>
             </div>
-            <div class="related-search">
+            <div
+                v-show="relatedOpen"
+                id="related-search-panel"
+                class="related-search"
+            >
                 <SearchList
                     route="diet/meals/food/all"
                     :on-select="onPickRelated"
@@ -138,7 +167,9 @@ const createFood = async () => {
                 />
             </div>
         </div>
-        <button @click="createFood">Create</button>
+        <button type="button" class="create-food-submit" @click="createFood">
+            Create
+        </button>
     </div>
 </template>
 
@@ -148,7 +179,6 @@ const createFood = async () => {
     flex-direction: column;
     gap: 1rem;
     color: white;
-    padding: 1.5rem 0.5rem;
 }
 
 .field {
@@ -179,6 +209,34 @@ label {
 
 .related-field {
     gap: 0.5rem;
+}
+.related-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+}
+.related-label {
+    margin: 0;
+    flex: 1;
+    min-width: 0;
+    font-size: 0.9rem;
+    color: #ccc;
+}
+.related-toggle {
+    flex-shrink: 0;
+    cursor: pointer;
+    border: none;
+    border-radius: 4px;
+    padding: 0.35rem 0.55rem;
+    background: rgb(70, 70, 70);
+    color: white;
+    line-height: 1;
+}
+.related-chevron {
+    display: inline-block;
+    font-size: 0.65rem;
+    transition: transform 0.15s ease;
 }
 
 .related-chip {
@@ -217,5 +275,13 @@ label {
     overflow: hidden;
     border-radius: 4px;
     border: 1px solid rgb(60, 60, 60);
+}
+
+.create-food-submit {
+    background-color: var(--color-secondBg);
+    color: var(--color-textPrimary);
+    &:hover {
+        background-color: var(--color-thirdBg);
+    }
 }
 </style>

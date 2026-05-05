@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { Plus, Loader } from "lucide-vue-next";
-import { computed, ref } from "vue";
+import { computed, ref, nextTick } from "vue";
 import type { Component } from "vue";
 import { useQuery } from "@tanstack/vue-query";
 import { apiClient } from "~/api/client";
+import { useListNavigation } from "~/composables/useListNavigation";
 
 const props = defineProps<{
     route: string;
@@ -16,6 +17,9 @@ const props = defineProps<{
 }>();
 
 const search = ref("");
+const itemsContainer = ref<HTMLElement | null>(null);
+const isHovering = ref(false);
+const isFocused = ref(false);
 
 const excludedIds = computed(() => new Set(props.prefilter ?? []));
 
@@ -90,14 +94,59 @@ const filteredList = computed(() => {
         : list.value;
 });
 
+const showCreate = computed(
+    () => !isPending.value && search.value.trim().length > 0 && props.onCreate,
+);
+
+const navigableCount = computed(
+    () => filteredList.value.length + (showCreate.value ? 1 : 0),
+);
+
+const globalNavActive = computed(() => isHovering.value && !isFocused.value);
+const { activeIndex, handleKey, setEnterHandler, reset } = useListNavigation(
+    navigableCount,
+    globalNavActive,
+);
+
 const handleFunctionCall = async <T extends (arg: any) => Promise<boolean>>(
     fn?: T,
     args?: any,
 ) => {
     if (!fn) return;
     const success = await fn(args);
-    if (success) search.value = "";
+    if (success) {
+        search.value = "";
+        reset();
+    }
 };
+
+function selectActive() {
+    if (activeIndex.value === -1) return;
+    const createIdx = filteredList.value.length;
+    if (activeIndex.value < createIdx) {
+        handleFunctionCall(
+            props.onSelect,
+            filteredList.value[activeIndex.value],
+        );
+    } else if (showCreate.value) {
+        handleFunctionCall(props.onCreate, search.value);
+    }
+}
+
+setEnterHandler(selectActive);
+
+function onInputKeydown(e: KeyboardEvent) {
+    if (e.key === "Enter") {
+        e.preventDefault();
+        selectActive();
+        return;
+    }
+    handleKey(e);
+    nextTick(() => {
+        const el = itemsContainer.value?.querySelector(".item.active");
+        el?.scrollIntoView({ block: "nearest" });
+    });
+}
 
 const refresh = () => {
     refetch();
@@ -109,25 +158,34 @@ const refresh = () => {
         <span class="error-message">Failed to Load Saved Meals</span>
         <button @click="refresh">Try again</button>
     </div>
-    <div v-else class="search-container">
+    <div
+        v-else
+        class="search-container"
+        @mouseenter="isHovering = true"
+        @mouseleave="isHovering = false"
+    >
         <div class="search-input-wrapper">
             <input
                 type="text"
                 v-model="search"
                 placeholder="Search"
                 :disabled="isPending"
+                @keydown="onInputKeydown"
+                @focus="isFocused = true"
+                @blur="isFocused = false"
             />
         </div>
-        <div class="items-container">
+        <div class="items-container" ref="itemsContainer">
             <template v-if="isPending">
-                <Loader v-if="isPending" class="spinner" :size="32" />
+                <Loader class="spinner" :size="32" />
             </template>
-            <template v-else-if="filteredList?.length">
+            <template v-else>
                 <button
                     v-for="(item, index) in filteredList"
                     :key="`${item.entry_kind ?? 'food'}-${item.id ?? item.ID ?? index}`"
                     @click="handleFunctionCall(onSelect, item)"
                     class="item"
+                    :class="{ active: activeIndex === index }"
                     role="option"
                 >
                     <component
@@ -140,25 +198,29 @@ const refresh = () => {
                     </template>
                     <Plus :size="18" />
                 </button>
-            </template>
-            <div
-                v-else-if="!isPending && search"
-                class="item empty-option"
-                @click="onCreate && handleFunctionCall(onCreate, search)"
-            >
-                <template v-if="onCreate">
+                <div
+                    v-if="showCreate"
+                    class="item empty-option"
+                    :class="{ active: activeIndex === filteredList.length }"
+                    @click="handleFunctionCall(onCreate, search)"
+                >
                     <Plus :size="18" />
                     <span>Create "{{ search }}"</span>
-                </template>
-                <template v-else-if="isPending">
-                    <Loader class="spinner" :size="18" />
-                </template>
-                <template v-else>
+                </div>
+                <div
+                    v-if="
+                        !isPending &&
+                        search &&
+                        !filteredList.length &&
+                        !onCreate
+                    "
+                    class="item empty-option"
+                >
                     <span class="no-hover-empty-option"
                         >{{ search }} does not exist</span
                     >
-                </template>
-            </div>
+                </div>
+            </template>
         </div>
     </div>
 </template>
@@ -170,6 +232,7 @@ const refresh = () => {
     flex: 1 1 auto;
     min-height: 0;
     gap: 1rem;
+    padding: 0.5rem;
     overflow: hidden;
 }
 
@@ -236,7 +299,8 @@ const refresh = () => {
     transition: background-color 0.2s ease-in-out;
 }
 
-.item:hover:not(:has(.no-hover-empty-option)) {
+.item:hover:not(:has(.no-hover-empty-option)),
+.item.active:not(:has(.no-hover-empty-option)) {
     background-color: rgb(82, 82, 82);
 }
 

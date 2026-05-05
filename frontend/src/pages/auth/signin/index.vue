@@ -29,7 +29,7 @@ const handleSubmit = async () => {
     isLoading.value = true;
 
     try {
-        if (!isLoginMode.value) {
+        if (isLoginMode.value) {
             await login(username.value, password.value);
             toast.push("Login successful!", "success");
             await router.push(redirectAfterSignIn());
