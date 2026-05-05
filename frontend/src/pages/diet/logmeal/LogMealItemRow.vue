@@ -146,7 +146,7 @@ function commitQtyEdit() {
                         <SimpleMacros
                             :calories="v.calories"
                             :protein="v.protein"
-                            :fiber="v.fiber"
+                            :fat="v.fat"
                             :carbs="v.carbs"
                             font-size="0.75rem"
                         />
@@ -227,7 +227,7 @@ function commitQtyEdit() {
             <SimpleMacros
                 :calories="item.amount * (item.food?.calories ?? 0)"
                 :protein="item.amount * (item.food?.protein ?? 0)"
-                :fiber="item.amount * (item.food?.fiber ?? 0)"
+                :fat="item.amount * (item.food?.fat ?? 0)"
                 :carbs="item.amount * (item.food?.carbs ?? 0)"
                 font-size="0.75rem"
             />

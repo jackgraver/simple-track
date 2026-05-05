@@ -20,18 +20,18 @@ import SimpleMacros from "~/shared/SimpleMacros.vue";
 function macroTotals(items: (MealItem | SavedMealItem)[] | undefined): {
     calories: number;
     protein: number;
-    fiber: number;
     carbs: number;
+    fat: number;
 } {
-    if (!items?.length) return { calories: 0, protein: 0, fiber: 0, carbs: 0 };
+    if (!items?.length) return { calories: 0, protein: 0, carbs: 0, fat: 0 };
     return items.reduce(
         (acc, i) => ({
             calories: acc.calories + (i.food?.calories ?? 0) * i.amount,
             protein: acc.protein + (i.food?.protein ?? 0) * i.amount,
-            fiber: acc.fiber + (i.food?.fiber ?? 0) * i.amount,
             carbs: acc.carbs + (i.food?.carbs ?? 0) * i.amount,
+            fat: acc.fat + (i.food?.fat ?? 0) * i.amount,
         }),
-        { calories: 0, protein: 0, fiber: 0, carbs: 0 },
+        { calories: 0, protein: 0, carbs: 0, fat: 0 },
     );
 }
 

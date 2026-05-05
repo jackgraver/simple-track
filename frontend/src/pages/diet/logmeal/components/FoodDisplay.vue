@@ -19,7 +19,7 @@ const isComposite = computed(() => props.item.entry_kind === "composite");
         <SimpleMacros
             :calories="item.calories"
             :protein="item.protein"
-            :fiber="item.fiber"
+            :fat="item.fat"
             :carbs="item.carbs"
         />
     </div>
