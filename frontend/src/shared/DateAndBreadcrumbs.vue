@@ -2,16 +2,19 @@
 import { ChevronLeftIcon, ChevronRightIcon } from "lucide-vue-next";
 import { computed, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import { formatDateLong } from "~/utils/dateUtil";
+import {
+    dateAtDietDayOffset,
+    dietDayOffsetFromLocalDate,
+    formatDateLong,
+    parseDietDayOffsetQuery,
+} from "~/utils/dateUtil";
 
 const route = useRoute();
 const router = useRouter();
 
-const dayOffset = computed(() => {
-    const raw = route.query.offset;
-    const value = typeof raw === "string" ? Number.parseInt(raw, 10) : 0;
-    return Number.isNaN(value) ? 0 : value;
-});
+const dayOffset = computed(() =>
+    parseDietDayOffsetQuery(route.query.offset),
+);
 
 const updateOffset = (nextOffset: number) => {
     const nextQuery = { ...route.query };
@@ -43,19 +46,9 @@ const goToToday = () => {
     if (!isToday.value) updateOffset(0);
 };
 
-/** Mirrors backend `utils.ZerodTime(offset)` (local calendar day minus offset). */
-const selectedCalendarDate = computed(() => {
-    const now = new Date();
-    return new Date(
-        now.getFullYear(),
-        now.getMonth(),
-        now.getDate() - dayOffset.value,
-        12,
-        0,
-        0,
-        0,
-    );
-});
+const selectedCalendarDate = computed(() =>
+    dateAtDietDayOffset(dayOffset.value),
+);
 
 const dateLabel = computed(() => {
     const d = selectedCalendarDate.value;
@@ -88,28 +81,9 @@ function onNativeDateChange(ev: Event) {
     const raw = (ev.target as HTMLInputElement).value;
     if (!raw) return;
     const parts = raw.split("-").map((s) => Number.parseInt(s, 10));
-    if (
-        parts.length !== 3 ||
-        parts.some((n) => Number.isNaN(n))
-    )
-        return;
+    if (parts.length !== 3 || parts.some((n) => Number.isNaN(n))) return;
     const [y, m0, dom] = parts;
-    const picked = new Date(y, m0 - 1, dom);
-    const now = new Date();
-    const todayMid = new Date(
-        now.getFullYear(),
-        now.getMonth(),
-        now.getDate(),
-    );
-    const pickedMid = new Date(
-        picked.getFullYear(),
-        picked.getMonth(),
-        picked.getDate(),
-    );
-    const nextOffset = Math.round(
-        (todayMid.getTime() - pickedMid.getTime()) / (24 * 60 * 60 * 1000),
-    );
-    updateOffset(nextOffset);
+    updateOffset(dietDayOffsetFromLocalDate(y, m0 - 1, dom));
 }
 </script>
 

@@ -3,14 +3,14 @@ import { computed } from "vue";
 import { useRoute } from "vue-router";
 import DietDayView from "./components/DietDayView.vue";
 import { CREATE_TYPE, LOG_TYPE } from "~/pages/diet/logmeal/logmealMode";
+import { parseDietDayOffsetQuery } from "~/utils/dateUtil";
 
 const route = useRoute();
 const isDietHome = computed(() => route.name === "diet");
 
-const dateOffset = computed(() => { 
-    const o = Number(route.query.offset);
-    return Number.isFinite(o) ? o : 0;
-});
+const dateOffset = computed(() =>
+    parseDietDayOffsetQuery(route.query.offset),
+);
 </script>
 
 <template>

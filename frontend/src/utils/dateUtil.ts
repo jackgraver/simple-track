@@ -81,3 +81,42 @@ export function ymdForDayOffset(offsetDays: number): string {
     const day = String(d.getDate()).padStart(2, "0");
     return `${y}-${m}-${day}`;
 }
+
+/** Matches backend `utils.ZerodTime(offset)`: local calendar day is today minus `offset` days (past → larger offset). */
+export function dateAtDietDayOffset(offsetDays: number): Date {
+    const now = new Date();
+    return new Date(
+        now.getFullYear(),
+        now.getMonth(),
+        now.getDate() - offsetDays,
+        12,
+        0,
+        0,
+        0,
+    );
+}
+
+/** Inverse of `dateAtDietDayOffset`: API offset from a local calendar date (`monthIndex` 0–11). */
+export function dietDayOffsetFromLocalDate(
+    year: number,
+    monthIndex: number,
+    day: number,
+): number {
+    const now = new Date();
+    const todayMid = new Date(
+        now.getFullYear(),
+        now.getMonth(),
+        now.getDate(),
+    );
+    const pickedMid = new Date(year, monthIndex, day);
+    return Math.round(
+        (todayMid.getTime() - pickedMid.getTime()) / (24 * 60 * 60 * 1000),
+    );
+}
+
+export function parseDietDayOffsetQuery(raw: unknown): number {
+    const s = Array.isArray(raw) ? raw[0] : raw;
+    if (typeof s !== "string") return 0;
+    const v = Number.parseInt(s, 10);
+    return Number.isNaN(v) ? 0 : v;
+}
