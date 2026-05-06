@@ -90,7 +90,10 @@ export function useLogEditedMeal() {
     const router = useRouter();
 
     return useMutation({
-        mutationFn: (meal: Meal) => logEditedMeal(meal),
+        mutationFn: (vars: { meal: Meal; plannedSourceMealId?: number }) =>
+            logEditedMeal(vars.meal, {
+                plannedSourceMealId: vars.plannedSourceMealId,
+            }),
         onSuccess: () => {
             invalidateDietQueries(queryClient);
             afterMealLogNavigate(router);

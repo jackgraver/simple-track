@@ -179,12 +179,21 @@ export async function createMeal(
     return response.data;
 }
 
-export async function logEditedMeal(meal: Meal): Promise<LogMealResponse> {
+export async function logEditedMeal(
+    meal: Meal,
+    options?: { plannedSourceMealId?: number },
+): Promise<LogMealResponse> {
+    const body: {
+        meal: Meal;
+        planned_source_meal_id?: number;
+    } = { meal };
+    const pid = options?.plannedSourceMealId;
+    if (pid != null && pid > 0) {
+        body.planned_source_meal_id = pid;
+    }
     const response = await apiClient.post<LogMealResponse>(
         "/diet/meals/meal/logedited",
-        {
-            meal,
-        },
+        body,
     );
     return response.data;
 }

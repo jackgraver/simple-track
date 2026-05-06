@@ -510,8 +510,15 @@ const saveSavedMealTemplate = async () => {
 
 const logEditedMeal = async () => {
     const mealToLog = { ...meal.value, ID: 0 };
+    const plannedSourceMealId =
+        editVariant.value === EDIT_VARIANT.planned && id.value !== 0
+            ? id.value
+            : undefined;
     try {
-        await logEditedMealMutation.mutateAsync(mealToLog);
+        await logEditedMealMutation.mutateAsync({
+            meal: mealToLog,
+            plannedSourceMealId,
+        });
         toast.push("Meal Logged Successfully!", "success");
     } catch (error: any) {
         toast.push("Log Edited Failed! " + (error.message || ""), "error");

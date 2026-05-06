@@ -336,8 +336,9 @@ func (h *MealHandler) postLogPlanned(c *gin.Context) {
 }
 
 type EditLoggedMealRequest struct {
-	Meal      models.Meal `json:"meal"`
-	OldMealID uint        `json:"oldMealID"`
+	Meal                 models.Meal `json:"meal"`
+	OldMealID            uint        `json:"oldMealID"`
+	PlannedSourceMealID  uint        `json:"planned_source_meal_id"`
 }
 
 func (h *MealHandler) postLogEdited(c *gin.Context) {
@@ -368,6 +369,13 @@ func (h *MealHandler) postLogEdited(c *gin.Context) {
 	}); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
+	}
+
+	if req.PlannedSourceMealID != 0 {
+		if err := services.SetPlannedMealLogged(h.db, day.ID, req.PlannedSourceMealID); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
 	}
 
 	day, err = services.MealPlanDayByID(h.db, int(day.ID))
