@@ -46,7 +46,6 @@ function macroTotals(
             protein: acc.protein + (i.food?.protein ?? 0) * i.amount,
             carbs: acc.carbs + (i.food?.carbs ?? 0) * i.amount,
             fat: acc.fat + (i.food?.fat ?? 0) * i.amount,
-            fat: acc.fat + (i.food?.fat ?? 0) * i.amount,
         }),
         { ...ZERO_MACROS },
     );

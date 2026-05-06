@@ -9,8 +9,13 @@ import {
     ChevronDown,
 } from "lucide-vue-next";
 import SimpleMacros from "~/shared/SimpleMacros.vue";
+import MealCardMacroDetails from "./MealCardMacroDetails.vue";
 import { computed, ref } from "vue";
-import { blockMacros, mealItemsToDisplayBlocks } from "~/utils/mealItemGroups";
+import {
+    blockMacros,
+    mealItemsToDisplayBlocks,
+    type MealItemWithIndex,
+} from "~/utils/mealItemGroups";
 
 function formatNum(n: number) {
     const s = n.toFixed(2);
@@ -66,6 +71,16 @@ function pluralize(name: string | undefined, amount: number): string {
     if (!name) return "";
     return amount > 1 && name.charAt(name.length - 1) !== "s" ? "s" : "";
 }
+
+function groupMacroTotals(rows: MealItemWithIndex[]) {
+    const m = blockMacros(rows);
+    return {
+        calories: m.calories,
+        protein: m.protein,
+        carbs: m.carbs,
+        fat: m.fat,
+    };
+}
 </script>
 
 <template>
@@ -109,34 +124,13 @@ function pluralize(name: string | undefined, amount: number): string {
                                         )
                                     }}</span
                                 >
-                                <span class="details">
-                                    <span class="cal"
-                                        >{{
-                                            formatNum(
-                                                (food.food?.calories ?? 0) *
-                                                    Number(food.amount),
-                                            )
-                                        }}C</span
-                                    >
-                                    /
-                                    <span class="pro"
-                                        >{{
-                                            formatNum(
-                                                (food.food?.protein ?? 0) *
-                                                    Number(food.amount),
-                                            )
-                                        }}P</span
-                                    >
-                                    /
-                                    <span class="fib"
-                                        >{{
-                                            formatNum(
-                                                (food.food?.fiber ?? 0) *
-                                                    Number(food.amount),
-                                            )
-                                        }}F</span
-                                    >
-                                </span>
+                                <MealCardMacroDetails
+                                    :calories="food.food?.calories ?? 0"
+                                    :protein="food.food?.protein ?? 0"
+                                    :carbs="food.food?.carbs ?? 0"
+                                    :fat="food.food?.fat ?? 0"
+                                    :amount="Number(food.amount)"
+                                />
                             </span>
                         </template>
                         <template v-else>
@@ -159,34 +153,12 @@ function pluralize(name: string | undefined, amount: number): string {
                                     <span class="group-title">{{
                                         block.label || "Group"
                                     }}</span>
-                                    <span class="details group-roll">
-                                        <span class="cal"
-                                            >{{
-                                                formatNum(
-                                                    blockMacros(block.rows)
-                                                        .calories,
-                                                )
-                                            }}C</span
-                                        >
-                                        /
-                                        <span class="pro"
-                                            >{{
-                                                formatNum(
-                                                    blockMacros(block.rows)
-                                                        .protein,
-                                                )
-                                            }}P</span
-                                        >
-                                        /
-                                        <span class="fib"
-                                            >{{
-                                                formatNum(
-                                                    blockMacros(block.rows)
-                                                        .fiber,
-                                                )
-                                            }}F</span
-                                        >
-                                    </span>
+                                    <MealCardMacroDetails
+                                        class="group-header-macros"
+                                        v-bind="groupMacroTotals(block.rows)"
+                                        :amount="1"
+                                        font-size="0.85rem"
+                                    />
                                 </button>
                                 <div
                                     v-if="isGroupExpanded(block.groupId)"
@@ -201,7 +173,7 @@ function pluralize(name: string | undefined, amount: number): string {
                                         class="food food-child"
                                     >
                                         <span
-                                            >({{
+                                            >{{
                                                 formatNum(
                                                     itemServingAmount(food),
                                                 )
@@ -209,44 +181,21 @@ function pluralize(name: string | undefined, amount: number): string {
                                                 food.food?.serving_type === "g"
                                                     ? "g"
                                                     : ""
-                                            }}) {{ food.food?.name
+                                            }}
+                                            {{ food.food?.name
                                             }}{{
                                                 Number(food.amount) > 1
                                                     ? "s"
                                                     : ""
                                             }}</span
                                         >
-                                        <span class="details">
-                                            <span class="cal"
-                                                >{{
-                                                    formatNum(
-                                                        (food.food?.calories ??
-                                                            0) *
-                                                            Number(food.amount),
-                                                    )
-                                                }}C</span
-                                            >
-                                            /
-                                            <span class="pro"
-                                                >{{
-                                                    formatNum(
-                                                        (food.food?.protein ??
-                                                            0) *
-                                                            Number(food.amount),
-                                                    )
-                                                }}P</span
-                                            >
-                                            /
-                                            <span class="fib"
-                                                >{{
-                                                    formatNum(
-                                                        (food.food?.fiber ??
-                                                            0) *
-                                                            Number(food.amount),
-                                                    )
-                                                }}F</span
-                                            >
-                                        </span>
+                                        <MealCardMacroDetails
+                                            :calories="food.food?.calories ?? 0"
+                                            :protein="food.food?.protein ?? 0"
+                                            :carbs="food.food?.carbs ?? 0"
+                                            :fat="food.food?.fat ?? 0"
+                                            :amount="Number(food.amount)"
+                                        />
                                     </span>
                                 </div>
                             </div>
@@ -323,6 +272,13 @@ function pluralize(name: string | undefined, amount: number): string {
     gap: 0.25rem;
 }
 
+.food {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.25rem 0.5rem;
+}
+
 .food-group {
     display: flex;
     flex-direction: column;
@@ -354,6 +310,11 @@ function pluralize(name: string | undefined, amount: number): string {
     color: #ccc;
 }
 
+.group-header-macros :deep(.macros) {
+    margin-top: 0;
+    gap: 0.45rem;
+}
+
 .group-children {
     display: flex;
     flex-direction: column;
@@ -367,35 +328,11 @@ function pluralize(name: string | undefined, amount: number): string {
     font-size: 0.92em;
 }
 
-.group-roll {
-    margin-left: auto;
-}
-
 .right {
     display: flex;
     flex-direction: column;
     justify-content: flex-end;
     align-items: flex-end;
-}
-
-.food .details {
-    opacity: 0;
-    visibility: hidden;
-    margin-left: 0.25rem;
-    transition: visibility 0.3s ease;
-    transition-delay: 0.5s;
-}
-
-.meal h3:hover ~ .food .details {
-    opacity: 1;
-    visibility: visible;
-    transition-delay: 0s;
-}
-
-.food:hover .details {
-    opacity: 1;
-    visibility: visible;
-    transition-delay: 0s;
 }
 
 .meal span {
@@ -406,14 +343,11 @@ function pluralize(name: string | undefined, amount: number): string {
     transition-delay: 0s;
 }
 
-.details .cal {
-    color: orange;
-}
-.details .pro {
-    color: #60a5fa;
-}
-.details .fib {
-    color: green;
+.meal-title:hover ~ .meal :deep(.meal-card-macro-details),
+.food:hover :deep(.meal-card-macro-details) {
+    opacity: 1;
+    visibility: visible;
+    transition-delay: 0s;
 }
 
 .actions {

@@ -41,6 +41,7 @@ export function blockMacros(rows: MealItemWithIndex[]): {
     protein: number;
     fiber: number;
     carbs: number;
+    fat: number;
 } {
     return rows.reduce(
         (acc, { item }) => {
@@ -50,8 +51,9 @@ export function blockMacros(rows: MealItemWithIndex[]): {
                 protein: acc.protein + (item.food?.protein ?? 0) * a,
                 fiber: acc.fiber + (item.food?.fiber ?? 0) * a,
                 carbs: acc.carbs + (item.food?.carbs ?? 0) * a,
+                fat: acc.fat + (item.food?.fat ?? 0) * a,
             };
         },
-        { calories: 0, protein: 0, fiber: 0, carbs: 0 },
+        { calories: 0, protein: 0, fiber: 0, carbs: 0, fat: 0 },
     );
 }
