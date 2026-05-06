@@ -11,13 +11,23 @@ const { getUsername } = useAuth();
         <Breadcrumbs class="min-w-0" />
         <div class="flex items-center gap-2 pt-2">
             <router-link
-                :to="{ name: 'gym' }"
+                :to="{
+                    name: 'gym',
+                    query: $route.query.offset
+                        ? { offset: $route.query.offset }
+                        : undefined,
+                }"
                 class="hover:bg-secondBg rounded-md p-2 text-sm"
                 active-class="underline underline-offset-4"
                 >Gym</router-link
             >
             <router-link
-                :to="{ name: 'diet' }"
+                :to="{
+                    name: 'diet',
+                    query: $route.query.offset
+                        ? { offset: $route.query.offset }
+                        : undefined,
+                }"
                 class="hover:bg-secondBg rounded-md p-2 text-sm"
                 active-class="underline underline-offset-4"
                 >Diet</router-link

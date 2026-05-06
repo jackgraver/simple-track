@@ -14,9 +14,7 @@ const { data, logPlannedMeal, logMeal, deleteLoggedMeal, editLogMeal } =
     <div class="flex min-w-0 flex-1 flex-col gap-2 pt-2">
         <h2 class="mb-0 text-lg font-semibold">Logged</h2>
         <template v-if="data">
-            <span
-                v-if="data.day.loggedMeals.length === 0"
-                class="text-zinc-500"
+            <span v-if="data.day.loggedMeals.length === 0" class="text-zinc-500"
                 >Nothing logged yet.</span
             >
             <MealCard

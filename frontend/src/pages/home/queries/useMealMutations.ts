@@ -10,43 +10,46 @@ import { homeKeys } from './keys';
 import type { Meal } from '~/types/diet';
 import { toValue, type MaybeRefOrGetter } from 'vue';
 
-export function useLogPlannedMeal(offset: number) {
+export function useLogPlannedMeal(offset: MaybeRefOrGetter<number>) {
     const queryClient = useQueryClient();
 
     return useMutation({
         mutationFn: (mealId: number) => logPlannedMeal(mealId),
-        onSuccess: () => {
-            queryClient.invalidateQueries({
-                queryKey: homeKeys.diet.today(offset)
-            });
+        onSuccess: (day) => {
+            queryClient.setQueryData(
+                homeKeys.diet.today(toValue(offset)),
+                day,
+            );
         },
     });
 }
 
-export function useDeleteLoggedMeal(offset: number) {
+export function useDeleteLoggedMeal(offset: MaybeRefOrGetter<number>) {
     const queryClient = useQueryClient();
 
     return useMutation({
         mutationFn: ({ mealId, dayId }: { mealId: number; dayId: number }) =>
             deleteLoggedMeal(mealId, dayId),
-        onSuccess: () => {
-            queryClient.invalidateQueries({
-                queryKey: homeKeys.diet.today(offset)
-            });
+        onSuccess: (day) => {
+            queryClient.setQueryData(
+                homeKeys.diet.today(toValue(offset)),
+                day,
+            );
         },
     });
 }
 
-export function useEditLoggedMeal(offset: number) {
+export function useEditLoggedMeal(offset: MaybeRefOrGetter<number>) {
     const queryClient = useQueryClient();
 
     return useMutation({
         mutationFn: ({ meal, oldMealId }: { meal: Meal; oldMealId: number }) =>
             editLoggedMeal(meal, oldMealId),
-        onSuccess: () => {
-            queryClient.invalidateQueries({
-                queryKey: homeKeys.diet.today(offset)
-            });
+        onSuccess: (day) => {
+            queryClient.setQueryData(
+                homeKeys.diet.today(toValue(offset)),
+                day,
+            );
         },
     });
 }

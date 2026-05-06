@@ -145,9 +145,9 @@ button {
     cursor: pointer;
 }
 
-button:disabled {
+/* button:disabled {
     background: #ccc;
-}
+} */
 
 button:disabled:hover {
     cursor: not-allowed;

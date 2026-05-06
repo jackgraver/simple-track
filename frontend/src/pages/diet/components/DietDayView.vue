@@ -63,14 +63,6 @@ const waterPlannedDisplay = computed(
     () => formatVolumeFromOz(goalOz.value).value,
 );
 const waterUnitSuffix = computed(() => ` ${displayUnit.value}`);
-
-async function openLogWater() {
-    await dialogManager.custom<boolean>({
-        title: "Log water",
-        component: LogWaterDialog,
-        componentProps: { dateStr: dateStr.value },
-    });
-}
 </script>
 
 <template>
@@ -114,9 +106,7 @@ async function openLogWater() {
                     class="box-border flex flex-col gap-1.5 px-0.5 pt-1"
                 >
                     <div v-if="waterError" class="text-xs text-red-400">
-                        {{
-                            waterQueryError?.message ?? "Failed to load water"
-                        }}
+                        {{ waterQueryError?.message ?? "Failed to load water" }}
                     </div>
                     <p
                         v-else-if="waterPending"
@@ -136,19 +126,10 @@ async function openLogWater() {
                             type="fiber"
                             class="min-w-0 flex-1"
                             :total="
-                                getTotalNumber(
-                                    pending,
-                                    error,
-                                    data?.totalFiber,
-                                )
+                                getTotalNumber(pending, error, data?.totalFiber)
                             "
                             :planned="
-                                planNum(
-                                    pending,
-                                    error,
-                                    data?.day.plan,
-                                    'fiber',
-                                )
+                                planNum(pending, error, data?.day.plan, 'fiber')
                             "
                         />
                     </div>

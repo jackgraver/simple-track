@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ChevronDown, ChevronUp, Pencil } from "lucide-vue-next";
 import { useRouter } from "vue-router";
-import { computed, ref } from "vue";
+import { computed, ref, watch } from "vue";
 import MealCard from "./MealCard.vue";
 import { useDietDayMealHandlers } from "./useDietDayMealHandlers";
 
@@ -22,6 +22,14 @@ const editPlannedMeal = () => {
 };
 
 const start = ref(0);
+
+watch(
+    () => data.value?.day.plannedMeals.length ?? 0,
+    (len) => {
+        const maxStart = Math.max(0, len - 2);
+        if (start.value > maxStart) start.value = maxStart;
+    },
+);
 
 const visibleItems = computed(() =>
     data.value?.day.plannedMeals.slice(start.value, start.value + 2),
@@ -53,10 +61,22 @@ function prev() {
                 </button>
             </div>
             <template v-if="data && data.day.plannedMeals.length > 2">
-                <button type="button" aria-label="Previous" @click="prev">
+                <button
+                    type="button"
+                    :disabled="start === 0"
+                    class="disabled:text-zinc-500"
+                    aria-label="Previous"
+                    @click="prev"
+                >
                     <ChevronUp />
                 </button>
-                <button type="button" aria-label="Next" @click="next">
+                <button
+                    type="button"
+                    :disabled="start === data.day.plannedMeals.length - 2"
+                    class="disabled:text-zinc-500"
+                    aria-label="Next"
+                    @click="next"
+                >
                     <ChevronDown />
                 </button>
             </template>

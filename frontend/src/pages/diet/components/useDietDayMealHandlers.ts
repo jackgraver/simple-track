@@ -19,9 +19,9 @@ export function useDietDayMealHandlers(getOffset: () => number) {
     const router = useRouter();
     const { data } = useDietLogsToday(getOffset);
 
-    const logPlannedMealMutation = useLogPlannedMeal(getOffset());
-    const deleteLoggedMealMutation = useDeleteLoggedMeal(getOffset());
-    const editLoggedMealMutation = useEditLoggedMeal(getOffset());
+    const logPlannedMealMutation = useLogPlannedMeal(getOffset);
+    const deleteLoggedMealMutation = useDeleteLoggedMeal(getOffset);
+    const editLoggedMealMutation = useEditLoggedMeal(getOffset);
 
     const logPlannedMeal = async (meal: Meal) => {
         try {
