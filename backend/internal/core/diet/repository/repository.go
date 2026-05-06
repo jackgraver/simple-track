@@ -291,6 +291,7 @@ func (r *Repository) defaultPlanID() (uint, error) {
 			Protein:  150,
 			Fiber:    30,
 			Carbs:    200,
+			Fat:      65,
 		}
 		if err := r.db.Create(&p).Error; err != nil {
 			return 0, err
@@ -385,19 +386,24 @@ func (r *Repository) DayByIDGeneric(ctx context.Context, id uint) (models.DietDa
 	return repo.GetByID(ctx, id, dbrepo.WithDefaultPreloads())
 }
 
-func (r *Repository) CalculateTotals(dayID uint) (float32, float32, float32, float32) {
-	var totals struct {
-		TotalCalories float32 `json:"total_calories"`
-		TotalProtein  float32 `json:"total_protein"`
-		TotalFiber    float32 `json:"total_fiber"`
-		TotalCarbs    float32 `json:"total_carbs"`
-	}
+// MealDayTotals aggregates logged macros for one diet day from day_logs.
+type MealDayTotals struct {
+	Calories float32
+	Protein  float32
+	Fiber    float32
+	Carbs    float32
+	Fat      float32
+}
+
+func (r *Repository) CalculateTotals(dayID uint) MealDayTotals {
+	var totals MealDayTotals
 	r.db.Raw(`
         SELECT
-            SUM(f.calories * mi.amount) AS total_calories,
-            SUM(f.protein  * mi.amount) AS total_protein,
-            SUM(f.fiber    * mi.amount) AS total_fiber,
-            SUM(f.carbs    * mi.amount) AS total_carbs
+            SUM(f.calories * mi.amount) AS calories,
+            SUM(f.protein  * mi.amount) AS protein,
+            SUM(f.fiber    * mi.amount) AS fiber,
+            SUM(f.carbs    * mi.amount) AS carbs,
+            SUM(COALESCE(f.fat, 0) * mi.amount) AS fat
         FROM day_logs dl
         JOIN meals m       ON dl.meal_id = m.id
         JOIN meal_items mi ON mi.meal_id = m.id
@@ -405,7 +411,7 @@ func (r *Repository) CalculateTotals(dayID uint) (float32, float32, float32, flo
         WHERE dl.day_id = ?
         AND dl.deleted_at IS NULL
     `, dayID).Scan(&totals)
-	return totals.TotalCalories, totals.TotalProtein, totals.TotalFiber, totals.TotalCarbs
+	return totals
 }
 
 func (r *Repository) AllMealDays() ([]models.DietDay, error) {

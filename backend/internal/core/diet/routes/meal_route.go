@@ -74,21 +74,23 @@ type compositeFoodWithMacros struct {
 	Protein   float32                    `json:"protein"`
 	Fiber     float32                    `json:"fiber"`
 	Carbs     float32                    `json:"carbs"`
+	Fat       float32                    `json:"fat"`
 }
 
-func sumCompositeMacros(cf models.CompositeFood) (cal, pro, fib, carb float32) {
+func sumCompositeMacros(cf models.CompositeFood) (cal, pro, fib, carb, fat float32) {
 	for _, it := range cf.Items {
 		a := it.Amount
 		cal += it.Food.Calories * a
 		pro += it.Food.Protein * a
 		fib += it.Food.Fiber * a
 		carb += it.Food.Carbs * a
+		fat += it.Food.Fat * a
 	}
-	return cal, pro, fib, carb
+	return cal, pro, fib, carb, fat
 }
 
 func compositeToResponse(cf models.CompositeFood) compositeFoodWithMacros {
-	cal, pro, fib, carb := sumCompositeMacros(cf)
+	cal, pro, fib, carb, fat := sumCompositeMacros(cf)
 	return compositeFoodWithMacros{
 		ID:        cf.ID,
 		CreatedAt: cf.CreatedAt,
@@ -100,6 +102,7 @@ func compositeToResponse(cf models.CompositeFood) compositeFoodWithMacros {
 		Protein:   pro,
 		Fiber:     fib,
 		Carbs:     carb,
+		Fat:       fat,
 	}
 }
 
@@ -321,13 +324,14 @@ func (h *MealHandler) postLogPlanned(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	totalCalories, totalProtein, totalFiber, totalCarbs := services.CalculateTotals(h.db, day.ID)
+	tot := services.CalculateTotals(h.db, day.ID)
 	c.JSON(http.StatusOK, gin.H{
 		"day":           day,
-		"totalCalories": totalCalories,
-		"totalProtein":  totalProtein,
-		"totalFiber":    totalFiber,
-		"totalCarbs":    totalCarbs,
+		"totalCalories": tot.Calories,
+		"totalProtein":  tot.Protein,
+		"totalFiber":    tot.Fiber,
+		"totalCarbs":    tot.Carbs,
+		"totalFat":      tot.Fat,
 	})
 }
 
@@ -371,13 +375,14 @@ func (h *MealHandler) postLogEdited(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	totalCalories, totalProtein, totalFiber, totalCarbs := services.CalculateTotals(h.db, day.ID)
+	tot := services.CalculateTotals(h.db, day.ID)
 	c.JSON(http.StatusOK, gin.H{
 		"day":           day,
-		"totalCalories": totalCalories,
-		"totalProtein":  totalProtein,
-		"totalFiber":    totalFiber,
-		"totalCarbs":    totalCarbs,
+		"totalCalories": tot.Calories,
+		"totalProtein":  tot.Protein,
+		"totalFiber":    tot.Fiber,
+		"totalCarbs":    tot.Carbs,
+		"totalFat":      tot.Fat,
 	})
 }
 
@@ -416,13 +421,14 @@ func (h *MealHandler) postEditLogged(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	totalCalories, totalProtein, totalFiber, totalCarbs := services.CalculateTotals(h.db, day.ID)
+	tot := services.CalculateTotals(h.db, day.ID)
 	c.JSON(http.StatusOK, gin.H{
 		"day":           day,
-		"totalCalories": totalCalories,
-		"totalProtein":  totalProtein,
-		"totalFiber":    totalFiber,
-		"totalCarbs":    totalCarbs,
+		"totalCalories": tot.Calories,
+		"totalProtein":  tot.Protein,
+		"totalFiber":    tot.Fiber,
+		"totalCarbs":    tot.Carbs,
+		"totalFat":      tot.Fat,
 	})
 }
 
@@ -454,13 +460,14 @@ func (h *MealHandler) deleteLoggedMeal(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	totalCalories, totalProtein, totalFiber, totalCarbs := services.CalculateTotals(h.db, day.ID)
+	tot := services.CalculateTotals(h.db, day.ID)
 	c.JSON(http.StatusOK, gin.H{
 		"day":           day,
-		"totalCalories": totalCalories,
-		"totalProtein":  totalProtein,
-		"totalFiber":    totalFiber,
-		"totalCarbs":    totalCarbs,
+		"totalCalories": tot.Calories,
+		"totalProtein":  tot.Protein,
+		"totalFiber":    tot.Fiber,
+		"totalCarbs":    tot.Carbs,
+		"totalFat":      tot.Fat,
 	})
 }
 
@@ -493,13 +500,14 @@ func (h *MealHandler) postPlannedFromSaved(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	totalCalories, totalProtein, totalFiber, totalCarbs := services.CalculateTotals(h.db, day.ID)
+	tot := services.CalculateTotals(h.db, day.ID)
 	c.JSON(http.StatusOK, gin.H{
 		"day":           day,
-		"totalCalories": totalCalories,
-		"totalProtein":  totalProtein,
-		"totalFiber":    totalFiber,
-		"totalCarbs":    totalCarbs,
+		"totalCalories": tot.Calories,
+		"totalProtein":  tot.Protein,
+		"totalFiber":    tot.Fiber,
+		"totalCarbs":    tot.Carbs,
+		"totalFat":      tot.Fat,
 	})
 }
 
@@ -532,12 +540,13 @@ func (h *MealHandler) deletePlannedMeal(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	totalCalories, totalProtein, totalFiber, totalCarbs := services.CalculateTotals(h.db, day.ID)
+	tot := services.CalculateTotals(h.db, day.ID)
 	c.JSON(http.StatusOK, gin.H{
 		"day":           day,
-		"totalCalories": totalCalories,
-		"totalProtein":  totalProtein,
-		"totalFiber":    totalFiber,
-		"totalCarbs":    totalCarbs,
+		"totalCalories": tot.Calories,
+		"totalProtein":  tot.Protein,
+		"totalFiber":    tot.Fiber,
+		"totalCarbs":    tot.Carbs,
+		"totalFat":      tot.Fat,
 	})
 }

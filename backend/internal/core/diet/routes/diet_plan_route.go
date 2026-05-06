@@ -61,6 +61,7 @@ type updatePlanMacrosRequest struct {
 	Protein  float32 `json:"protein"`
 	Fiber    float32 `json:"fiber"`
 	Carbs    float32 `json:"carbs"`
+	Fat      float32 `json:"fat"`
 }
 
 func (h *DietPlanHandler) putPlanMacros(c *gin.Context) {
@@ -75,7 +76,7 @@ func (h *DietPlanHandler) putPlanMacros(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	if req.Calories < 0 || req.Protein < 0 || req.Fiber < 0 || req.Carbs < 0 {
+	if req.Calories < 0 || req.Protein < 0 || req.Fiber < 0 || req.Carbs < 0 || req.Fat < 0 {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "macro targets must be non-negative"})
 		return
 	}
@@ -92,11 +93,13 @@ func (h *DietPlanHandler) putPlanMacros(c *gin.Context) {
 	plan.Protein = req.Protein
 	plan.Fiber = req.Fiber
 	plan.Carbs = req.Carbs
+	plan.Fat = req.Fat
 	if err := h.db.Model(&plan).Updates(map[string]any{
 		"calories": req.Calories,
 		"protein":  req.Protein,
 		"fiber":    req.Fiber,
 		"carbs":    req.Carbs,
+		"fat":      req.Fat,
 	}).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

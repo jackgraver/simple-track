@@ -43,9 +43,11 @@ type MealMacroTotals = {
     protein: number;
     fiber: number;
     carbs: number;
+    fat: number;
 };
 
 function macrosForMeal(m: Meal): MealMacroTotals {
+    console.log(m.items);
     return {
         calories: formatNum(
             m.items.reduce(
@@ -72,6 +74,13 @@ function macrosForMeal(m: Meal): MealMacroTotals {
             m.items.reduce(
                 (total, item) =>
                     total + Number(item.amount) * (item.food?.carbs ?? 0),
+                0,
+            ),
+        ),
+        fat: formatNum(
+            m.items.reduce(
+                (total, item) =>
+                    total + Number(item.amount) * (item.food?.fat ?? 0),
                 0,
             ),
         ),
@@ -198,14 +207,7 @@ const removeGroupLines = (indices: number[]) => {
 };
 
 const route = useRoute();
-const backTo = computed(() =>
-    route.name === "diet-log"
-        ? { name: "diet" as const }
-        : { name: "home" as const },
-);
-const backLabel = computed(() =>
-    route.name === "diet-log" ? "← Diet" : "← Home",
-);
+
 const queryType = computed(() => {
     const t = route.query.type;
     return Array.isArray(t) ? t[0] : t;
@@ -299,6 +301,8 @@ const macroBarsDayTotals = computed(() => {
     const dayProtein = t?.totalProtein ?? 0;
     const dayFiber = t?.totalFiber ?? 0;
     const dayCarbs = t?.totalCarbs ?? 0;
+    const dayFat = t?.totalFat ?? 0;
+    console.log(t);
 
     if (
         pageMode.value === PAGE_MODE.edit &&
@@ -311,6 +315,7 @@ const macroBarsDayTotals = computed(() => {
             totalProtein: dayProtein - b.protein + tm.protein,
             totalFiber: dayFiber - b.fiber + tm.fiber,
             totalCarbs: dayCarbs - b.carbs + tm.carbs,
+            totalFat: dayFat - b.fat + tm.fat,
         };
     }
     return {
@@ -318,6 +323,7 @@ const macroBarsDayTotals = computed(() => {
         totalProtein: dayProtein + tm.protein,
         totalFiber: dayFiber + tm.fiber,
         totalCarbs: dayCarbs + tm.carbs,
+        totalFat: dayFat + tm.fat,
     };
 });
 
@@ -529,11 +535,6 @@ const updateLoggedMeal = async () => {
 
 <template>
     <div class="flex flex-col items-center py-4">
-        <router-link
-            :to="backTo"
-            class="mb-2 w-[80%] max-w-[80%] text-left text-sm text-textSecondary hover:text-textPrimary"
-            >{{ backLabel }}</router-link
-        >
         <div
             v-if="editMissingId"
             class="flex h-[60dvh] items-center justify-center p-8 text-cfRed"
@@ -568,7 +569,7 @@ const updateLoggedMeal = async () => {
                         <SimpleMacros
                             :calories="totalMacros.calories"
                             :protein="totalMacros.protein"
-                            :fiber="totalMacros.fiber"
+                            :fat="totalMacros.fat"
                             :carbs="totalMacros.carbs"
                         />
                     </div>
@@ -720,11 +721,11 @@ const updateLoggedMeal = async () => {
                         v-if="pageMode !== PAGE_MODE.create"
                         :totalCalories="macroBarsDayTotals.totalCalories"
                         :totalProtein="macroBarsDayTotals.totalProtein"
-                        :totalFiber="macroBarsDayTotals.totalFiber"
+                        :totalFat="macroBarsDayTotals.totalFat"
                         :totalCarbs="macroBarsDayTotals.totalCarbs"
                         :planned-calories="today?.day.plan.calories ?? 0"
                         :planned-protein="today?.day.plan.protein ?? 0"
-                        :planned-fiber="today?.day.plan.fiber ?? 0"
+                        :planned-fat="today?.day.plan.fat ?? 0"
                         :planned-carbs="today?.day.plan.carbs ?? 0"
                     />
                 </footer>
