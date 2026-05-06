@@ -27,11 +27,12 @@ type MacroSummary = {
     calories: number;
     protein: number;
     carbs: number;
+    fat: number;
 };
 const ZERO_MACROS: MacroSummary = {
     calories: 0,
     protein: 0,
-    fiber: 0,
+    fat: 0,
     carbs: 0,
 };
 
