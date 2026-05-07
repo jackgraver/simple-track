@@ -109,7 +109,7 @@ function groupMacroTotals(rows: MealItemWithIndex[]) {
                                 :key="'u-' + i"
                                 class="food"
                             >
-                                <span
+                                <span class="food-line-label"
                                     >{{ formatNum(itemServingAmount(food))
                                     }}{{
                                         food.food?.serving_type === "g"
@@ -125,6 +125,7 @@ function groupMacroTotals(rows: MealItemWithIndex[]) {
                                     }}</span
                                 >
                                 <MealCardMacroDetails
+                                    class="macro-keep-size"
                                     :calories="food.food?.calories ?? 0"
                                     :protein="food.food?.protein ?? 0"
                                     :carbs="food.food?.carbs ?? 0"
@@ -150,14 +151,13 @@ function groupMacroTotals(rows: MealItemWithIndex[]) {
                                         :size="16"
                                         class="chev"
                                     />
-                                    <span class="group-title">{{
+                                    <span class="group-title food-line-label">{{
                                         block.label || "Group"
                                     }}</span>
                                     <MealCardMacroDetails
-                                        class="group-header-macros"
+                                        class="group-header-macros macro-keep-size"
                                         v-bind="groupMacroTotals(block.rows)"
                                         :amount="1"
-                                        font-size="0.85rem"
                                     />
                                 </button>
                                 <div
@@ -172,7 +172,7 @@ function groupMacroTotals(rows: MealItemWithIndex[]) {
                                         :key="'g-' + i"
                                         class="food food-child"
                                     >
-                                        <span
+                                        <span class="food-line-label"
                                             >{{
                                                 formatNum(
                                                     itemServingAmount(food),
@@ -190,6 +190,7 @@ function groupMacroTotals(rows: MealItemWithIndex[]) {
                                             }}</span
                                         >
                                         <MealCardMacroDetails
+                                            class="macro-keep-size"
                                             :calories="food.food?.calories ?? 0"
                                             :protein="food.food?.protein ?? 0"
                                             :carbs="food.food?.carbs ?? 0"
@@ -264,6 +265,7 @@ function groupMacroTotals(rows: MealItemWithIndex[]) {
     flex: 1;
     display: flex;
     flex-direction: column;
+    min-width: 0;
 }
 
 .foods {
@@ -274,9 +276,26 @@ function groupMacroTotals(rows: MealItemWithIndex[]) {
 
 .food {
     display: flex;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     align-items: baseline;
     gap: 0.25rem 0.5rem;
+    min-width: 0;
+}
+.food-line-label {
+    flex: 0 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.macro-keep-size {
+    flex-shrink: 0;
+}
+.macro-keep-size :deep(.macros) {
+    gap: clamp(0.25rem, 1.5vw, 0.45rem);
+}
+.macro-keep-size :deep(.macro) {
+    font-size: clamp(0.62rem, 2.5vw, 0.85rem);
 }
 
 .food-group {
@@ -287,10 +306,11 @@ function groupMacroTotals(rows: MealItemWithIndex[]) {
 
 .group-header {
     display: flex;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     align-items: center;
     gap: 0.25rem 0.5rem;
     width: 100%;
+    min-width: 0;
     margin: 0;
     padding: 0;
     cursor: pointer;

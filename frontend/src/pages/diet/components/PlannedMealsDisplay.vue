@@ -50,7 +50,9 @@ function prev() {
     <div class="flex min-w-0 flex-1 flex-col gap-2 pt-2">
         <div class="flex flex-row items-center justify-between gap-2">
             <div class="flex w-full items-center gap-2">
-                <h2 class="mb-0 flex-1 text-lg font-semibold">Planned</h2>
+                <h2 class="mb-0 flex-1 text-lg font-semibold">
+                    Planned ({{ data?.day.plannedMeals.length }})
+                </h2>
                 <button
                     type="button"
                     class="flex items-center gap-1 rounded-md border px-2 py-1 m-0! text-sm font-medium text-zinc-200"

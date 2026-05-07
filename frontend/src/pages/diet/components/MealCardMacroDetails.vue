@@ -28,7 +28,6 @@ const scaled = computed(() => {
             :protein="scaled.protein"
             :carbs="scaled.carbs"
             :fat="scaled.fat"
-            font-size="0.85rem"
         />
     </div>
 </template>
@@ -37,12 +36,14 @@ const scaled = computed(() => {
 .meal-card-macro-details {
     opacity: 0;
     visibility: hidden;
-    margin-left: 0.25rem;
     transition: visibility 0.3s ease;
     transition-delay: 0.5s;
 }
 .meal-card-macro-details :deep(.macros) {
     margin-top: 0;
     gap: 0.45rem;
+}
+.meal-card-macro-details :deep(.macro) {
+    font-size: clamp(0.62rem, 2.5vw, 0.85rem);
 }
 </style>

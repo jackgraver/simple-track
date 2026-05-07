@@ -559,10 +559,10 @@ const updateLoggedMeal = async () => {
         </div>
         <div
             v-else-if="meal"
-            class="grid h-[calc(100dvh-7rem)] w-full grid-cols-[2fr_1fr] grid-rows-2 gap-4 pb-8"
+            class="flex w-full flex-col gap-4 pb-8 md:grid md:h-[calc(100dvh-7rem)] md:grid-cols-[2fr_1fr] md:grid-rows-2"
         >
             <article
-                class="row-span-2 flex min-h-0 flex-col overflow-hidden rounded-lg bg-firstBg"
+                class="flex min-h-[min(28rem,55dvh)] flex-col overflow-hidden rounded-lg bg-firstBg md:row-span-2 md:min-h-0"
             >
                 <header
                     class="shrink-0 border-b border-secondBg p-4 text-textPrimary"
@@ -738,7 +738,7 @@ const updateLoggedMeal = async () => {
                 </footer>
             </article>
             <aside
-                class="flex min-h-0 flex-col overflow-hidden rounded-lg bg-firstBg p-4 text-textPrimary"
+                class="flex min-h-[min(20rem,45dvh)] flex-col overflow-hidden rounded-lg bg-firstBg p-4 text-textPrimary md:min-h-0"
             >
                 <h2 class="mt-0 text-lg font-semibold">Add Foods</h2>
                 <SearchList
@@ -749,7 +749,7 @@ const updateLoggedMeal = async () => {
                 />
             </aside>
             <aside
-                class="flex min-h-0 flex-col overflow-hidden rounded-lg bg-firstBg p-4 text-textPrimary"
+                class="flex min-h-[min(20rem,45dvh)] flex-col overflow-hidden rounded-lg bg-firstBg p-4 text-textPrimary md:min-h-0"
             >
                 <h2 class="mt-0 text-lg font-semibold">Select Saved Meal</h2>
                 <SearchList
