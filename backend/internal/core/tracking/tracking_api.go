@@ -2,6 +2,7 @@ package tracking
 
 import (
 	"be-simpletracker/internal/core/tracking/missed"
+	"be-simpletracker/internal/core/tracking/profile"
 	"be-simpletracker/internal/core/tracking/steps"
 	"be-simpletracker/internal/core/tracking/water"
 	"be-simpletracker/internal/core/tracking/weight"
@@ -24,12 +25,14 @@ func (h *Handler) Migrate() error {
 		&weight.BodyWeightLog{},
 		&water.WaterLog{},
 		&water.DrinkSizePreset{},
+		&profile.UserProfile{},
 	)
 }
 
 func (h *Handler) RegisterRoutes(router *gin.Engine, authMiddleware gin.HandlerFunc) {
 	group := router.Group("/tracking", authMiddleware)
 	missed.RegisterMissedRoutes(group, h.db)
+	profile.RegisterProfileRoutes(group.Group("/profile"), h.db)
 	weight.RegisterWeightRoutes(group.Group("/weight"), h.db)
 	steps.RegisterStepsRoutes(group.Group("/steps"), h.db)
 	water.RegisterWaterRoutes(group.Group("/water"), h.db)

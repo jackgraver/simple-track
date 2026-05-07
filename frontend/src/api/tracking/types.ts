@@ -1,3 +1,18 @@
+export type ActivityLevel =
+    | 'sedentary'
+    | 'lightly_active'
+    | 'moderately_active'
+    | 'very_active'
+    | 'extra_active';
+
+export type UserProfile = {
+    ID: number;
+    height_in: number;
+    age: number;
+    sex: 'male' | 'female';
+    activity_level: ActivityLevel;
+};
+
 export type BodyWeightLog = {
     ID: number;
     date: string;

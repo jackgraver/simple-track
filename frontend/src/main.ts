@@ -10,6 +10,8 @@ import {
   CategoryScale,
   LinearScale,
   Filler,
+  ArcElement,
+  DoughnutController,
 } from 'chart.js'
 import { router } from './router'
 import App from './App.vue'
@@ -28,6 +30,8 @@ ChartJS.register(
   CategoryScale,
   LinearScale,
   Filler,
+  ArcElement,
+  DoughnutController,
 )
 
 const queryClient = new QueryClient({
