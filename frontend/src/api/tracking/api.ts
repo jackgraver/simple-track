@@ -4,8 +4,24 @@ import type {
     DrinkSizePreset,
     MissedTracking,
     StepLog,
+    UserProfile,
     WaterLog,
 } from '~/api/tracking/types';
+
+export async function fetchProfile(): Promise<UserProfile | null> {
+    const res = await apiGET<{ profile: UserProfile | null }>('/tracking/profile');
+    return res.profile ?? null;
+}
+
+export async function saveProfile(body: {
+    height_in: number;
+    age: number;
+    sex: 'male' | 'female';
+    activity_level: UserProfile['activity_level'];
+}): Promise<UserProfile> {
+    const res = await apiPUT<{ profile: UserProfile }>('/tracking/profile', body);
+    return res.profile;
+}
 
 export async function fetchWeightLogs(limit?: number): Promise<BodyWeightLog[]> {
     const params = limit != null && limit > 0 ? { limit } : undefined;
