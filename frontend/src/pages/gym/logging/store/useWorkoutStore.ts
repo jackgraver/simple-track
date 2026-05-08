@@ -3,11 +3,13 @@ import {
     useWorkoutLogsPrevious,
     useLogExercise,
     useAddExerciseToWorkout,
+    useRemoveExerciseFromWorkout,
     useDeleteLoggedSet,
     useUpsertCardio,
     useUpsertMobilityPre,
     useUpsertMobilityPost,
 } from "~/api/workout/queries";
+import axios from "axios";
 import { useWebStorageJsonSync } from "~/composables/useWebStorageJsonSync";
 import { sortExerciseGroupsByLogOrder } from "./sortExerciseGroupsByLogOrder";
 import { computed, ref, watch, type MaybeRefOrGetter } from "vue";
@@ -36,6 +38,7 @@ export function useWorkoutStore(offset: MaybeRefOrGetter<number> = 0) {
     const workoutLogsQuery = useWorkoutLogsPrevious(offset);
     const logExerciseMutation = useLogExercise(offset);
     const addExerciseMutation = useAddExerciseToWorkout(offset);
+    const removeExerciseMutation = useRemoveExerciseFromWorkout(offset);
     const deleteLoggedSetMutation = useDeleteLoggedSet(offset);
     const upsertCardioMutation = useUpsertCardio(offset);
     const upsertMobilityPreMutation = useUpsertMobilityPre(offset);
@@ -170,6 +173,20 @@ export function useWorkoutStore(offset: MaybeRefOrGetter<number> = 0) {
         }
     };
 
+    const removeExerciseFromLog = async (exerciseId: number): Promise<void> => {
+        try {
+            await removeExerciseMutation.mutateAsync(exerciseId);
+            unhideExerciseFromSession(exerciseId);
+        } catch (err: unknown) {
+            if (axios.isAxiosError(err) && err.response?.status === 404) {
+                hideExerciseLocally(exerciseId);
+                return;
+            }
+            console.error("Error removing exercise:", err);
+            throw err;
+        }
+    };
+
     const deleteLoggedSet = async (setId: number): Promise<void> => {
         try {
             await deleteLoggedSetMutation.mutateAsync(setId);
@@ -215,6 +232,7 @@ export function useWorkoutStore(offset: MaybeRefOrGetter<number> = 0) {
         error,
         logExercise,
         addExerciseToWorkout,
+        removeExerciseFromLog,
         hideExerciseLocally,
         deleteLoggedSet,
         saveCardio,

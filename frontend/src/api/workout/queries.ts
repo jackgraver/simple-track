@@ -234,6 +234,29 @@ export function useAddExerciseToWorkout(offset: MaybeRefOrGetter<number> = 0) {
     });
 }
 
+export function useRemoveExerciseFromWorkout(offset: MaybeRefOrGetter<number> = 0) {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: async (exerciseId: number) => {
+            return apiDELETE<{ success?: boolean }>('/workout/exercises/remove', {
+                data: { exercise_id: exerciseId },
+                params: { offset: toValue(offset) },
+            });
+        },
+        onSuccess: () => {
+            const currentOffset = toValue(offset);
+            queryClient.invalidateQueries({
+                queryKey: liveworkoutKeys.workouts.previous(currentOffset),
+            });
+            queryClient.invalidateQueries({
+                queryKey: liveworkoutKeys.workouts.day(currentOffset),
+            });
+            invalidateWorkoutActivityQueries(queryClient);
+        },
+    });
+}
+
 export function useDeleteLoggedSet(offset: MaybeRefOrGetter<number> = 0) {
     const queryClient = useQueryClient();
 

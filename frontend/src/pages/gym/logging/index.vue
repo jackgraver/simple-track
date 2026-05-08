@@ -3,6 +3,7 @@ import { useWorkoutStore } from "./store/useWorkoutStore";
 import ExerciseListView from "./components/ExerciseListView.vue";
 import { useRoute, useRouter } from "vue-router";
 import { computed } from "vue";
+import { getApiErrorMessage } from "~/api/httpError";
 import { toast } from "~/composables/toast/useToast";
 import { useLoggingRouteContext } from "./composables/useLoggingRouteContext";
 
@@ -19,7 +20,7 @@ const {
     error,
     data,
     addExerciseToWorkout,
-    hideExerciseLocally,
+    removeExerciseFromLog,
 } = useWorkoutStore(offset);
 
 const workoutName = computed(() => data.value?.day?.workout_plan?.name || "");
@@ -43,8 +44,9 @@ const handleAddExercise = async (exerciseId: number) => {
     try {
         await addExerciseToWorkout(exerciseId);
         toast.push("Exercise added", "success");
-    } catch (err: any) {
-        toast.push(err.message || "Failed to add exercise", "error");
+    } catch (err: unknown) {
+        console.error(err);
+        toast.push(getApiErrorMessage(err, "Failed to add exercise"), "error");
     }
 };
 
@@ -71,7 +73,7 @@ const selectPostMobility = () => {
     });
 };
 
-const handleRemoveExercise = (index: number) => {
+const handleRemoveExercise = async (index: number) => {
     const exerciseGroup = log.value[index];
     if (!exerciseGroup) return;
 
@@ -82,8 +84,13 @@ const handleRemoveExercise = (index: number) => {
         return;
     }
 
-    hideExerciseLocally(exerciseId);
-    toast.push("Exercise removed", "success");
+    try {
+        await removeExerciseFromLog(exerciseId);
+        toast.push("Exercise removed", "success");
+    } catch (err: unknown) {
+        console.error(err);
+        toast.push(getApiErrorMessage(err, "Failed to remove exercise"), "error");
+    }
 };
 </script>
 
