@@ -4,6 +4,7 @@ import (
 	"be-simpletracker/internal/core/workout/models"
 	"be-simpletracker/internal/core/workout/services"
 	"be-simpletracker/internal/utils"
+	"be-simpletracker/internal/utils/apierr"
 	"errors"
 	"net/http"
 	"strconv"
@@ -148,39 +149,34 @@ func getOrCreateTodayOrAbort(c *gin.Context, db *gorm.DB) (models.WorkoutLog, bo
 func (h *ExercisesHandler) addExerciseToWorkout(c *gin.Context) {
 	var request AddExerciseRequest
 	if err := c.ShouldBindJSON(&request); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		apierr.BadRequest(c, "Invalid request body")
 		return
 	}
 	today, ok := getOrCreateTodayOrAbort(c, h.db)
 	if !ok {
 		return
 	}
-
-	// Check if exercise already exists in workout
 	for _, ex := range today.Exercises {
 		if ex.ExerciseID == request.ExerciseID {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Exercise already in workout"})
+			apierr.Conflict(c, "Exercise already in workout")
 			return
 		}
 	}
-
-	// Create a new logged exercise entry (empty, ready to be logged)
 	newExercise := models.LoggedExercise{
 		WorkoutLogID: today.ID,
 		ExerciseID:   request.ExerciseID,
 		Sets:         []models.LoggedSet{},
 		Notes:        "",
 	}
-
 	err := services.LogExercise(h.db, &newExercise)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		apierr.Internal(c, err)
 		return
 	}
 	var createdExercise models.LoggedExercise
 	err = h.db.Preload("Exercise").Preload("Sets").Where("id = ?", newExercise.ID).First(&createdExercise).Error
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		apierr.Internal(c, err)
 		return
 	}
 
