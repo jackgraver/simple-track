@@ -184,7 +184,7 @@ function openWaterLogsDialog() {
                     />
                 </div>
             </div>
-            <div class="flex w-full flex-col gap-8 sm:flex-row sm:gap-6">
+            <div class="flex w-full flex-col gap-8 sm:flex-row sm:gap-6 pb-16">
                 <LoggedMealsDisplay :date-offset="dateOffset" />
                 <PlannedMealsDisplay :date-offset="dateOffset" />
             </div>

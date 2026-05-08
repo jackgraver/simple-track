@@ -10,7 +10,7 @@ import DateAndBreadcrumbs from "./shared/DateAndBreadcrumbs.vue";
         class="dark mx-auto box-border w-full max-w-full min-h-dvh overflow-x-clip"
     >
         <div
-            class="flex w-full flex-col items-stretch px-4 lg:px-0 lg:mx-auto lg:max-w-8/12"
+            class="flex w-full flex-col items-stretch px-4 lg:px-8 xl:px-0 xl:mx-auto xl:max-w-8/12"
         >
             <NavBar />
             <DateAndBreadcrumbs />
