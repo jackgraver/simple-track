@@ -1,14 +1,14 @@
 <script setup lang="ts">
 import MacroBar from "~/pages/diet/components/macrobar/MacroBar.vue";
 import MacroBars from "~/pages/diet/components/MacroBars.vue";
-import LogWaterDialog from "~/pages/diet/components/dialog/LogWaterDialog.vue";
+import WaterLogsDialog from "~/pages/diet/components/dialog/WaterLogsDialog.vue";
 import { useDietLogsToday } from "~/pages/home/queries/useDietLogsToday";
 import LoggedMealsDisplay from "./LoggedMealsDisplay.vue";
 import PlannedMealsDisplay from "./PlannedMealsDisplay.vue";
 import { useWaterLogs } from "~/api/tracking/queries";
 import { dialogManager } from "~/composables/dialog/useDialog";
 import { useWaterPrefs } from "~/composables/water/useWaterPrefs";
-import { ymdForDayOffset } from "~/utils/dateUtil";
+import { formatDateLong, ymdForDayOffset } from "~/utils/dateUtil";
 import { computed, ref } from "vue";
 
 const props = defineProps<{
@@ -63,6 +63,19 @@ const waterPlannedDisplay = computed(
     () => formatVolumeFromOz(goalOz.value).value,
 );
 const waterUnitSuffix = computed(() => ` ${displayUnit.value}`);
+const waterDayLabelLong = computed(() =>
+    formatDateLong(`${dateStr.value}T12:00:00`),
+);
+function openWaterLogsDialog() {
+    void dialogManager.custom<void>({
+        title: "Water log",
+        component: WaterLogsDialog,
+        componentProps: {
+            dateStr: dateStr.value,
+            dayLabel: waterDayLabelLong.value,
+        },
+    });
+}
 </script>
 
 <template>
@@ -115,13 +128,21 @@ const waterUnitSuffix = computed(() => ` ${displayUnit.value}`);
                         Loading water…
                     </p>
                     <div v-else class="flex flex-row gap-2">
-                        <MacroBar
-                            type="water"
-                            class="min-w-0 flex-1"
-                            :total="waterTotalDisplay"
-                            :planned="waterPlannedDisplay"
-                            :value-suffix="waterUnitSuffix"
-                        />
+                        <button
+                            type="button"
+                            class="min-w-0 flex-1 cursor-pointer rounded text-left transition-opacity hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2 focus-visible:ring-offset-[rgb(26,26,26)] m-0! p-0!"
+                            :aria-label="'Water log for ' + waterDayLabelLong"
+                            title="View today's water entries"
+                            @click="openWaterLogsDialog"
+                        >
+                            <MacroBar
+                                type="water"
+                                class="min-w-0 flex-1"
+                                :total="waterTotalDisplay"
+                                :planned="waterPlannedDisplay"
+                                :value-suffix="waterUnitSuffix"
+                            />
+                        </button>
                         <MacroBar
                             type="fiber"
                             class="min-w-0 flex-1"

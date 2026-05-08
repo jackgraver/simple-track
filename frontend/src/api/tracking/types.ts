@@ -28,4 +28,5 @@ export type WaterLog = {
     amount_oz: number;
     preset_id: number | null;
     preset?: DrinkSizePreset | null;
+    CreatedAt?: string;
 };
