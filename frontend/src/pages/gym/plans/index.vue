@@ -63,6 +63,16 @@ const unassignedPlans = computed(() =>
 
 const draggingPlanId = ref<number | null>(null);
 const dropTargetKey = ref<number | "pool" | null>(null);
+const dragHandleActive = ref(false);
+
+const onHandleMouseDown = () => {
+    dragHandleActive.value = true;
+    const onUp = () => {
+        dragHandleActive.value = false;
+        window.removeEventListener("mouseup", onUp);
+    };
+    window.addEventListener("mouseup", onUp);
+};
 
 const todayDow = () => new Date().getDay();
 
@@ -71,6 +81,10 @@ const goDetail = (id: number) => {
 };
 
 const onDragStart = (e: DragEvent, plan: WorkoutPlan) => {
+    if (!dragHandleActive.value) {
+        e.preventDefault();
+        return;
+    }
     draggingPlanId.value = plan.ID;
     e.dataTransfer?.setData("text/plain", String(plan.ID));
     if (e.dataTransfer) {
@@ -169,7 +183,7 @@ const onDropPool = async () => {
 };
 
 const planCardClasses =
-    "cursor-grab active:cursor-grabbing rounded-md border border-(--color-border) bg-secondBg px-3 py-2 text-left transition-opacity hover:bg-thirdBg/40";
+    "rounded-md border border-(--color-border) bg-secondBg px-3 py-2 text-left transition-opacity hover:bg-thirdBg/40";
 const planDraggingClass = (planId: number) =>
     draggingPlanId.value === planId ? "opacity-60" : "";
 
@@ -185,8 +199,8 @@ const exerciseCountLabel = (n: number) => `${n} exercise${n === 1 ? "" : "s"}`;
                 Workout schedule
             </h1>
             <p class="m-0 text-sm text-textSecondary">
-                Drag plans onto a weekday or into Unassigned. Click a plan to
-                edit exercises.
+Grab the handle to drag plans between days. Click a plan to
+                view exercises.
             </p>
         </div>
         <div v-if="isPending" class="text-center text-sm text-textSecondary">
@@ -238,28 +252,34 @@ const exerciseCountLabel = (n: number) => `${n} exercise${n === 1 ? "" : "s"}`;
                             @click="goDetail(planByDay[slot.dow]!.ID)"
                             @keydown.enter="goDetail(planByDay[slot.dow]!.ID)"
                         >
-                            <div
-                                class="truncate text-sm font-medium text-textPrimary"
-                            >
-                                {{ planByDay[slot.dow]!.name }}
-                            </div>
-                            <div class="mt-1 text-xs text-textSecondary">
-                                {{
-                                    exerciseCountLabel(
-                                        planByDay[slot.dow]!.exercises.length,
-                                    )
-                                }}
-                            </div>
-                            <div
-                                v-if="
-                                    planByDay[
-                                        slot.dow
-                                    ]!.planned_cardio_type?.trim()
-                                "
-                                class="mt-1 truncate text-[11px] text-textSecondary"
-                            >
-                                Cardio:
-                                {{ planByDay[slot.dow]!.planned_cardio_type }}
+                            <div class="flex items-start gap-2">
+                                <div
+                                    class="mt-0.5 shrink-0 cursor-grab text-textSecondary/40 hover:text-textSecondary active:cursor-grabbing"
+                                    @mousedown="onHandleMouseDown"
+                                >
+                                    <svg width="10" height="14" viewBox="0 0 10 14" fill="currentColor">
+                                        <circle cx="2" cy="2" r="1.5" />
+                                        <circle cx="8" cy="2" r="1.5" />
+                                        <circle cx="2" cy="7" r="1.5" />
+                                        <circle cx="8" cy="7" r="1.5" />
+                                        <circle cx="2" cy="12" r="1.5" />
+                                        <circle cx="8" cy="12" r="1.5" />
+                                    </svg>
+                                </div>
+                                <div class="min-w-0 flex-1">
+                                    <div class="truncate text-sm font-medium text-textPrimary">
+                                        {{ planByDay[slot.dow]!.name }}
+                                    </div>
+                                    <div class="mt-1 text-xs text-textSecondary">
+                                        {{ exerciseCountLabel(planByDay[slot.dow]!.exercises.length) }}
+                                    </div>
+                                    <div
+                                        v-if="planByDay[slot.dow]!.planned_cardio_type?.trim()"
+                                        class="mt-1 truncate text-[11px] text-textSecondary"
+                                    >
+                                        Cardio: {{ planByDay[slot.dow]!.planned_cardio_type }}
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </template>
@@ -304,13 +324,28 @@ const exerciseCountLabel = (n: number) => `${n} exercise${n === 1 ? "" : "s"}`;
                         @click="goDetail(p.ID)"
                         @keydown.enter="goDetail(p.ID)"
                     >
-                        <div
-                            class="truncate text-sm font-medium text-textPrimary"
-                        >
-                            {{ p.name }}
-                        </div>
-                        <div class="mt-1 text-xs text-textSecondary">
-                            {{ exerciseCountLabel(p.exercises.length) }}
+                        <div class="flex items-start gap-2">
+                            <div
+                                class="mt-0.5 shrink-0 cursor-grab text-textSecondary/40 hover:text-textSecondary active:cursor-grabbing"
+                                @mousedown="onHandleMouseDown"
+                            >
+                                <svg width="10" height="14" viewBox="0 0 10 14" fill="currentColor">
+                                    <circle cx="2" cy="2" r="1.5" />
+                                    <circle cx="8" cy="2" r="1.5" />
+                                    <circle cx="2" cy="7" r="1.5" />
+                                    <circle cx="8" cy="7" r="1.5" />
+                                    <circle cx="2" cy="12" r="1.5" />
+                                    <circle cx="8" cy="12" r="1.5" />
+                                </svg>
+                            </div>
+                            <div class="min-w-0 flex-1">
+                                <div class="truncate text-sm font-medium text-textPrimary">
+                                    {{ p.name }}
+                                </div>
+                                <div class="mt-1 text-xs text-textSecondary">
+                                    {{ exerciseCountLabel(p.exercises.length) }}
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>

@@ -269,11 +269,6 @@ const moveExerciseInPlan = async (
 <template>
     <div class="flex w-full max-w-3xl flex-col gap-4 pb-8 pt-2">
         <div class="flex flex-wrap items-center gap-3">
-            <router-link
-                :to="{ name: 'gym-plans' }"
-                class="text-sm text-textSecondary underline-offset-2 transition-colors hover:text-textPrimary hover:underline"
-                >← Schedule</router-link
-            >
             <span
                 v-if="plan"
                 class="text-xs font-medium uppercase tracking-wide text-textSecondary"
