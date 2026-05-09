@@ -70,4 +70,10 @@ const { displayTotal } = useMacroBarAnimation(() => props.total ?? 0);
 .fat {
     background-color: var(--macro-fat);
 }
+.fiber {
+    background-color: var(--macro-fiber);
+}
+.water {
+    background-color: var(--macro-water);
+}
 </style>
