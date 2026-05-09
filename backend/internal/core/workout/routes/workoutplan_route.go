@@ -151,7 +151,7 @@ func (h *WorkoutPlanHandler) reorderPlanExercises(c *gin.Context) {
 }
 
 type AssignDayRequest struct {
-	DayOfWeek int `json:"day_of_week" binding:"required,min=0,max=6"`
+	DayOfWeek *int `json:"day_of_week" binding:"required,gte=0,lte=6"`
 }
 
 func (h *WorkoutPlanHandler) assignPlanToDay(c *gin.Context) {
@@ -172,7 +172,7 @@ func (h *WorkoutPlanHandler) assignPlanToDay(c *gin.Context) {
 		return
 	}
 
-	plan, err := services.AssignPlanToDay(h.db, uint(planID), request.DayOfWeek)
+	plan, err := services.AssignPlanToDay(h.db, uint(planID), *request.DayOfWeek)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

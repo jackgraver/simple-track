@@ -199,8 +199,8 @@ const exerciseCountLabel = (n: number) => `${n} exercise${n === 1 ? "" : "s"}`;
                 Workout schedule
             </h1>
             <p class="m-0 text-sm text-textSecondary">
-Grab the handle to drag plans between days. Click a plan to
-                view exercises.
+                Grab the handle to drag plans between days. Click a plan to view
+                exercises.
             </p>
         </div>
         <div v-if="isPending" class="text-center text-sm text-textSecondary">
@@ -257,7 +257,12 @@ Grab the handle to drag plans between days. Click a plan to
                                     class="mt-0.5 shrink-0 cursor-grab text-textSecondary/40 hover:text-textSecondary active:cursor-grabbing"
                                     @mousedown="onHandleMouseDown"
                                 >
-                                    <svg width="10" height="14" viewBox="0 0 10 14" fill="currentColor">
+                                    <svg
+                                        width="10"
+                                        height="14"
+                                        viewBox="0 0 10 14"
+                                        fill="currentColor"
+                                    >
                                         <circle cx="2" cy="2" r="1.5" />
                                         <circle cx="8" cy="2" r="1.5" />
                                         <circle cx="2" cy="7" r="1.5" />
@@ -267,17 +272,34 @@ Grab the handle to drag plans between days. Click a plan to
                                     </svg>
                                 </div>
                                 <div class="min-w-0 flex-1">
-                                    <div class="truncate text-sm font-medium text-textPrimary">
+                                    <div
+                                        class="truncate text-sm font-medium text-textPrimary"
+                                    >
                                         {{ planByDay[slot.dow]!.name }}
                                     </div>
-                                    <div class="mt-1 text-xs text-textSecondary">
-                                        {{ exerciseCountLabel(planByDay[slot.dow]!.exercises.length) }}
+                                    <div
+                                        class="mt-1 text-xs text-textSecondary"
+                                    >
+                                        {{
+                                            exerciseCountLabel(
+                                                planByDay[slot.dow]!.exercises
+                                                    .length,
+                                            )
+                                        }}
                                     </div>
                                     <div
-                                        v-if="planByDay[slot.dow]!.planned_cardio_type?.trim()"
+                                        v-if="
+                                            planByDay[
+                                                slot.dow
+                                            ]!.planned_cardio_type?.trim()
+                                        "
                                         class="mt-1 truncate text-[11px] text-textSecondary"
                                     >
-                                        Cardio: {{ planByDay[slot.dow]!.planned_cardio_type }}
+                                        Cardio:
+                                        {{
+                                            planByDay[slot.dow]!
+                                                .planned_cardio_type
+                                        }}
                                     </div>
                                 </div>
                             </div>
@@ -329,7 +351,12 @@ Grab the handle to drag plans between days. Click a plan to
                                 class="mt-0.5 shrink-0 cursor-grab text-textSecondary/40 hover:text-textSecondary active:cursor-grabbing"
                                 @mousedown="onHandleMouseDown"
                             >
-                                <svg width="10" height="14" viewBox="0 0 10 14" fill="currentColor">
+                                <svg
+                                    width="10"
+                                    height="14"
+                                    viewBox="0 0 10 14"
+                                    fill="currentColor"
+                                >
                                     <circle cx="2" cy="2" r="1.5" />
                                     <circle cx="8" cy="2" r="1.5" />
                                     <circle cx="2" cy="7" r="1.5" />
@@ -339,7 +366,9 @@ Grab the handle to drag plans between days. Click a plan to
                                 </svg>
                             </div>
                             <div class="min-w-0 flex-1">
-                                <div class="truncate text-sm font-medium text-textPrimary">
+                                <div
+                                    class="truncate text-sm font-medium text-textPrimary"
+                                >
                                     {{ p.name }}
                                 </div>
                                 <div class="mt-1 text-xs text-textSecondary">
