@@ -4,6 +4,7 @@ const props = defineProps<{
     protein: number;
     carbs: number;
     fat: number;
+    fiber: number;
     fontSize?: string;
 }>();
 
@@ -26,6 +27,9 @@ function round2(n: number) {
         <span class="macro fat" :style="{ fontSize: props.fontSize }"
             >{{ round2(props.fat) }}F</span
         >
+        <span class="macro fiber" :style="{ fontSize: props.fontSize }"
+            >{{ round2(props.fiber) }}Fi</span
+        >
     </div>
 </template>
 
@@ -42,15 +46,18 @@ function round2(n: number) {
 }
 
 .calories {
-    color: #facc15;
+    color: var(--macro-calories, #fb923c);
 }
 .protein {
-    color: #60a5fa;
+    color: var(--macro-protein, #60a5fa);
 }
 .carbs {
-    color: red;
+    color: var(--macro-carbs, #f87171);
 }
 .fat {
-    color: #34d399;
+    color: var(--macro-fat, #c084fc);
+}
+.fiber {
+    color: var(--macro-fiber, #34d399);
 }
 </style>

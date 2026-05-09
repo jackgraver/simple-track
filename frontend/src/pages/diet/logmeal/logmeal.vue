@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import "~/pages/diet/macro-colors.css";
 import { useRoute } from "vue-router";
 import type {
     CompositeFood,
@@ -541,7 +542,7 @@ const updateLoggedMeal = async () => {
 </script>
 
 <template>
-    <div class="flex flex-col items-center py-4">
+    <div class="diet-module flex flex-col items-center py-4">
         <div
             v-if="editMissingId"
             class="flex h-[60dvh] items-center justify-center p-8 text-cfRed"
@@ -578,6 +579,7 @@ const updateLoggedMeal = async () => {
                             :protein="totalMacros.protein"
                             :fat="totalMacros.fat"
                             :carbs="totalMacros.carbs"
+                            :fiber="totalMacros.fiber"
                         />
                     </div>
                     <div class="flex min-w-0 flex-1 flex-col gap-2">

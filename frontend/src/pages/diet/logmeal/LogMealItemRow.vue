@@ -148,6 +148,7 @@ function commitQtyEdit() {
                             :protein="v.protein"
                             :fat="v.fat"
                             :carbs="v.carbs"
+                            :fiber="v.fiber"
                             font-size="0.75rem"
                         />
                     </button>
@@ -229,6 +230,7 @@ function commitQtyEdit() {
                 :protein="item.amount * (item.food?.protein ?? 0)"
                 :fat="item.amount * (item.food?.fat ?? 0)"
                 :carbs="item.amount * (item.food?.carbs ?? 0)"
+                :fiber="item.amount * (item.food?.fiber ?? 0)"
                 font-size="0.75rem"
             />
         </span>

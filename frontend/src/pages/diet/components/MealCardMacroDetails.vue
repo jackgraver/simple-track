@@ -7,6 +7,7 @@ const props = defineProps<{
     protein: number;
     carbs: number;
     fat: number;
+    fiber: number;
     amount: number;
 }>();
 
@@ -17,6 +18,7 @@ const scaled = computed(() => {
         protein: (props.protein ?? 0) * a,
         carbs: (props.carbs ?? 0) * a,
         fat: (props.fat ?? 0) * a,
+        fiber: (props.fiber ?? 0) * a,
     };
 });
 </script>
@@ -28,6 +30,7 @@ const scaled = computed(() => {
             :protein="scaled.protein"
             :carbs="scaled.carbs"
             :fat="scaled.fat"
+            :fiber="scaled.fiber"
         />
     </div>
 </template>

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import "./macro-colors.css";
 import { computed } from "vue";
 import { useRoute } from "vue-router";
 import DietDayView from "./components/DietDayView.vue";
@@ -23,7 +24,7 @@ async function openWaterLog() {
 </script>
 
 <template>
-    <div class="flex w-full flex-col gap-6">
+    <div class="diet-module flex w-full flex-col gap-6">
         <template v-if="isDietHome">
             <div
                 class="flex items-center justify-between gap-4 border-b border-(--color-border) pb-3"

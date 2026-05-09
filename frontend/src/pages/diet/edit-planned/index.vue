@@ -28,12 +28,14 @@ type MacroSummary = {
     protein: number;
     carbs: number;
     fat: number;
+    fiber: number;
 };
 const ZERO_MACROS: MacroSummary = {
     calories: 0,
     protein: 0,
     fat: 0,
     carbs: 0,
+    fiber: 0,
 };
 
 function macroTotals(
@@ -46,6 +48,7 @@ function macroTotals(
             protein: acc.protein + (i.food?.protein ?? 0) * i.amount,
             carbs: acc.carbs + (i.food?.carbs ?? 0) * i.amount,
             fat: acc.fat + (i.food?.fat ?? 0) * i.amount,
+            fiber: acc.fiber + (i.food?.fiber ?? 0) * i.amount,
         }),
         { ...ZERO_MACROS },
     );

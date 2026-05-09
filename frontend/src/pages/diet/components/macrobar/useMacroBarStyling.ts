@@ -41,10 +41,10 @@ export const typeLabels: Record<MacroBarNutrientType, string> = {
 };
 
 export const macroFillClass: Record<MacroBarNutrientType, string> = {
-    calories: "bg-[orange]",
-    protein: "bg-[#60a5fa]",
-    fiber: "bg-[green]",
-    carbs: "bg-[red]",
-    fat: "bg-[#a855f7]",
-    water: "bg-[blue]",
+    calories: "calories",
+    protein: "protein",
+    fiber: "fiber",
+    carbs: "carbs",
+    fat: "fat",
+    water: "water",
 };

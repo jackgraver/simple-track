@@ -31,14 +31,16 @@ function macroTotalsForMeal(meal: Meal) {
     let protein = 0;
     let carbs = 0;
     let fat = 0;
+    let fiber = 0;
     for (const item of meal.items) {
         const a = Number(item.amount);
         calories += (item.food?.calories ?? 0) * a;
         protein += (item.food?.protein ?? 0) * a;
         carbs += (item.food?.carbs ?? 0) * a;
         fat += (item.food?.fat ?? 0) * a;
+        fiber += (item.food?.fiber ?? 0) * a;
     }
-    return { calories, protein, carbs, fat };
+    return { calories, protein, carbs, fat, fiber };
 }
 
 const props = defineProps<{
@@ -79,6 +81,7 @@ function groupMacroTotals(rows: MealItemWithIndex[]) {
         protein: m.protein,
         carbs: m.carbs,
         fat: m.fat,
+        fiber: m.fiber,
     };
 }
 </script>
@@ -93,6 +96,7 @@ function groupMacroTotals(rows: MealItemWithIndex[]) {
                 :protein="mealMacroTotals.protein"
                 :fat="mealMacroTotals.fat"
                 :carbs="mealMacroTotals.carbs"
+                :fiber="mealMacroTotals.fiber"
                 font-size="0.9rem"
             />
         </h3>
@@ -130,6 +134,7 @@ function groupMacroTotals(rows: MealItemWithIndex[]) {
                                     :protein="food.food?.protein ?? 0"
                                     :carbs="food.food?.carbs ?? 0"
                                     :fat="food.food?.fat ?? 0"
+                                    :fiber="food.food?.fiber ?? 0"
                                     :amount="Number(food.amount)"
                                 />
                             </span>
@@ -195,6 +200,7 @@ function groupMacroTotals(rows: MealItemWithIndex[]) {
                                             :protein="food.food?.protein ?? 0"
                                             :carbs="food.food?.carbs ?? 0"
                                             :fat="food.food?.fat ?? 0"
+                                            :fiber="food.food?.fiber ?? 0"
                                             :amount="Number(food.amount)"
                                         />
                                     </span>
