@@ -69,6 +69,7 @@ type Food struct {
 	Carbs            float32 `json:"carbs"`
 	Fat              float32 `json:"fat"`
 	VariantGroupID   *uint   `json:"variant_group_id" gorm:"index"`
+	QuickEntry       bool    `json:"quick_entry" gorm:"default:false;index"`
 	Variants         []Food  `json:"variants,omitempty" gorm:"-"`
 }
 

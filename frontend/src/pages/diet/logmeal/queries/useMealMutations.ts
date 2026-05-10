@@ -4,7 +4,9 @@ import {
     createMeal,
     createSavedMeal,
     logEditedMeal,
+    quickLog,
     updateLoggedMeal,
+    type QuickLogPayload,
     type SavedMealItemPayload,
 } from '~/api/diet/api';
 import { logmealKeys } from './keys';
@@ -33,6 +35,17 @@ function afterMealLogNavigate(router: ReturnType<typeof useRouter>) {
         return;
     }
     router.push({ name: 'gym' });
+}
+
+export function useQuickLog() {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: (payload: QuickLogPayload) => quickLog(payload),
+        onSuccess: () => {
+            invalidateDietQueries(queryClient);
+        },
+    });
 }
 
 export function useCreateSavedMeal() {

@@ -7,6 +7,7 @@ import { CREATE_TYPE, LOG_TYPE } from "~/pages/diet/logmeal/logmealMode";
 import { parseDietDayOffsetQuery, ymdForDayOffset } from "~/utils/dateUtil";
 import { dialogManager } from "~/composables/dialog/useDialog";
 import LogWaterDialog from "./components/dialog/LogWaterDialog.vue";
+import QuickLogDialog from "./components/dialog/QuickLogDialog.vue";
 
 const route = useRoute();
 const isDietHome = computed(() => route.name === "diet");
@@ -19,6 +20,15 @@ async function openWaterLog() {
         title: "Log water",
         component: LogWaterDialog,
         componentProps: { dateStr: dateStr.value },
+    });
+}
+async function openQuickLog() {
+    await dialogManager.custom<boolean>({
+        title: "Quick log",
+        component: QuickLogDialog,
+        componentProps: {
+            dateOffset: dateOffset.value ?? 0,
+        },
     });
 }
 </script>
@@ -57,6 +67,17 @@ async function openWaterLog() {
                     >
                     <button
                         class="transition-colors hover:text-textPrimary p-0!"
+                        type="button"
+                        @click="openQuickLog"
+                    >
+                        Quick log
+                    </button>
+                    <span aria-hidden="true" class="text-textSecondary/50"
+                        >·</span
+                    >
+                    <button
+                        class="transition-colors hover:text-textPrimary p-0!"
+                        type="button"
                         @click="openWaterLog"
                     >
                         Log Water

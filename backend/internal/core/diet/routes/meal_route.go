@@ -4,8 +4,10 @@ import (
 	"be-simpletracker/internal/core/diet/models"
 	"be-simpletracker/internal/core/diet/services"
 	"be-simpletracker/internal/utils"
+	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -34,6 +36,7 @@ func RegisterMealRoutes(group *gin.RouterGroup, db *gorm.DB) {
 		meals.GET("/saved-meal/all", h.getAllSavedMeals)
 		meals.POST("/saved-meal/new", h.postNewSavedMeal)
 		meals.GET("/meal/:id", h.getMeal)
+		meals.POST("/quick-log", h.postQuickLog)
 		meals.POST("/meal/new", h.postNewMeal)
 		meals.POST("/meal/log-planned", h.postLogPlanned)
 		meals.POST("/meal/logedited", h.postLogEdited)
@@ -48,6 +51,88 @@ func RegisterMealRoutes(group *gin.RouterGroup, db *gorm.DB) {
 type CreateFoodRequest struct {
 	models.Food
 	RelatedFoodID *uint `json:"related_food_id,omitempty"`
+}
+
+type QuickLogRequest struct {
+	Name     string  `json:"name" binding:"required"`
+	Calories float32 `json:"calories"`
+	Protein  float32 `json:"protein"`
+	Carbs    float32 `json:"carbs"`
+	Fat      float32 `json:"fat"`
+	Fiber    float32 `json:"fiber"`
+	Offset   int     `json:"offset"`
+}
+
+func (h *MealHandler) postQuickLog(c *gin.Context) {
+	var req QuickLogRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	displayName := strings.TrimSpace(req.Name)
+	if displayName == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "name is required"})
+		return
+	}
+	foodRowName := fmt.Sprintf("%s [ql-%d]", displayName, time.Now().UnixNano())
+	var dayID uint
+	err := h.db.Transaction(func(tx *gorm.DB) error {
+		day, derr := services.FindMealPlanDay(tx, utils.ZerodTime(req.Offset))
+		if derr != nil {
+			return derr
+		}
+		if day == nil {
+			return fmt.Errorf("day not found")
+		}
+		dayID = day.ID
+		food := models.Food{
+			Name:          foodRowName,
+			ServingType:   "",
+			ServingAmount: 1,
+			Calories:      req.Calories,
+			Protein:       req.Protein,
+			Fiber:         req.Fiber,
+			Carbs:         req.Carbs,
+			Fat:           req.Fat,
+			QuickEntry:    true,
+		}
+		if err := tx.Create(&food).Error; err != nil {
+			return err
+		}
+		meal := models.Meal{
+			Name: displayName,
+			Items: []models.MealItem{{
+				FoodID: food.ID,
+				Amount: 1,
+			}},
+		}
+		mealID, merr := services.CreateMeal(tx, &meal)
+		if merr != nil {
+			return merr
+		}
+		return services.CreateDayMeal(tx, &models.DayLog{
+			DayID:  dayID,
+			MealID: mealID,
+		})
+	})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	day, err := services.MealPlanDayByID(h.db, int(dayID))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	tot := services.CalculateTotals(h.db, dayID)
+	c.JSON(http.StatusOK, gin.H{
+		"day":           day,
+		"totalCalories": tot.Calories,
+		"totalProtein":  tot.Protein,
+		"totalFiber":    tot.Fiber,
+		"totalCarbs":    tot.Carbs,
+		"totalFat":      tot.Fat,
+	})
 }
 
 func (h *MealHandler) postFood(c *gin.Context) {

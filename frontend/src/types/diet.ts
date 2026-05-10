@@ -59,6 +59,7 @@ export interface Food extends BaseModel {
     fat: number;
     variant_group_id?: number | null;
     variants?: Food[];
+    quick_entry?: boolean;
 }
 
 export interface SavedMeal extends BaseModel {

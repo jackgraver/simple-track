@@ -74,7 +74,7 @@ func (r *Repository) enrichDietDayFoodVariants(d *models.DietDay) {
 
 func (r *Repository) FoodsAll(excludeIDs []uint) ([]models.Food, error) {
 	var foods []models.Food
-	query := r.db.Model(&models.Food{})
+	query := r.db.Model(&models.Food{}).Where("quick_entry = ? OR quick_entry IS NULL", false)
 	if len(excludeIDs) > 0 {
 		query = query.Where("id NOT IN ?", excludeIDs)
 	}

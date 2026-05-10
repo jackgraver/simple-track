@@ -43,6 +43,33 @@ export type UpdatePlanMacrosPayload = {
     fat: number;
 };
 
+export type QuickLogPayload = {
+    name: string;
+    calories: number;
+    protein: number;
+    carbs: number;
+    fat: number;
+    fiber: number;
+    offset?: number;
+};
+
+export async function quickLog(payload: QuickLogPayload): Promise<DietLogsTodayResponse> {
+    const body = {
+        name: payload.name,
+        calories: payload.calories,
+        protein: payload.protein,
+        carbs: payload.carbs,
+        fat: payload.fat,
+        fiber: payload.fiber,
+        offset: payload.offset ?? 0,
+    };
+    const response = await apiClient.post<DietLogsTodayResponse>(
+        "/diet/meals/quick-log",
+        body,
+    );
+    return response.data;
+}
+
 export async function getDietLogsToday(
     offset: number = 0,
 ): Promise<DietLogsTodayResponse> {
