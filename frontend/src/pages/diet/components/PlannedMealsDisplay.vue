@@ -11,7 +11,7 @@ const props = defineProps<{
 
 const router = useRouter();
 
-const { data, logPlannedMeal, logMeal, deleteLoggedMeal, editLogMeal } =
+const { data, logPlannedMeal, logMeal, deleteLoggedMeal } =
     useDietDayMealHandlers(() => props.dateOffset);
 
 const editPlannedMeal = () => {
@@ -102,7 +102,6 @@ function prev() {
                 :on-log-planned="logPlannedMeal"
                 :on-log-edited="logMeal"
                 :on-delete="deleteLoggedMeal"
-                :on-edit="editLogMeal"
                 type="planned"
             />
         </template>

@@ -84,6 +84,10 @@ function groupMacroTotals(rows: MealItemWithIndex[]) {
         fiber: m.fiber,
     };
 }
+
+const isQuickLog = computed(() =>
+    props.meal.items.some((item) => item.food?.quick_entry),
+);
 </script>
 
 <template>
@@ -107,105 +111,127 @@ function groupMacroTotals(rows: MealItemWithIndex[]) {
                         v-for="(block, bi) in mealBlocks"
                         :key="'mb-' + bi"
                     >
-                        <template v-if="block.kind === 'ungrouped'">
-                            <span
-                                v-for="{ item: food, index: i } in block.rows"
-                                :key="'u-' + i"
-                                class="food"
-                            >
-                                <span class="food-line-label"
-                                    >{{ formatNum(itemServingAmount(food))
-                                    }}{{
-                                        food.food?.serving_type === "g"
-                                            ? "g"
-                                            : ""
-                                    }}
-                                    {{ food.food?.name
-                                    }}{{
-                                        pluralize(
-                                            food.food?.name,
-                                            Number(food.amount),
-                                        )
-                                    }}</span
-                                >
-                                <MealCardMacroDetails
-                                    class="macro-keep-size"
-                                    :calories="food.food?.calories ?? 0"
-                                    :protein="food.food?.protein ?? 0"
-                                    :carbs="food.food?.carbs ?? 0"
-                                    :fat="food.food?.fat ?? 0"
-                                    :fiber="food.food?.fiber ?? 0"
-                                    :amount="Number(food.amount)"
-                                />
-                            </span>
-                        </template>
+                        <template v-if="isQuickLog">
+                            <span class="food-line-label"
+                                >Quick Log Entry
+                            </span></template
+                        >
                         <template v-else>
-                            <div class="food-group">
-                                <button
-                                    type="button"
-                                    class="group-header food"
-                                    @click="toggleGroupCollapse(block.groupId)"
+                            <template v-if="block.kind === 'ungrouped'">
+                                <span
+                                    v-for="{
+                                        item: food,
+                                        index: i,
+                                    } in block.rows"
+                                    :key="'u-' + i"
+                                    class="food"
                                 >
-                                    <ChevronRight
-                                        v-if="!isGroupExpanded(block.groupId)"
-                                        :size="16"
-                                        class="chev"
-                                    />
-                                    <ChevronDown
-                                        v-else
-                                        :size="16"
-                                        class="chev"
-                                    />
-                                    <span class="group-title food-line-label">{{
-                                        block.label || "Group"
-                                    }}</span>
-                                    <MealCardMacroDetails
-                                        class="group-header-macros macro-keep-size"
-                                        v-bind="groupMacroTotals(block.rows)"
-                                        :amount="1"
-                                    />
-                                </button>
-                                <div
-                                    v-if="isGroupExpanded(block.groupId)"
-                                    class="group-children"
-                                >
-                                    <span
-                                        v-for="{
-                                            item: food,
-                                            index: i,
-                                        } in block.rows"
-                                        :key="'g-' + i"
-                                        class="food food-child"
+                                    <span class="food-line-label"
+                                        >{{ formatNum(itemServingAmount(food))
+                                        }}{{
+                                            food.food?.serving_type === "g"
+                                                ? "g"
+                                                : ""
+                                        }}
+                                        {{ food.food?.name
+                                        }}{{
+                                            pluralize(
+                                                food.food?.name,
+                                                Number(food.amount),
+                                            )
+                                        }}</span
                                     >
-                                        <span class="food-line-label"
-                                            >{{
-                                                formatNum(
-                                                    itemServingAmount(food),
-                                                )
-                                            }}{{
-                                                food.food?.serving_type === "g"
-                                                    ? "g"
-                                                    : ""
-                                            }}
-                                            {{ food.food?.name
-                                            }}{{
-                                                Number(food.amount) > 1
-                                                    ? "s"
-                                                    : ""
-                                            }}</span
+                                    <MealCardMacroDetails
+                                        class="macro-keep-size"
+                                        :calories="food.food?.calories ?? 0"
+                                        :protein="food.food?.protein ?? 0"
+                                        :carbs="food.food?.carbs ?? 0"
+                                        :fat="food.food?.fat ?? 0"
+                                        :fiber="food.food?.fiber ?? 0"
+                                        :amount="Number(food.amount)"
+                                    />
+                                </span>
+                            </template>
+                            <template v-else>
+                                <div class="food-group">
+                                    <button
+                                        type="button"
+                                        class="group-header food"
+                                        @click="
+                                            toggleGroupCollapse(block.groupId)
+                                        "
+                                    >
+                                        <ChevronRight
+                                            v-if="
+                                                !isGroupExpanded(block.groupId)
+                                            "
+                                            :size="16"
+                                            class="chev"
+                                        />
+                                        <ChevronDown
+                                            v-else
+                                            :size="16"
+                                            class="chev"
+                                        />
+                                        <span
+                                            class="group-title food-line-label"
+                                            >{{ block.label || "Group" }}</span
                                         >
                                         <MealCardMacroDetails
-                                            class="macro-keep-size"
-                                            :calories="food.food?.calories ?? 0"
-                                            :protein="food.food?.protein ?? 0"
-                                            :carbs="food.food?.carbs ?? 0"
-                                            :fat="food.food?.fat ?? 0"
-                                            :fiber="food.food?.fiber ?? 0"
-                                            :amount="Number(food.amount)"
+                                            class="group-header-macros macro-keep-size"
+                                            v-bind="
+                                                groupMacroTotals(block.rows)
+                                            "
+                                            :amount="1"
                                         />
-                                    </span>
+                                    </button>
+                                    <div
+                                        v-if="isGroupExpanded(block.groupId)"
+                                        class="group-children"
+                                    >
+                                        <span
+                                            v-for="{
+                                                item: food,
+                                                index: i,
+                                            } in block.rows"
+                                            :key="'g-' + i"
+                                            class="food food-child"
+                                        >
+                                            <span class="food-line-label"
+                                                >{{
+                                                    formatNum(
+                                                        itemServingAmount(food),
+                                                    )
+                                                }}{{
+                                                    food.food?.serving_type ===
+                                                    "g"
+                                                        ? "g"
+                                                        : ""
+                                                }}
+                                                {{ food.food?.name
+                                                }}{{
+                                                    Number(food.amount) > 1
+                                                        ? "s"
+                                                        : ""
+                                                }}</span
+                                            >
+                                            <MealCardMacroDetails
+                                                class="macro-keep-size"
+                                                :calories="
+                                                    food.food?.calories ?? 0
+                                                "
+                                                :protein="
+                                                    food.food?.protein ?? 0
+                                                "
+                                                :carbs="food.food?.carbs ?? 0"
+                                                :fat="food.food?.fat ?? 0"
+                                                :fiber="food.food?.fiber ?? 0"
+                                                :amount="Number(food.amount)"
+                                            />
+                                        </span>
+                                    </div>
                                 </div>
-                            </div>
+                            </template>
                         </template>
                     </template>
                 </div>
@@ -218,7 +244,6 @@ function groupMacroTotals(rows: MealItemWithIndex[]) {
                         <Trash2 :size="20" />
                     </button>
                 </div>
-
                 <div class="actions" v-else-if="type === 'planned'">
                     <button @click="onLogEdited(meal, EDIT_LOGGED_TYPE)">
                         <SquarePen :size="20" />

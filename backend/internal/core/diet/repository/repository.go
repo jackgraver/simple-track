@@ -24,12 +24,19 @@ func New(db *gorm.DB) *Repository {
 }
 
 func (r *Repository) EnrichFoodVariants(f *models.Food) {
-	if f == nil || f.VariantGroupID == nil {
+	if f == nil {
+		return
+	}
+	models.NormalizeQuickLogFoodNameForResponse(f)
+	if f.VariantGroupID == nil {
 		return
 	}
 	var sibs []models.Food
 	if err := r.db.Where("variant_group_id = ? AND id != ?", *f.VariantGroupID, f.ID).Order("name ASC").Find(&sibs).Error; err != nil {
 		return
+	}
+	for i := range sibs {
+		models.NormalizeQuickLogFoodNameForResponse(&sibs[i])
 	}
 	f.Variants = sibs
 }
@@ -162,10 +169,13 @@ func (r *Repository) FoodsAllWithVariantSiblings(excludeIDs []uint) ([]models.Fo
 	out := make([]models.FoodWithVariants, 0, len(foods))
 	for _, f := range foods {
 		row := models.FoodWithVariants{Food: f}
+		models.NormalizeQuickLogFoodNameForResponse(&row.Food)
 		if f.VariantGroupID != nil {
 			for _, s := range byGroup[*f.VariantGroupID] {
 				if s.ID != f.ID {
-					row.Variants = append(row.Variants, s)
+					sibling := s
+					models.NormalizeQuickLogFoodNameForResponse(&sibling)
+					row.Variants = append(row.Variants, sibling)
 				}
 			}
 		}
@@ -178,6 +188,11 @@ func (r *Repository) CompositeFoodsAll() ([]models.CompositeFood, error) {
 	var list []models.CompositeFood
 	if err := r.db.Preload("Items.Food").Order("name ASC").Find(&list).Error; err != nil {
 		return nil, err
+	}
+	for i := range list {
+		for j := range list[i].Items {
+			models.NormalizeQuickLogFoodNameForResponse(&list[i].Items[j].Food)
+		}
 	}
 	return list, nil
 }

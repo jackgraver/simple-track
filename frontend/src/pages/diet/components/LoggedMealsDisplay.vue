@@ -6,7 +6,7 @@ const props = defineProps<{
     dateOffset: number;
 }>();
 
-const { data, logPlannedMeal, logMeal, deleteLoggedMeal, editLogMeal } =
+const { data, logPlannedMeal, logMeal, deleteLoggedMeal } =
     useDietDayMealHandlers(() => props.dateOffset);
 </script>
 
@@ -24,7 +24,6 @@ const { data, logPlannedMeal, logMeal, deleteLoggedMeal, editLogMeal } =
                 :on-log-planned="logPlannedMeal"
                 :on-log-edited="logMeal"
                 :on-delete="deleteLoggedMeal"
-                :on-edit="editLogMeal"
                 type="logged"
             />
         </template>

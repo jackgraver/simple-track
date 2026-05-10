@@ -51,10 +51,11 @@ export type QuickLogPayload = {
     fat: number;
     fiber: number;
     offset?: number;
+    replace_meal_id?: number;
 };
 
 export async function quickLog(payload: QuickLogPayload): Promise<DietLogsTodayResponse> {
-    const body = {
+    const body: Record<string, unknown> = {
         name: payload.name,
         calories: payload.calories,
         protein: payload.protein,
@@ -63,6 +64,12 @@ export async function quickLog(payload: QuickLogPayload): Promise<DietLogsTodayR
         fiber: payload.fiber,
         offset: payload.offset ?? 0,
     };
+    if (
+        payload.replace_meal_id != null &&
+        payload.replace_meal_id > 0
+    ) {
+        body.replace_meal_id = payload.replace_meal_id;
+    }
     const response = await apiClient.post<DietLogsTodayResponse>(
         "/diet/meals/quick-log",
         body,

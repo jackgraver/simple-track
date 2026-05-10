@@ -1,5 +1,4 @@
 import type { Meal } from "~/types/diet";
-import LogEditedDialog from "~/pages/home/dialog/LogEditedDialog.vue";
 import { toast } from "~/composables/toast/useToast";
 import { dialogManager } from "~/composables/dialog/useDialog";
 import { useRouter } from "vue-router";
@@ -7,13 +6,10 @@ import { useDietLogsToday } from "~/pages/home/queries/useDietLogsToday";
 import {
     useLogPlannedMeal,
     useDeleteLoggedMeal,
-    useEditLoggedMeal,
 } from "~/pages/home/queries/useMealMutations";
-import {
-    EDIT_LOGGED_TYPE,
-    EDIT_TYPE,
-    LOG_TYPE,
-} from "~/pages/diet/logmeal/logmealMode";
+import { LOG_TYPE, EDIT_TYPE, EDIT_LOGGED_TYPE } from "~/pages/diet/logmeal/logmealMode";
+import { mealHasQuickEntryFood } from "~/utils/dietMealQuickLog";
+import QuickLogDialog from "~/pages/diet/components/dialog/QuickLogDialog.vue";
 
 export function useDietDayMealHandlers(getOffset: () => number) {
     const router = useRouter();
@@ -21,7 +17,6 @@ export function useDietDayMealHandlers(getOffset: () => number) {
 
     const logPlannedMealMutation = useLogPlannedMeal(getOffset);
     const deleteLoggedMealMutation = useDeleteLoggedMeal(getOffset);
-    const editLoggedMealMutation = useEditLoggedMeal(getOffset);
 
     const logPlannedMeal = async (meal: Meal) => {
         try {
@@ -40,6 +35,17 @@ export function useDietDayMealHandlers(getOffset: () => number) {
             router.push({ name: "diet-log", query: { type: LOG_TYPE } });
             return;
         }
+        if (meal && type === EDIT_TYPE && mealHasQuickEntryFood(meal)) {
+            await dialogManager.custom<boolean>({
+                title: "Edit quick log",
+                component: QuickLogDialog,
+                componentProps: {
+                    dateOffset: getOffset(),
+                    editingMeal: meal,
+                },
+            });
+            return;
+        }
         router.push({
             name: "diet-log",
             query: { type, id: String(meal?.ID ?? "") },
@@ -47,11 +53,14 @@ export function useDietDayMealHandlers(getOffset: () => number) {
     };
 
     const deleteLoggedMeal = async (meal: Meal) => {
+        const name = meal.name.trim();
+        const quick = mealHasQuickEntryFood(meal);
         const confirmed = await dialogManager.confirm({
-            title: "Delete Logged Meal",
-            message: "Are you sure you want to delete this meal?",
+            title: quick ? "Remove quick log" : "Delete Logged Meal",
+            message: quick
+                ? `Remove “${name}” from today's log? This one-off entry will be discarded.`
+                : `Are you sure you want to delete “${name}”?`,
         });
-
         if (!confirmed) return;
 
         if (!data.value?.day.ID) {
@@ -70,41 +79,10 @@ export function useDietDayMealHandlers(getOffset: () => number) {
         }
     };
 
-    const editLogMeal = (meal: Meal) => {
-        const oldMealID = meal.ID;
-        dialogManager
-            .custom<Meal>({
-                title: "Log Edited Meal",
-                component: LogEditedDialog,
-                componentProps: { meal },
-            })
-            .then(async (editedMeal) => {
-                if (!editedMeal) return;
-                try {
-                    await editLoggedMealMutation.mutateAsync({
-                        meal: editedMeal,
-                        oldMealId: oldMealID,
-                    });
-                    toast.push("Meal Edited Successfully!", "success");
-                } catch (error: unknown) {
-                    const msg =
-                        error instanceof Error
-                            ? error.message
-                            : "Unknown error";
-                    toast.push("Log Edited Failed! " + msg, "error");
-                }
-            })
-            .catch((err) => {
-                console.error("Dialog error:", err);
-                toast.push("Dialog Error", "error");
-            });
-    };
-
     return {
         data,
         logPlannedMeal,
         logMeal,
         deleteLoggedMeal,
-        editLogMeal,
     };
 }

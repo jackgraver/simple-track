@@ -1,6 +1,11 @@
 package models
 
-import "gorm.io/gorm"
+import (
+	"regexp"
+	"strings"
+
+	"gorm.io/gorm"
+)
 
 // Meal represents a logged meal instance (foods eaten in one sitting); day_logs reference this.
 type Meal struct {
@@ -75,6 +80,21 @@ type Food struct {
 
 func (f Food) GetID() uint       { return f.ID }
 func (f Food) TableName() string { return "foods" }
+
+var quickLogFoodNameSuffix = regexp.MustCompile(`\s*\[ql-\d+\]\s*$`)
+
+// NormalizeQuickLogFoodNameForResponse overwrites Name with the human-readable value for API
+// responses only (in-memory; DB row unchanged). Applies to quick-entry rows or legacy names that
+// end with our uniquifier suffix.
+func NormalizeQuickLogFoodNameForResponse(f *Food) {
+	if f == nil {
+		return
+	}
+	if !f.QuickEntry && !quickLogFoodNameSuffix.MatchString(f.Name) {
+		return
+	}
+	f.Name = strings.TrimRight(quickLogFoodNameSuffix.ReplaceAllString(f.Name, ""), " \t")
+}
 
 // FoodWithVariants is one food row for the food picker, including optional sibling variant foods.
 type FoodWithVariants struct {

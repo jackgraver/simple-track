@@ -54,13 +54,14 @@ type CreateFoodRequest struct {
 }
 
 type QuickLogRequest struct {
-	Name     string  `json:"name" binding:"required"`
-	Calories float32 `json:"calories"`
-	Protein  float32 `json:"protein"`
-	Carbs    float32 `json:"carbs"`
-	Fat      float32 `json:"fat"`
-	Fiber    float32 `json:"fiber"`
-	Offset   int     `json:"offset"`
+	Name          string  `json:"name" binding:"required"`
+	Calories      float32 `json:"calories"`
+	Protein       float32 `json:"protein"`
+	Carbs         float32 `json:"carbs"`
+	Fat           float32 `json:"fat"`
+	Fiber         float32 `json:"fiber"`
+	Offset        int     `json:"offset"`
+	ReplaceMealID uint    `json:"replace_meal_id"`
 }
 
 func (h *MealHandler) postQuickLog(c *gin.Context) {
@@ -109,6 +110,18 @@ func (h *MealHandler) postQuickLog(c *gin.Context) {
 		mealID, merr := services.CreateMeal(tx, &meal)
 		if merr != nil {
 			return merr
+		}
+		if req.ReplaceMealID != 0 {
+			var cnt int64
+			if cerr := tx.Model(&models.DayLog{}).
+				Where("day_id = ? AND meal_id = ? AND deleted_at IS NULL", dayID, req.ReplaceMealID).
+				Count(&cnt).Error; cerr != nil {
+				return cerr
+			}
+			if cnt != 1 {
+				return fmt.Errorf("replace_meal_id does not match a log on this day")
+			}
+			return services.UpdateDayLogMeal(tx, dayID, req.ReplaceMealID, mealID)
 		}
 		return services.CreateDayMeal(tx, &models.DayLog{
 			DayID:  dayID,
@@ -240,6 +253,9 @@ func (h *MealHandler) postNewCompositeFood(c *gin.Context) {
 	if err := h.db.Preload("Items.Food").First(&loaded, id).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
+	}
+	for i := range loaded.Items {
+		models.NormalizeQuickLogFoodNameForResponse(&loaded.Items[i].Food)
 	}
 	c.JSON(http.StatusCreated, gin.H{"composite_food": compositeToResponse(loaded)})
 }
