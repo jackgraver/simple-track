@@ -1,23 +1,27 @@
 <script setup lang="ts">
-import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query';
-import { computed, ref, watch } from 'vue';
-import { useRouter } from 'vue-router';
-import { updatePlanMacros } from '~/api/diet/api';
-import { fetchProfile, fetchWeightLogs, saveProfile } from '~/api/tracking/api';
-import { trackingKeys } from '~/api/tracking/keys';
-import type { ActivityLevel } from '~/api/tracking/types';
-import { toast } from '~/composables/toast/useToast';
-import { homeKeys } from '~/pages/home/queries/keys';
-import { useDietLogsToday } from '~/pages/home/queries/useDietLogsToday';
-import BodyProfileCard from './components/BodyProfileCard.vue';
-import MacroSlidersPanel from './components/MacroSlidersPanel.vue';
-import TDEECalculator from './components/TDEECalculator.vue';
-import { useMacroSliders } from './useMacroSliders';
-import { useTDEE } from './useTDEE';
+import { useMutation, useQuery, useQueryClient } from "@tanstack/vue-query";
+import { computed, ref, watch } from "vue";
+import { useRouter } from "vue-router";
+import { updatePlanMacros } from "~/api/diet/api";
+import { fetchProfile, fetchWeightLogs, saveProfile } from "~/api/tracking/api";
+import { trackingKeys } from "~/api/tracking/keys";
+import type { ActivityLevel } from "~/api/tracking/types";
+import { toast } from "~/composables/toast/useToast";
+import { homeKeys } from "~/pages/home/queries/keys";
+import { useDietLogsToday } from "~/pages/home/queries/useDietLogsToday";
+import BodyProfileCard from "./components/BodyProfileCard.vue";
+import MacroSlidersPanel from "./components/MacroSlidersPanel.vue";
+import TDEECalculator from "./components/TDEECalculator.vue";
+import { useMacroSliders } from "./useMacroSliders";
+import { useTDEE } from "./useTDEE";
 
 const router = useRouter();
 const queryClient = useQueryClient();
-const { data: dayData, isPending: dayPending, error: loadError } = useDietLogsToday(0);
+const {
+    data: dayData,
+    isPending: dayPending,
+    error: loadError,
+} = useDietLogsToday(0);
 const { data: profileRow, isPending: profilePending } = useQuery({
     queryKey: trackingKeys.profile,
     queryFn: fetchProfile,
@@ -33,8 +37,8 @@ const latestLogWeightLbs = computed(() => {
 const weightLbs = ref(0);
 const heightIn = ref(70);
 const age = ref(30);
-const sex = ref<'male' | 'female'>('male');
-const activityLevel = ref<ActivityLevel>('moderately_active');
+const sex = ref<"male" | "female">("male");
+const activityLevel = ref<ActivityLevel>("moderately_active");
 watch(
     profileRow,
     (p) => {
@@ -75,7 +79,9 @@ const macrosValid = computed(() => {
         sliders.fatG.value,
         sliders.fiberG.value,
     ];
-    return nums.every((n) => typeof n === 'number' && !Number.isNaN(n) && n >= 0);
+    return nums.every(
+        (n) => typeof n === "number" && !Number.isNaN(n) && n >= 0,
+    );
 });
 const profileValid = computed(
     () => heightIn.value > 0 && age.value > 0 && weightLbs.value > 0,
@@ -83,7 +89,7 @@ const profileValid = computed(
 const saveMutation = useMutation({
     mutationFn: async () => {
         const id = planId.value;
-        if (id == null) throw new Error('No diet plan loaded');
+        if (id == null) throw new Error("No diet plan loaded");
         return updatePlanMacros(id, {
             calories: sliders.calorieTarget.value,
             protein: sliders.proteinG.value,
@@ -94,11 +100,11 @@ const saveMutation = useMutation({
     },
     onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: homeKeys.diet.all });
-        toast.push('Macro targets saved', 'success');
-        router.push({ name: 'diet' });
+        toast.push("Macro targets saved", "success");
+        router.push({ name: "diet" });
     },
     onError: () => {
-        toast.push('Could not save macro targets', 'error');
+        toast.push("Could not save macro targets", "error");
     },
 });
 const profileMutation = useMutation({
@@ -111,10 +117,10 @@ const profileMutation = useMutation({
         }),
     onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: trackingKeys.profile });
-        toast.push('Profile saved', 'success');
+        toast.push("Profile saved", "success");
     },
     onError: () => {
-        toast.push('Could not save profile', 'error');
+        toast.push("Could not save profile", "error");
     },
 });
 const saving = computed(() => saveMutation.isPending.value);
@@ -123,7 +129,7 @@ const isPending = computed(() => dayPending.value || profilePending.value);
 const submit = () => saveMutation.mutate();
 const saveProfileAction = () => profileMutation.mutate();
 const goBack = () => {
-    router.push({ name: 'diet' });
+    router.push({ name: "diet" });
 };
 function applyTdeeCalories(n: number) {
     sliders.setCalorieTarget(n);
@@ -131,36 +137,37 @@ function applyTdeeCalories(n: number) {
 </script>
 
 <template>
-    <div class="mx-auto flex max-w-lg flex-col gap-6 pb-8 pt-2">
-        <div class="flex flex-wrap items-center gap-3">
-            <button
-                type="button"
-                class="text-sm text-zinc-400 underline hover:text-zinc-200"
-                @click="goBack"
-            >
-                ← Diet
-            </button>
-            <h1 class="m-0 text-xl font-semibold tracking-tight text-zinc-100">
-                Macro targets
+    <div class="flex flex-col gap-5 pb-8 pt-2">
+        <div class="flex items-baseline gap-3">
+            <h1 class="m-0 text-lg font-semibold text-textPrimary">
+                Macro Targets
             </h1>
+            <span v-if="dayData?.day.plan?.name" class="text-sm text-zinc-500">
+                {{ dayData.day.plan.name }}
+            </span>
         </div>
         <div v-if="isPending" class="text-zinc-500">Loading…</div>
         <div v-else-if="loadError" class="text-red-400">
             {{ loadError.message }}
         </div>
         <template v-else>
-            <p v-if="dayData?.day.plan?.name" class="m-0 text-sm text-zinc-400">
-                Plan: {{ dayData.day.plan.name }}
-            </p>
-            <details class="group rounded-lg border border-zinc-700 bg-zinc-950/40" open>
-                <summary
-                    class="cursor-pointer list-none p-3 text-sm font-medium text-zinc-200 marker:content-none [&::-webkit-details-marker]:hidden"
+            <div class="grid grid-cols-1 items-start gap-5 md:grid-cols-2">
+                <section
+                    class="flex flex-col gap-3 rounded-lg border border-zinc-700 bg-zinc-950/40 p-4"
                 >
-                    <span class="underline decoration-zinc-600 group-open:no-underline"
-                        >Body profile</span
-                    >
-                </summary>
-                <div class="border-t border-zinc-800 p-3 pt-0">
+                    <div class="flex items-center justify-between">
+                        <h2 class="m-0 text-sm font-medium text-zinc-200">
+                            Body Profile
+                        </h2>
+                        <button
+                            type="button"
+                            class="rounded-md border border-zinc-600 bg-zinc-800 px-3 py-1.5 text-xs font-medium text-zinc-100 hover:bg-zinc-700 disabled:opacity-50"
+                            :disabled="savingProfile || !profileValid"
+                            @click="saveProfileAction"
+                        >
+                            {{ savingProfile ? "Saving…" : "Save profile" }}
+                        </button>
+                    </div>
                     <BodyProfileCard
                         :weight-lbs="weightLbs"
                         :height-in="heightIn"
@@ -174,55 +181,37 @@ function applyTdeeCalories(n: number) {
                         @update:sex="sex = $event"
                         @update:activity-level="activityLevel = $event"
                     />
-                    <p v-if="!profileValid" class="mt-2 text-xs text-zinc-500">
+                    <p v-if="!profileValid" class="m-0 text-xs text-zinc-500">
                         Add weight, height, and age for TDEE.
                     </p>
-                    <button
-                        type="button"
-                        class="mt-3 rounded-md border border-zinc-600 bg-zinc-900 px-3 py-2 text-sm font-medium text-zinc-100 hover:bg-zinc-800 disabled:opacity-50"
-                        :disabled="savingProfile || !profileValid"
-                        @click="saveProfileAction"
-                    >
-                        {{ savingProfile ? 'Saving…' : 'Save profile' }}
-                    </button>
-                </div>
-            </details>
-            <details class="group rounded-lg border border-zinc-700 bg-zinc-950/40" open>
-                <summary
-                    class="cursor-pointer list-none p-3 text-sm font-medium text-zinc-200 marker:content-none [&::-webkit-details-marker]:hidden"
+                </section>
+                <section
+                    class="flex flex-col gap-3 rounded-lg border border-zinc-700 bg-zinc-950/40 p-4"
                 >
-                    <span class="underline decoration-zinc-600 group-open:no-underline"
-                        >TDEE estimate</span
-                    >
-                </summary>
-                <div class="border-t border-zinc-800 p-3 pt-0">
+                    <h2 class="m-0 text-sm font-medium text-zinc-200">
+                        TDEE Estimate
+                    </h2>
                     <TDEECalculator
                         :bmr="bmr"
                         :tdee="tdee"
                         :multiplier="multiplier"
                         @apply-calories="applyTdeeCalories"
                     />
-                </div>
-            </details>
-            <details class="group rounded-lg border border-zinc-700 bg-zinc-950/40" open>
-                <summary
-                    class="cursor-pointer list-none p-3 text-sm font-medium text-zinc-200 marker:content-none [&::-webkit-details-marker]:hidden"
-                >
-                    <span class="underline decoration-zinc-600 group-open:no-underline"
-                        >Macros</span
-                    >
-                </summary>
-                <div class="border-t border-zinc-800 p-3 pt-0">
-                    <MacroSlidersPanel :sliders="sliders" :weight-lbs="weightLbs" />
-                </div>
-            </details>
-            <form class="flex flex-col gap-3" @submit.prevent="submit">
+                </section>
+            </div>
+            <section
+                class="flex flex-col gap-3 rounded-lg border border-zinc-700 bg-zinc-950/40 p-4"
+            >
+                <h2 class="m-0 text-sm font-medium text-zinc-200">Macros</h2>
+                <MacroSlidersPanel :sliders="sliders" :weight-lbs="weightLbs" />
+            </section>
+            <form @submit.prevent="submit">
                 <button
                     type="submit"
-                    class="rounded-md border border-amber-700/50 bg-amber-950/40 px-3 py-2 text-sm font-medium text-amber-100 hover:bg-amber-950/70 disabled:opacity-50"
+                    class="w-full rounded-md border border-amber-700/50 bg-amber-950/40 px-4 py-2.5 text-sm font-semibold text-amber-100 transition-colors hover:bg-amber-950/70 disabled:opacity-50"
                     :disabled="saving || planId == null || !macrosValid"
                 >
-                    {{ saving ? 'Saving…' : 'Save targets' }}
+                    {{ saving ? "Saving…" : "Save targets" }}
                 </button>
             </form>
         </template>
