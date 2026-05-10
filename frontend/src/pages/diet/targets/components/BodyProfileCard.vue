@@ -72,97 +72,101 @@ function applyLatestWeight() {
 </script>
 
 <template>
-    <div class="rounded-lg border border-zinc-600 bg-zinc-900/60 p-4">
+    <div class="flex flex-col gap-3">
         <p
             v-if="latestLogWeightLbs != null && latestLogWeightLbs > 0"
-            class="mb-3 text-xs text-zinc-500"
+            class="m-0 text-xs text-zinc-500"
         >
             Latest logged weight: {{ latestLogWeightLbs }} lb
             <button
                 type="button"
-                class="ml-2 underline hover:text-zinc-300"
+                class="ml-1 text-zinc-400 underline underline-offset-2 hover:text-zinc-200"
                 @click="applyLatestWeight"
             >
                 Use
             </button>
         </p>
-        <label class="mb-3 flex flex-col gap-1">
-            <span class="text-sm font-medium text-zinc-300">Weight (lb)</span>
-            <input
-                :value="weightLbs"
-                type="number"
-                min="1"
-                step="0.1"
-                class="rounded-md border border-zinc-600 bg-zinc-900 px-3 py-2 text-zinc-100 outline-none ring-amber-700/40 focus:border-amber-600 focus:ring-2"
-                @input="
-                    emit(
-                        'update:weightLbs',
-                        Number(($event.target as HTMLInputElement).value) || 0,
-                    )
-                "
-            />
-        </label>
-        <div class="mb-3 flex flex-wrap items-center gap-2">
-            <span class="text-sm font-medium text-zinc-300">Height</span>
-            <label class="flex items-center gap-2 text-xs text-zinc-400">
-                <input v-model="useMetric" type="checkbox" class="accent-amber-600" />
-                Metric (cm)
-            </label>
-        </div>
-        <div v-if="useMetric" class="mb-3 flex flex-col gap-1">
-            <input
-                :value="heightCm"
-                type="number"
-                min="1"
-                step="0.1"
-                class="rounded-md border border-zinc-600 bg-zinc-900 px-3 py-2 text-zinc-100 outline-none ring-amber-700/40 focus:border-amber-600 focus:ring-2"
-                @input="heightCm = Number(($event.target as HTMLInputElement).value) || 0"
-            />
-        </div>
-        <div v-else class="mb-3 flex flex-wrap items-end gap-2">
+        <div class="grid grid-cols-2 gap-3">
             <label class="flex flex-col gap-1">
-                <span class="text-xs text-zinc-400">Ft</span>
+                <span class="text-xs font-medium text-zinc-400">Weight (lb)</span>
                 <input
-                    :value="feet"
+                    :value="weightLbs"
                     type="number"
-                    min="0"
-                    step="1"
-                    class="w-20 rounded-md border border-zinc-600 bg-zinc-900 px-2 py-2 text-zinc-100"
-                    @input="feet = Number(($event.target as HTMLInputElement).value)"
-                />
-            </label>
-            <label class="flex flex-col gap-1">
-                <span class="text-xs text-zinc-400">In</span>
-                <input
-                    :value="inchesOnly"
-                    type="number"
-                    min="0"
+                    min="1"
                     step="0.1"
-                    class="w-20 rounded-md border border-zinc-600 bg-zinc-900 px-2 py-2 text-zinc-100"
-                    @input="inchesOnly = Number(($event.target as HTMLInputElement).value)"
+                    class="rounded-md border border-zinc-600 bg-zinc-900 px-3 py-1.5 text-sm text-zinc-100 outline-none ring-amber-700/40 focus:border-amber-600 focus:ring-2"
+                    @input="
+                        emit(
+                            'update:weightLbs',
+                            Number(($event.target as HTMLInputElement).value) || 0,
+                        )
+                    "
+                />
+            </label>
+            <label class="flex flex-col gap-1">
+                <span class="text-xs font-medium text-zinc-400">Age</span>
+                <input
+                    :value="age"
+                    type="number"
+                    min="1"
+                    max="130"
+                    step="1"
+                    class="rounded-md border border-zinc-600 bg-zinc-900 px-3 py-1.5 text-sm text-zinc-100 outline-none ring-amber-700/40 focus:border-amber-600 focus:ring-2"
+                    @input="
+                        emit('update:age', Number(($event.target as HTMLInputElement).value) || 0)
+                    "
                 />
             </label>
         </div>
-        <label class="mb-3 flex flex-col gap-1">
-            <span class="text-sm font-medium text-zinc-300">Age</span>
-            <input
-                :value="age"
-                type="number"
-                min="1"
-                max="130"
-                step="1"
-                class="rounded-md border border-zinc-600 bg-zinc-900 px-3 py-2 text-zinc-100 outline-none ring-amber-700/40 focus:border-amber-600 focus:ring-2"
-                @input="
-                    emit('update:age', Number(($event.target as HTMLInputElement).value) || 0)
-                "
-            />
-        </label>
-        <div class="mb-3 flex flex-col gap-2">
-            <span class="text-sm font-medium text-zinc-300">Sex</span>
-            <div class="flex flex-wrap gap-2">
+        <div class="flex flex-col gap-1">
+            <div class="flex items-center gap-2">
+                <span class="text-xs font-medium text-zinc-400">Height</span>
+                <label class="flex items-center gap-1.5 text-xs text-zinc-500">
+                    <input v-model="useMetric" type="checkbox" class="accent-amber-600" />
+                    cm
+                </label>
+            </div>
+            <div v-if="useMetric">
+                <input
+                    :value="heightCm"
+                    type="number"
+                    min="1"
+                    step="0.1"
+                    class="w-full rounded-md border border-zinc-600 bg-zinc-900 px-3 py-1.5 text-sm text-zinc-100 outline-none ring-amber-700/40 focus:border-amber-600 focus:ring-2"
+                    @input="heightCm = Number(($event.target as HTMLInputElement).value) || 0"
+                />
+            </div>
+            <div v-else class="flex items-end gap-2">
+                <label class="flex flex-col gap-1">
+                    <span class="text-xs text-zinc-500">Ft</span>
+                    <input
+                        :value="feet"
+                        type="number"
+                        min="0"
+                        step="1"
+                        class="w-20 rounded-md border border-zinc-600 bg-zinc-900 px-2 py-1.5 text-sm text-zinc-100"
+                        @input="feet = Number(($event.target as HTMLInputElement).value)"
+                    />
+                </label>
+                <label class="flex flex-col gap-1">
+                    <span class="text-xs text-zinc-500">In</span>
+                    <input
+                        :value="inchesOnly"
+                        type="number"
+                        min="0"
+                        step="0.1"
+                        class="w-20 rounded-md border border-zinc-600 bg-zinc-900 px-2 py-1.5 text-sm text-zinc-100"
+                        @input="inchesOnly = Number(($event.target as HTMLInputElement).value)"
+                    />
+                </label>
+            </div>
+        </div>
+        <div class="flex flex-col gap-1.5">
+            <span class="text-xs font-medium text-zinc-400">Sex</span>
+            <div class="flex gap-2">
                 <button
                     type="button"
-                    class="rounded-md border px-3 py-1.5 text-sm font-medium"
+                    class="rounded-md border px-3 py-1 text-xs font-medium"
                     :class="
                         sex === 'male'
                             ? 'border-amber-600 bg-amber-950/50 text-amber-100'
@@ -174,7 +178,7 @@ function applyLatestWeight() {
                 </button>
                 <button
                     type="button"
-                    class="rounded-md border px-3 py-1.5 text-sm font-medium"
+                    class="rounded-md border px-3 py-1 text-xs font-medium"
                     :class="
                         sex === 'female'
                             ? 'border-amber-600 bg-amber-950/50 text-amber-100'
@@ -187,10 +191,10 @@ function applyLatestWeight() {
             </div>
         </div>
         <label class="flex flex-col gap-1">
-            <span class="text-sm font-medium text-zinc-300">Activity</span>
+            <span class="text-xs font-medium text-zinc-400">Activity</span>
             <select
                 :value="activityLevel"
-                class="rounded-md border border-zinc-600 bg-zinc-900 px-3 py-2 text-zinc-100 outline-none ring-amber-700/40 focus:border-amber-600 focus:ring-2"
+                class="rounded-md border border-zinc-600 bg-zinc-900 px-3 py-1.5 text-sm text-zinc-100 outline-none ring-amber-700/40 focus:border-amber-600 focus:ring-2"
                 @change="
                     emit(
                         'update:activityLevel',

@@ -35,18 +35,25 @@ function apply() {
 </script>
 
 <template>
-    <div class="rounded-lg border border-zinc-600 bg-zinc-900/60 p-4">
-        <div v-if="bmr != null && tdee != null" class="flex flex-col gap-3">
-            <div class="text-sm text-zinc-400">
-                <p class="m-0">BMR: {{ Math.round(bmr) }} kcal/day</p>
-                <p class="m-0">Activity × {{ multiplier }}</p>
-                <p class="m-0 font-medium text-zinc-200">
-                    TDEE: {{ Math.round(tdee) }} kcal/day
-                </p>
+    <div class="flex flex-col gap-3">
+        <template v-if="bmr != null && tdee != null">
+            <div class="grid grid-cols-3 gap-2 rounded-md bg-zinc-900/60 px-3 py-2.5 text-center text-xs">
+                <div>
+                    <span class="text-zinc-500">BMR</span>
+                    <p class="m-0 text-sm tabular-nums font-medium text-zinc-200">{{ Math.round(bmr) }}</p>
+                </div>
+                <div>
+                    <span class="text-zinc-500">× {{ multiplier }}</span>
+                    <p class="m-0 text-sm text-zinc-400">&nbsp;</p>
+                </div>
+                <div>
+                    <span class="text-zinc-500">TDEE</span>
+                    <p class="m-0 text-sm tabular-nums font-semibold text-zinc-100">{{ Math.round(tdee) }}</p>
+                </div>
             </div>
-            <div>
-                <p class="mb-2 text-sm font-medium text-zinc-300">Goal</p>
-                <div class="mb-2 flex flex-wrap gap-2">
+            <div class="flex flex-col gap-2">
+                <span class="text-xs font-medium text-zinc-400">Goal</span>
+                <div class="flex flex-wrap gap-1.5">
                     <button
                         v-for="g in goalChoices"
                         :key="g.id"
@@ -62,19 +69,21 @@ function apply() {
                         {{ g.label }}
                     </button>
                 </div>
-                <p class="mb-2 text-sm tabular-nums text-zinc-200">
-                    Target: {{ goalCalories ?? '—' }} kcal/day
-                </p>
+            </div>
+            <div class="flex items-center justify-between gap-3 rounded-md bg-zinc-900/60 px-3 py-2">
+                <span class="text-sm tabular-nums text-zinc-200">
+                    {{ goalCalories ?? '—' }} kcal/day
+                </span>
                 <button
                     type="button"
-                    class="rounded-md border border-amber-700/50 bg-amber-950/30 px-3 py-2 text-sm font-medium text-amber-100 hover:bg-amber-950/50"
+                    class="shrink-0 rounded-md border border-amber-700/50 bg-amber-950/30 px-3 py-1.5 text-xs font-medium text-amber-100 hover:bg-amber-950/50 disabled:opacity-50"
                     :disabled="goalCalories == null"
                     @click="apply"
                 >
-                    Use as calorie target
+                    Apply to macros
                 </button>
             </div>
-        </div>
+        </template>
         <p v-else class="m-0 text-sm text-zinc-500">
             Fill body profile and weight to estimate TDEE.
         </p>
