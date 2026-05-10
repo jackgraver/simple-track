@@ -5,6 +5,7 @@ import {
     editLoggedMeal,
     deletePlannedMeal,
     addPlannedMealFromSaved,
+    reorderPlannedMeals,
 } from '~/api/diet/api';
 import { homeKeys } from './keys';
 import type { Meal } from '~/types/diet';
@@ -74,6 +75,20 @@ export function useAddPlannedFromSaved(offset: MaybeRefOrGetter<number>) {
     return useMutation({
         mutationFn: (savedMealId: number) =>
             addPlannedMealFromSaved(savedMealId, toValue(offset)),
+        onSuccess: () => {
+            queryClient.invalidateQueries({
+                queryKey: homeKeys.diet.today(toValue(offset)),
+            });
+        },
+    });
+}
+
+export function useReorderPlannedMeals(offset: MaybeRefOrGetter<number>) {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: (plannedMealIds: number[]) =>
+            reorderPlannedMeals(plannedMealIds, toValue(offset)),
         onSuccess: () => {
             queryClient.invalidateQueries({
                 queryKey: homeKeys.diet.today(toValue(offset)),

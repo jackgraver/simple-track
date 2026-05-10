@@ -570,7 +570,7 @@ func GetExerciseProgression(db *gorm.DB, exerciseID uint) ([]ExerciseProgression
 	return entries, nil
 }
 
-// LoadPlanWithOrderedExercises loads a plan and its exercises sorted by join position.
+// LoadPlanWithOrderedExercises loads a plan and its exercises sorted by display_order on the plan↔exercise join.
 func LoadPlanWithOrderedExercises(db *gorm.DB, planID uint) (*models.WorkoutPlan, error) {
 	var plan models.WorkoutPlan
 	if err := db.First(&plan, planID).Error; err != nil {
@@ -621,20 +621,20 @@ func AddExerciseToPlan(db *gorm.DB, planID uint, exerciseID uint) error {
 	return db.Create(&models.WorkoutPlanExercise{
 		WorkoutPlanID: planID,
 		ExerciseID:    exerciseID,
-		Position:      int(count),
+		DisplayOrder:  int(count),
 	}).Error
 }
 
-func renumberWorkoutPlanExercisePositions(db *gorm.DB, planID uint) error {
+func renumberWorkoutPlanExerciseDisplayOrder(db *gorm.DB, planID uint) error {
 	var rows []models.WorkoutPlanExercise
-	if err := db.Where("workout_plan_id = ?", planID).Order("position ASC").Find(&rows).Error; err != nil {
+	if err := db.Where("workout_plan_id = ?", planID).Order("display_order ASC").Find(&rows).Error; err != nil {
 		return err
 	}
 	for i := range rows {
-		if rows[i].Position != i {
+		if rows[i].DisplayOrder != i {
 			if err := db.Model(&models.WorkoutPlanExercise{}).
 				Where("workout_plan_id = ? AND exercise_id = ?", planID, rows[i].ExerciseID).
-				Update("position", i).Error; err != nil {
+				Update("display_order", i).Error; err != nil {
 				return err
 			}
 		}
@@ -650,7 +650,7 @@ func RemoveExerciseFromPlan(db *gorm.DB, planID uint, exerciseID uint) error {
 	if res.RowsAffected == 0 {
 		return gorm.ErrRecordNotFound
 	}
-	return renumberWorkoutPlanExercisePositions(db, planID)
+	return renumberWorkoutPlanExerciseDisplayOrder(db, planID)
 }
 
 // ReorderPlanExercises sets exercise order for a plan. exerciseIDs must be a permutation of the plan's exercises.
@@ -679,7 +679,7 @@ func ReorderPlanExercises(db *gorm.DB, planID uint, exerciseIDs []uint) error {
 		for i, eid := range exerciseIDs {
 			if err := tx.Model(&models.WorkoutPlanExercise{}).
 				Where("workout_plan_id = ? AND exercise_id = ?", planID, eid).
-				Update("position", i).Error; err != nil {
+				Update("display_order", i).Error; err != nil {
 				return err
 			}
 		}

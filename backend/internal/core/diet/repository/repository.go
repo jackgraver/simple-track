@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 
@@ -253,6 +254,54 @@ func (r *Repository) PlannedMealDelete(plannedMealID uint, dayID uint) error {
 	return r.db.Delete(&pm).Error
 }
 
+func (r *Repository) NextPlannedMealDisplayOrder(dayID uint) (int, error) {
+	var next int
+	err := r.db.Model(&models.PlannedMeal{}).
+		Where("day_id = ? AND logged = ?", dayID, false).
+		Select("COALESCE(MAX(display_order), -1) + 1").
+		Scan(&next).Error
+	return next, err
+}
+
+func (r *Repository) PlannedMealReorder(dayID uint, orderedIDs []uint) error {
+	return r.db.Transaction(func(tx *gorm.DB) error {
+		var count int64
+		if err := tx.Model(&models.PlannedMeal{}).
+			Where("day_id = ? AND logged = ?", dayID, false).
+			Count(&count).Error; err != nil {
+			return err
+		}
+		if count == 0 {
+			if len(orderedIDs) == 0 {
+				return nil
+			}
+			return fmt.Errorf("no planned meals to reorder")
+		}
+		if int(count) != len(orderedIDs) {
+			return fmt.Errorf("planned meal count mismatch: expected %d ids, got %d", count, len(orderedIDs))
+		}
+		seen := make(map[uint]struct{}, len(orderedIDs))
+		for _, id := range orderedIDs {
+			if _, dup := seen[id]; dup {
+				return fmt.Errorf("duplicate planned meal id in reorder list")
+			}
+			seen[id] = struct{}{}
+			var pm models.PlannedMeal
+			if err := tx.Where("id = ? AND day_id = ? AND logged = ?", id, dayID, false).First(&pm).Error; err != nil {
+				return err
+			}
+		}
+		for i, id := range orderedIDs {
+			if err := tx.Model(&models.PlannedMeal{}).
+				Where("id = ? AND day_id = ?", id, dayID).
+				Update("display_order", i).Error; err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+}
+
 func (r *Repository) MealByID(id uint) (*models.Meal, error) {
 	var meal models.Meal
 	if err := r.db.Preload("Items.Food").First(&meal, id).Error; err != nil {
@@ -349,7 +398,9 @@ func isUniqueConstraintError(err error) bool {
 func (r *Repository) loadDietDayWithPreloads(id uint) (models.DietDay, error) {
 	var day models.DietDay
 	if err := r.db.
-		Preload("PlannedMeals", "logged = ?", false).
+		Preload("PlannedMeals", func(db *gorm.DB) *gorm.DB {
+			return db.Where("logged = ?", false).Order("display_order ASC, id ASC")
+		}).
 		Preload("PlannedMeals.Meal.Items.Food").
 		Preload("Plan").
 		Preload("Logs.Meal.Items.Food").

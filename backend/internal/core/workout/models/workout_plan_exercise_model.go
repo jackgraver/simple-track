@@ -4,7 +4,7 @@ package models
 type WorkoutPlanExercise struct {
 	WorkoutPlanID uint `gorm:"primaryKey" json:"workout_plan_id"`
 	ExerciseID    uint `gorm:"primaryKey" json:"exercise_id"`
-	Position      int  `gorm:"not null;default:0" json:"position"`
+	DisplayOrder  int  `gorm:"not null;default:0" json:"display_order"`
 }
 
 func (WorkoutPlanExercise) TableName() string {

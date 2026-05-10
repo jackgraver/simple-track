@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ChevronLeft, ChevronRight } from "lucide-vue-next";
+import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp } from "lucide-vue-next";
 import { computed, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useQueries, useQuery, useQueryClient } from "@tanstack/vue-query";
@@ -12,7 +12,7 @@ import type {
     SavedMealItem,
 } from "~/types/diet";
 import { useDietLogsToday } from "~/pages/home/queries/useDietLogsToday";
-import { useDeletePlannedMeal } from "~/pages/home/queries/useMealMutations";
+import { useDeletePlannedMeal, useReorderPlannedMeals } from "~/pages/home/queries/useMealMutations";
 import { toast } from "~/composables/toast/useToast";
 import SimpleMacros from "~/shared/SimpleMacros.vue";
 import { homeKeys } from "~/pages/home/queries/keys";
@@ -219,6 +219,12 @@ const {
 const plannedMeals = computed(
     (): PlannedMeal[] => dayData.value?.day.plannedMeals ?? [],
 );
+const sortedPlannedMeals = computed(() =>
+    [...plannedMeals.value].sort(
+        (a, b) =>
+            (a.display_order ?? 0) - (b.display_order ?? 0) || a.ID - b.ID,
+    ),
+);
 
 const {
     data: savedRaw,
@@ -235,7 +241,9 @@ const {
 const savedMeals = computed((): SavedMeal[] => savedRaw.value ?? []);
 
 const deletePlanned = useDeletePlannedMeal(dateOffset);
+const reorderPlanned = useReorderPlannedMeals(dateOffset);
 const isRemoving = computed(() => deletePlanned.isPending.value);
+const isReordering = computed(() => reorderPlanned.isPending.value);
 const singleAdding = ref(false);
 
 async function removePlanned(pm: PlannedMeal) {
@@ -244,6 +252,21 @@ async function removePlanned(pm: PlannedMeal) {
         toast.push("Removed from planned", "success");
     } catch {
         toast.push("Could not remove planned meal", "error");
+    }
+}
+
+async function movePlanned(index: number, dir: -1 | 1) {
+    const ordered = sortedPlannedMeals.value.map((p) => p.ID);
+    const j = index + dir;
+    if (j < 0 || j >= ordered.length) return;
+    const next = [...ordered];
+    const t = next[index];
+    next[index] = next[j];
+    next[j] = t;
+    try {
+        await reorderPlanned.mutateAsync(next);
+    } catch {
+        toast.push("Could not update order", "error");
     }
 }
 
@@ -265,14 +288,35 @@ async function addSavedToSelectedDay(sm: SavedMeal) {
 
 const bulkFrom = ref("");
 const bulkTo = ref("");
-const bulkSavedIds = ref(new Set<number>());
+const bulkSavedOrder = ref<number[]>([]);
 const bulkSaving = ref(false);
 
+const bulkSavedMealsOrdered = computed((): SavedMeal[] => {
+    const byId = new Map(savedMeals.value.map((s) => [s.ID, s]));
+    return bulkSavedOrder.value
+        .map((id) => byId.get(id))
+        .filter((s): s is SavedMeal => s != null);
+});
+
 function toggleBulkSaved(id: number) {
-    const next = new Set(bulkSavedIds.value);
-    if (next.has(id)) next.delete(id);
-    else next.add(id);
-    bulkSavedIds.value = next;
+    const cur = bulkSavedOrder.value;
+    const i = cur.indexOf(id);
+    if (i >= 0) {
+        bulkSavedOrder.value = cur.filter((x) => x !== id);
+    } else {
+        bulkSavedOrder.value = [...cur, id];
+    }
+}
+
+function moveBulkSaved(index: number, dir: -1 | 1) {
+    const j = index + dir;
+    const cur = bulkSavedOrder.value;
+    if (j < 0 || j >= cur.length) return;
+    const next = [...cur];
+    const t = next[index];
+    next[index] = next[j];
+    next[j] = t;
+    bulkSavedOrder.value = next;
 }
 
 async function saveBulkRange() {
@@ -287,7 +331,7 @@ async function saveBulkRange() {
         toast.push("Invalid date range", "error");
         return;
     }
-    const mealIds = [...bulkSavedIds.value];
+    const mealIds = [...bulkSavedOrder.value];
     if (mealIds.length === 0) {
         toast.push("Select at least one saved meal", "error");
         return;
@@ -416,14 +460,14 @@ async function saveBulkRange() {
                         Currently planned
                     </h3>
                     <p
-                        v-if="plannedMeals.length === 0"
+                        v-if="sortedPlannedMeals.length === 0"
                         class="m-0 text-sm text-zinc-500"
                     >
                         Nothing planned yet. Add a saved meal below.
                     </p>
                     <ul v-else class="m-0 flex list-none flex-col gap-2 p-0">
                         <li
-                            v-for="pm in plannedMeals"
+                            v-for="(pm, index) in sortedPlannedMeals"
                             :key="pm.ID"
                             class="flex items-center justify-between gap-2 rounded-lg border border-zinc-700 bg-zinc-900/50 px-3 py-2"
                         >
@@ -438,10 +482,41 @@ async function saveBulkRange() {
                                     v-bind="macroTotals(pm.meal.items)"
                                 />
                             </div>
+                            <div
+                                class="flex shrink-0 flex-col items-center gap-0.5"
+                            >
+                                <button
+                                    type="button"
+                                    class="rounded border border-zinc-600 p-0.5 text-zinc-300 hover:bg-zinc-800 disabled:opacity-40"
+                                    :disabled="
+                                        index === 0 ||
+                                        isReordering ||
+                                        isRemoving
+                                    "
+                                    aria-label="Move up"
+                                    @click="movePlanned(index, -1)"
+                                >
+                                    <ChevronUp class="size-4" />
+                                </button>
+                                <button
+                                    type="button"
+                                    class="rounded border border-zinc-600 p-0.5 text-zinc-300 hover:bg-zinc-800 disabled:opacity-40"
+                                    :disabled="
+                                        index ===
+                                            sortedPlannedMeals.length - 1 ||
+                                        isReordering ||
+                                        isRemoving
+                                    "
+                                    aria-label="Move down"
+                                    @click="movePlanned(index, 1)"
+                                >
+                                    <ChevronDown class="size-4" />
+                                </button>
+                            </div>
                             <button
                                 type="button"
                                 class="shrink-0 rounded-md border border-red-900/60 bg-red-950/40 px-2 py-1 text-sm font-medium text-red-200 hover:bg-red-950/70 disabled:opacity-50"
-                                :disabled="isRemoving"
+                                :disabled="isRemoving || isReordering"
                                 @click="removePlanned(pm)"
                             >
                                 Remove
@@ -497,7 +572,8 @@ async function saveBulkRange() {
                 Plan a date range
             </h2>
             <p class="m-0 text-xs text-zinc-500">
-                Pick dates and saved meals, then save.
+                Pick dates and saved meals. Order below is first → last on each
+                day.
             </p>
             <div class="flex flex-wrap items-end gap-3">
                 <label
@@ -544,7 +620,7 @@ async function saveBulkRange() {
                         <input
                             type="checkbox"
                             class="mt-1 accent-amber-600"
-                            :checked="bulkSavedIds.has(sm.ID)"
+                            :checked="bulkSavedOrder.includes(sm.ID)"
                             @change="toggleBulkSaved(sm.ID)"
                         />
                         <span class="min-w-0 flex-1">
@@ -560,6 +636,48 @@ async function saveBulkRange() {
                         </span>
                     </label>
                 </div>
+            </div>
+            <div v-if="bulkSavedOrder.length > 0" class="flex flex-col gap-2">
+                <span class="text-xs font-medium text-zinc-400"
+                    >Order on each day</span
+                >
+                <ul class="m-0 flex list-none flex-col gap-1.5 p-0">
+                    <li
+                        v-for="(sm, index) in bulkSavedMealsOrdered"
+                        :key="'bulk-order-' + sm.ID"
+                        class="flex items-center gap-2 rounded-md border border-zinc-700 bg-zinc-900/60 px-2 py-1.5"
+                    >
+                        <span class="min-w-0 flex-1 text-sm text-zinc-100">{{
+                            sm.name
+                        }}</span>
+                        <div class="flex shrink-0 flex-col gap-0.5">
+                            <button
+                                type="button"
+                                class="rounded border border-zinc-600 p-0.5 text-zinc-300 hover:bg-zinc-800 disabled:opacity-40"
+                                :disabled="
+                                    index === 0 || bulkSaving
+                                "
+                                aria-label="Move up in bulk order"
+                                @click="moveBulkSaved(index, -1)"
+                            >
+                                <ChevronUp class="size-4" />
+                            </button>
+                            <button
+                                type="button"
+                                class="rounded border border-zinc-600 p-0.5 text-zinc-300 hover:bg-zinc-800 disabled:opacity-40"
+                                :disabled="
+                                    index ===
+                                        bulkSavedMealsOrdered.length - 1 ||
+                                    bulkSaving
+                                "
+                                aria-label="Move down in bulk order"
+                                @click="moveBulkSaved(index, 1)"
+                            >
+                                <ChevronDown class="size-4" />
+                            </button>
+                        </div>
+                    </li>
+                </ul>
             </div>
             <button
                 type="button"

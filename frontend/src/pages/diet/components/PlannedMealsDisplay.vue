@@ -23,8 +23,16 @@ const editPlannedMeal = () => {
 
 const start = ref(0);
 
+const sortedPlannedMeals = computed(() => {
+    const list = data.value?.day.plannedMeals ?? [];
+    return [...list].sort(
+        (a, b) =>
+            (a.display_order ?? 0) - (b.display_order ?? 0) || a.ID - b.ID,
+    );
+});
+
 watch(
-    () => data.value?.day.plannedMeals.length ?? 0,
+    () => sortedPlannedMeals.value.length,
     (len) => {
         const maxStart = Math.max(0, len - 2);
         if (start.value > maxStart) start.value = maxStart;
@@ -32,13 +40,13 @@ watch(
 );
 
 const visibleItems = computed(() =>
-    data.value?.day.plannedMeals.slice(start.value, start.value + 2),
+    sortedPlannedMeals.value.slice(start.value, start.value + 2),
 );
 
 function next() {
     start.value = Math.min(
         start.value + 1,
-        (data?.value?.day?.plannedMeals?.length ?? 0) - 2,
+        sortedPlannedMeals.value.length - 2,
     );
 }
 function prev() {
@@ -51,7 +59,7 @@ function prev() {
         <div class="flex flex-row items-center justify-between gap-2">
             <div class="flex w-full items-center gap-2">
                 <h2 class="mb-0 flex-1 text-lg font-semibold">
-                    Planned ({{ data?.day.plannedMeals.length }})
+                    Planned ({{ sortedPlannedMeals.length }})
                 </h2>
                 <button
                     type="button"
@@ -62,7 +70,7 @@ function prev() {
                     Edit
                 </button>
             </div>
-            <template v-if="data && data.day.plannedMeals.length > 2">
+            <template v-if="data && sortedPlannedMeals.length > 2">
                 <button
                     type="button"
                     :disabled="start === 0"
@@ -74,7 +82,7 @@ function prev() {
                 </button>
                 <button
                     type="button"
-                    :disabled="start === data.day.plannedMeals.length - 2"
+                    :disabled="start === sortedPlannedMeals.length - 2"
                     class="disabled:text-zinc-500"
                     aria-label="Next"
                     @click="next"

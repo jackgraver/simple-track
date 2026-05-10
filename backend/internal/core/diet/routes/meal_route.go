@@ -40,6 +40,7 @@ func RegisterMealRoutes(group *gin.RouterGroup, db *gorm.DB) {
 		meals.POST("/meal/editlogged", h.postEditLogged)
 		meals.DELETE("/meal/logged", h.deleteLoggedMeal)
 		meals.POST("/planned/from-saved", h.postPlannedFromSaved)
+		meals.POST("/planned/reorder", h.postPlannedReorder)
 		meals.DELETE("/planned", h.deletePlannedMeal)
 	}
 }
@@ -496,6 +497,46 @@ func (h *MealHandler) postPlannedFromSaved(c *gin.Context) {
 	}
 	if err := services.AddPlannedMealFromSavedMeal(h.db, req.Offset, req.SavedMealID); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	day, err := services.FindMealPlanDay(h.db, utils.ZerodTime(req.Offset))
+	if err != nil || day == nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Day not found"})
+		return
+	}
+	day, err = services.MealPlanDayByID(h.db, int(day.ID))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	tot := services.CalculateTotals(h.db, day.ID)
+	c.JSON(http.StatusOK, gin.H{
+		"day":           day,
+		"totalCalories": tot.Calories,
+		"totalProtein":  tot.Protein,
+		"totalFiber":    tot.Fiber,
+		"totalCarbs":    tot.Carbs,
+		"totalFat":      tot.Fat,
+	})
+}
+
+type ReorderPlannedMealsRequest struct {
+	Offset         int    `json:"offset"`
+	PlannedMealIDs []uint `json:"planned_meal_ids"`
+}
+
+func (h *MealHandler) postPlannedReorder(c *gin.Context) {
+	var req ReorderPlannedMealsRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if len(req.PlannedMealIDs) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "planned_meal_ids is required"})
+		return
+	}
+	if err := services.ReorderPlannedMeals(h.db, req.Offset, req.PlannedMealIDs); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 	day, err := services.FindMealPlanDay(h.db, utils.ZerodTime(req.Offset))

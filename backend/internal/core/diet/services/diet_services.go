@@ -127,12 +127,27 @@ func AddPlannedMealFromSavedMeal(db *gorm.DB, offset int, savedMealID uint) erro
 		if err != nil {
 			return err
 		}
+		displayOrder, err := r.NextPlannedMealDisplayOrder(day.ID)
+		if err != nil {
+			return err
+		}
 		return r.PlannedMealCreate(&models.PlannedMeal{
-			DayID:  day.ID,
-			MealID: mealID,
-			Logged: false,
+			DayID:        day.ID,
+			MealID:       mealID,
+			Logged:       false,
+			DisplayOrder: displayOrder,
 		})
 	})
+}
+
+// ReorderPlannedMeals sets display_order for unlogged planned meals on the day at offset from orderedIDs (full list, in desired order).
+func ReorderPlannedMeals(db *gorm.DB, offset int, orderedIDs []uint) error {
+	r := dietrepo.New(db)
+	day, err := r.FindDayByDate(utils.ZerodTime(offset))
+	if err != nil {
+		return err
+	}
+	return r.PlannedMealReorder(day.ID, orderedIDs)
 }
 
 // DeletePlannedMeal removes a planned meal row for the calendar day at offset.

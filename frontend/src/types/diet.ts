@@ -24,6 +24,7 @@ export interface PlannedMeal extends BaseModel {
     day_id: number;
     meal_id: number;
     meal: Meal;
+    display_order?: number;
 }
 
 export interface DayLog extends BaseModel {

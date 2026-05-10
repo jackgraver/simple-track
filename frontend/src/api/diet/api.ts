@@ -111,6 +111,20 @@ export async function addPlannedMealFromSaved(
     return response.data;
 }
 
+export async function reorderPlannedMeals(
+    plannedMealIds: number[],
+    offset = 0,
+): Promise<DietLogsTodayResponse> {
+    const response = await apiClient.post<DietLogsTodayResponse>(
+        "/diet/meals/planned/reorder",
+        {
+            planned_meal_ids: plannedMealIds,
+            offset,
+        },
+    );
+    return response.data;
+}
+
 export async function editLoggedMeal(
     meal: Meal,
     oldMealId: number,

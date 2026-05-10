@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import { ChevronRightIcon } from "lucide-vue-next";
 import { computed } from "vue";
+import type { RouteLocationRaw } from "vue-router";
 import { useRoute } from "vue-router";
 
 type Crumb = {
     key: string;
     label: string;
-    to: { path: string };
+    to: RouteLocationRaw;
     isCurrent: boolean;
 };
 
@@ -15,13 +16,28 @@ const MAX_VISIBLE = 3;
 const route = useRoute();
 
 const crumbs = computed<Crumb[]>(() => {
-    const matched = route.matched.filter((r) => r.meta?.breadcrumb);
-    return matched.map((r, i) => ({
+    const withCrumb = route.matched.filter((r) => r.meta?.breadcrumb);
+    const matched =
+        route.name === "gym-plan-detail"
+            ? withCrumb.filter((r) => r.name !== "gym")
+            : withCrumb;
+    let list: Crumb[] = matched.map((r, i) => ({
         key: String(r.name ?? r.path) + ":" + i,
         label: r.meta!.breadcrumb as string,
         to: { path: r.path },
         isCurrent: i === matched.length - 1,
     }));
+    if (route.name === "gym-plan-detail") {
+        list.unshift({
+            key: "gym-plans",
+            label: "Plans",
+            to: { name: "gym-plans" },
+            isCurrent: false,
+        });
+        const last = list.length - 1;
+        list = list.map((c, i) => ({ ...c, isCurrent: i === last }));
+    }
+    return list;
 });
 
 const showBreadcrumbs = computed(() => crumbs.value.length > 1);
