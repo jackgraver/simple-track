@@ -104,7 +104,13 @@ const loggingRoute = computed(() => ({
                             >·</span
                         >
                         <router-link
-                            :to="{ name: 'gym-weight' }"
+                            :to="{
+                                name: 'gym-weight',
+                                query:
+                                    dayOffset === 0
+                                        ? {}
+                                        : { offset: String(dayOffset) },
+                            }"
                             class="transition-colors hover:text-textPrimary"
                             >Weight</router-link
                         >
@@ -112,7 +118,13 @@ const loggingRoute = computed(() => ({
                             >·</span
                         >
                         <router-link
-                            :to="{ name: 'gym-steps' }"
+                            :to="{
+                                name: 'gym-steps',
+                                query:
+                                    dayOffset === 0
+                                        ? {}
+                                        : { offset: String(dayOffset) },
+                            }"
                             class="transition-colors hover:text-textPrimary"
                             >Steps</router-link
                         >

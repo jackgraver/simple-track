@@ -3,6 +3,14 @@ import { Bell } from "lucide-vue-next";
 import { computed, onMounted, onUnmounted, ref } from "vue";
 import { useMissedTracking } from "~/api/tracking/queries";
 import { isAuthenticated } from "~/composables/auth/session";
+import { dietDayOffsetFromLocalDate } from "~/utils/dateUtil";
+
+function queryForTrackingDate(ymd: string): Record<string, string> {
+    const parts = ymd.split("-").map((s) => Number.parseInt(s, 10));
+    if (parts.length !== 3 || parts.some((n) => Number.isNaN(n))) return {};
+    const off = dietDayOffsetFromLocalDate(parts[0]!, parts[1]! - 1, parts[2]!);
+    return off === 0 ? {} : { offset: String(off) };
+}
 
 const { data, isPending, isError } = useMissedTracking();
 const open = ref(false);
@@ -17,11 +25,11 @@ onUnmounted(() => document.removeEventListener("click", onDocClick));
 const missedItems = computed(() => {
     const d = data.value;
     if (!d) return [];
-    const q = { date: d.date };
+    const q = queryForTrackingDate(d.date);
     const items: {
         key: string;
         label: string;
-        to: { name: string; query: { date: string } };
+        to: { name: string; query: Record<string, string> };
     }[] = [];
     if (d.steps)
         items.push({
