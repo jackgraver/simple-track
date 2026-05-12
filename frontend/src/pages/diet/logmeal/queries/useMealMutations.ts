@@ -3,6 +3,7 @@ import {
     createCompositeFood,
     createMeal,
     createSavedMeal,
+    deleteSavedMeal,
     logEditedMeal,
     quickLog,
     updateLoggedMeal,
@@ -59,6 +60,21 @@ export function useCreateSavedMeal() {
             queryClient.invalidateQueries({ queryKey: ['savedMeals'] });
             queryClient.invalidateQueries({
                 queryKey: ['searchList', '/diet/meals/saved-meal/all'],
+            });
+        },
+    });
+}
+
+export function useDeleteSavedMeal() {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: (vars: { savedMealId: number; force?: boolean }) =>
+            deleteSavedMeal(vars.savedMealId, { force: vars.force }),
+        onSuccess: () => {
+            invalidateDietQueries(queryClient);
+            queryClient.invalidateQueries({
+                queryKey: homeKeys.diet.monthPlannedSummaryPrefix,
             });
         },
     });
@@ -128,6 +144,7 @@ export function useUpdateLoggedMeal() {
         },
     });
 }
+
 export function useUpdateSavedMeal() {
     const queryClient = useQueryClient();
 

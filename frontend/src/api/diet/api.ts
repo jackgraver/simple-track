@@ -1,5 +1,5 @@
 import { apiClient } from "~/api/client";
-import type { CompositeFood, DietDay, Meal, Plan } from "~/types/diet";
+import type { CompositeFood, DietDay, Meal, Plan, SavedMeal } from "~/types/diet";
 
 export type DietLogsTodayResponse = {
     day: DietDay;
@@ -203,6 +203,44 @@ export async function createSavedMeal(payload: {
     const response = await apiClient.post<CreateSavedMealResponse>(
         "/diet/meals/saved-meal/new",
         payload,
+    );
+    return response.data;
+}
+
+export async function getSavedMealById(id: number): Promise<SavedMeal> {
+    const response = await apiClient.get<{ saved_meal: SavedMeal }>(
+        `/diet/meals/saved-meal/${id}`,
+    );
+    return response.data.saved_meal;
+}
+
+export async function updateSavedMeal(
+    savedMealId: number,
+    payload: { name: string; items: SavedMealItemPayload[] },
+): Promise<void> {
+    await apiClient.put(`/diet/meals/saved-meal/${savedMealId}`, payload);
+}
+
+export async function deleteSavedMeal(
+    savedMealId: number,
+    options?: { force?: boolean },
+): Promise<void> {
+    const config =
+        options?.force === true
+            ? { params: { force: "true" as const } }
+            : undefined;
+    await apiClient.delete(`/diet/meals/saved-meal/${savedMealId}`, config);
+}
+
+export type SavedMealDeleteDependentsInfo = {
+    reference_count: number;
+};
+
+export async function previewSavedMealDelete(
+    savedMealId: number,
+): Promise<SavedMealDeleteDependentsInfo> {
+    const response = await apiClient.delete<SavedMealDeleteDependentsInfo>(
+        `/diet/meals/saved-meal/${savedMealId}`,
     );
     return response.data;
 }

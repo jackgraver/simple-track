@@ -92,6 +92,39 @@ func CreateSavedMeal(db *gorm.DB, sm *models.SavedMeal) (uint, error) {
 	return dietrepo.New(db).SavedMealCreate(sm)
 }
 
+type SavedMealPlannedUsage struct {
+	ReferenceCount int64 `json:"reference_count"`
+}
+
+func SavedMealByID(db *gorm.DB, id uint) (*models.SavedMeal, error) {
+	return dietrepo.New(db).SavedMealByID(id)
+}
+
+func SavedMealPlannedUsageInfo(db *gorm.DB, savedMealID uint) (SavedMealPlannedUsage, error) {
+	r := dietrepo.New(db)
+	var out SavedMealPlannedUsage
+	count, err := r.CountUnloggedPlannedBySavedMealID(savedMealID)
+	if err != nil {
+		return out, err
+	}
+	out.ReferenceCount = count
+	return out, nil
+}
+
+func DeleteSavedMeal(db *gorm.DB, id uint) error {
+	return db.Transaction(func(tx *gorm.DB) error {
+		r := dietrepo.New(tx)
+		if err := r.DeleteUnloggedPlannedBySavedMealID(id); err != nil {
+			return err
+		}
+		return r.SavedMealDelete(id)
+	})
+}
+
+func ReplaceSavedMeal(db *gorm.DB, id uint, incoming *models.SavedMeal) error {
+	return dietrepo.New(db).SavedMealReplace(id, incoming)
+}
+
 func SetPlannedMealLogged(db *gorm.DB, dayID uint, mealID uint) error {
 	return dietrepo.New(db).SetPlannedMealLogged(dayID, mealID)
 }
@@ -131,9 +164,11 @@ func AddPlannedMealFromSavedMeal(db *gorm.DB, offset int, savedMealID uint) erro
 		if err != nil {
 			return err
 		}
+		sid := savedMealID
 		return r.PlannedMealCreate(&models.PlannedMeal{
 			DayID:        day.ID,
 			MealID:       mealID,
+			SavedMealID:  &sid,
 			Logged:       false,
 			DisplayOrder: displayOrder,
 		})

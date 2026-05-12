@@ -20,12 +20,13 @@ func (p Plan) Preloads() []string { return []string{} }
 // PlannedMeal represents a meal that is planned for a day
 type PlannedMeal struct {
 	gorm.Model
-	DayID     uint    `json:"day_id" gorm:"not null"`
-	DietDay   DietDay `gorm:"foreignKey:DayID" json:"day"`
-	MealID    uint    `json:"meal_id" gorm:"not null"`
-	Meal      Meal    `json:"meal"`
-	Logged    bool    `json:"logged"`
-	DisplayOrder int `json:"display_order" gorm:"not null;default:0"`
+	DayID        uint    `json:"day_id" gorm:"not null"`
+	DietDay      DietDay `gorm:"foreignKey:DayID" json:"day"`
+	MealID       uint    `json:"meal_id" gorm:"not null"`
+	Meal         Meal    `json:"meal"`
+	SavedMealID  *uint   `json:"saved_meal_id,omitempty" gorm:"index"`
+	Logged       bool    `json:"logged"`
+	DisplayOrder int     `json:"display_order" gorm:"not null;default:0"`
 }
 
 func (p PlannedMeal) GetID() uint        { return p.ID }

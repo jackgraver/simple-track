@@ -1,10 +1,23 @@
 <script setup lang="ts">
-import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp } from "lucide-vue-next";
+import {
+    ChevronDown,
+    ChevronLeft,
+    ChevronRight,
+    ChevronUp,
+    SquarePen,
+    Trash2,
+} from "lucide-vue-next";
 import { computed, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useQuery, useQueryClient } from "@tanstack/vue-query";
+import { dialogManager } from "~/composables/dialog/useDialog";
 import { apiClient } from "~/api/client";
-import { addPlannedMealFromSaved, getMonthPlannedSummary } from "~/api/diet/api";
+import {
+    addPlannedMealFromSaved,
+    getMonthPlannedSummary,
+    previewSavedMealDelete,
+    type SavedMealDeleteDependentsInfo,
+} from "~/api/diet/api";
 import type {
     MealItem,
     PlannedMeal,
@@ -12,7 +25,12 @@ import type {
     SavedMealItem,
 } from "~/types/diet";
 import { useDietLogsToday } from "~/pages/home/queries/useDietLogsToday";
-import { useDeletePlannedMeal, useReorderPlannedMeals } from "~/pages/home/queries/useMealMutations";
+import {
+    useAddPlannedFromSaved,
+    useDeletePlannedMeal,
+    useReorderPlannedMeals,
+} from "~/pages/home/queries/useMealMutations";
+import { useDeleteSavedMeal } from "~/pages/diet/logmeal/queries/useMealMutations";
 import { toast } from "~/composables/toast/useToast";
 import SimpleMacros from "~/shared/SimpleMacros.vue";
 import { homeKeys } from "~/pages/home/queries/keys";
@@ -22,6 +40,7 @@ import {
     formatDateLong,
     parseDietDayOffsetQuery,
 } from "~/utils/dateUtil";
+import { EDIT_SAVED_TYPE } from "~/pages/diet/logmeal/logmealMode";
 
 type MacroSummary = {
     calories: number;
@@ -236,9 +255,17 @@ const savedMeals = computed((): SavedMeal[] => savedRaw.value ?? []);
 
 const deletePlanned = useDeletePlannedMeal(dateOffset);
 const reorderPlanned = useReorderPlannedMeals(dateOffset);
+const addFromSaved = useAddPlannedFromSaved(dateOffset);
+const deleteSavedTemplate = useDeleteSavedMeal();
+const savedMealDeletePreviewBusy = ref(false);
 const isRemoving = computed(() => deletePlanned.isPending.value);
 const isReordering = computed(() => reorderPlanned.isPending.value);
-const singleAdding = ref(false);
+const savedMealActionsBusy = computed(
+    () =>
+        addFromSaved.isPending.value ||
+        deleteSavedTemplate.isPending.value ||
+        savedMealDeletePreviewBusy.value,
+);
 
 async function removePlanned(pm: PlannedMeal) {
     try {
@@ -265,22 +292,57 @@ async function movePlanned(index: number, dir: -1 | 1) {
 }
 
 async function addSavedToSelectedDay(sm: SavedMeal) {
-    const off = dateOffset.value;
-    singleAdding.value = true;
     try {
-        await addPlannedMealFromSaved(sm.ID, off);
-        await queryClient.invalidateQueries({
-            queryKey: homeKeys.diet.today(off),
-        });
-        await queryClient.invalidateQueries({
-            queryKey: homeKeys.diet.monthPlannedSummaryPrefix,
-        });
+        await addFromSaved.mutateAsync(sm.ID);
         toast.push(`Added "${sm.name}" to planned`, "success");
     } catch {
         toast.push("Could not add to planned", "error");
-    } finally {
-        singleAdding.value = false;
     }
+}
+
+async function deleteSavedMealTemplate(sm: SavedMeal) {
+    savedMealDeletePreviewBusy.value = true;
+    let preview: SavedMealDeleteDependentsInfo;
+    try {
+        preview = await previewSavedMealDelete(sm.ID);
+    } catch {
+        toast.push("Could not load saved meal", "error");
+        return;
+    } finally {
+        savedMealDeletePreviewBusy.value = false;
+    }
+    const ok =
+        preview.reference_count > 0
+            ? await dialogManager.confirm({
+                  title: "Saved meal is on your plan",
+                  message: `This meal is referenced ${preview.reference_count} times in your plan. Deleting removes those planned meals. Delete “${sm.name}”?`,
+                  confirmText: "Delete",
+                  cancelText: "Cancel",
+              })
+            : await dialogManager.confirm({
+                  title: "Delete saved meal",
+                  message: `Delete “${sm.name}”?`,
+                  confirmText: "Delete",
+                  cancelText: "Cancel",
+              });
+    if (!ok) return;
+    try {
+        await deleteSavedTemplate.mutateAsync({
+            savedMealId: sm.ID,
+            force: true,
+        });
+        bulkSavedOrder.value = bulkSavedOrder.value.filter((id) => id !== sm.ID);
+        toast.push("Saved meal deleted", "success");
+    } catch {
+        toast.push("Could not delete saved meal", "error");
+    }
+}
+
+function openEditSavedMeal(sm: SavedMeal) {
+    router.push({
+        name: "diet-log",
+        query: { type: EDIT_SAVED_TYPE, id: String(sm.ID) },
+    });
 }
 
 const bulkFrom = ref("");
@@ -544,23 +606,45 @@ async function saveBulkRange() {
                         No saved meals yet. Create one from the Diet page.
                     </p>
                     <div v-else class="flex flex-wrap gap-2">
-                        <button
+                        <div
                             v-for="sm in savedMeals"
                             :key="sm.ID"
-                            type="button"
-                            class="flex max-w-full flex-col items-start gap-1 rounded-md border border-zinc-600 bg-zinc-800 px-3 py-2 text-left hover:bg-zinc-700 disabled:opacity-50"
-                            :disabled="singleAdding"
-                            @click="addSavedToSelectedDay(sm)"
+                            class="flex max-w-full items-stretch overflow-hidden rounded-md border border-zinc-600 bg-zinc-800"
                         >
-                            <span class="font-medium text-zinc-100">{{
-                                sm.name
-                            }}</span>
-                            <SimpleMacros
-                                v-if="sm.items?.length"
-                                font-size="0.8rem"
-                                v-bind="macroTotals(sm.items)"
-                            />
-                        </button>
+                            <button
+                                type="button"
+                                class="flex min-w-0 flex-1 flex-col items-start gap-1 px-3 py-2 text-left hover:bg-zinc-700 disabled:opacity-50"
+                                :disabled="savedMealActionsBusy"
+                                @click="addSavedToSelectedDay(sm)"
+                            >
+                                <span class="font-medium text-zinc-100">{{
+                                    sm.name
+                                }}</span>
+                                <SimpleMacros
+                                    v-if="sm.items?.length"
+                                    font-size="0.8rem"
+                                    v-bind="macroTotals(sm.items)"
+                                />
+                            </button>
+                            <button
+                                type="button"
+                                class="shrink-0 border-l border-zinc-600 px-2 text-zinc-300 hover:bg-zinc-700 disabled:opacity-50"
+                                :disabled="savedMealActionsBusy"
+                                aria-label="Edit saved meal"
+                                @click.stop="openEditSavedMeal(sm)"
+                            >
+                                <SquarePen class="size-4" />
+                            </button>
+                            <button
+                                type="button"
+                                class="shrink-0 border-l border-zinc-600 px-2 text-red-300 hover:bg-red-950/40 disabled:opacity-50"
+                                :disabled="savedMealActionsBusy"
+                                aria-label="Delete saved meal"
+                                @click="deleteSavedMealTemplate(sm)"
+                            >
+                                <Trash2 class="size-4" />
+                            </button>
+                        </div>
                     </div>
                 </div>
             </template>
@@ -654,9 +738,7 @@ async function saveBulkRange() {
                             <button
                                 type="button"
                                 class="rounded border border-zinc-600 p-0.5 text-zinc-300 hover:bg-zinc-800 disabled:opacity-40"
-                                :disabled="
-                                    index === 0 || bulkSaving
-                                "
+                                :disabled="index === 0 || bulkSaving"
                                 aria-label="Move up in bulk order"
                                 @click="moveBulkSaved(index, -1)"
                             >

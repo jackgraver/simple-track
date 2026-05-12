@@ -4,6 +4,8 @@ import (
 	"be-simpletracker/internal/core/diet/models"
 	"be-simpletracker/internal/core/diet/services"
 	"be-simpletracker/internal/utils"
+	"be-simpletracker/internal/utils/apierr"
+	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -34,7 +36,10 @@ func RegisterMealRoutes(group *gin.RouterGroup, db *gorm.DB) {
 		meals.POST("/composite-food/new", h.postNewCompositeFood)
 		meals.GET("/meal/all", h.getAllMeals)
 		meals.GET("/saved-meal/all", h.getAllSavedMeals)
+		meals.GET("/saved-meal/:id", h.getSavedMeal)
 		meals.POST("/saved-meal/new", h.postNewSavedMeal)
+		meals.PUT("/saved-meal/:id", h.putSavedMeal)
+		meals.DELETE("/saved-meal/:id", h.deleteSavedMeal)
 		meals.GET("/meal/:id", h.getMeal)
 		meals.POST("/quick-log", h.postQuickLog)
 		meals.POST("/meal/new", h.postNewMeal)
@@ -67,12 +72,12 @@ type QuickLogRequest struct {
 func (h *MealHandler) postQuickLog(c *gin.Context) {
 	var req QuickLogRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		apierr.BadRequest(c, err.Error())
 		return
 	}
 	displayName := strings.TrimSpace(req.Name)
 	if displayName == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "name is required"})
+		apierr.BadRequest(c, "name is required")
 		return
 	}
 	foodRowName := fmt.Sprintf("%s [ql-%d]", displayName, time.Now().UnixNano())
@@ -129,12 +134,12 @@ func (h *MealHandler) postQuickLog(c *gin.Context) {
 		})
 	})
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		apierr.Internal(c, err)
 		return
 	}
 	day, err := services.MealPlanDayByID(h.db, int(dayID))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		apierr.Internal(c, err)
 		return
 	}
 	tot := services.CalculateTotals(h.db, dayID)
@@ -151,12 +156,12 @@ func (h *MealHandler) postQuickLog(c *gin.Context) {
 func (h *MealHandler) postFood(c *gin.Context) {
 	var req CreateFoodRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		apierr.BadRequest(c, err.Error())
 		return
 	}
 	createdFood, err := services.CreateFood(h.db, &req.Food, req.RelatedFoodID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		apierr.Internal(c, err)
 		return
 	}
 	c.JSON(http.StatusCreated, gin.H{"food": createdFood})
@@ -215,12 +220,12 @@ func (h *MealHandler) getAllFoods(c *gin.Context) {
 	}
 	foods, err := services.AllFoodsForPicker(h.db, excludeIDs)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		apierr.Internal(c, err)
 		return
 	}
 	composites, err := services.AllCompositeFoods(h.db)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		apierr.Internal(c, err)
 		return
 	}
 	compositeDTOs := make([]compositeFoodWithMacros, 0, len(composites))
@@ -236,22 +241,22 @@ func (h *MealHandler) getAllFoods(c *gin.Context) {
 func (h *MealHandler) postNewCompositeFood(c *gin.Context) {
 	var cf models.CompositeFood
 	if err := c.ShouldBindJSON(&cf); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		apierr.BadRequest(c, err.Error())
 		return
 	}
 	cf.ID = 0
 	if cf.Name == "" || len(cf.Items) == 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "name and at least one item required"})
+		apierr.BadRequest(c, "name and at least one item required")
 		return
 	}
 	id, err := services.CreateCompositeFood(h.db, &cf)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		apierr.Internal(c, err)
 		return
 	}
 	var loaded models.CompositeFood
 	if err := h.db.Preload("Items.Food").First(&loaded, id).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		apierr.Internal(c, err)
 		return
 	}
 	for i := range loaded.Items {
@@ -270,7 +275,7 @@ func (h *MealHandler) getAllMeals(c *gin.Context) {
 	}
 	meals, err := services.AllMeals(h.db, excludeIDs)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		apierr.Internal(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"meals": meals})
@@ -286,7 +291,7 @@ func (h *MealHandler) getAllSavedMeals(c *gin.Context) {
 	}
 	saved, err := services.AllSavedMeals(h.db, excludeIDs)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		apierr.Internal(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"saved_meals": saved})
@@ -295,27 +300,127 @@ func (h *MealHandler) getAllSavedMeals(c *gin.Context) {
 func (h *MealHandler) postNewSavedMeal(c *gin.Context) {
 	var sm models.SavedMeal
 	if err := c.ShouldBindJSON(&sm); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		apierr.BadRequest(c, err.Error())
 		return
 	}
 	sm.ID = 0
 	id, err := services.CreateSavedMeal(h.db, &sm)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		apierr.Internal(c, err)
 		return
 	}
 	c.JSON(http.StatusCreated, gin.H{"saved_meal_id": id})
+}
+
+func (h *MealHandler) deleteSavedMeal(c *gin.Context) {
+	idStr := c.Param("id")
+	id64, err := strconv.ParseUint(idStr, 10, 64)
+	if err != nil || id64 == 0 {
+		apierr.BadRequest(c, "invalid saved meal id")
+		return
+	}
+	id := uint(id64)
+	force := strings.ToLower(strings.TrimSpace(c.Query("force"))) == "true"
+
+	if _, err := services.SavedMealByID(h.db, id); err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			apierr.NotFound(c, "saved meal not found")
+			return
+		}
+		apierr.Internal(c, err)
+		return
+	}
+
+	if !force {
+		info, err := services.SavedMealPlannedUsageInfo(h.db, id)
+		if err != nil {
+			apierr.Internal(c, err)
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{
+			"reference_count": info.ReferenceCount,
+		})
+		return
+	}
+
+	if err := services.DeleteSavedMeal(h.db, id); err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			apierr.NotFound(c, "saved meal not found")
+			return
+		}
+		apierr.Internal(c, err)
+		return
+	}
+	c.Status(http.StatusNoContent)
+}
+
+func (h *MealHandler) getSavedMeal(c *gin.Context) {
+	idStr := c.Param("id")
+	id64, err := strconv.ParseUint(idStr, 10, 64)
+	if err != nil || id64 == 0 {
+		apierr.BadRequest(c, "invalid saved meal id")
+		return
+	}
+	sm, err := services.SavedMealByID(h.db, uint(id64))
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			apierr.NotFound(c, "saved meal not found")
+			return
+		}
+		apierr.Internal(c, err)
+		return
+	}
+	for i := range sm.Items {
+		models.NormalizeQuickLogFoodNameForResponse(&sm.Items[i].Food)
+	}
+	c.JSON(http.StatusOK, gin.H{"saved_meal": sm})
+}
+
+func (h *MealHandler) putSavedMeal(c *gin.Context) {
+	idStr := c.Param("id")
+	id64, err := strconv.ParseUint(idStr, 10, 64)
+	if err != nil || id64 == 0 {
+		apierr.BadRequest(c, "invalid saved meal id")
+		return
+	}
+	var body models.SavedMeal
+	if err := c.ShouldBindJSON(&body); err != nil {
+		apierr.BadRequest(c, err.Error())
+		return
+	}
+	body.ID = 0
+	if body.Name == "" || len(body.Items) == 0 {
+		apierr.BadRequest(c, "name and at least one item required")
+		return
+	}
+	if err := services.ReplaceSavedMeal(h.db, uint(id64), &body); err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			apierr.NotFound(c, "saved meal not found")
+			return
+		}
+		apierr.Internal(c, err)
+		return
+	}
+	updated, err := services.SavedMealByID(h.db, uint(id64))
+	if err != nil {
+		apierr.Internal(c, err)
+		return
+	}
+	for i := range updated.Items {
+		models.NormalizeQuickLogFoodNameForResponse(&updated.Items[i].Food)
+	}
+	c.JSON(http.StatusOK, gin.H{"saved_meal": updated})
 }
 
 func savedMealFromMealTemplate(m *models.Meal) *models.SavedMeal {
 	s := &models.SavedMeal{Name: m.Name}
 	for _, it := range m.Items {
 		s.Items = append(s.Items, models.SavedMealItem{
-			FoodID:            it.FoodID,
-			Amount:            float64(it.Amount),
-			GroupID:           it.GroupID,
-			GroupLabel:        it.GroupLabel,
-			CompositeFoodID:   it.CompositeFoodID,
+			FoodID:          it.FoodID,
+			Amount:          float64(it.Amount),
+			GroupID:         it.GroupID,
+			GroupLabel:      it.GroupLabel,
+			CompositeFoodID: it.CompositeFoodID,
 		})
 	}
 	return s
@@ -325,12 +430,12 @@ func (h *MealHandler) getMeal(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := strconv.ParseUint(idStr, 10, 32)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid ID"})
+		apierr.BadRequest(c, "Invalid ID")
 		return
 	}
 	meal, err := services.MealByID(h.db, uint(id))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		apierr.Internal(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, meal)
@@ -345,30 +450,30 @@ type CreateMealRequest struct {
 func (h *MealHandler) postNewMeal(c *gin.Context) {
 	var req CreateMealRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		apierr.BadRequest(c, err.Error())
 		return
 	}
 	mealID, err := services.CreateMeal(h.db, &req.Meal)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		apierr.Internal(c, err)
 		return
 	}
 
 	if req.Log {
 		day, err := services.FindMealPlanDay(h.db, utils.ZerodTime(0))
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			apierr.Internal(c, err)
 			return
 		}
 		if day == nil {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Day not found"})
+			apierr.NotFound(c, "Day not found")
 			return
 		}
 		if err := services.CreateDayMeal(h.db, &models.DayLog{
 			DayID:  day.ID,
 			MealID: mealID,
 		}); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			apierr.Internal(c, err)
 			return
 		}
 	}
@@ -376,7 +481,7 @@ func (h *MealHandler) postNewMeal(c *gin.Context) {
 	if req.Log && req.SaveToLibrary {
 		sm := savedMealFromMealTemplate(&req.Meal)
 		if _, err := services.CreateSavedMeal(h.db, sm); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			apierr.Internal(c, err)
 			return
 		}
 	}
@@ -391,25 +496,25 @@ type LogPlannedMealRequest struct {
 func (h *MealHandler) postLogPlanned(c *gin.Context) {
 	var req LogPlannedMealRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		apierr.BadRequest(c, err.Error())
 		return
 	}
 	day, err := services.FindMealPlanDay(h.db, utils.ZerodTime(0))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		apierr.Internal(c, err)
 		return
 	}
 	if day == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Day not found"})
+		apierr.NotFound(c, "Day not found")
 		return
 	}
 	if err := services.SetPlannedMealLogged(h.db, day.ID, req.MealID); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		apierr.Internal(c, err)
 		return
 	}
 	exists, err := services.DayLogExistsForMeal(h.db, day.ID, req.MealID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		apierr.Internal(c, err)
 		return
 	}
 	if !exists {
@@ -417,13 +522,13 @@ func (h *MealHandler) postLogPlanned(c *gin.Context) {
 			DayID:  day.ID,
 			MealID: req.MealID,
 		}); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			apierr.Internal(c, err)
 			return
 		}
 	}
 	day, err = services.MealPlanDayByID(h.db, int(day.ID))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		apierr.Internal(c, err)
 		return
 	}
 	tot := services.CalculateTotals(h.db, day.ID)
@@ -438,30 +543,30 @@ func (h *MealHandler) postLogPlanned(c *gin.Context) {
 }
 
 type EditLoggedMealRequest struct {
-	Meal                 models.Meal `json:"meal"`
-	OldMealID            uint        `json:"oldMealID"`
-	PlannedSourceMealID  uint        `json:"planned_source_meal_id"`
+	Meal                models.Meal `json:"meal"`
+	OldMealID           uint        `json:"oldMealID"`
+	PlannedSourceMealID uint        `json:"planned_source_meal_id"`
 }
 
 func (h *MealHandler) postLogEdited(c *gin.Context) {
 	var req EditLoggedMealRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		apierr.BadRequest(c, err.Error())
 		return
 	}
 	newMealID, err := services.CreateMeal(h.db, &req.Meal)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		apierr.Internal(c, err)
 		return
 	}
 
 	day, err := services.FindMealPlanDay(h.db, utils.ZerodTime(0))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		apierr.Internal(c, err)
 		return
 	}
 	if day == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Day not found"})
+		apierr.NotFound(c, "Day not found")
 		return
 	}
 
@@ -469,20 +574,20 @@ func (h *MealHandler) postLogEdited(c *gin.Context) {
 		DayID:  day.ID,
 		MealID: newMealID,
 	}); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		apierr.Internal(c, err)
 		return
 	}
 
 	if req.PlannedSourceMealID != 0 {
 		if err := services.SetPlannedMealLogged(h.db, day.ID, req.PlannedSourceMealID); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			apierr.Internal(c, err)
 			return
 		}
 	}
 
 	day, err = services.MealPlanDayByID(h.db, int(day.ID))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		apierr.Internal(c, err)
 		return
 	}
 	tot := services.CalculateTotals(h.db, day.ID)
@@ -499,16 +604,16 @@ func (h *MealHandler) postLogEdited(c *gin.Context) {
 func (h *MealHandler) postEditLogged(c *gin.Context) {
 	var req EditLoggedMealRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		apierr.BadRequest(c, err.Error())
 		return
 	}
 	day, err := services.FindMealPlanDay(h.db, utils.ZerodTime(0))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		apierr.Internal(c, err)
 		return
 	}
 	if day == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Day not found"})
+		apierr.NotFound(c, "Day not found")
 		return
 	}
 	// Client sends meal with ID 0 (same as postNewMeal): persist edited meal, then point day_log at the new row.
@@ -523,12 +628,12 @@ func (h *MealHandler) postEditLogged(c *gin.Context) {
 		return services.UpdateDayLogMeal(tx, day.ID, req.OldMealID, newMealID)
 	})
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		apierr.Internal(c, err)
 		return
 	}
 	day, err = services.MealPlanDayByID(h.db, int(day.ID))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		apierr.Internal(c, err)
 		return
 	}
 	tot := services.CalculateTotals(h.db, day.ID)
@@ -549,25 +654,25 @@ type DeleteLoggedMealRequest struct {
 func (h *MealHandler) deleteLoggedMeal(c *gin.Context) {
 	var req DeleteLoggedMealRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		apierr.BadRequest(c, err.Error())
 		return
 	}
 	day, err := services.FindMealPlanDay(h.db, utils.ZerodTime(0))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		apierr.Internal(c, err)
 		return
 	}
 	if day == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Day not found"})
+		apierr.NotFound(c, "Day not found")
 		return
 	}
 	if err := services.DeleteLoggedMeal(h.db, day.ID, req.MealID); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		apierr.Internal(c, err)
 		return
 	}
 	day, err = services.MealPlanDayByID(h.db, int(day.ID))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		apierr.Internal(c, err)
 		return
 	}
 	tot := services.CalculateTotals(h.db, day.ID)
@@ -589,25 +694,29 @@ type AddPlannedFromSavedRequest struct {
 func (h *MealHandler) postPlannedFromSaved(c *gin.Context) {
 	var req AddPlannedFromSavedRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		apierr.BadRequest(c, err.Error())
 		return
 	}
 	if req.SavedMealID == 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "saved_meal_id is required"})
+		apierr.BadRequest(c, "saved_meal_id is required")
 		return
 	}
 	if err := services.AddPlannedMealFromSavedMeal(h.db, req.Offset, req.SavedMealID); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		apierr.Internal(c, err)
 		return
 	}
 	day, err := services.FindMealPlanDay(h.db, utils.ZerodTime(req.Offset))
-	if err != nil || day == nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Day not found"})
+	if err != nil {
+		apierr.Internal(c, err)
+		return
+	}
+	if day == nil {
+		apierr.NotFound(c, "Day not found")
 		return
 	}
 	day, err = services.MealPlanDayByID(h.db, int(day.ID))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		apierr.Internal(c, err)
 		return
 	}
 	tot := services.CalculateTotals(h.db, day.ID)
@@ -629,25 +738,29 @@ type ReorderPlannedMealsRequest struct {
 func (h *MealHandler) postPlannedReorder(c *gin.Context) {
 	var req ReorderPlannedMealsRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		apierr.BadRequest(c, err.Error())
 		return
 	}
 	if len(req.PlannedMealIDs) == 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "planned_meal_ids is required"})
+		apierr.BadRequest(c, "planned_meal_ids is required")
 		return
 	}
 	if err := services.ReorderPlannedMeals(h.db, req.Offset, req.PlannedMealIDs); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		apierr.BadRequest(c, err.Error())
 		return
 	}
 	day, err := services.FindMealPlanDay(h.db, utils.ZerodTime(req.Offset))
-	if err != nil || day == nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Day not found"})
+	if err != nil {
+		apierr.Internal(c, err)
+		return
+	}
+	if day == nil {
+		apierr.NotFound(c, "Day not found")
 		return
 	}
 	day, err = services.MealPlanDayByID(h.db, int(day.ID))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		apierr.Internal(c, err)
 		return
 	}
 	tot := services.CalculateTotals(h.db, day.ID)
@@ -669,25 +782,29 @@ type DeletePlannedMealRequest struct {
 func (h *MealHandler) deletePlannedMeal(c *gin.Context) {
 	var req DeletePlannedMealRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		apierr.BadRequest(c, err.Error())
 		return
 	}
 	if req.PlannedMealID == 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "planned_meal_id is required"})
+		apierr.BadRequest(c, "planned_meal_id is required")
 		return
 	}
 	if err := services.DeletePlannedMeal(h.db, req.Offset, req.PlannedMealID); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		apierr.Internal(c, err)
 		return
 	}
 	day, err := services.FindMealPlanDay(h.db, utils.ZerodTime(req.Offset))
-	if err != nil || day == nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Day not found"})
+	if err != nil {
+		apierr.Internal(c, err)
+		return
+	}
+	if day == nil {
+		apierr.NotFound(c, "Day not found")
 		return
 	}
 	day, err = services.MealPlanDayByID(h.db, int(day.ID))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		apierr.Internal(c, err)
 		return
 	}
 	tot := services.CalculateTotals(h.db, day.ID)

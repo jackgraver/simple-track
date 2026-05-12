@@ -256,6 +256,51 @@ func (r *Repository) SavedMealByID(id uint) (*models.SavedMeal, error) {
 	return &sm, nil
 }
 
+func (r *Repository) SavedMealDelete(id uint) error {
+	var sm models.SavedMeal
+	if err := r.db.First(&sm, id).Error; err != nil {
+		return err
+	}
+	return r.db.Delete(&sm).Error
+}
+
+func (r *Repository) CountUnloggedPlannedBySavedMealID(savedMealID uint) (int64, error) {
+	var count int64
+	err := r.db.Model(&models.PlannedMeal{}).
+		Where("saved_meal_id = ? AND logged = ?", savedMealID, false).
+		Count(&count).Error
+	return count, err
+}
+
+func (r *Repository) DeleteUnloggedPlannedBySavedMealID(savedMealID uint) error {
+	return r.db.Where("saved_meal_id = ? AND logged = ?", savedMealID, false).Delete(&models.PlannedMeal{}).Error
+}
+
+// SavedMealReplace updates the template name and replaces all items in one transaction.
+func (r *Repository) SavedMealReplace(id uint, incoming *models.SavedMeal) error {
+	return r.db.Transaction(func(tx *gorm.DB) error {
+		var existing models.SavedMeal
+		if err := tx.First(&existing, id).Error; err != nil {
+			return err
+		}
+		if err := tx.Where("saved_meal_id = ?", id).Delete(&models.SavedMealItem{}).Error; err != nil {
+			return err
+		}
+		if err := tx.Model(&existing).Update("name", incoming.Name).Error; err != nil {
+			return err
+		}
+		for i := range incoming.Items {
+			row := incoming.Items[i]
+			row.ID = 0
+			row.SavedMealID = id
+			if err := tx.Create(&row).Error; err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+}
+
 func (r *Repository) PlannedMealCreate(pm *models.PlannedMeal) error {
 	pm.ID = 0
 	return r.db.Create(pm).Error
