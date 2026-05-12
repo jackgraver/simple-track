@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ChevronDown, ChevronUp, Pencil } from "lucide-vue-next";
 import { useRouter } from "vue-router";
-import { computed, ref, watch } from "vue";
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
 import MealCard from "./MealCard.vue";
 import { useDietDayMealHandlers } from "./useDietDayMealHandlers";
 
@@ -21,7 +21,56 @@ const editPlannedMeal = () => {
     });
 };
 
+const CARD_HEIGHT_ESTIMATE = 140;
+const BOTTOM_PADDING = 24;
+
+const isMobile = ref(false);
+const containerRef = ref<HTMLElement | null>(null);
+const maxVisible = ref(2);
 const start = ref(0);
+
+let mediaQuery: MediaQueryList | null = null;
+
+function onMediaChange(e: MediaQueryListEvent | MediaQueryList) {
+    isMobile.value = e.matches;
+}
+
+function checkOverflow() {
+    if (isMobile.value || !containerRef.value) return;
+    const bottom = containerRef.value.getBoundingClientRect().bottom;
+    if (
+        bottom > window.innerHeight - BOTTOM_PADDING &&
+        maxVisible.value > 1
+    ) {
+        maxVisible.value--;
+    }
+}
+
+function recalcMaxVisible() {
+    if (isMobile.value || !containerRef.value) return;
+    const top = containerRef.value.getBoundingClientRect().top;
+    const available = window.innerHeight - top - BOTTOM_PADDING;
+    const estimated = Math.max(1, Math.floor(available / CARD_HEIGHT_ESTIMATE));
+    const len = (data.value?.day.plannedMeals ?? []).length;
+    maxVisible.value =
+        len > 0 ? Math.min(estimated, len) : estimated;
+    void nextTick(() => {
+        checkOverflow();
+    });
+}
+
+onMounted(() => {
+    mediaQuery = window.matchMedia("(max-width: 767px)");
+    onMediaChange(mediaQuery);
+    mediaQuery.addEventListener("change", onMediaChange);
+    window.addEventListener("resize", recalcMaxVisible);
+    recalcMaxVisible();
+});
+
+onUnmounted(() => {
+    mediaQuery?.removeEventListener("change", onMediaChange);
+    window.removeEventListener("resize", recalcMaxVisible);
+});
 
 const sortedPlannedMeals = computed(() => {
     const list = data.value?.day.plannedMeals ?? [];
@@ -33,20 +82,42 @@ const sortedPlannedMeals = computed(() => {
 
 watch(
     () => sortedPlannedMeals.value.length,
-    (len) => {
-        const maxStart = Math.max(0, len - 2);
+    () => {
+        recalcMaxVisible();
+    },
+);
+
+watch(
+    () => [sortedPlannedMeals.value.length, maxVisible.value],
+    ([len, max]) => {
+        const maxStart = Math.max(0, len - max);
         if (start.value > maxStart) start.value = maxStart;
     },
 );
 
 const visibleItems = computed(() =>
-    sortedPlannedMeals.value.slice(start.value, start.value + 2),
+    isMobile.value
+        ? sortedPlannedMeals.value
+        : sortedPlannedMeals.value.slice(start.value, start.value + maxVisible.value),
+);
+
+watch(visibleItems, () => {
+    void nextTick(() => {
+        checkOverflow();
+    });
+});
+
+const showChevrons = computed(
+    () => !isMobile.value && sortedPlannedMeals.value.length > maxVisible.value,
 );
 
 function next() {
     start.value = Math.min(
         start.value + 1,
-        sortedPlannedMeals.value.length - 2,
+        Math.max(
+            0,
+            sortedPlannedMeals.value.length - maxVisible.value,
+        ),
     );
 }
 function prev() {
@@ -55,9 +126,9 @@ function prev() {
 </script>
 
 <template>
-    <div class="flex min-w-0 flex-1 flex-col gap-2 pt-2">
+    <div ref="containerRef" class="flex min-w-0 flex-1 flex-col gap-2 pt-2">
         <div class="flex flex-row items-center justify-between gap-2">
-            <div class="flex w-full items-center gap-2">
+            <div class="flex min-w-0 flex-1 items-center gap-2">
                 <h2 class="mb-0 flex-1 text-lg font-semibold">
                     Planned ({{ sortedPlannedMeals.length }})
                 </h2>
@@ -70,11 +141,11 @@ function prev() {
                     Edit
                 </button>
             </div>
-            <template v-if="data && sortedPlannedMeals.length > 2">
+            <template v-if="data && showChevrons">
                 <button
                     type="button"
                     :disabled="start === 0"
-                    class="disabled:text-zinc-500"
+                    class="shrink-0 disabled:text-zinc-500"
                     aria-label="Previous"
                     @click="prev"
                 >
@@ -82,8 +153,8 @@ function prev() {
                 </button>
                 <button
                     type="button"
-                    :disabled="start === sortedPlannedMeals.length - 2"
-                    class="disabled:text-zinc-500"
+                    :disabled="start >= sortedPlannedMeals.length - maxVisible"
+                    class="shrink-0 disabled:text-zinc-500"
                     aria-label="Next"
                     @click="next"
                 >

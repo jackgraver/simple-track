@@ -3,8 +3,8 @@ import MacroBar from "~/pages/diet/components/macrobar/MacroBar.vue";
 import MacroBars from "~/pages/diet/components/MacroBars.vue";
 import WaterLogsDialog from "~/pages/diet/components/dialog/WaterLogsDialog.vue";
 import { useDietLogsToday } from "~/pages/home/queries/useDietLogsToday";
-import LoggedMealsDisplay from "./LoggedMealsDisplay.vue";
 import PlannedMealsDisplay from "./PlannedMealsDisplay.vue";
+import LoggedMealsDisplay from "./LoggedMealsDisplay.vue";
 import { useWaterLogs } from "~/api/tracking/queries";
 import { dialogManager } from "~/composables/dialog/useDialog";
 import { useWaterPrefs } from "~/composables/water/useWaterPrefs";
@@ -185,8 +185,8 @@ function openWaterLogsDialog() {
                 </div>
             </div>
             <div class="flex w-full flex-col gap-8 sm:flex-row sm:gap-6 pb-16">
-                <LoggedMealsDisplay :date-offset="dateOffset" />
                 <PlannedMealsDisplay :date-offset="dateOffset" />
+                <LoggedMealsDisplay :date-offset="dateOffset" />
             </div>
         </div>
     </div>

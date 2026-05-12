@@ -52,7 +52,6 @@ const props = defineProps<{
         type: typeof EDIT_TYPE | typeof EDIT_LOGGED_TYPE,
     ) => void;
     onDelete: (meal: Meal) => void;
-    onEdit: (meal: Meal) => void;
 }>();
 
 const mealMacroTotals = computed(() => macroTotalsForMeal(props.meal));
