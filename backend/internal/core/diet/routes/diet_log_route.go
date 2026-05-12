@@ -25,6 +25,7 @@ func RegisterDietLogRoutes(group *gin.RouterGroup, db *gorm.DB) {
 	{
 		logs.GET("/today", utils.DayOffsetMiddleware(), h.getMealPlanToday)
 		logs.GET("/week", h.getMealPlanWeek)
+		logs.GET("/month-planned-summary", h.getMonthPlannedSummary)
 		logs.GET("/month", h.getMealPlanMonth)
 		logs.GET("/day/:id", h.getMealPlanDay)
 		logs.GET("/goals/today", h.getGoalsToday)
@@ -58,6 +59,23 @@ func (h *DietLogHandler) getMealPlanWeek(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"days":  data,
 		"today": time.Now(),
+	})
+}
+
+func (h *DietLogHandler) getMonthPlannedSummary(c *gin.Context) {
+	offset, err := utils.ParseQueryInt(c, monthOffsetQuery)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	counts, err := h.svc.MonthPlannedSummary(c.Request.Context(), offset)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"planned_counts": counts,
+		"month_offset":   offset,
 	})
 }
 

@@ -13,6 +13,9 @@ export const homeKeys = {
         all: [...homeKeysBase.all, 'diet'] as const,
         today: (offset: number) => 
             [...homeKeysBase.all, 'diet', 'today', offset] as const,
+        monthPlannedSummaryPrefix: [...homeKeysBase.all, 'diet', 'month-planned-summary'] as const,
+        monthPlannedSummary: (monthOffset: number) =>
+            [...homeKeysBase.all, 'diet', 'month-planned-summary', monthOffset] as const,
     },
 } as const;
 

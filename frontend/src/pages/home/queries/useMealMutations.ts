@@ -1,4 +1,8 @@
-import { useMutation, useQueryClient } from '@tanstack/vue-query';
+import {
+    useMutation,
+    useQueryClient,
+    type QueryClient,
+} from '@tanstack/vue-query';
 import {
     logPlannedMeal,
     deleteLoggedMeal,
@@ -11,6 +15,12 @@ import { homeKeys } from './keys';
 import type { Meal } from '~/types/diet';
 import { toValue, type MaybeRefOrGetter } from 'vue';
 
+function invalidateMonthPlannedSummaries(queryClient: QueryClient) {
+    queryClient.invalidateQueries({
+        queryKey: homeKeys.diet.monthPlannedSummaryPrefix,
+    });
+}
+
 export function useLogPlannedMeal(offset: MaybeRefOrGetter<number>) {
     const queryClient = useQueryClient();
 
@@ -21,6 +31,7 @@ export function useLogPlannedMeal(offset: MaybeRefOrGetter<number>) {
                 homeKeys.diet.today(toValue(offset)),
                 day,
             );
+            invalidateMonthPlannedSummaries(queryClient);
         },
     });
 }
@@ -65,6 +76,7 @@ export function useDeletePlannedMeal(offset: MaybeRefOrGetter<number>) {
             queryClient.invalidateQueries({
                 queryKey: homeKeys.diet.today(toValue(offset)),
             });
+            invalidateMonthPlannedSummaries(queryClient);
         },
     });
 }
@@ -79,6 +91,7 @@ export function useAddPlannedFromSaved(offset: MaybeRefOrGetter<number>) {
             queryClient.invalidateQueries({
                 queryKey: homeKeys.diet.today(toValue(offset)),
             });
+            invalidateMonthPlannedSummaries(queryClient);
         },
     });
 }
@@ -93,6 +106,7 @@ export function useReorderPlannedMeals(offset: MaybeRefOrGetter<number>) {
             queryClient.invalidateQueries({
                 queryKey: homeKeys.diet.today(toValue(offset)),
             });
+            invalidateMonthPlannedSummaries(queryClient);
         },
     });
 }

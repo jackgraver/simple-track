@@ -2,9 +2,9 @@
 import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp } from "lucide-vue-next";
 import { computed, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import { useQueries, useQuery, useQueryClient } from "@tanstack/vue-query";
+import { useQuery, useQueryClient } from "@tanstack/vue-query";
 import { apiClient } from "~/api/client";
-import { addPlannedMealFromSaved, getDietLogsToday } from "~/api/diet/api";
+import { addPlannedMealFromSaved, getMonthPlannedSummary } from "~/api/diet/api";
 import type {
     MealItem,
     PlannedMeal,
@@ -141,31 +141,25 @@ function nextMonth() {
     }
 }
 
-const monthOffsets = computed(() => {
-    const y = calendarYear.value;
-    const m = calendarMonth.value;
-    const dim = daysInMonth(y, m);
-    return Array.from({ length: dim }, (_, i) =>
-        dietDayOffsetFromLocalDate(y, m, i + 1),
+const dietMonthOffset = computed(() => {
+    const now = new Date();
+    return (
+        (calendarYear.value - now.getFullYear()) * 12 +
+        (calendarMonth.value - now.getMonth())
     );
 });
-
-const monthQueries = useQueries({
-    queries: computed(() =>
-        monthOffsets.value.map((offset) => ({
-            queryKey: homeKeys.diet.today(offset),
-            queryFn: () => getDietLogsToday(offset),
-            staleTime: 1000 * 60 * 2,
-        })),
+const { data: monthPlannedCounts, isPending: monthPlannedPending } = useQuery({
+    queryKey: computed(() =>
+        homeKeys.diet.monthPlannedSummary(dietMonthOffset.value),
     ),
+    queryFn: () => getMonthPlannedSummary(dietMonthOffset.value),
+    staleTime: 1000 * 60 * 2,
 });
-
 function plannedCountForMonthDay(index: number): number {
-    return monthQueries.value[index]?.data?.day.plannedMeals?.length ?? 0;
+    return monthPlannedCounts.value?.[index] ?? 0;
 }
-
-function monthDayPending(index: number): boolean {
-    return monthQueries.value[index]?.isPending ?? true;
+function monthDayPending(_index: number): boolean {
+    return monthPlannedPending.value;
 }
 
 type CalendarCell =
@@ -278,6 +272,9 @@ async function addSavedToSelectedDay(sm: SavedMeal) {
         await queryClient.invalidateQueries({
             queryKey: homeKeys.diet.today(off),
         });
+        await queryClient.invalidateQueries({
+            queryKey: homeKeys.diet.monthPlannedSummaryPrefix,
+        });
         toast.push(`Added "${sm.name}" to planned`, "success");
     } catch {
         toast.push("Could not add to planned", "error");
@@ -348,6 +345,9 @@ async function saveBulkRange() {
                 queryKey: homeKeys.diet.today(off),
             });
         }
+        await queryClient.invalidateQueries({
+            queryKey: homeKeys.diet.monthPlannedSummaryPrefix,
+        });
         toast.push(
             `Added ${mealIds.length} meal(s) across ${offsets.length} day(s)`,
             "success",

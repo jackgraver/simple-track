@@ -89,6 +89,16 @@ export async function getDietLogsToday(
     return response.data;
 }
 
+export async function getMonthPlannedSummary(
+    monthOffset: number,
+): Promise<number[]> {
+    const response = await apiClient.get<{ planned_counts: number[] }>(
+        "/diet/logs/month-planned-summary",
+        { params: { monthoffset: monthOffset } },
+    );
+    return response.data.planned_counts;
+}
+
 export async function logPlannedMeal(
     mealId: number,
 ): Promise<DietLogsTodayResponse> {

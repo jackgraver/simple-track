@@ -434,6 +434,33 @@ func (r *Repository) DayMealPlanToday(offset int) (models.DietDay, error) {
 	return r.loadDietDayWithPreloads(d.ID)
 }
 
+// CountUnloggedPlannedMealsPerCalendarDay returns YYYY-MM-DD (loc) → count for that calendar day.
+func (r *Repository) CountUnloggedPlannedMealsPerCalendarDay(start, end time.Time) (map[string]int, error) {
+	out := make(map[string]int)
+	rows, err := r.db.Model(&models.PlannedMeal{}).
+		Joins("JOIN days ON days.id = planned_meals.day_id").
+		Where("planned_meals.logged = ?", false).
+		Where("days.date >= ? AND days.date <= ?", start, end).
+		Where("planned_meals.deleted_at IS NULL").
+		Where("days.deleted_at IS NULL").
+		Select("days.date").
+		Rows()
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var d time.Time
+		if err := rows.Scan(&d); err != nil {
+			return nil, err
+		}
+		loc := d.Location()
+		k := time.Date(d.Year(), d.Month(), d.Day(), 0, 0, 0, 0, loc).Format("2006-01-02")
+		out[k]++
+	}
+	return out, rows.Err()
+}
+
 func (r *Repository) DayByID(id int) (*models.DietDay, error) {
 	day, err := r.loadDietDayWithPreloads(uint(id))
 	if err != nil {
