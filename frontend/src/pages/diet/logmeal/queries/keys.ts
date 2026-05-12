@@ -9,6 +9,10 @@ export const logmealKeys = {
         detail: (id: number) => 
             [...logmealKeysBase.all, 'meals', 'detail', id] as const,
     },
+    savedMeals: {
+        detail: (id: number) =>
+            [...logmealKeysBase.all, 'saved-meals', 'detail', id] as const,
+    },
     diet: {
         all: [...logmealKeysBase.all, 'diet'] as const,
         today: () => 

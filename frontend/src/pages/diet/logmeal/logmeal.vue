@@ -21,12 +21,14 @@ import CreateFoodDialog from "./dialog/CreateFoodDialog.vue";
 import { computed, ref, toRaw, watch } from "vue";
 import { mealItemsToDisplayBlocks } from "~/utils/mealItemGroups";
 import { useMeal } from "./queries/useMeal";
+import { useSavedMeal } from "./queries/useSavedMeal";
 import { useDietLogsToday } from "./queries/useDietLogsToday";
 import {
     useCreateMeal,
     useCreateSavedMeal,
     useLogEditedMeal,
     useUpdateLoggedMeal,
+    useUpdateSavedMeal,
 } from "./queries/useMealMutations";
 import MacroBars from "~/pages/diet/components/MacroBars.vue";
 import { savedMealToMeal } from "~/utils/savedMealToMeal";
@@ -48,7 +50,6 @@ type MealMacroTotals = {
 };
 
 function macrosForMeal(m: Meal): MealMacroTotals {
-    console.log(m.items);
     return {
         calories: formatNum(
             m.items.reduce(
@@ -224,6 +225,12 @@ const editVariant = computed(() =>
 const id = computed(() => Number(route.query.id ?? 0));
 const mealId = computed(() => {
     if (pageMode.value !== PAGE_MODE.edit) return null;
+    if (editVariant.value === EDIT_VARIANT.saved) return null;
+    return id.value !== 0 ? id.value : null;
+});
+const savedMealEditId = computed(() => {
+    if (pageMode.value !== PAGE_MODE.edit) return null;
+    if (editVariant.value !== EDIT_VARIANT.saved) return null;
     return id.value !== 0 ? id.value : null;
 });
 const editMissingId = computed(
@@ -236,6 +243,9 @@ const pageTitle = computed(() => {
         case PAGE_MODE.log:
             return "Log Meal";
         case PAGE_MODE.edit:
+            if (editVariant.value === EDIT_VARIANT.saved) {
+                return "Edit Saved Meal";
+            }
             return editVariant.value === EDIT_VARIANT.planned
                 ? "Log Meal"
                 : "Edit Logged Meal";
@@ -244,6 +254,27 @@ const pageTitle = computed(() => {
     }
 });
 const { data: mealData, error: mealError } = useMeal(mealId);
+const { data: savedMealData, error: savedMealError } =
+    useSavedMeal(savedMealEditId);
+
+const mealLoadError = computed(() => {
+    if (
+        pageMode.value === PAGE_MODE.edit &&
+        editVariant.value === EDIT_VARIANT.saved
+    ) {
+        return savedMealError.value;
+    }
+    return mealError.value;
+});
+
+const showDietDayMacroBars = computed(
+    () =>
+        pageMode.value !== PAGE_MODE.create &&
+        !(
+            pageMode.value === PAGE_MODE.edit &&
+            editVariant.value === EDIT_VARIANT.saved
+        ),
+);
 
 // Fetch today's diet logs
 const { data: today } = useDietLogsToday();
@@ -261,8 +292,9 @@ const meal = ref<Meal>({
 const baselineMealMacros = ref<MealMacroTotals | null>(null);
 
 watch(
-    [pageMode, id, mealData, queryType],
-    ([mode, newId, newMealData, qType]) => {
+    [pageMode, id, mealData, savedMealData, queryType],
+    ([mode, newId, newMealData, newSavedData, qType]) => {
+        const variant = parseEditMealVariant(qType);
         if (
             (mode === PAGE_MODE.log || mode === PAGE_MODE.create) &&
             newId === 0
@@ -277,14 +309,36 @@ watch(
             baselineMealMacros.value = null;
             return;
         }
-        if (newMealData?.meal) {
-            meal.value = cloneMeal(newMealData.meal);
-            if (
-                mode === PAGE_MODE.edit &&
-                parseEditMealVariant(qType) === EDIT_VARIANT.logged
-            ) {
-                baselineMealMacros.value = macrosForMeal(meal.value);
+        if (mode === PAGE_MODE.edit && newId !== 0) {
+            if (variant === EDIT_VARIANT.saved) {
+                if (newSavedData) {
+                    meal.value = cloneMeal(savedMealToMeal(newSavedData));
+                } else {
+                    meal.value = {
+                        ID: 0,
+                        created_at: "",
+                        updated_at: "",
+                        name: "",
+                        items: [],
+                    };
+                }
+                baselineMealMacros.value = null;
+                return;
+            }
+            if (newMealData?.meal) {
+                meal.value = cloneMeal(newMealData.meal);
+                baselineMealMacros.value =
+                    variant === EDIT_VARIANT.logged
+                        ? macrosForMeal(meal.value)
+                        : null;
             } else {
+                meal.value = {
+                    ID: 0,
+                    created_at: "",
+                    updated_at: "",
+                    name: "",
+                    items: [],
+                };
                 baselineMealMacros.value = null;
             }
         }
@@ -303,7 +357,6 @@ const macroBarsDayTotals = computed(() => {
     const dayFiber = t?.totalFiber ?? 0;
     const dayCarbs = t?.totalCarbs ?? 0;
     const dayFat = t?.totalFat ?? 0;
-    console.log(t);
 
     if (
         pageMode.value === PAGE_MODE.edit &&
@@ -412,7 +465,6 @@ const createFood = async (name: string): Promise<boolean> => {
             return false;
         }
     } catch (err) {
-        console.error("Dialog error:", err);
         toast.push("Dialog Error", "error");
         return false;
     }
@@ -461,6 +513,7 @@ const createMealMutation = useCreateMeal();
 const createSavedMealMutation = useCreateSavedMeal();
 const logEditedMealMutation = useLogEditedMeal();
 const updateLoggedMealMutation = useUpdateLoggedMeal();
+const updateSavedMealMutation = useUpdateSavedMeal();
 
 const logMealToDay = async (saveToLibrary: boolean) => {
     const mealToCreate = { ...meal.value, ID: 0 };
@@ -539,6 +592,34 @@ const updateLoggedMeal = async () => {
         toast.push("Update Failed! " + (error.message || ""), "error");
     }
 };
+
+const saveEditedSavedMeal = async () => {
+    const name = meal.value.name.trim();
+    if (!name || meal.value.items.length === 0) {
+        toast.push("Add a name and at least one food.", "error");
+        return;
+    }
+    if (id.value === 0) return;
+    try {
+        await updateSavedMealMutation.mutateAsync({
+            savedMealId: id.value,
+            name,
+            items: meal.value.items.map((i) => ({
+                food_id: i.food_id,
+                amount: i.amount,
+                group_id: i.group_id ?? "",
+                group_label: i.group_label ?? "",
+                composite_food_id: i.composite_food_id ?? null,
+            })),
+        });
+        toast.push("Saved meal updated!", "success");
+    } catch (error: any) {
+        toast.push(
+            "Could not update saved meal. " + (error?.message || ""),
+            "error",
+        );
+    }
+};
 </script>
 
 <template>
@@ -550,12 +631,12 @@ const updateLoggedMeal = async () => {
             <span>Missing meal id for this edit.</span>
         </div>
         <div
-            v-else-if="mealError && id !== 0"
+            v-else-if="mealLoadError && id !== 0"
             class="flex h-[60dvh] items-center justify-center p-8 text-cfRed"
         >
             <span
                 >Error loading meal:
-                {{ mealError?.message || "Unknown error" }}</span
+                {{ mealLoadError?.message || "Unknown error" }}</span
             >
         </div>
         <div
@@ -706,6 +787,17 @@ const updateLoggedMeal = async () => {
                         <button
                             v-if="
                                 pageMode === PAGE_MODE.edit &&
+                                editVariant === EDIT_VARIANT.saved
+                            "
+                            class="flex-1 cursor-pointer rounded bg-secondBg px-5 py-2.5 text-sm text-textPrimary hover:bg-thirdBg"
+                            type="button"
+                            @click="saveEditedSavedMeal"
+                        >
+                            Save changes
+                        </button>
+                        <button
+                            v-if="
+                                pageMode === PAGE_MODE.edit &&
                                 editVariant === EDIT_VARIANT.logged
                             "
                             class="flex-1 cursor-pointer rounded bg-secondBg px-5 py-2.5 text-sm text-textPrimary hover:bg-thirdBg"
@@ -727,7 +819,7 @@ const updateLoggedMeal = async () => {
                         </button>
                     </div>
                     <MacroBars
-                        v-if="pageMode !== PAGE_MODE.create"
+                        v-if="showDietDayMacroBars"
                         :totalCalories="macroBarsDayTotals.totalCalories"
                         :totalProtein="macroBarsDayTotals.totalProtein"
                         :totalFat="macroBarsDayTotals.totalFat"

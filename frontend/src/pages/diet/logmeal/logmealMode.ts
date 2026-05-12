@@ -3,6 +3,7 @@ export const LOG_TYPE = "log" as const;
 export const CREATE_TYPE = "create" as const;
 export const EDIT_TYPE = "edit" as const;
 export const EDIT_LOGGED_TYPE = "editlogged" as const;
+export const EDIT_SAVED_TYPE = "editsaved" as const;
 
 /** Resolved page mode (three UI states). */
 export const PAGE_MODE = {
@@ -15,6 +16,7 @@ export const PAGE_MODE = {
 export const EDIT_VARIANT = {
     logged: "logged",
     planned: "planned",
+    saved: "saved",
 } as const;
 
 export type LogMealPageMode = (typeof PAGE_MODE)[keyof typeof PAGE_MODE];
@@ -26,14 +28,17 @@ export type LogMealQueryTypeParam =
     | typeof LOG_TYPE
     | typeof CREATE_TYPE
     | typeof EDIT_TYPE
-    | typeof EDIT_LOGGED_TYPE;
+    | typeof EDIT_LOGGED_TYPE
+    | typeof EDIT_SAVED_TYPE;
 
 export function parseLogMealPageMode(
     queryType: string | string[] | null | undefined,
 ): LogMealPageMode {
     const raw = normalizeQueryString(queryType);
     if (raw === CREATE_TYPE) return PAGE_MODE.create;
-    if (raw === EDIT_TYPE || raw === EDIT_LOGGED_TYPE) return PAGE_MODE.edit;
+    if (raw === EDIT_TYPE || raw === EDIT_LOGGED_TYPE || raw === EDIT_SAVED_TYPE) {
+        return PAGE_MODE.edit;
+    }
     if (raw === LOG_TYPE) return PAGE_MODE.log;
     return PAGE_MODE.log;
 }
@@ -41,9 +46,10 @@ export function parseLogMealPageMode(
 export function parseEditMealVariant(
     queryType: string | string[] | null | undefined,
 ): EditMealVariant {
-    return normalizeQueryString(queryType) === EDIT_LOGGED_TYPE
-        ? EDIT_VARIANT.planned
-        : EDIT_VARIANT.logged;
+    const raw = normalizeQueryString(queryType);
+    if (raw === EDIT_SAVED_TYPE) return EDIT_VARIANT.saved;
+    if (raw === EDIT_LOGGED_TYPE) return EDIT_VARIANT.planned;
+    return EDIT_VARIANT.logged;
 }
 
 function normalizeQueryString(

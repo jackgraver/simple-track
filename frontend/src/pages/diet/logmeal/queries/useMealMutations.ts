@@ -6,6 +6,7 @@ import {
     logEditedMeal,
     quickLog,
     updateLoggedMeal,
+    updateSavedMeal,
     type QuickLogPayload,
     type SavedMealItemPayload,
 } from '~/api/diet/api';
@@ -124,6 +125,30 @@ export function useUpdateLoggedMeal() {
         onSuccess: () => {
             invalidateDietQueries(queryClient);
             afterMealLogNavigate(router);
+        },
+    });
+}
+export function useUpdateSavedMeal() {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: (payload: {
+            savedMealId: number;
+            name: string;
+            items: SavedMealItemPayload[];
+        }) =>
+            updateSavedMeal(payload.savedMealId, {
+                name: payload.name,
+                items: payload.items,
+            }),
+        onSuccess: (_data, variables) => {
+            queryClient.invalidateQueries({
+                queryKey: logmealKeys.savedMeals.detail(variables.savedMealId),
+            });
+            queryClient.invalidateQueries({ queryKey: ['savedMeals'] });
+            queryClient.invalidateQueries({
+                queryKey: ['searchList', '/diet/meals/saved-meal/all'],
+            });
         },
     });
 }
