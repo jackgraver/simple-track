@@ -1,34 +1,42 @@
 <script setup lang="ts">
-const props = defineProps<{
-    calories: number;
-    protein: number;
-    carbs: number;
-    fat: number;
-    fiber: number;
-    fontSize?: string;
-}>();
+const props = withDefaults(
+    defineProps<{
+        calories: number;
+        protein: number;
+        carbs: number;
+        fat: number;
+        fiber: number;
+        fontSize?: string;
+        decimals?: "two" | "none";
+    }>(),
+    { decimals: "two" },
+);
 
 function round2(n: number) {
     return Math.round((n + Number.EPSILON) * 100) / 100;
+}
+
+function fmt(n: number) {
+    return props.decimals === "none" ? Math.round(n) : round2(n);
 }
 </script>
 
 <template>
     <div class="macros">
         <span class="macro calories" :style="{ fontSize: props.fontSize }"
-            >{{ round2(props.calories) }}C</span
+            >{{ fmt(props.calories) }}C</span
         >
         <span class="macro protein" :style="{ fontSize: props.fontSize }"
-            >{{ round2(props.protein) }}P</span
+            >{{ fmt(props.protein) }}P</span
         >
         <span class="macro carbs" :style="{ fontSize: props.fontSize }"
-            >{{ round2(props.carbs) }}C</span
+            >{{ fmt(props.carbs) }}C</span
         >
         <span class="macro fat" :style="{ fontSize: props.fontSize }"
-            >{{ round2(props.fat) }}F</span
+            >{{ fmt(props.fat) }}F</span
         >
         <span class="macro fiber" :style="{ fontSize: props.fontSize }"
-            >{{ round2(props.fiber) }}Fi</span
+            >{{ fmt(props.fiber) }}Fi</span
         >
     </div>
 </template>

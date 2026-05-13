@@ -150,6 +150,7 @@ function commitQtyEdit() {
                             :carbs="v.carbs"
                             :fiber="v.fiber"
                             font-size="0.75rem"
+                            decimals="none"
                         />
                     </button>
                 </div>
@@ -232,6 +233,7 @@ function commitQtyEdit() {
                 :carbs="item.amount * (item.food?.carbs ?? 0)"
                 :fiber="item.amount * (item.food?.fiber ?? 0)"
                 font-size="0.75rem"
+                decimals="none"
             />
         </span>
         <button

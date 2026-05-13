@@ -6,6 +6,7 @@ import { resolveAuthSession } from "~/composables/auth/useAuth";
 declare module "vue-router" {
     interface RouteMeta {
         breadcrumb?: string;
+        hideDateAndBreadcrumbs?: boolean;
     }
 }
 
@@ -74,14 +75,20 @@ const routes: RouteRecordRaw[] = [
                 path: "logging",
                 name: "logging",
                 component: () => import("~/pages/gym/logging/index.vue"),
-                meta: { breadcrumb: "Logging" },
+                meta: {
+                    breadcrumb: "Logging",
+                    hideDateAndBreadcrumbs: true,
+                },
             },
             {
                 path: "logging/:id(\\d+)",
                 name: "logging-exercise",
                 component: () =>
                     import("~/pages/gym/logging/exercise/[id].vue"),
-                meta: { breadcrumb: "Exercise" },
+                meta: {
+                    breadcrumb: "Exercise",
+                    hideDateAndBreadcrumbs: true,
+                },
             },
             {
                 path: "logging/cardio",

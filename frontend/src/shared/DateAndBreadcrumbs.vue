@@ -1,4 +1,4 @@
-<script lang="ts" setup>  
+<script lang="ts" setup>
 import { ChevronLeftIcon, ChevronRightIcon } from "lucide-vue-next";
 import { computed, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
@@ -12,9 +12,7 @@ import {
 const route = useRoute();
 const router = useRouter();
 
-const dayOffset = computed(() =>
-    parseDietDayOffsetQuery(route.query.offset),
-);
+const dayOffset = computed(() => parseDietDayOffsetQuery(route.query.offset));
 
 const updateOffset = (nextOffset: number) => {
     const nextQuery = { ...route.query };
@@ -30,7 +28,6 @@ const updateOffset = (nextOffset: number) => {
         hash: route.hash,
     });
 };
-
 
 const goToPreviousDay = () => {
     updateOffset(dayOffset.value + 1);
@@ -128,7 +125,9 @@ function onNativeDateChange(ev: Event) {
                     :value="selectedYmd"
                     @change="onNativeDateChange"
                 />
-                <div class="flex h-4 shrink-0 items-center justify-center leading-none">
+                <div
+                    class="flex h-4 shrink-0 items-center justify-center leading-none"
+                >
                     <button
                         type="button"
                         class="m-0! py-0! text-xs leading-none text-textSecondary underline-offset-2 transition-colors hover:text-textPrimary hover:underline disabled:pointer-events-none"

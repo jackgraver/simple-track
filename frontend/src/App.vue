@@ -1,8 +1,15 @@
 <script setup lang="ts">
+import { computed } from "vue";
+import { useRoute } from "vue-router";
 import ToastContainer from "./composables/toast/ToastContainer.vue";
 import DialogContainer from "./composables/dialog/DialogContainer.vue";
 import NavBar from "./shared/NavBar.vue";
 import DateAndBreadcrumbs from "./shared/DateAndBreadcrumbs.vue";
+
+const route = useRoute();
+const showDateAndBreadcrumbs = computed(
+    () => route.meta.hideDateAndBreadcrumbs !== true,
+);
 </script>
 
 <template>
@@ -13,7 +20,7 @@ import DateAndBreadcrumbs from "./shared/DateAndBreadcrumbs.vue";
             class="flex w-full flex-col items-stretch px-4 lg:px-8 xl:px-0 xl:mx-auto xl:max-w-8/12"
         >
             <NavBar />
-            <DateAndBreadcrumbs />
+            <DateAndBreadcrumbs v-if="showDateAndBreadcrumbs" />
             <RouterView />
         </div>
     </main>
