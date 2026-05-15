@@ -24,6 +24,13 @@ func NewMealHandler(db *gorm.DB) *MealHandler {
 	return &MealHandler{db: db}
 }
 
+func (h *MealHandler) mealPlanDayByRowIDOrToday(dayID uint) (*models.DietDay, error) {
+	if dayID != 0 {
+		return services.MealPlanDayByID(h.db, int(dayID))
+	}
+	return services.FindMealPlanDay(h.db, utils.ZerodTime(0))
+}
+
 func RegisterMealRoutes(group *gin.RouterGroup, db *gorm.DB) {
 	h := NewMealHandler(db)
 	foods := group.Group("/foods")
@@ -546,6 +553,7 @@ type EditLoggedMealRequest struct {
 	Meal                models.Meal `json:"meal"`
 	OldMealID           uint        `json:"oldMealID"`
 	PlannedSourceMealID uint        `json:"planned_source_meal_id"`
+	DayID               uint        `json:"day_id"`
 }
 
 func (h *MealHandler) postLogEdited(c *gin.Context) {
@@ -560,7 +568,7 @@ func (h *MealHandler) postLogEdited(c *gin.Context) {
 		return
 	}
 
-	day, err := services.FindMealPlanDay(h.db, utils.ZerodTime(0))
+	day, err := h.mealPlanDayByRowIDOrToday(req.DayID)
 	if err != nil {
 		apierr.Internal(c, err)
 		return
@@ -607,7 +615,7 @@ func (h *MealHandler) postEditLogged(c *gin.Context) {
 		apierr.BadRequest(c, err.Error())
 		return
 	}
-	day, err := services.FindMealPlanDay(h.db, utils.ZerodTime(0))
+	day, err := h.mealPlanDayByRowIDOrToday(req.DayID)
 	if err != nil {
 		apierr.Internal(c, err)
 		return
@@ -649,6 +657,7 @@ func (h *MealHandler) postEditLogged(c *gin.Context) {
 
 type DeleteLoggedMealRequest struct {
 	MealID uint `json:"meal_id"`
+	DayID  uint `json:"day_id"`
 }
 
 func (h *MealHandler) deleteLoggedMeal(c *gin.Context) {
@@ -657,7 +666,7 @@ func (h *MealHandler) deleteLoggedMeal(c *gin.Context) {
 		apierr.BadRequest(c, err.Error())
 		return
 	}
-	day, err := services.FindMealPlanDay(h.db, utils.ZerodTime(0))
+	day, err := h.mealPlanDayByRowIDOrToday(req.DayID)
 	if err != nil {
 		apierr.Internal(c, err)
 		return

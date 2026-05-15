@@ -172,13 +172,19 @@ export async function reorderPlannedMeals(
 export async function editLoggedMeal(
     meal: Meal,
     oldMealId: number,
+    options?: { dayId?: number },
 ): Promise<DietLogsTodayResponse> {
+    const body: { meal: Meal; oldMealID: number; day_id?: number } = {
+        meal,
+        oldMealID: oldMealId,
+    };
+    const did = options?.dayId;
+    if (did != null && did > 0) {
+        body.day_id = did;
+    }
     const response = await apiClient.post<DietLogsTodayResponse>(
-        "/diet/logs/meal/editlogged",
-        {
-            meal,
-            oldMealID: oldMealId,
-        },
+        "/diet/meals/meal/editlogged",
+        body,
     );
     return response.data;
 }
@@ -277,15 +283,20 @@ export async function createMeal(
 
 export async function logEditedMeal(
     meal: Meal,
-    options?: { plannedSourceMealId?: number },
+    options?: { plannedSourceMealId?: number; dayId?: number },
 ): Promise<LogMealResponse> {
     const body: {
         meal: Meal;
         planned_source_meal_id?: number;
+        day_id?: number;
     } = { meal };
     const pid = options?.plannedSourceMealId;
     if (pid != null && pid > 0) {
         body.planned_source_meal_id = pid;
+    }
+    const did = options?.dayId;
+    if (did != null && did > 0) {
+        body.day_id = did;
     }
     const response = await apiClient.post<LogMealResponse>(
         "/diet/meals/meal/logedited",
@@ -297,13 +308,19 @@ export async function logEditedMeal(
 export async function updateLoggedMeal(
     meal: Meal,
     oldMealId: number,
+    options?: { dayId?: number },
 ): Promise<LogMealResponse> {
+    const body: { meal: Meal; oldMealID: number; day_id?: number } = {
+        meal,
+        oldMealID: oldMealId,
+    };
+    const did = options?.dayId;
+    if (did != null && did > 0) {
+        body.day_id = did;
+    }
     const response = await apiClient.post<LogMealResponse>(
         "/diet/meals/meal/editlogged",
-        {
-            meal,
-            oldMealID: oldMealId,
-        },
+        body,
     );
     return response.data;
 }

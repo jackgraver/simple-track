@@ -1,7 +1,10 @@
 package utils
 
 import (
+	"encoding/json"
+	"log"
 	"net/http"
+	"os"
 	"sort"
 	"strings"
 	"sync"
@@ -9,6 +12,36 @@ import (
 
 	"github.com/gin-gonic/gin"
 )
+
+const benchmarkLogFile = "benchmark.log"
+const benchmarkLogBuffer = 4096
+
+type benchmarkLogEntry struct {
+	Route     string  `json:"route"`
+	Method    string  `json:"method"`
+	LatencyMs float64 `json:"latency_ms"`
+	Timestamp string  `json:"timestamp"`
+}
+
+var benchmarkLogCh chan benchmarkLogEntry
+
+func init() {
+	benchmarkLogCh = make(chan benchmarkLogEntry, benchmarkLogBuffer)
+	go func() {
+		f, err := os.OpenFile(benchmarkLogFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+		if err != nil {
+			log.Printf("benchmark log: failed to open %s: %v", benchmarkLogFile, err)
+			return
+		}
+		defer f.Close()
+		enc := json.NewEncoder(f)
+		for entry := range benchmarkLogCh {
+			if err := enc.Encode(entry); err != nil {
+				log.Printf("benchmark log: write error: %v", err)
+			}
+		}
+	}()
+}
 
 const benchmarkRoutePath = "/benchmark"
 
@@ -44,7 +77,17 @@ func BenchmarkMiddleware(router *gin.Engine) gin.HandlerFunc {
 			return
 		}
 
-		benchmarker.AddBenchmark(path, float64(elapsed.Nanoseconds())/1e6)
+		latency := float64(elapsed.Nanoseconds()) / 1e6
+		benchmarker.AddBenchmark(path, latency)
+		select {
+		case benchmarkLogCh <- benchmarkLogEntry{
+			Route:     path,
+			Method:    c.Request.Method,
+			LatencyMs: latency,
+			Timestamp: start.UTC().Format(time.RFC3339Nano),
+		}:
+		default:
+		}
 	}
 }
 

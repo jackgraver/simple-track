@@ -120,9 +120,14 @@ export function useLogEditedMeal() {
     const router = useRouter();
 
     return useMutation({
-        mutationFn: (vars: { meal: Meal; plannedSourceMealId?: number }) =>
+        mutationFn: (vars: {
+            meal: Meal;
+            plannedSourceMealId?: number;
+            dayId?: number;
+        }) =>
             logEditedMeal(vars.meal, {
                 plannedSourceMealId: vars.plannedSourceMealId,
+                dayId: vars.dayId,
             }),
         onSuccess: () => {
             invalidateDietQueries(queryClient);
@@ -136,8 +141,15 @@ export function useUpdateLoggedMeal() {
     const router = useRouter();
 
     return useMutation({
-        mutationFn: ({ meal, oldMealId }: { meal: Meal; oldMealId: number }) =>
-            updateLoggedMeal(meal, oldMealId),
+        mutationFn: ({
+            meal,
+            oldMealId,
+            dayId,
+        }: {
+            meal: Meal;
+            oldMealId: number;
+            dayId?: number;
+        }) => updateLoggedMeal(meal, oldMealId, { dayId }),
         onSuccess: () => {
             invalidateDietQueries(queryClient);
             afterMealLogNavigate(router);

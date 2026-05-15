@@ -55,8 +55,15 @@ export function useEditLoggedMeal(offset: MaybeRefOrGetter<number>) {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: ({ meal, oldMealId }: { meal: Meal; oldMealId: number }) =>
-            editLoggedMeal(meal, oldMealId),
+        mutationFn: ({
+            meal,
+            oldMealId,
+            dayId,
+        }: {
+            meal: Meal;
+            oldMealId: number;
+            dayId?: number;
+        }) => editLoggedMeal(meal, oldMealId, { dayId }),
         onSuccess: (day) => {
             queryClient.setQueryData(
                 homeKeys.diet.today(toValue(offset)),

@@ -46,9 +46,18 @@ export function useDietDayMealHandlers(getOffset: () => number) {
             });
             return;
         }
+        const rowDayId = data.value?.day.ID;
+        const query: Record<string, string> = { type, id: String(meal?.ID ?? "") };
+        if (
+            rowDayId &&
+            meal &&
+            (type === EDIT_TYPE || type === EDIT_LOGGED_TYPE)
+        ) {
+            query.dayId = String(rowDayId);
+        }
         router.push({
             name: "diet-log",
-            query: { type, id: String(meal?.ID ?? "") },
+            query,
         });
     };
 

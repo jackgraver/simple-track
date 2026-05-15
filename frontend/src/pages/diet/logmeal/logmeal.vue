@@ -223,6 +223,12 @@ const editVariant = computed(() =>
         : null,
 );
 const id = computed(() => Number(route.query.id ?? 0));
+const mealLogDayId = computed(() => {
+    const d = route.query.dayId;
+    const v = Array.isArray(d) ? d[0] : d;
+    const n = Number(v ?? 0);
+    return Number.isFinite(n) && n > 0 ? n : undefined;
+});
 const mealId = computed(() => {
     if (pageMode.value !== PAGE_MODE.edit) return null;
     if (editVariant.value === EDIT_VARIANT.saved) return null;
@@ -572,6 +578,7 @@ const logEditedMeal = async () => {
         await logEditedMealMutation.mutateAsync({
             meal: mealToLog,
             plannedSourceMealId,
+            dayId: mealLogDayId.value,
         });
         toast.push("Meal Logged Successfully!", "success");
     } catch (error: any) {
@@ -586,6 +593,7 @@ const updateLoggedMeal = async () => {
         await updateLoggedMealMutation.mutateAsync({
             meal: mealToUpdate,
             oldMealId: oldMealID,
+            dayId: mealLogDayId.value,
         });
         toast.push("Meal Updated Successfully!", "success");
     } catch (error: any) {
