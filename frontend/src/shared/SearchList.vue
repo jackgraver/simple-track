@@ -175,7 +175,10 @@ const refresh = () => {
                 @blur="isFocused = false"
             />
         </div>
-        <div class="items-container" ref="itemsContainer">
+        <div
+            class="items-container min-h-0 max-md:max-h-[min(45dvh,20rem)] md:flex-1"
+            ref="itemsContainer"
+        >
             <template v-if="isPending">
                 <Loader class="spinner" :size="32" />
             </template>

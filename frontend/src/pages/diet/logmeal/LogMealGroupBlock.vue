@@ -176,9 +176,7 @@ async function saveAsCompositeFood() {
                 @set-item-amount="
                     (rowI, amt) => emit('setItemAmount', rowI, amt)
                 "
-                @swap-variant="
-                    (rowI, v) => emit('swapVariant', rowI, v)
-                "
+                @swap-variant="(rowI, v) => emit('swapVariant', rowI, v)"
                 @remove="emit('removeItem', $event)"
             />
         </div>

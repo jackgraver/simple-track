@@ -14,7 +14,9 @@ defineProps<{
 </script>
 
 <template>
-    <div class="bars-container">
+    <div
+        class="grid grid-cols-2 grid-rows-2 gap-2 w-full md:flex md:flex-row md:gap-2 md:w-full md:grid-none"
+    >
         <MacroBar
             :total="totalCalories"
             :planned="plannedCalories"

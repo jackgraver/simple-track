@@ -169,7 +169,7 @@ function commitQtyEdit() {
         <div class="flex items-center justify-center gap-1 tabular-nums">
             <button
                 v-if="!qtyEditing"
-                class="flex h-9 w-9 shrink-0 items-center justify-center rounded border border-secondBg bg-secondBg text-textPrimary transition-colors hover:border-thirdBg hover:bg-thirdBg"
+                class="hidden md:flex h-9 w-9 shrink-0 items-center justify-center rounded border border-secondBg bg-secondBg text-textPrimary transition-colors hover:border-thirdBg hover:bg-thirdBg"
                 type="button"
                 @click="emit('amountPlusMinus', rowIndex, 'minus')"
             >
@@ -216,7 +216,7 @@ function commitQtyEdit() {
             </div>
             <button
                 v-if="!qtyEditing"
-                class="flex h-9 w-9 shrink-0 items-center justify-center rounded border border-secondBg bg-secondBg text-textPrimary transition-colors hover:border-thirdBg hover:bg-thirdBg"
+                class="hidden md:flex h-9 w-9 shrink-0 items-center justify-center rounded border border-secondBg bg-secondBg text-textPrimary transition-colors hover:border-thirdBg hover:bg-thirdBg"
                 type="button"
                 @click="emit('amountPlusMinus', rowIndex, 'plus')"
             >
@@ -224,7 +224,7 @@ function commitQtyEdit() {
             </button>
         </div>
         <span
-            class="flex min-w-0 justify-end text-sm tabular-nums text-textSecondary"
+            class="hidden display:flex min-w-0 justify-end text-sm tabular-nums text-textSecondary"
         >
             <SimpleMacros
                 :calories="item.amount * (item.food?.calories ?? 0)"

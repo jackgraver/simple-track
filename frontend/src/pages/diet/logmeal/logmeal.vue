@@ -631,7 +631,7 @@ const saveEditedSavedMeal = async () => {
 </script>
 
 <template>
-    <div class="diet-module flex flex-col items-center py-4">
+    <div class="diet-module flex flex-col items-center pt-4">
         <div
             v-if="editMissingId"
             class="flex h-[60dvh] items-center justify-center p-8 text-cfRed"
@@ -649,7 +649,7 @@ const saveEditedSavedMeal = async () => {
         </div>
         <div
             v-else-if="meal"
-            class="flex w-full flex-col gap-4 pb-8 md:grid md:h-[calc(100dvh-7rem)] md:grid-cols-[2fr_1fr] md:grid-rows-2"
+            class="flex w-full flex-col gap-4 md:grid md:h-[calc(100dvh-7rem)] md:grid-cols-[2fr_1fr] md:grid-rows-2 pb-16 md:pb-0"
         >
             <article
                 class="flex min-h-[min(28rem,55dvh)] flex-col overflow-hidden rounded-lg bg-firstBg md:row-span-2 md:min-h-0"
@@ -714,16 +714,18 @@ const saveEditedSavedMeal = async () => {
                         class="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto px-4 pb-1"
                     >
                         <div
-                            v-if="meal.items.length"
                             :class="[
                                 mealItemsListGridClass,
-                                'mb-1 hidden border-b border-secondBg pb-2 text-xs font-medium text-textSecondary sm:grid',
+                                'mb-1 border-b border-secondBg pb-2 text-xs font-medium text-textSecondary sm:grid',
                             ]"
                         >
                             <span><span class="sr-only">Select</span></span>
                             <span class="min-w-0">Item</span>
                             <span class="min-w-0 text-center">Qty</span>
-                            <span class="min-w-0 text-right">Macros</span>
+                            <span
+                                class="hidden display:block min-w-0 text-right"
+                                >Macros</span
+                            >
                             <span
                                 class="flex h-9 w-9 shrink-0 justify-self-end"
                                 aria-hidden="true"
