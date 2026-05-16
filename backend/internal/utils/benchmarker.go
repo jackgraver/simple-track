@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"bufio"
 	"encoding/json"
 	"log"
 	"net/http"
@@ -13,8 +14,12 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-const benchmarkLogFile = "benchmark.log"
-const benchmarkLogBuffer = 4096
+const (
+	benchmarkLogFile      = "benchmark.log"
+	benchmarkLogChanSize  = 4096
+	benchmarkLogWriteBuf  = 64 * 1024
+	benchmarkLogFlushTick = 500 * time.Millisecond
+)
 
 type benchmarkLogEntry struct {
 	Route     string  `json:"route"`
@@ -26,21 +31,61 @@ type benchmarkLogEntry struct {
 var benchmarkLogCh chan benchmarkLogEntry
 
 func init() {
-	benchmarkLogCh = make(chan benchmarkLogEntry, benchmarkLogBuffer)
-	go func() {
-		f, err := os.OpenFile(benchmarkLogFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
-		if err != nil {
-			log.Printf("benchmark log: failed to open %s: %v", benchmarkLogFile, err)
-			return
+	benchmarkLogCh = make(chan benchmarkLogEntry, benchmarkLogChanSize)
+	go runBenchmarkLogWriter()
+}
+
+// runBenchmarkLogWriter owns the benchmark log file for the lifetime of the
+// process: a single open handle, a buffered writer to coalesce syscalls, and
+// a periodic flush so data still reaches disk under low traffic.
+func runBenchmarkLogWriter() {
+	f, err := os.OpenFile(benchmarkLogFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	if err != nil {
+		log.Printf("benchmark log: failed to open %s: %v", benchmarkLogFile, err)
+		for range benchmarkLogCh {
 		}
-		defer f.Close()
-		enc := json.NewEncoder(f)
-		for entry := range benchmarkLogCh {
-			if err := enc.Encode(entry); err != nil {
-				log.Printf("benchmark log: write error: %v", err)
+		return
+	}
+	defer f.Close()
+
+	bw := bufio.NewWriterSize(f, benchmarkLogWriteBuf)
+	enc := json.NewEncoder(bw)
+	defer bw.Flush()
+
+	ticker := time.NewTicker(benchmarkLogFlushTick)
+	defer ticker.Stop()
+
+	writeEntry := func(e benchmarkLogEntry) {
+		if err := enc.Encode(e); err != nil {
+			log.Printf("benchmark log: write error: %v", err)
+		}
+	}
+
+	for {
+		select {
+		case entry, ok := <-benchmarkLogCh:
+			if !ok {
+				return
+			}
+			writeEntry(entry)
+			drained := false
+			for !drained {
+				select {
+				case more, ok := <-benchmarkLogCh:
+					if !ok {
+						return
+					}
+					writeEntry(more)
+				default:
+					drained = true
+				}
+			}
+		case <-ticker.C:
+			if err := bw.Flush(); err != nil {
+				log.Printf("benchmark log: flush error: %v", err)
 			}
 		}
-	}()
+	}
 }
 
 const benchmarkRoutePath = "/benchmark"

@@ -190,27 +190,18 @@ type RemoveExerciseRequest struct {
 func (h *ExercisesHandler) removeExerciseFromWorkout(c *gin.Context) {
 	var request RemoveExerciseRequest
 	if err := c.ShouldBindJSON(&request); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		apierr.BadRequest(c, "Invalid request body")
 		return
 	}
-	today, ok := getOrCreateTodayOrAbort(c, h.db)
-	if !ok {
-		return
-	}
-	var loggedExercise models.LoggedExercise
-	err := h.db.Where("workout_log_id = ? AND exercise_id = ?", today.ID, request.ExerciseID).First(&loggedExercise).Error
+	err := services.RemoveLoggedExerciseForDay(c.Request.Context(), h.db, utils.GetDayOffset(c), request.ExerciseID)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Exercise not found in workout"})
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			apierr.NotFound(c, "Exercise not found in workout")
+			return
+		}
+		apierr.Internal(c, err)
 		return
 	}
-
-	// Hard delete so removing an exercise clears its sets instead of only soft deleting the parent row.
-	err = h.db.Unscoped().Delete(&loggedExercise).Error
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-
 	c.JSON(http.StatusOK, gin.H{"success": true})
 }
 

@@ -503,6 +503,27 @@ func UpdateLoggedExercise(db *gorm.DB, exercise models.LoggedExercise) error {
 	})
 }
 
+// RemoveLoggedExerciseForDay deletes the logged exercise (and cascades its sets via the FK)
+// for the workout log on the day at the given offset. Uses a single DELETE with a subquery so
+// we avoid loading the full workout log up front just to discover its id.
+func RemoveLoggedExerciseForDay(ctx context.Context, db *gorm.DB, offset int, exerciseID uint) error {
+	day := utils.ZerodTime(offset)
+	res := db.WithContext(ctx).Unscoped().
+		Where(
+			"exercise_id = ? AND workout_log_id IN (?)",
+			exerciseID,
+			db.Model(&models.WorkoutLog{}).Select("id").Where("date = ?", day),
+		).
+		Delete(&models.LoggedExercise{})
+	if res.Error != nil {
+		return res.Error
+	}
+	if res.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
+}
+
 func DeleteLoggedSet(db *gorm.DB, setID uint) error {
 	return db.Transaction(func(tx *gorm.DB) error {
 		var set models.LoggedSet
