@@ -18,6 +18,8 @@ export function useWebStorageJsonSync<T extends object>(options: {
     key: ComputedRef<string>;
     /** Refs that should trigger a save when any of them change. */
     watchSources: Ref[];
+    /** When true, deep-watch ref/object sources (e.g. a single `meal` ref). */
+    deep?: boolean;
     getSnapshot: () => T;
     /** Apply parsed JSON to app state; return false if ignored. Use `ctx.remove()` to drop bad entries. */
     tryRestore: (
@@ -66,7 +68,10 @@ export function useWebStorageJsonSync<T extends object>(options: {
         saveEnabled = v;
     };
 
-    watch(options.watchSources, save, { flush: "post" });
+    watch(options.watchSources, save, {
+        flush: "post",
+        deep: options.deep ?? false,
+    });
 
     return {
         save,

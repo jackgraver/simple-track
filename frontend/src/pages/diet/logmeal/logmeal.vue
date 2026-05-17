@@ -17,8 +17,9 @@ import { mealItemsListGridClass } from "./mealItemsListGrid";
 import Input from "~/shared/input/Input.vue";
 import { dialogManager } from "~/composables/dialog/useDialog";
 import { toast } from "~/composables/toast/useToast";
+import { useWebStorageJsonSync } from "~/composables/useWebStorageJsonSync";
 import CreateFoodDialog from "./dialog/CreateFoodDialog.vue";
-import { computed, ref, toRaw, watch } from "vue";
+import { computed, nextTick, ref, toRaw, watch } from "vue";
 import { mealItemsToDisplayBlocks } from "~/utils/mealItemGroups";
 import { useMeal } from "./queries/useMeal";
 import { useSavedMeal } from "./queries/useSavedMeal";
@@ -47,6 +48,11 @@ type MealMacroTotals = {
     fiber: number;
     carbs: number;
     fat: number;
+};
+
+type LogMealDraftSnapshot = {
+    name: string;
+    items: MealItem[];
 };
 
 function macrosForMeal(m: Meal): MealMacroTotals {
@@ -294,13 +300,79 @@ const meal = ref<Meal>({
     items: [],
 });
 
+const logMealDraftStorageKey = computed(() => {
+    if (
+        (pageMode.value !== PAGE_MODE.log &&
+            pageMode.value !== PAGE_MODE.create) ||
+        id.value !== 0
+    ) {
+        return "";
+    }
+    if (pageMode.value === PAGE_MODE.log) {
+        const d = mealLogDayId.value;
+        return d
+            ? `simpletracker:diet:logmeal-draft:v1:log:day:${d}`
+            : `simpletracker:diet:logmeal-draft:v1:log`;
+    }
+    return `simpletracker:diet:logmeal-draft:v1:create`;
+});
+
+const logMealDraftSync = useWebStorageJsonSync<LogMealDraftSnapshot>({
+    key: logMealDraftStorageKey,
+    watchSources: [meal],
+    deep: true,
+    canPersist: () => logMealDraftStorageKey.value !== "",
+    getSnapshot: () => ({
+        name: meal.value.name,
+        items: JSON.parse(JSON.stringify(toRaw(meal.value.items))) as MealItem[],
+    }),
+    tryRestore: (parsed, { remove }) => {
+        if (typeof parsed.name !== "string") {
+            remove();
+            return false;
+        }
+        if (!Array.isArray(parsed.items)) {
+            remove();
+            return false;
+        }
+        let items: MealItem[];
+        try {
+            items = JSON.parse(JSON.stringify(parsed.items)) as MealItem[];
+        } catch {
+            remove();
+            return false;
+        }
+        if (
+            !items.every(
+                (it) =>
+                    typeof it?.food_id === "number" &&
+                    it.food &&
+                    typeof it.food === "object",
+            )
+        ) {
+            remove();
+            return false;
+        }
+        meal.value = {
+            ...meal.value,
+            name: parsed.name,
+            items,
+        };
+        return true;
+    },
+});
+
 /** Snapshot when opening "edit logged meal"; today totals already include this meal. */
 const baselineMealMacros = ref<MealMacroTotals | null>(null);
 
+let logMealDraftHydrateGeneration = 0;
+
 watch(
-    [pageMode, id, mealData, savedMealData, queryType],
+    [pageMode, id, mealData, savedMealData, queryType, mealLogDayId],
     ([mode, newId, newMealData, newSavedData, qType]) => {
         const variant = parseEditMealVariant(qType);
+        logMealDraftSync.setSaveEnabled(false);
+        logMealDraftHydrateGeneration++;
         if (
             (mode === PAGE_MODE.log || mode === PAGE_MODE.create) &&
             newId === 0
@@ -313,6 +385,12 @@ watch(
                 items: [],
             };
             baselineMealMacros.value = null;
+            const hydrateGen = logMealDraftHydrateGeneration;
+            void nextTick(() => {
+                if (hydrateGen !== logMealDraftHydrateGeneration) return;
+                logMealDraftSync.restore();
+                logMealDraftSync.setSaveEnabled(true);
+            });
             return;
         }
         if (mode === PAGE_MODE.edit && newId !== 0) {
@@ -533,6 +611,14 @@ const logMealToDay = async (saveToLibrary: boolean) => {
             saveToLibrary ? "Meal logged and saved for later!" : "Meal logged!",
             "success",
         );
+        logMealDraftSync.clear();
+        meal.value = {
+            ID: 0,
+            created_at: "",
+            updated_at: "",
+            name: "",
+            items: [],
+        };
     } catch (error: any) {
         toast.push("Log meal failed! " + (error.message || ""), "error");
     }
@@ -556,6 +642,7 @@ const saveSavedMealTemplate = async () => {
             })),
         });
         toast.push("Saved meal created!", "success");
+        logMealDraftSync.clear();
         meal.value = {
             ID: 0,
             created_at: "",
