@@ -722,8 +722,7 @@ const saveEditedSavedMeal = async () => {
                             <span><span class="sr-only">Select</span></span>
                             <span class="min-w-0">Item</span>
                             <span class="min-w-0 text-center">Qty</span>
-                            <span
-                                class="hidden display:block min-w-0 text-right"
+                            <span class="hidden md:block min-w-0 text-right"
                                 >Macros</span
                             >
                             <span

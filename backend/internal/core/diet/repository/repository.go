@@ -81,7 +81,7 @@ func (r *Repository) enrichDietDayFoodVariants(d *models.DietDay) {
 
 func (r *Repository) FoodsAll(excludeIDs []uint) ([]models.Food, error) {
 	var foods []models.Food
-	query := r.db.Model(&models.Food{}).Where("quick_entry = ? OR quick_entry IS NULL", false)
+	query := r.db.Model(&models.Food{}).Where("quick_entry = ? OR quick_entry IS NULL", false).Order("name ASC")
 	if len(excludeIDs) > 0 {
 		query = query.Where("id NOT IN ?", excludeIDs)
 	}
@@ -210,7 +210,7 @@ func (r *Repository) CompositeFoodCreate(cf *models.CompositeFood) (uint, error)
 
 func (r *Repository) MealsAll(excludeIDs []uint) ([]models.Meal, error) {
 	var meals []models.Meal
-	query := r.db.Model(&models.Meal{})
+	query := r.db.Model(&models.Meal{}).Order("name ASC")
 	if len(excludeIDs) > 0 {
 		query = query.Where("id NOT IN ?", excludeIDs)
 	}
@@ -222,7 +222,7 @@ func (r *Repository) MealsAll(excludeIDs []uint) ([]models.Meal, error) {
 
 func (r *Repository) SavedMealsAll(excludeIDs []uint) ([]models.SavedMeal, error) {
 	var meals []models.SavedMeal
-	query := r.db.Model(&models.SavedMeal{})
+	query := r.db.Model(&models.SavedMeal{}).Order("name ASC")
 	if len(excludeIDs) > 0 {
 		query = query.Where("id NOT IN ?", excludeIDs)
 	}

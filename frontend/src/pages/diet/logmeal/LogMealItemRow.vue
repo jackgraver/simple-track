@@ -224,7 +224,7 @@ function commitQtyEdit() {
             </button>
         </div>
         <span
-            class="hidden display:flex min-w-0 justify-end text-sm tabular-nums text-textSecondary"
+            class="hidden md:flex min-w-0 justify-end text-sm tabular-nums text-textSecondary"
         >
             <SimpleMacros
                 :calories="item.amount * (item.food?.calories ?? 0)"
