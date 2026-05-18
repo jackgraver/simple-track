@@ -3,10 +3,11 @@ package main
 import (
 	"be-simpletracker/internal/core/auth"
 	diet "be-simpletracker/internal/core/diet"
-	"be-simpletracker/internal/env"
+	finance "be-simpletracker/internal/core/finance"
 	tracking "be-simpletracker/internal/core/tracking"
 	workout "be-simpletracker/internal/core/workout"
 	"be-simpletracker/internal/database"
+	"be-simpletracker/internal/env"
 	"be-simpletracker/internal/utils"
 	"fmt"
 	"log"
@@ -90,4 +91,6 @@ func CreateFeatures(db *gorm.DB, router *gin.Engine) {
 		panic(err)
 	}
 	trackingHandler.RegisterRoutes(router, authMW)
+
+	finance.RegisterRoutes(router, authMW);
 }

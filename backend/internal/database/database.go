@@ -16,6 +16,8 @@ import (
 	"gorm.io/gorm"
 )
 
+var db_conn *gorm.DB
+
 func ConnectToPostgres() (*gorm.DB, error) {
 	if err := env.Load(); err != nil {
 		return nil, err
@@ -26,7 +28,13 @@ func ConnectToPostgres() (*gorm.DB, error) {
 		return nil, err
 	}
 
+	db_conn = db
+
 	return db, nil
+}
+
+func GetDB() *gorm.DB {
+	return db_conn
 }
 
 func resolvePostgresDSN() string {

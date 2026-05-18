@@ -130,6 +130,12 @@ const routes: RouteRecordRaw[] = [
         name: "signin",
         component: () => import("~/pages/auth/signin/index.vue"),
     },
+    {
+        path: "/finance",
+        name: "finance",
+        component: () => import("~/pages/finance/index.vue"),
+        meta: { breadcrumb: "Finance" },
+    },
 ];
 
 export const router = createRouter({
