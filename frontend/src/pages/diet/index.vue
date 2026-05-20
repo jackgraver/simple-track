@@ -4,7 +4,7 @@ import { computed } from "vue";
 import { useRoute } from "vue-router";
 import DietDayView from "./components/DietDayView.vue";
 import { CREATE_TYPE, LOG_TYPE } from "~/pages/diet/logmeal/logmealMode";
-import { parseDietDayOffsetQuery, ymdForDayOffset } from "~/utils/dateUtil";
+import { parseDietDayOffsetQuery, withDietDayOffsetQuery, ymdForDayOffset } from "~/utils/dateUtil";
 import { dialogManager } from "~/composables/dialog/useDialog";
 import LogWaterDialog from "./components/dialog/LogWaterDialog.vue";
 import QuickLogDialog from "./components/dialog/QuickLogDialog.vue";
@@ -14,6 +14,13 @@ const isDietHome = computed(() => route.name === "diet");
 
 const dateOffset = computed(() => parseDietDayOffsetQuery(route.query.offset));
 const dateStr = computed(() => ymdForDayOffset(dateOffset.value ?? 0));
+
+const logMealLinkQuery = computed(() =>
+    withDietDayOffsetQuery(dateOffset.value ?? 0, { type: LOG_TYPE }),
+);
+const createSavedMealLinkQuery = computed(() =>
+    withDietDayOffsetQuery(dateOffset.value ?? 0, { type: CREATE_TYPE }),
+);
 
 async function openWaterLog() {
     await dialogManager.custom<boolean>({
@@ -42,7 +49,7 @@ async function openQuickLog() {
                 <h1 class="m-0 text-lg font-semibold text-textPrimary">Diet</h1>
                 <nav class="flex items-center gap-3 text-sm text-textSecondary">
                     <router-link
-                        :to="{ name: 'diet-log', query: { type: LOG_TYPE } }"
+                        :to="{ name: 'diet-log', query: logMealLinkQuery }"
                         class="transition-colors hover:text-textPrimary"
                         >Log meal</router-link
                     >
@@ -50,7 +57,7 @@ async function openQuickLog() {
                         >·</span
                     >
                     <router-link
-                        :to="{ name: 'diet-log', query: { type: CREATE_TYPE } }"
+                        :to="{ name: 'diet-log', query: createSavedMealLinkQuery }"
                         class="transition-colors hover:text-textPrimary"
                         >New saved meal</router-link
                     >

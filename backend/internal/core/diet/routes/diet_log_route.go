@@ -32,6 +32,9 @@ func RegisterDietLogRoutes(group *gin.RouterGroup, db *gorm.DB) {
 	}
 }
 
+// @Summary Get today's meal plan with totals
+// @Route /diet/logs/today
+// @Method [get]
 func (h *DietLogHandler) getMealPlanToday(c *gin.Context) {
 	offset := utils.GetDayOffset(c)
 	day, tot, err := h.svc.MealPlanToday(c.Request.Context(), offset)
@@ -50,6 +53,9 @@ func (h *DietLogHandler) getMealPlanToday(c *gin.Context) {
 	})
 }
 
+// @Summary Get meal plan data for the current week
+// @Route /diet/logs/week
+// @Method [get]
 func (h *DietLogHandler) getMealPlanWeek(c *gin.Context) {
 	data, err := h.svc.MealPlanWeek(c.Request.Context())
 	if err != nil {
@@ -62,6 +68,9 @@ func (h *DietLogHandler) getMealPlanWeek(c *gin.Context) {
 	})
 }
 
+// @Summary Get planned meal counts summary for a month
+// @Route /diet/logs/month-planned-summary
+// @Method [get]
 func (h *DietLogHandler) getMonthPlannedSummary(c *gin.Context) {
 	offset, err := utils.ParseQueryInt(c, monthOffsetQuery)
 	if err != nil {
@@ -79,6 +88,9 @@ func (h *DietLogHandler) getMonthPlannedSummary(c *gin.Context) {
 	})
 }
 
+// @Summary Get meal plan data for a month
+// @Route /diet/logs/month
+// @Method [get]
 func (h *DietLogHandler) getMealPlanMonth(c *gin.Context) {
 	offset, err := utils.ParseQueryInt(c, monthOffsetQuery)
 	if err != nil {
@@ -102,6 +114,9 @@ func (h *DietLogHandler) getMealPlanMonth(c *gin.Context) {
 	})
 }
 
+// @Summary Get meal plan for a specific day by ID
+// @Route /diet/logs/day/:id
+// @Method [get]
 func (h *DietLogHandler) getMealPlanDay(c *gin.Context) {
 	idStr := c.Param("id")
 	id64, err := strconv.ParseUint(idStr, 10, 32)
@@ -124,6 +139,9 @@ func (h *DietLogHandler) getMealPlanDay(c *gin.Context) {
 	})
 }
 
+// @Summary Get today's dietary goals
+// @Route /diet/logs/goals/today
+// @Method [get]
 func (h *DietLogHandler) getGoalsToday(c *gin.Context) {
 	goals, err := h.svc.GoalsToday()
 	if err != nil {

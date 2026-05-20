@@ -8,6 +8,7 @@ import {
     useDeleteLoggedMeal,
 } from "~/pages/home/queries/useMealMutations";
 import { LOG_TYPE, EDIT_TYPE, EDIT_LOGGED_TYPE } from "~/pages/diet/logmeal/logmealMode";
+import { withDietDayOffsetQuery } from "~/utils/dateUtil";
 import { mealHasQuickEntryFood } from "~/utils/dietMealQuickLog";
 import QuickLogDialog from "~/pages/diet/components/dialog/QuickLogDialog.vue";
 
@@ -32,7 +33,10 @@ export function useDietDayMealHandlers(getOffset: () => number) {
         type: typeof LOG_TYPE | typeof EDIT_TYPE | typeof EDIT_LOGGED_TYPE,
     ) => {
         if (type === LOG_TYPE) {
-            router.push({ name: "diet-log", query: { type: LOG_TYPE } });
+            router.push({
+                name: "diet-log",
+                query: withDietDayOffsetQuery(getOffset(), { type: LOG_TYPE }),
+            });
             return;
         }
         if (meal && type === EDIT_TYPE && mealHasQuickEntryFood(meal)) {
@@ -47,7 +51,10 @@ export function useDietDayMealHandlers(getOffset: () => number) {
             return;
         }
         const rowDayId = data.value?.day.ID;
-        const query: Record<string, string> = { type, id: String(meal?.ID ?? "") };
+        const query = withDietDayOffsetQuery(getOffset(), {
+            type,
+            id: String(meal?.ID ?? ""),
+        });
         if (
             rowDayId &&
             meal &&

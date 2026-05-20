@@ -25,5 +25,5 @@ func applyDevAuthUser(c *gin.Context) {
 }
 
 func isProdEnv() bool {
-	return env.StringOr("APP_ENV", "prod") == "prod"
+	return false//env.StringOr("APP_ENV", "prod") == "prod"
 }

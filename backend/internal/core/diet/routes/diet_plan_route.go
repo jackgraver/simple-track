@@ -29,6 +29,9 @@ func RegisterDietPlanRoutes(group *gin.RouterGroup, db *gorm.DB) {
 	}
 }
 
+// @Summary List all diet plans
+// @Route /diet/plans/plan/all
+// @Method [get]
 func (h *DietPlanHandler) getAllPlans(c *gin.Context) {
 	ctx := c.Request.Context()
 	params := utils.ParseQueryParams(c)
@@ -64,6 +67,9 @@ type updatePlanMacrosRequest struct {
 	Fat      float32 `json:"fat"`
 }
 
+// @Summary Update macro targets for a diet plan
+// @Route /diet/plans/plan/:id
+// @Method [put]
 func (h *DietPlanHandler) putPlanMacros(c *gin.Context) {
 	idStr := c.Param("id")
 	id64, err := strconv.ParseUint(idStr, 10, 32)

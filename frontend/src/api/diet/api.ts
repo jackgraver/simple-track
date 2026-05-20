@@ -265,14 +265,20 @@ export async function createCompositeFood(body: {
 export async function createMeal(
     meal: Meal,
     log: boolean,
-    saveToLibrary?: boolean,
+    options?: { saveToLibrary?: boolean; offset?: number },
 ): Promise<CreateMealResponse> {
-    const body: { meal: Meal; log: boolean; save_to_library?: boolean } = {
+    const body: {
+        meal: Meal;
+        log: boolean;
+        save_to_library?: boolean;
+        offset?: number;
+    } = {
         meal,
         log,
     };
     if (log) {
-        body.save_to_library = saveToLibrary === true;
+        body.save_to_library = options?.saveToLibrary === true;
+        body.offset = options?.offset ?? 0;
     }
     const response = await apiClient.post<CreateMealResponse>(
         "/diet/meals/meal/new",

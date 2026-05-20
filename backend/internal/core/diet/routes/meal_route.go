@@ -76,6 +76,9 @@ type QuickLogRequest struct {
 	ReplaceMealID uint    `json:"replace_meal_id"`
 }
 
+// @Summary Quick-log a meal with macro values
+// @Route /diet/meals/quick-log
+// @Method [post]
 func (h *MealHandler) postQuickLog(c *gin.Context) {
 	var req QuickLogRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -160,6 +163,9 @@ func (h *MealHandler) postQuickLog(c *gin.Context) {
 	})
 }
 
+// @Summary Create a new food item
+// @Route /diet/foods
+// @Method [post]
 func (h *MealHandler) postFood(c *gin.Context) {
 	var req CreateFoodRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -217,6 +223,9 @@ func compositeToResponse(cf models.CompositeFood) compositeFoodWithMacros {
 	}
 }
 
+// @Summary List all foods and composite foods
+// @Route /diet/meals/food/all
+// @Method [get]
 func (h *MealHandler) getAllFoods(c *gin.Context) {
 	excludeIDsStr := c.Query("exclude")
 	var excludeIDs []uint
@@ -245,6 +254,9 @@ func (h *MealHandler) getAllFoods(c *gin.Context) {
 	})
 }
 
+// @Summary Create a new composite food
+// @Route /diet/meals/composite-food/new
+// @Method [post]
 func (h *MealHandler) postNewCompositeFood(c *gin.Context) {
 	var cf models.CompositeFood
 	if err := c.ShouldBindJSON(&cf); err != nil {
@@ -272,6 +284,9 @@ func (h *MealHandler) postNewCompositeFood(c *gin.Context) {
 	c.JSON(http.StatusCreated, gin.H{"composite_food": compositeToResponse(loaded)})
 }
 
+// @Summary List all meals
+// @Route /diet/meals/meal/all
+// @Method [get]
 func (h *MealHandler) getAllMeals(c *gin.Context) {
 	excludeIDsStr := c.Query("exclude")
 	var excludeIDs []uint
@@ -288,6 +303,9 @@ func (h *MealHandler) getAllMeals(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"meals": meals})
 }
 
+// @Summary List all saved meals
+// @Route /diet/meals/saved-meal/all
+// @Method [get]
 func (h *MealHandler) getAllSavedMeals(c *gin.Context) {
 	excludeIDsStr := c.Query("exclude")
 	var excludeIDs []uint
@@ -304,6 +322,9 @@ func (h *MealHandler) getAllSavedMeals(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"saved_meals": saved})
 }
 
+// @Summary Create a new saved meal
+// @Route /diet/meals/saved-meal/new
+// @Method [post]
 func (h *MealHandler) postNewSavedMeal(c *gin.Context) {
 	var sm models.SavedMeal
 	if err := c.ShouldBindJSON(&sm); err != nil {
@@ -319,6 +340,9 @@ func (h *MealHandler) postNewSavedMeal(c *gin.Context) {
 	c.JSON(http.StatusCreated, gin.H{"saved_meal_id": id})
 }
 
+// @Summary Delete a saved meal
+// @Route /diet/meals/saved-meal/:id
+// @Method [delete]
 func (h *MealHandler) deleteSavedMeal(c *gin.Context) {
 	idStr := c.Param("id")
 	id64, err := strconv.ParseUint(idStr, 10, 64)
@@ -361,6 +385,9 @@ func (h *MealHandler) deleteSavedMeal(c *gin.Context) {
 	c.Status(http.StatusNoContent)
 }
 
+// @Summary Get a saved meal by ID
+// @Route /diet/meals/saved-meal/:id
+// @Method [get]
 func (h *MealHandler) getSavedMeal(c *gin.Context) {
 	idStr := c.Param("id")
 	id64, err := strconv.ParseUint(idStr, 10, 64)
@@ -383,6 +410,9 @@ func (h *MealHandler) getSavedMeal(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"saved_meal": sm})
 }
 
+// @Summary Update a saved meal
+// @Route /diet/meals/saved-meal/:id
+// @Method [put]
 func (h *MealHandler) putSavedMeal(c *gin.Context) {
 	idStr := c.Param("id")
 	id64, err := strconv.ParseUint(idStr, 10, 64)
@@ -433,6 +463,9 @@ func savedMealFromMealTemplate(m *models.Meal) *models.SavedMeal {
 	return s
 }
 
+// @Summary Get a meal by ID
+// @Route /diet/meals/meal/:id
+// @Method [get]
 func (h *MealHandler) getMeal(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := strconv.ParseUint(idStr, 10, 32)
@@ -452,8 +485,12 @@ type CreateMealRequest struct {
 	Meal          models.Meal `json:"meal"`
 	Log           bool        `json:"log"`
 	SaveToLibrary bool        `json:"save_to_library"`
+	Offset        int         `json:"offset"`
 }
 
+// @Summary Create a new meal
+// @Route /diet/meals/meal/new
+// @Method [post]
 func (h *MealHandler) postNewMeal(c *gin.Context) {
 	var req CreateMealRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -467,7 +504,7 @@ func (h *MealHandler) postNewMeal(c *gin.Context) {
 	}
 
 	if req.Log {
-		day, err := services.FindMealPlanDay(h.db, utils.ZerodTime(0))
+		day, err := services.FindMealPlanDay(h.db, utils.ZerodTime(req.Offset))
 		if err != nil {
 			apierr.Internal(c, err)
 			return
@@ -500,6 +537,9 @@ type LogPlannedMealRequest struct {
 	MealID uint `json:"meal_id"`
 }
 
+// @Summary Log a planned meal as eaten
+// @Route /diet/meals/meal/log-planned
+// @Method [post]
 func (h *MealHandler) postLogPlanned(c *gin.Context) {
 	var req LogPlannedMealRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -556,6 +596,9 @@ type EditLoggedMealRequest struct {
 	DayID               uint        `json:"day_id"`
 }
 
+// @Summary Create and log an edited meal copy
+// @Route /diet/meals/meal/logedited
+// @Method [post]
 func (h *MealHandler) postLogEdited(c *gin.Context) {
 	var req EditLoggedMealRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -609,6 +652,9 @@ func (h *MealHandler) postLogEdited(c *gin.Context) {
 	})
 }
 
+// @Summary Edit an existing logged meal in place
+// @Route /diet/meals/meal/editlogged
+// @Method [post]
 func (h *MealHandler) postEditLogged(c *gin.Context) {
 	var req EditLoggedMealRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -660,6 +706,9 @@ type DeleteLoggedMealRequest struct {
 	DayID  uint `json:"day_id"`
 }
 
+// @Summary Delete a logged meal from a day
+// @Route /diet/meals/meal/logged
+// @Method [delete]
 func (h *MealHandler) deleteLoggedMeal(c *gin.Context) {
 	var req DeleteLoggedMealRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -700,6 +749,9 @@ type AddPlannedFromSavedRequest struct {
 	Offset      int  `json:"offset"`
 }
 
+// @Summary Add a planned meal from a saved meal template
+// @Route /diet/meals/planned/from-saved
+// @Method [post]
 func (h *MealHandler) postPlannedFromSaved(c *gin.Context) {
 	var req AddPlannedFromSavedRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -744,6 +796,9 @@ type ReorderPlannedMealsRequest struct {
 	PlannedMealIDs []uint `json:"planned_meal_ids"`
 }
 
+// @Summary Reorder planned meals for a day
+// @Route /diet/meals/planned/reorder
+// @Method [post]
 func (h *MealHandler) postPlannedReorder(c *gin.Context) {
 	var req ReorderPlannedMealsRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -788,6 +843,9 @@ type DeletePlannedMealRequest struct {
 	Offset        int  `json:"offset"`
 }
 
+// @Summary Delete a planned meal from a day
+// @Route /diet/meals/planned
+// @Method [delete]
 func (h *MealHandler) deletePlannedMeal(c *gin.Context) {
 	var req DeletePlannedMealRequest
 	if err := c.ShouldBindJSON(&req); err != nil {

@@ -120,3 +120,11 @@ export function parseDietDayOffsetQuery(raw: unknown): number {
     const v = Number.parseInt(s, 10);
     return Number.isNaN(v) ? 0 : v;
 }
+
+export function withDietDayOffsetQuery(
+    offset: number,
+    query: Record<string, string>,
+): Record<string, string> {
+    if (offset === 0) return query;
+    return { ...query, offset: String(offset) };
+}

@@ -39,6 +39,7 @@ import {
     dietDayOffsetFromLocalDate,
     formatDateLong,
     parseDietDayOffsetQuery,
+    withDietDayOffsetQuery,
 } from "~/utils/dateUtil";
 import { EDIT_SAVED_TYPE } from "~/pages/diet/logmeal/logmealMode";
 
@@ -341,7 +342,10 @@ async function deleteSavedMealTemplate(sm: SavedMeal) {
 function openEditSavedMeal(sm: SavedMeal) {
     router.push({
         name: "diet-log",
-        query: { type: EDIT_SAVED_TYPE, id: String(sm.ID) },
+        query: withDietDayOffsetQuery(dateOffset.value, {
+            type: EDIT_SAVED_TYPE,
+            id: String(sm.ID),
+        }),
     });
 }
 

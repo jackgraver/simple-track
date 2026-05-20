@@ -23,7 +23,8 @@ import { computed, nextTick, ref, toRaw, watch } from "vue";
 import { mealItemsToDisplayBlocks } from "~/utils/mealItemGroups";
 import { useMeal } from "./queries/useMeal";
 import { useSavedMeal } from "./queries/useSavedMeal";
-import { useDietLogsToday } from "./queries/useDietLogsToday";
+import { useDietLogsToday } from "~/pages/home/queries/useDietLogsToday";
+import { parseDietDayOffsetQuery } from "~/utils/dateUtil";
 import {
     useCreateMeal,
     useCreateSavedMeal,
@@ -216,6 +217,8 @@ const removeGroupLines = (indices: number[]) => {
 
 const route = useRoute();
 
+const dayOffset = computed(() => parseDietDayOffsetQuery(route.query.offset));
+
 const queryType = computed(() => {
     const t = route.query.type;
     return Array.isArray(t) ? t[0] : t;
@@ -288,8 +291,8 @@ const showDietDayMacroBars = computed(
         ),
 );
 
-// Fetch today's diet logs
-const { data: today } = useDietLogsToday();
+// Fetch diet logs for the selected day (offset from DateAndBreadcrumbs)
+const { data: dayLogs } = useDietLogsToday(dayOffset);
 
 // start with a default empty meal
 const meal = ref<Meal>({
@@ -309,10 +312,7 @@ const logMealDraftStorageKey = computed(() => {
         return "";
     }
     if (pageMode.value === PAGE_MODE.log) {
-        const d = mealLogDayId.value;
-        return d
-            ? `simpletracker:diet:logmeal-draft:v1:log:day:${d}`
-            : `simpletracker:diet:logmeal-draft:v1:log`;
+        return `simpletracker:diet:logmeal-draft:v1:log`;
     }
     return `simpletracker:diet:logmeal-draft:v1:create`;
 });
@@ -368,7 +368,7 @@ const baselineMealMacros = ref<MealMacroTotals | null>(null);
 let logMealDraftHydrateGeneration = 0;
 
 watch(
-    [pageMode, id, mealData, savedMealData, queryType, mealLogDayId],
+    [pageMode, id, mealData, savedMealData, queryType],
     ([mode, newId, newMealData, newSavedData, qType]) => {
         const variant = parseEditMealVariant(qType);
         logMealDraftSync.setSaveEnabled(false);
@@ -432,9 +432,9 @@ watch(
 
 const totalMacros = computed(() => macrosForMeal(meal.value));
 
-/** Day preview for MacroBars: add draft meal to today, except edit-logged replace baseline. */
+/** Day preview for MacroBars: add draft meal to selected day, except edit-logged replace baseline. */
 const macroBarsDayTotals = computed(() => {
-    const t = today.value;
+    const t = dayLogs.value;
     const tm = totalMacros.value;
     const dayCal = t?.totalCalories ?? 0;
     const dayProtein = t?.totalProtein ?? 0;
@@ -585,10 +585,15 @@ function swapVariant(index: number, v: Food) {
 
 const setMeal = async (item: Meal | SavedMeal): Promise<boolean> => {
     const first = item.items[0];
-    meal.value =
+    const loaded =
         first && "saved_meal_id" in first
             ? savedMealToMeal(item as SavedMeal)
             : cloneMeal(item as Meal);
+    const keepName = meal.value.name.trim();
+    meal.value = {
+        ...loaded,
+        name: keepName || loaded.name,
+    };
     return true;
 };
 
@@ -606,6 +611,7 @@ const logMealToDay = async (saveToLibrary: boolean) => {
             meal: mealToCreate,
             log: true,
             saveToLibrary,
+            offset: dayOffset.value,
         });
         toast.push(
             saveToLibrary ? "Meal logged and saved for later!" : "Meal logged!",
@@ -920,10 +926,10 @@ const saveEditedSavedMeal = async () => {
                         :totalProtein="macroBarsDayTotals.totalProtein"
                         :totalFat="macroBarsDayTotals.totalFat"
                         :totalCarbs="macroBarsDayTotals.totalCarbs"
-                        :planned-calories="today?.day.plan.calories ?? 0"
-                        :planned-protein="today?.day.plan.protein ?? 0"
-                        :planned-fat="today?.day.plan.fat ?? 0"
-                        :planned-carbs="today?.day.plan.carbs ?? 0"
+                        :planned-calories="dayLogs?.day.plan.calories ?? 0"
+                        :planned-protein="dayLogs?.day.plan.protein ?? 0"
+                        :planned-fat="dayLogs?.day.plan.fat ?? 0"
+                        :planned-carbs="dayLogs?.day.plan.carbs ?? 0"
                     />
                 </footer>
             </article>

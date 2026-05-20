@@ -31,7 +31,7 @@ const routes: RouteRecordRaw[] = [
                 path: "log",
                 name: "diet-log",
                 component: () => import("~/pages/diet/logmeal/logmeal.vue"),
-                meta: { breadcrumb: "Log meal", hideDateAndBreadcrumbs: true },
+                meta: { breadcrumb: "Log meal", hideDateAndBreadcrumbs: false },
             },
             {
                 path: "edit-planned",

@@ -13,13 +13,13 @@ import {
 } from '~/api/diet/api';
 import { logmealKeys } from './keys';
 import { homeKeys } from '~/pages/home/queries/keys';
+import { parseDietDayOffsetQuery } from '~/utils/dateUtil';
 import type { Meal } from '~/types/diet';
 import { useRouter } from 'vue-router';
 
 function invalidateDietQueries(
     queryClient: ReturnType<typeof useQueryClient>,
 ) {
-    queryClient.invalidateQueries({ queryKey: logmealKeys.diet.today() });
     queryClient.invalidateQueries({ queryKey: homeKeys.diet.all });
     queryClient.invalidateQueries({ queryKey: ['savedMeals'] });
     queryClient.invalidateQueries({
@@ -28,9 +28,14 @@ function invalidateDietQueries(
 }
 
 function afterMealLogNavigate(router: ReturnType<typeof useRouter>) {
-    const name = router.currentRoute.value.name;
+    const route = router.currentRoute.value;
+    const name = route.name;
     if (name === 'diet-log') {
-        router.push({ name: 'diet' });
+        const offset = parseDietDayOffsetQuery(route.query.offset);
+        router.push({
+            name: 'diet',
+            query: offset === 0 ? {} : { offset: String(offset) },
+        });
         return;
     }
     if (name === 'home') {
@@ -101,11 +106,13 @@ export function useCreateMeal() {
             meal,
             log,
             saveToLibrary,
+            offset,
         }: {
             meal: Meal;
             log: boolean;
             saveToLibrary?: boolean;
-        }) => createMeal(meal, log, saveToLibrary),
+            offset?: number;
+        }) => createMeal(meal, log, { saveToLibrary, offset }),
         onSuccess: (_, variables) => {
             invalidateDietQueries(queryClient);
             if (variables.log) {
