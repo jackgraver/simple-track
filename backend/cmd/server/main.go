@@ -82,8 +82,7 @@ func CreateFeatures(db *gorm.DB, router *gin.Engine) {
 	}
 	dietHandler.RegisterRoutes(router, authMW)
 
-	workoutHandler := workout.NewHandler(db)
-	workoutHandler.RegisterRoutes(router, authMW)
+	workout.RegisterRoutes(router, authMW)
 
 	trackingHandler := tracking.NewHandler(db)
 	if err := trackingHandler.Migrate(); err != nil {

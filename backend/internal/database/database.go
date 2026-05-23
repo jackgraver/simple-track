@@ -33,6 +33,10 @@ func ConnectToPostgres() (*gorm.DB, error) {
 	return db, nil
 }
 
+func SetDB(db *gorm.DB) {
+	db_conn = db
+}
+
 func GetDB() *gorm.DB {
 	return db_conn
 }
@@ -64,6 +68,7 @@ func ConnectToSqlite(dbPath string) (*gorm.DB, error) {
 		return nil, err
 	}
 
+	db_conn = db
 	return db, nil
 }
 

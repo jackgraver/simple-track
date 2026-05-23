@@ -14,12 +14,20 @@ import (
 )
 
 func GetAllExercises(c *gin.Context) {
-	page, err := utils.ParseQueryInt(c, pageQuery)
+	page, err := utils.ParseQueryInt(c, utils.QueryIntVar{
+		Key:        "page",
+		Default:    1,
+		ErrInvalid: "page must be an integer",
+	})
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	pageSize, err := utils.ParseQueryInt(c, pageSizeQuery)
+	pageSize, err := utils.ParseQueryInt(c, utils.QueryIntVar{
+		Key:        "page_size",
+		Default:    0,
+		ErrInvalid: "page_size must be an integer",
+	})
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return

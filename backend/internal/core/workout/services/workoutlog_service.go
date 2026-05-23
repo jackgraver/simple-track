@@ -3,7 +3,6 @@ package services
 import (
 	"be-simpletracker/internal/core/workout/models"
 	workoutrepo "be-simpletracker/internal/core/workout/repository"
-	"be-simpletracker/internal/database"
 	"be-simpletracker/internal/utils"
 	"context"
 	"errors"
@@ -14,12 +13,6 @@ import (
 	"gorm.io/gorm"
 )
 
-func conn() *gorm.DB {
-	return database.GetDB()
-}
-
-// GetOrCreateToday returns the workout log for the calendar day (with offset from today),
-// creating a row if missing and attaching the plan for that weekday when one exists.
 func GetOrCreateToday(ctx context.Context, offset int) (models.WorkoutLog, error) {
 	day := utils.ZerodTime(offset)
 	workoutDay, err := workoutrepo.LoadByDate(ctx, day)
@@ -48,30 +41,21 @@ func GetOrCreateToday(ctx context.Context, offset int) (models.WorkoutLog, error
 	return workoutrepo.LoadByDate(ctx, day)
 }
 
-// SwitchPlan sets workout_plan_id on the log for the given day offset without changing weekly plan assignments.
 func SwitchPlan(ctx context.Context, offset int, planID *uint) (PreviousWorkoutResponse, error) {
 	day, err := GetOrCreateToday(ctx, offset)
 	if err != nil {
 		return PreviousWorkoutResponse{}, err
 	}
 	if planID != nil {
-		var n int64
-		if err := conn().WithContext(ctx).Model(&models.WorkoutPlan{}).Where("id = ?", *planID).Count(&n).Error; err != nil {
+		exists, err := workoutrepo.WorkoutPlanExists(ctx, *planID)
+		if err != nil {
 			return PreviousWorkoutResponse{}, err
 		}
-		if n == 0 {
+		if !exists {
 			return PreviousWorkoutResponse{}, fmt.Errorf("workout plan not found")
 		}
 	}
-	var wid any
-	if planID == nil {
-		wid = nil
-	} else {
-		wid = *planID
-	}
-	if err := conn().WithContext(ctx).Model(&models.WorkoutLog{}).Where("id = ?", day.ID).Updates(map[string]any{
-		"workout_plan_id": wid,
-	}).Error; err != nil {
+	if err := workoutrepo.UpdateWorkoutPlanID(ctx, day.ID, planID); err != nil {
 		return PreviousWorkoutResponse{}, err
 	}
 	return GetPreviousWorkoutView(ctx, offset)
@@ -97,23 +81,21 @@ type MonthWorkoutLogsResponse struct {
 }
 
 type PreviousWorkoutResponse struct {
-	Day                 models.WorkoutLog `json:"day"`
-	PlannedExercises    []ExerciseGroup   `json:"planned_exercises"`
-	PlannedCardio       any               `json:"planned_cardio"`
-	LoggedCardio        *models.Cardio    `json:"logged_cardio"`
-	PlannedPreMobility  *MobilityRoutineView `json:"planned_pre_mobility"`
-	LoggedPreMobility   *MobilityLoggedView  `json:"logged_pre_mobility"`
-	PlannedPostMobility *MobilityRoutineView `json:"planned_post_mobility"`
-	LoggedPostMobility  *MobilityLoggedView  `json:"logged_post_mobility"`
+	Day                 models.WorkoutLog        `json:"day"`
+	PlannedExercises    []ExerciseGroup           `json:"planned_exercises"`
+	PlannedCardio       any                     `json:"planned_cardio"`
+	LoggedCardio        *models.Cardio          `json:"logged_cardio"`
+	PlannedPreMobility  *MobilityRoutineView    `json:"planned_pre_mobility"`
+	LoggedPreMobility   *MobilityLoggedView     `json:"logged_pre_mobility"`
+	PlannedPostMobility *MobilityRoutineView    `json:"planned_post_mobility"`
+	LoggedPostMobility  *MobilityLoggedView     `json:"logged_post_mobility"`
 }
 
-// MobilityRoutineView is planned stretches for one slot (pre or post).
 type MobilityRoutineView struct {
 	Title string   `json:"title"`
 	Items []string `json:"items"`
 }
 
-// MobilityLoggedView is planned items plus which are checked for this workout log.
 type MobilityLoggedView struct {
 	Title   string   `json:"title"`
 	Items   []string `json:"items"`
@@ -221,18 +203,14 @@ const (
 	maxActivityWeeks       = 104
 )
 
-// ErrInvalidActivityMode is returned when mode is not "year" or "rolling".
 var ErrInvalidActivityMode = errors.New("invalid activity mode")
 
-// WorkoutActivityResponse lists calendar days (local YYYY-MM-DD) with at least one logged set in range.
 type WorkoutActivityResponse struct {
 	ActiveDates []string   `json:"active_dates"`
 	Range       MonthRange `json:"range"`
 	Mode        string     `json:"mode"`
 }
 
-// GetWorkoutActivity aggregates days with logged sets for the given mode.
-// When useDays is true, days is the inclusive rolling window length (capped); otherwise weeks is used (capped).
 func GetWorkoutActivity(ctx context.Context, mode string, weeks int) (WorkoutActivityResponse, error) {
 	if mode != "year" && mode != "rolling" {
 		return WorkoutActivityResponse{}, ErrInvalidActivityMode
@@ -418,281 +396,49 @@ func UpsertMobilityPost(ctx context.Context, offset int, checked []string) (*Mob
 }
 
 func LogExercise(exercise *models.LoggedExercise) error {
-	err := conn().Omit("Exercise").Create(exercise).Error
-	if err != nil {
-		return err
-	}
-	return nil
+	return workoutrepo.CreateLoggedExercise(exercise)
 }
 
 func UpdateLoggedExercise(exercise models.LoggedExercise) error {
-	return conn().Transaction(func(tx *gorm.DB) error {
-		if err := tx.Model(&models.LoggedExercise{}).
-			Where("id = ?", exercise.ID).
-			Updates(map[string]any{
-				"workout_log_id": exercise.WorkoutLogID,
-				"exercise_id":    exercise.ExerciseID,
-				"notes":          exercise.Notes,
-			}).Error; err != nil {
-			return err
-		}
-
-		incomingSetIDs := make(map[uint]struct{}, len(exercise.Sets))
-		for i := range exercise.Sets {
-			set := exercise.Sets[i]
-			set.LoggedExerciseID = exercise.ID
-
-			if set.ID > 0 {
-				incomingSetIDs[set.ID] = struct{}{}
-				if err := tx.Model(&models.LoggedSet{}).
-					Where("id = ? AND logged_exercise_id = ?", set.ID, exercise.ID).
-					Updates(map[string]any{
-						"reps":               set.Reps,
-						"weight":             set.Weight,
-						"weight_setup":       set.WeightSetup,
-						"logged_exercise_id": exercise.ID,
-					}).Error; err != nil {
-					return err
-				}
-				continue
-			}
-
-			set.ID = 0
-			if err := tx.Create(&set).Error; err != nil {
-				return err
-			}
-			incomingSetIDs[set.ID] = struct{}{}
-		}
-
-		var existingSetIDs []uint
-		if err := tx.Model(&models.LoggedSet{}).
-			Where("logged_exercise_id = ?", exercise.ID).
-			Pluck("id", &existingSetIDs).Error; err != nil {
-			return err
-		}
-
-		setIDsToDelete := make([]uint, 0)
-		for _, existingSetID := range existingSetIDs {
-			if _, ok := incomingSetIDs[existingSetID]; !ok {
-				setIDsToDelete = append(setIDsToDelete, existingSetID)
-			}
-		}
-
-		if len(setIDsToDelete) > 0 {
-			if err := tx.Unscoped().
-				Where("logged_exercise_id = ? AND id IN ?", exercise.ID, setIDsToDelete).
-				Delete(&models.LoggedSet{}).Error; err != nil {
-				return err
-			}
-		}
-
-		return nil
-	})
+	return workoutrepo.UpdateLoggedExerciseWithSets(exercise)
 }
 
-// RemoveLoggedExerciseForDay deletes the logged exercise (and cascades its sets via the FK)
-// for the workout log on the day at the given offset. Uses a single DELETE with a subquery so
-// we avoid loading the full workout log up front just to discover its id.
 func RemoveLoggedExerciseForDay(ctx context.Context, offset int, exerciseID uint) error {
-	day := utils.ZerodTime(offset)
-	res := conn().WithContext(ctx).Unscoped().
-		Where(
-			"exercise_id = ? AND workout_log_id IN (?)",
-			exerciseID,
-			conn().Model(&models.WorkoutLog{}).Select("id").Where("date = ?", day),
-		).
-		Delete(&models.LoggedExercise{})
-	if res.Error != nil {
-		return res.Error
-	}
-	if res.RowsAffected == 0 {
-		return gorm.ErrRecordNotFound
-	}
-	return nil
+	return workoutrepo.RemoveLoggedExerciseForDay(ctx, utils.ZerodTime(offset), exerciseID)
 }
 
 func DeleteLoggedSet(setID uint) error {
-	return conn().Transaction(func(tx *gorm.DB) error {
-		var set models.LoggedSet
-		if err := tx.Where("id = ?", setID).First(&set).Error; err != nil {
-			return err
-		}
-
-		if err := tx.Unscoped().Delete(&set).Error; err != nil {
-			return err
-		}
-
-		var remainingSetCount int64
-		if err := tx.Model(&models.LoggedSet{}).
-			Where("logged_exercise_id = ?", set.LoggedExerciseID).
-			Count(&remainingSetCount).Error; err != nil {
-			return err
-		}
-
-		if remainingSetCount == 0 {
-			if err := tx.Unscoped().
-				Delete(&models.LoggedExercise{}, set.LoggedExerciseID).Error; err != nil {
-				return err
-			}
-		}
-
-		return nil
-	})
+	return workoutrepo.DeleteLoggedSet(setID)
 }
 
 func GetAllExercises(excludeIDs []uint) ([]models.Exercise, error) {
-	var exercises []models.Exercise
-	query := conn().Model(&models.Exercise{})
-	if len(excludeIDs) > 0 {
-		query = query.Where("id NOT IN ?", excludeIDs)
-	}
-	err := query.Find(&exercises).Error
-	if err != nil {
-		return []models.Exercise{}, err
-	}
-	return exercises, nil
+	return workoutrepo.FindAllExercises(excludeIDs)
 }
 
-type ExerciseProgressionEntry struct {
-	Date   time.Time `json:"date"`
-	Weight float32   `json:"weight"`
-	Reps   uint      `json:"reps"`
-}
+type ExerciseProgressionEntry = workoutrepo.ExerciseProgressionEntry
 
 func GetExerciseProgression(exerciseID uint) ([]ExerciseProgressionEntry, error) {
-	var entries []ExerciseProgressionEntry
-
-	err := conn().
-		Table("logged_exercises").
-		Select("workout_logs.date, logged_sets.weight, logged_sets.reps").
-		Joins("JOIN workout_logs ON workout_logs.id = logged_exercises.workout_log_id").
-		Joins("JOIN logged_sets ON logged_sets.logged_exercise_id = logged_exercises.id").
-		Where("logged_exercises.exercise_id = ?", exerciseID).
-		Where("logged_sets.weight > 0 AND logged_sets.reps > 0").
-		Order("workout_logs.date ASC").
-		Scan(&entries).Error
-
-	if err != nil {
-		return []ExerciseProgressionEntry{}, err
-	}
-	return entries, nil
+	return workoutrepo.GetExerciseProgression(exerciseID)
 }
 
-// LoadPlanWithOrderedExercises loads a plan and its exercises sorted by display_order on the plan↔exercise join.
 func LoadPlanWithOrderedExercises(planID uint) (*models.WorkoutPlan, error) {
-	var plan models.WorkoutPlan
-	if err := conn().First(&plan, planID).Error; err != nil {
-		return nil, err
-	}
-	ex, err := models.LoadExercisesOrderedForPlan(conn(), planID)
-	if err != nil {
-		return nil, err
-	}
-	plan.Exercises = ex
-	return &plan, nil
+	return workoutrepo.LoadPlanWithOrderedExercises(planID)
 }
 
 func GetAllWorkoutPlans() ([]models.WorkoutPlan, error) {
-	var workoutPlans []models.WorkoutPlan
-	err := conn().Find(&workoutPlans).Error
-	if err != nil {
-		return []models.WorkoutPlan{}, err
-	}
-	for i := range workoutPlans {
-		ex, err := models.LoadExercisesOrderedForPlan(conn(), workoutPlans[i].ID)
-		if err != nil {
-			return nil, err
-		}
-		workoutPlans[i].Exercises = ex
-	}
-	return workoutPlans, nil
+	return workoutrepo.FindAllWorkoutPlans()
 }
 
 func AddExerciseToPlan(planID uint, exerciseID uint) error {
-	if err := conn().First(&models.WorkoutPlan{}, planID).Error; err != nil {
-		return err
-	}
-	if err := conn().First(&models.Exercise{}, exerciseID).Error; err != nil {
-		return err
-	}
-	var n int64
-	if err := conn().Model(&models.WorkoutPlanExercise{}).Where("workout_plan_id = ? AND exercise_id = ?", planID, exerciseID).Count(&n).Error; err != nil {
-		return err
-	}
-	if n > 0 {
-		return fmt.Errorf("exercise already in plan")
-	}
-	var count int64
-	if err := conn().Model(&models.WorkoutPlanExercise{}).Where("workout_plan_id = ?", planID).Count(&count).Error; err != nil {
-		return err
-	}
-	return conn().Create(&models.WorkoutPlanExercise{
-		WorkoutPlanID: planID,
-		ExerciseID:    exerciseID,
-		DisplayOrder:  int(count),
-	}).Error
-}
-
-func renumberWorkoutPlanExerciseDisplayOrder(planID uint) error {
-	var rows []models.WorkoutPlanExercise
-	if err := conn().Where("workout_plan_id = ?", planID).Order("display_order ASC").Find(&rows).Error; err != nil {
-		return err
-	}
-	for i := range rows {
-		if rows[i].DisplayOrder != i {
-			if err := conn().Model(&models.WorkoutPlanExercise{}).
-				Where("workout_plan_id = ? AND exercise_id = ?", planID, rows[i].ExerciseID).
-				Update("display_order", i).Error; err != nil {
-				return err
-			}
-		}
-	}
-	return nil
+	return workoutrepo.AddExerciseToPlan(planID, exerciseID)
 }
 
 func RemoveExerciseFromPlan(planID uint, exerciseID uint) error {
-	res := conn().Where("workout_plan_id = ? AND exercise_id = ?", planID, exerciseID).Delete(&models.WorkoutPlanExercise{})
-	if res.Error != nil {
-		return res.Error
-	}
-	if res.RowsAffected == 0 {
-		return gorm.ErrRecordNotFound
-	}
-	return renumberWorkoutPlanExerciseDisplayOrder(planID)
+	return workoutrepo.RemoveExerciseFromPlan(planID, exerciseID)
 }
 
-// ReorderPlanExercises sets exercise order for a plan. exerciseIDs must be a permutation of the plan's exercises.
 func ReorderPlanExercises(planID uint, exerciseIDs []uint) error {
-	var existing []models.WorkoutPlanExercise
-	if err := conn().Where("workout_plan_id = ?", planID).Find(&existing).Error; err != nil {
-		return err
-	}
-	if len(exerciseIDs) != len(existing) {
-		return fmt.Errorf("exercise list must include all plan exercises")
-	}
-	existingSet := make(map[uint]struct{}, len(existing))
-	for _, e := range existing {
-		existingSet[e.ExerciseID] = struct{}{}
-	}
-	for _, id := range exerciseIDs {
-		if _, ok := existingSet[id]; !ok {
-			return fmt.Errorf("invalid exercise id for plan")
-		}
-		delete(existingSet, id)
-	}
-	if len(existingSet) != 0 {
-		return fmt.Errorf("exercise list must include all plan exercises")
-	}
-	return conn().Transaction(func(tx *gorm.DB) error {
-		for i, eid := range exerciseIDs {
-			if err := tx.Model(&models.WorkoutPlanExercise{}).
-				Where("workout_plan_id = ? AND exercise_id = ?", planID, eid).
-				Update("display_order", i).Error; err != nil {
-				return err
-			}
-		}
-		return nil
-	})
+	return workoutrepo.ReorderPlanExercises(planID, exerciseIDs)
 }
 
 func CreateExercise(name string, repRollover uint, cues string) (*models.Exercise, error) {
@@ -701,156 +447,81 @@ func CreateExercise(name string, repRollover uint, cues string) (*models.Exercis
 		RepRollover: repRollover,
 		Cues:        cues,
 	}
-
-	if err := conn().Create(&exercise).Error; err != nil {
+	if err := workoutrepo.CreateExercise(&exercise); err != nil {
 		return nil, err
 	}
-
 	return &exercise, nil
 }
 
-// UpdateExercise updates global exercise fields (name, rep rollover, cues).
 func UpdateExercise(id uint, name string, repRollover uint, cues string) (*models.Exercise, error) {
-	var exercise models.Exercise
-	if err := conn().First(&exercise, id).Error; err != nil {
-		return nil, err
-	}
-	if err := conn().Model(&exercise).Updates(map[string]interface{}{
-		"name":         name,
-		"rep_rollover": repRollover,
-		"cues":         cues,
-	}).Error; err != nil {
-		return nil, err
-	}
-	if err := conn().First(&exercise, id).Error; err != nil {
-		return nil, err
-	}
-	return &exercise, nil
+	return workoutrepo.UpdateExercise(id, name, repRollover, cues)
 }
 
-// AssignPlanToDay assigns a workout plan to a specific day of the week
-// If another plan is already assigned to that day, it will be unassigned first
-// dayOfWeek: 0=Sunday, 1=Monday, ..., 6=Saturday
 func AssignPlanToDay(planID uint, dayOfWeek int) (*models.WorkoutPlan, error) {
-	// Validate dayOfWeek
 	if dayOfWeek < 0 || dayOfWeek > 6 {
 		return nil, fmt.Errorf("day_of_week must be between 0 (Sunday) and 6 (Saturday)")
 	}
-
-	// Find the plan
-	var plan models.WorkoutPlan
-	if err := conn().First(&plan, planID).Error; err != nil {
+	if _, err := workoutrepo.FindWorkoutPlanByID(planID); err != nil {
 		return nil, fmt.Errorf("plan not found: %w", err)
 	}
-
-	// Unassign any existing plan from this day
-	if err := conn().Model(&models.WorkoutPlan{}).
-		Where("day_of_week = ? AND id != ?", dayOfWeek, planID).
-		Update("day_of_week", nil).Error; err != nil {
+	if err := workoutrepo.UnassignOtherPlansFromDay(dayOfWeek, planID); err != nil {
 		return nil, fmt.Errorf("failed to unassign existing plan: %w", err)
 	}
-
-	// Assign the plan to the day
-	dayOfWeekPtr := &dayOfWeek
-	if err := conn().Model(&plan).Update("day_of_week", dayOfWeekPtr).Error; err != nil {
+	if err := workoutrepo.AssignWorkoutPlanToDay(planID, dayOfWeek); err != nil {
 		return nil, fmt.Errorf("failed to assign plan to day: %w", err)
 	}
-
-	reloaded, err := LoadPlanWithOrderedExercises(planID)
+	reloaded, err := workoutrepo.LoadPlanWithOrderedExercises(planID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to reload plan: %w", err)
 	}
-
 	return reloaded, nil
 }
 
-// UnassignPlanFromDay removes the day assignment from a workout plan
 func UnassignPlanFromDay(planID uint) (*models.WorkoutPlan, error) {
-	var plan models.WorkoutPlan
-	if err := conn().First(&plan, planID).Error; err != nil {
+	if _, err := workoutrepo.FindWorkoutPlanByID(planID); err != nil {
 		return nil, fmt.Errorf("plan not found: %w", err)
 	}
-
-	if err := conn().Model(&plan).Update("day_of_week", nil).Error; err != nil {
+	if err := workoutrepo.ClearWorkoutPlanDay(planID); err != nil {
 		return nil, fmt.Errorf("failed to unassign plan from day: %w", err)
 	}
-
-	reloaded, err := LoadPlanWithOrderedExercises(planID)
+	reloaded, err := workoutrepo.LoadPlanWithOrderedExercises(planID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to reload plan: %w", err)
 	}
-
 	return reloaded, nil
 }
 
-// GetPlanByDay returns the workout plan assigned to a specific day of the week.
 func GetPlanByDay(dayOfWeek int) (*models.WorkoutPlan, error) {
 	if dayOfWeek < 0 || dayOfWeek > 6 {
 		return nil, fmt.Errorf("day_of_week must be between 0 (Sunday) and 6 (Saturday)")
 	}
-
-	var plan models.WorkoutPlan
-	err := conn().Where("day_of_week = ?", dayOfWeek).First(&plan).Error
+	plan, err := workoutrepo.FindWorkoutPlanByDayOfWeek(dayOfWeek)
 	if err != nil {
 		if err == gorm.ErrRecordNotFound {
-			return nil, nil // No plan assigned to this day
+			return nil, nil
 		}
 		return nil, err
 	}
-
-	return LoadPlanWithOrderedExercises(plan.ID)
+	return workoutrepo.LoadPlanWithOrderedExercises(plan.ID)
 }
 
 func UpdateExerciseCues(exerciseID uint, cues string) (*models.Exercise, error) {
-	var exercise models.Exercise
-	if err := conn().First(&exercise, exerciseID).Error; err != nil {
-		return nil, err
-	}
-	if err := conn().Model(&exercise).Update("cues", cues).Error; err != nil {
-		return nil, err
-	}
-	return &exercise, nil
+	return workoutrepo.UpdateExerciseCues(exerciseID, cues)
 }
 
-type ExerciseListResult struct {
-	Exercises []models.Exercise
-	Total     int64
-}
+type ExerciseListResult = workoutrepo.ExerciseListResult
 
 func ListExercises(page, pageSize int, search string) (ExerciseListResult, error) {
-	query := conn().Model(&models.Exercise{})
-	if search != "" {
-		query = query.Where("name ILIKE ?", "%"+search+"%")
-	}
-	query = query.Order("name ASC")
-
-	var total int64
-	if err := query.Count(&total).Error; err != nil {
-		return ExerciseListResult{}, err
-	}
-
-	var exercises []models.Exercise
-	if pageSize > 0 {
-		query = query.Limit(pageSize).Offset((page - 1) * pageSize)
-	}
-	if err := query.Find(&exercises).Error; err != nil {
-		return ExerciseListResult{}, err
-	}
-
-	return ExerciseListResult{Exercises: exercises, Total: total}, nil
+	return workoutrepo.ListExercises(page, pageSize, search)
 }
 
 func LoadLoggedExercise(id uint) (models.LoggedExercise, error) {
-	var exercise models.LoggedExercise
-	err := conn().Preload("Exercise").Preload("Sets").Where("id = ?", id).First(&exercise).Error
-	return exercise, err
+	return workoutrepo.LoadLoggedExercise(id)
 }
 
 func SetPlannedCardioType(planID uint, cardioType string) (*models.WorkoutPlan, error) {
-	if err := conn().Model(&models.WorkoutPlan{}).
-		Where("id = ?", planID).
-		Update("planned_cardio_type", strings.TrimSpace(cardioType)).Error; err != nil {
+	if err := workoutrepo.UpdatePlannedCardioType(planID, strings.TrimSpace(cardioType)); err != nil {
 		return nil, err
 	}
-	return LoadPlanWithOrderedExercises(planID)
+	return workoutrepo.LoadPlanWithOrderedExercises(planID)
 }

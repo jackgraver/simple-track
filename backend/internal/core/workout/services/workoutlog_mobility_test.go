@@ -40,6 +40,7 @@ func TestUpsertMobilityPre_persistsChecked(t *testing.T) {
 	if err := db.Create(&wl).Error; err != nil {
 		t.Fatal(err)
 	}
+	useTestDB(db)
 	view, err := UpsertMobilityPre(context.Background(), 0, []string{"A", "C"})
 	if err != nil {
 		t.Fatal(err)

@@ -21,7 +21,11 @@ func GetWorkoutToday(c *gin.Context) {
 }
 
 func GetWorkoutMonth(c *gin.Context) {
-	offset, err := utils.ParseQueryInt(c, monthOffsetQuery)
+	offset, err := utils.ParseQueryInt(c, utils.QueryIntVar{
+		Key:        "monthoffset",
+		Default:    0,
+		ErrInvalid: "monthoffset must be an integer",
+	})
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -95,7 +99,11 @@ func GetWorkoutActivity(c *gin.Context) {
 		mode = "rolling"
 	}
 
-	weeks, err := utils.ParseQueryInt(c, activityWeeksQuery)
+	weeks, err := utils.ParseQueryInt(c, utils.QueryIntVar{
+		Key:        "weeks",
+		Default:    52,
+		ErrInvalid: "weeks must be an integer",
+	})
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
