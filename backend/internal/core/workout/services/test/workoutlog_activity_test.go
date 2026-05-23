@@ -1,31 +1,16 @@
-package services
+package test
 
 import (
 	"be-simpletracker/internal/core/workout/models"
+	"be-simpletracker/internal/core/workout/services"
 	"be-simpletracker/internal/utils"
 	"context"
 	"errors"
 	"testing"
-
-	"github.com/glebarez/sqlite"
-	"gorm.io/gorm"
 )
 
 func TestGetWorkoutActivity_year_includesDayWithSet(t *testing.T) {
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := db.AutoMigrate(
-		&models.Exercise{},
-		&models.WorkoutPlan{},
-		&models.WorkoutLog{},
-		&models.LoggedExercise{},
-		&models.LoggedSet{},
-		&models.Cardio{},
-	); err != nil {
-		t.Fatal(err)
-	}
+	db := setupTestDB(t)
 	today := utils.ZerodTime(0)
 	ex := models.Exercise{Name: "Bench"}
 	if err := db.Create(&ex).Error; err != nil {
@@ -42,8 +27,7 @@ func TestGetWorkoutActivity_year_includesDayWithSet(t *testing.T) {
 	if err := db.Create(&models.LoggedSet{LoggedExerciseID: le.ID, Reps: 5, Weight: 100}).Error; err != nil {
 		t.Fatal(err)
 	}
-	useTestDB(db)
-	res, err := GetWorkoutActivity(context.Background(), "year", 52)
+	res, err := services.GetWorkoutActivity(context.Background(), "year", 52)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -64,20 +48,7 @@ func TestGetWorkoutActivity_year_includesDayWithSet(t *testing.T) {
 }
 
 func TestGetWorkoutActivity_rolling_excludesOldDayOutsideWindow(t *testing.T) {
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := db.AutoMigrate(
-		&models.Exercise{},
-		&models.WorkoutPlan{},
-		&models.WorkoutLog{},
-		&models.LoggedExercise{},
-		&models.LoggedSet{},
-		&models.Cardio{},
-	); err != nil {
-		t.Fatal(err)
-	}
+	db := setupTestDB(t)
 	ex := models.Exercise{Name: "Squat"}
 	if err := db.Create(&ex).Error; err != nil {
 		t.Fatal(err)
@@ -94,29 +65,21 @@ func TestGetWorkoutActivity_rolling_excludesOldDayOutsideWindow(t *testing.T) {
 	if err := db.Create(&models.LoggedSet{LoggedExerciseID: leOld.ID, Reps: 3, Weight: 50}).Error; err != nil {
 		t.Fatal(err)
 	}
-	useTestDB(db)
-	res, err := GetWorkoutActivity(context.Background(), "rolling", 52)
+	res, err := services.GetWorkoutActivity(context.Background(), "rolling", 52)
 	if err != nil {
 		t.Fatal(err)
 	}
 	for _, d := range res.ActiveDates {
 		if d == old.Format("2006-01-02") {
-			t.Fatalf("old day should be outside 30d window: %+v", res.ActiveDates)
+			t.Fatalf("old day should be outside window: %+v", res.ActiveDates)
 		}
 	}
 }
 
 func TestGetWorkoutActivity_invalidMode(t *testing.T) {
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := db.AutoMigrate(&models.WorkoutLog{}); err != nil {
-		t.Fatal(err)
-	}
-	useTestDB(db)
-	_, err = GetWorkoutActivity(context.Background(), "nope", 52)
-	if !errors.Is(err, ErrInvalidActivityMode) {
+	setupTestDB(t)
+	_, err := services.GetWorkoutActivity(context.Background(), "nope", 52)
+	if !errors.Is(err, services.ErrInvalidActivityMode) {
 		t.Fatalf("expected ErrInvalidActivityMode, got %v", err)
 	}
 }
