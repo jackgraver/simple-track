@@ -40,8 +40,7 @@ func TestUpsertMobilityPre_persistsChecked(t *testing.T) {
 	if err := db.Create(&wl).Error; err != nil {
 		t.Fatal(err)
 	}
-	svc := NewWorkoutLogService(db)
-	view, err := svc.UpsertMobilityPre(context.Background(), 0, []string{"A", "C"})
+	view, err := UpsertMobilityPre(context.Background(), 0, []string{"A", "C"})
 	if err != nil {
 		t.Fatal(err)
 	}

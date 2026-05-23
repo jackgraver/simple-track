@@ -1,43 +1,16 @@
-package routes
+package controller
 
 import (
-	"be-simpletracker/internal/core/workout/models"
 	"be-simpletracker/internal/core/workout/services"
 	"net/http"
 	"strconv"
-	"strings"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
 
-type WorkoutPlanHandler struct {
-	db *gorm.DB
-}
-
-// NewWorkoutPlanHandler creates a new workout plan handler
-func NewWorkoutPlanHandler(db *gorm.DB) *WorkoutPlanHandler {
-	return &WorkoutPlanHandler{db: db}
-}
-
-// RegisterWorkoutPlanRoutes registers all plan routes under the workout group
-func RegisterWorkoutPlanRoutes(group *gin.RouterGroup, db *gorm.DB) {
-	h := NewWorkoutPlanHandler(db)
-
-	plans := group.Group("/plans")
-	{
-		plans.GET("/all", h.getAllWorkoutPlans)
-		plans.POST("/:id/exercises/add", h.addExerciseToPlan)
-		plans.DELETE("/:id/exercises/remove", h.removeExerciseFromPlan)
-		plans.PUT("/:id/exercises/reorder", h.reorderPlanExercises)
-		plans.POST("/:id/assign-day", h.assignPlanToDay)
-		plans.DELETE("/:id/assign-day", h.unassignPlanFromDay)
-		plans.PUT("/:id/planned-cardio", h.setPlannedCardio)
-	}
-}
-
-func (h *WorkoutPlanHandler) getAllWorkoutPlans(c *gin.Context) {
-	workoutPlans, err := services.GetAllWorkoutPlans(h.db)
+func GetAllWorkoutPlans(c *gin.Context) {
+	workoutPlans, err := services.GetAllWorkoutPlans()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -50,7 +23,7 @@ type PlanExerciseRequest struct {
 	ExerciseID uint `json:"exercise_id" binding:"required"`
 }
 
-func (h *WorkoutPlanHandler) addExerciseToPlan(c *gin.Context) {
+func AddExerciseToPlan(c *gin.Context) {
 	planIDStr := c.Param("id")
 	planID, err := strconv.ParseUint(planIDStr, 10, 32)
 	if err != nil {
@@ -64,7 +37,7 @@ func (h *WorkoutPlanHandler) addExerciseToPlan(c *gin.Context) {
 		return
 	}
 
-	plan, err := services.LoadPlanWithOrderedExercises(h.db, uint(planID))
+	plan, err := services.LoadPlanWithOrderedExercises(uint(planID))
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Plan not found"})
 		return
@@ -76,12 +49,12 @@ func (h *WorkoutPlanHandler) addExerciseToPlan(c *gin.Context) {
 		}
 	}
 
-	if err := services.AddExerciseToPlan(h.db, uint(planID), request.ExerciseID); err != nil {
+	if err := services.AddExerciseToPlan(uint(planID), request.ExerciseID); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	plan, err = services.LoadPlanWithOrderedExercises(h.db, uint(planID))
+	plan, err = services.LoadPlanWithOrderedExercises(uint(planID))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -90,7 +63,7 @@ func (h *WorkoutPlanHandler) addExerciseToPlan(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"plan": plan})
 }
 
-func (h *WorkoutPlanHandler) removeExerciseFromPlan(c *gin.Context) {
+func RemoveExerciseFromPlan(c *gin.Context) {
 	planIDStr := c.Param("id")
 	planID, err := strconv.ParseUint(planIDStr, 10, 32)
 	if err != nil {
@@ -104,7 +77,7 @@ func (h *WorkoutPlanHandler) removeExerciseFromPlan(c *gin.Context) {
 		return
 	}
 
-	if err := services.RemoveExerciseFromPlan(h.db, uint(planID), request.ExerciseID); err != nil {
+	if err := services.RemoveExerciseFromPlan(uint(planID), request.ExerciseID); err != nil {
 		if err == gorm.ErrRecordNotFound {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Exercise not in plan"})
 			return
@@ -113,7 +86,7 @@ func (h *WorkoutPlanHandler) removeExerciseFromPlan(c *gin.Context) {
 		return
 	}
 
-	plan, err := services.LoadPlanWithOrderedExercises(h.db, uint(planID))
+	plan, err := services.LoadPlanWithOrderedExercises(uint(planID))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -126,7 +99,7 @@ type reorderExercisesBody struct {
 	ExerciseIDs []uint `json:"exercise_ids" binding:"required"`
 }
 
-func (h *WorkoutPlanHandler) reorderPlanExercises(c *gin.Context) {
+func ReorderPlanExercises(c *gin.Context) {
 	planIDStr := c.Param("id")
 	planID, err := strconv.ParseUint(planIDStr, 10, 32)
 	if err != nil {
@@ -138,11 +111,11 @@ func (h *WorkoutPlanHandler) reorderPlanExercises(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	if err := services.ReorderPlanExercises(h.db, uint(planID), body.ExerciseIDs); err != nil {
+	if err := services.ReorderPlanExercises(uint(planID), body.ExerciseIDs); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	plan, err := services.LoadPlanWithOrderedExercises(h.db, uint(planID))
+	plan, err := services.LoadPlanWithOrderedExercises(uint(planID))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -154,7 +127,7 @@ type AssignDayRequest struct {
 	DayOfWeek *int `json:"day_of_week" binding:"required,gte=0,lte=6"`
 }
 
-func (h *WorkoutPlanHandler) assignPlanToDay(c *gin.Context) {
+func AssignPlanToDay(c *gin.Context) {
 	planIDStr := c.Param("id")
 	planID, err := strconv.ParseUint(planIDStr, 10, 32)
 	if err != nil {
@@ -172,7 +145,7 @@ func (h *WorkoutPlanHandler) assignPlanToDay(c *gin.Context) {
 		return
 	}
 
-	plan, err := services.AssignPlanToDay(h.db, uint(planID), *request.DayOfWeek)
+	plan, err := services.AssignPlanToDay(uint(planID), *request.DayOfWeek)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -185,7 +158,7 @@ type plannedCardioBody struct {
 	Type string `json:"type"`
 }
 
-func (h *WorkoutPlanHandler) setPlannedCardio(c *gin.Context) {
+func SetPlannedCardio(c *gin.Context) {
 	planIDStr := c.Param("id")
 	planID, err := strconv.ParseUint(planIDStr, 10, 32)
 	if err != nil {
@@ -197,13 +170,7 @@ func (h *WorkoutPlanHandler) setPlannedCardio(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	if err := h.db.Model(&models.WorkoutPlan{}).
-		Where("id = ?", planID).
-		Update("planned_cardio_type", strings.TrimSpace(body.Type)).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-	plan, err := services.LoadPlanWithOrderedExercises(h.db, uint(planID))
+	plan, err := services.SetPlannedCardioType(uint(planID), body.Type)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -211,7 +178,7 @@ func (h *WorkoutPlanHandler) setPlannedCardio(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"plan": plan})
 }
 
-func (h *WorkoutPlanHandler) unassignPlanFromDay(c *gin.Context) {
+func UnassignPlanFromDay(c *gin.Context) {
 	planIDStr := c.Param("id")
 	planID, err := strconv.ParseUint(planIDStr, 10, 32)
 	if err != nil {
@@ -219,7 +186,7 @@ func (h *WorkoutPlanHandler) unassignPlanFromDay(c *gin.Context) {
 		return
 	}
 
-	plan, err := services.UnassignPlanFromDay(h.db, uint(planID))
+	plan, err := services.UnassignPlanFromDay(uint(planID))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

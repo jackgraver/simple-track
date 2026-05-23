@@ -38,7 +38,7 @@ func TestUpsertCardioForWorkoutLog_usesPlannedTypeWhenTypeEmpty(t *testing.T) {
 	if err := db.Create(&wl).Error; err != nil {
 		t.Fatal(err)
 	}
-	c, err := UpsertCardioForWorkoutLog(context.Background(), db, 0, 25, "", "S3E4 of Breaking Bad")
+	c, err := UpsertCardioForWorkoutLog(context.Background(), 0, 25, "", "S3E4 of Breaking Bad")
 	if err != nil {
 		t.Fatal(err)
 	}

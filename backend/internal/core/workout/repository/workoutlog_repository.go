@@ -5,22 +5,19 @@ import (
 	"time"
 
 	"be-simpletracker/internal/core/workout/models"
+	"be-simpletracker/internal/database"
 	dbrepo "be-simpletracker/internal/database/repository"
 
 	"gorm.io/gorm"
 )
 
-type WorkoutLogRepository struct {
-	db *gorm.DB
+func conn() *gorm.DB {
+	return database.GetDB()
 }
 
-func NewWorkoutLogRepository(db *gorm.DB) *WorkoutLogRepository {
-	return &WorkoutLogRepository{db: db}
-}
-
-func (r *WorkoutLogRepository) LoadByDate(ctx context.Context, date time.Time) (models.WorkoutLog, error) {
+func LoadByDate(ctx context.Context, date time.Time) (models.WorkoutLog, error) {
 	var workoutDay models.WorkoutLog
-	err := r.db.WithContext(ctx).
+	err := conn().WithContext(ctx).
 		Preload("Cardio").
 		Preload("Exercises.Sets").
 		Preload("Exercises.Exercise").
@@ -31,7 +28,7 @@ func (r *WorkoutLogRepository) LoadByDate(ctx context.Context, date time.Time) (
 		return models.WorkoutLog{}, err
 	}
 	if workoutDay.WorkoutPlan != nil {
-		ex, err := models.LoadExercisesOrderedForPlan(r.db, workoutDay.WorkoutPlan.ID)
+		ex, err := models.LoadExercisesOrderedForPlan(conn(), workoutDay.WorkoutPlan.ID)
 		if err != nil {
 			return models.WorkoutLog{}, err
 		}
@@ -40,21 +37,20 @@ func (r *WorkoutLogRepository) LoadByDate(ctx context.Context, date time.Time) (
 	return workoutDay, nil
 }
 
-func (r *WorkoutLogRepository) CreateMinimal(ctx context.Context, log *models.WorkoutLog) error {
-	return r.db.WithContext(ctx).Omit("WorkoutPlan", "Exercises", "Cardio").Create(log).Error
+func CreateMinimal(ctx context.Context, log *models.WorkoutLog) error {
+	return conn().WithContext(ctx).Omit("WorkoutPlan", "Exercises", "Cardio").Create(log).Error
 }
 
-func (r *WorkoutLogRepository) GetByDateRange(ctx context.Context, start, end time.Time) ([]models.WorkoutLog, error) {
-	repo := dbrepo.NewGormRepository[models.WorkoutLog](r.db)
+func GetByDateRange(ctx context.Context, start, end time.Time) ([]models.WorkoutLog, error) {
+	repo := dbrepo.NewGormRepository[models.WorkoutLog](conn())
 	return repo.GetByDateRange(ctx, start, end, dbrepo.WithDefaultPreloads())
 }
 
-// DatesWithLoggedSets returns distinct workout log dates in [start, end] that have at least one logged set.
-func (r *WorkoutLogRepository) DatesWithLoggedSets(ctx context.Context, start, end time.Time) ([]time.Time, error) {
+func DatesWithLoggedSets(ctx context.Context, start, end time.Time) ([]time.Time, error) {
 	var rows []struct {
 		D time.Time `gorm:"column:d"`
 	}
-	err := r.db.WithContext(ctx).Raw(`
+	err := conn().WithContext(ctx).Raw(`
 SELECT workout_logs.date AS d
 FROM logged_sets
 JOIN logged_exercises ON logged_exercises.id = logged_sets.logged_exercise_id
@@ -73,9 +69,9 @@ ORDER BY workout_logs.date ASC
 	return out, nil
 }
 
-func (r *WorkoutLogRepository) GetPreviousExerciseLog(ctx context.Context, day time.Time, exercise string, offset int) (models.LoggedExercise, error) {
+func GetPreviousExerciseLog(ctx context.Context, day time.Time, exercise string, offset int) (models.LoggedExercise, error) {
 	var exerciseLog models.LoggedExercise
-	err := r.db.WithContext(ctx).
+	err := conn().WithContext(ctx).
 		Joins("JOIN workout_logs ON workout_logs.id = logged_exercises.workout_log_id").
 		Joins("JOIN exercises ON exercises.id = logged_exercises.exercise_id").
 		Where("exercises.name = ?", exercise).
@@ -93,34 +89,34 @@ func (r *WorkoutLogRepository) GetPreviousExerciseLog(ctx context.Context, day t
 	return exerciseLog, nil
 }
 
-func (r *WorkoutLogRepository) FirstCardioByWorkoutLogID(ctx context.Context, workoutLogID uint) (models.Cardio, error) {
+func FirstCardioByWorkoutLogID(ctx context.Context, workoutLogID uint) (models.Cardio, error) {
 	var existing models.Cardio
-	err := r.db.WithContext(ctx).Where("workout_log_id = ?", workoutLogID).First(&existing).Error
+	err := conn().WithContext(ctx).Where("workout_log_id = ?", workoutLogID).First(&existing).Error
 	return existing, err
 }
 
-func (r *WorkoutLogRepository) CreateCardio(ctx context.Context, row *models.Cardio) error {
-	return r.db.WithContext(ctx).Create(row).Error
+func CreateCardio(ctx context.Context, row *models.Cardio) error {
+	return conn().WithContext(ctx).Create(row).Error
 }
 
-func (r *WorkoutLogRepository) SaveCardio(ctx context.Context, row *models.Cardio) error {
-	return r.db.WithContext(ctx).Save(row).Error
+func SaveCardio(ctx context.Context, row *models.Cardio) error {
+	return conn().WithContext(ctx).Save(row).Error
 }
 
-func (r *WorkoutLogRepository) UpdatePreMobilityChecked(ctx context.Context, workoutLogID uint, checked []string) error {
+func UpdatePreMobilityChecked(ctx context.Context, workoutLogID uint, checked []string) error {
 	var wl models.WorkoutLog
-	if err := r.db.WithContext(ctx).First(&wl, workoutLogID).Error; err != nil {
+	if err := conn().WithContext(ctx).First(&wl, workoutLogID).Error; err != nil {
 		return err
 	}
 	wl.PreMobilityChecked = checked
-	return r.db.WithContext(ctx).Session(&gorm.Session{FullSaveAssociations: false}).Save(&wl).Error
+	return conn().WithContext(ctx).Session(&gorm.Session{FullSaveAssociations: false}).Save(&wl).Error
 }
 
-func (r *WorkoutLogRepository) UpdatePostMobilityChecked(ctx context.Context, workoutLogID uint, checked []string) error {
+func UpdatePostMobilityChecked(ctx context.Context, workoutLogID uint, checked []string) error {
 	var wl models.WorkoutLog
-	if err := r.db.WithContext(ctx).First(&wl, workoutLogID).Error; err != nil {
+	if err := conn().WithContext(ctx).First(&wl, workoutLogID).Error; err != nil {
 		return err
 	}
 	wl.PostMobilityChecked = checked
-	return r.db.WithContext(ctx).Session(&gorm.Session{FullSaveAssociations: false}).Save(&wl).Error
+	return conn().WithContext(ctx).Session(&gorm.Session{FullSaveAssociations: false}).Save(&wl).Error
 }

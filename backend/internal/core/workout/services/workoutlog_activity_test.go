@@ -42,8 +42,7 @@ func TestGetWorkoutActivity_year_includesDayWithSet(t *testing.T) {
 	if err := db.Create(&models.LoggedSet{LoggedExerciseID: le.ID, Reps: 5, Weight: 100}).Error; err != nil {
 		t.Fatal(err)
 	}
-	svc := NewWorkoutLogService(db)
-	res, err := svc.GetWorkoutActivity(context.Background(), "year", 52)
+	res, err := GetWorkoutActivity(context.Background(), "year", 52)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -94,8 +93,7 @@ func TestGetWorkoutActivity_rolling_excludesOldDayOutsideWindow(t *testing.T) {
 	if err := db.Create(&models.LoggedSet{LoggedExerciseID: leOld.ID, Reps: 3, Weight: 50}).Error; err != nil {
 		t.Fatal(err)
 	}
-	svc := NewWorkoutLogService(db)
-	res, err := svc.GetWorkoutActivity(context.Background(), "rolling", 52)
+	res, err := GetWorkoutActivity(context.Background(), "rolling", 52)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -114,8 +112,7 @@ func TestGetWorkoutActivity_invalidMode(t *testing.T) {
 	if err := db.AutoMigrate(&models.WorkoutLog{}); err != nil {
 		t.Fatal(err)
 	}
-	svc := NewWorkoutLogService(db)
-	_, err = svc.GetWorkoutActivity(context.Background(), "nope", 52)
+	_, err = GetWorkoutActivity(context.Background(), "nope", 52)
 	if !errors.Is(err, ErrInvalidActivityMode) {
 		t.Fatalf("expected ErrInvalidActivityMode, got %v", err)
 	}
