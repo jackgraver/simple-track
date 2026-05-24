@@ -87,7 +87,7 @@ func TestAuthMiddleware_invalidCookie_returnsInvalidTokenError(t *testing.T) {
 }
 
 func TestAuthMiddleware_devTokenDisabledByDefault_evenInDevEnv(t *testing.T) {
-	t.Setenv("APP_ENV", "development")
+	t.Setenv("ALLOW_BYPASS", "")
 	t.Setenv("DEV_AUTH_TOKEN", "")
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
@@ -96,12 +96,12 @@ func TestAuthMiddleware_devTokenDisabledByDefault_evenInDevEnv(t *testing.T) {
 	rec := httptest.NewRecorder()
 	r.ServeHTTP(rec, req)
 	if rec.Code != http.StatusUnauthorized {
-		t.Fatalf("dev env without DEV_AUTH_TOKEN must NOT bypass: got %d want 401", rec.Code)
+		t.Fatalf("without DEV_AUTH_TOKEN must NOT bypass: got %d want 401", rec.Code)
 	}
 }
 
-func TestAuthMiddleware_devToken_unsetAppEnv_isTreatedAsProd(t *testing.T) {
-	t.Setenv("APP_ENV", "")
+func TestAuthMiddleware_devToken_unsetAllowBypass_disabled(t *testing.T) {
+	t.Setenv("ALLOW_BYPASS", "")
 	t.Setenv("DEV_AUTH_TOKEN", testDevAuthToken)
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
@@ -111,12 +111,12 @@ func TestAuthMiddleware_devToken_unsetAppEnv_isTreatedAsProd(t *testing.T) {
 	rec := httptest.NewRecorder()
 	r.ServeHTTP(rec, req)
 	if rec.Code != http.StatusUnauthorized {
-		t.Fatalf("unset APP_ENV must be treated as prod: got %d want 401", rec.Code)
+		t.Fatalf("unset ALLOW_BYPASS must disable bypass: got %d want 401", rec.Code)
 	}
 }
 
 func TestAuthMiddleware_devToken_cookieAuthorizes(t *testing.T) {
-	t.Setenv("APP_ENV", "development")
+	t.Setenv("ALLOW_BYPASS", "true")
 	t.Setenv("DEV_AUTH_TOKEN", testDevAuthToken)
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
@@ -142,7 +142,7 @@ func TestAuthMiddleware_devToken_cookieAuthorizes(t *testing.T) {
 }
 
 func TestAuthMiddleware_devToken_overrideUser(t *testing.T) {
-	t.Setenv("APP_ENV", "development")
+	t.Setenv("ALLOW_BYPASS", "true")
 	t.Setenv("DEV_AUTH_TOKEN", testDevAuthToken)
 	t.Setenv("DEV_AUTH_USER", "alice")
 	gin.SetMode(gin.TestMode)
@@ -168,8 +168,8 @@ func TestAuthMiddleware_devToken_overrideUser(t *testing.T) {
 	}
 }
 
-func TestAuthMiddleware_devToken_refusesInProductionEnv(t *testing.T) {
-	t.Setenv("APP_ENV", "prod")
+func TestAuthMiddleware_devToken_allowBypassFalse_disabled(t *testing.T) {
+	t.Setenv("ALLOW_BYPASS", "false")
 	t.Setenv("DEV_AUTH_TOKEN", testDevAuthToken)
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
@@ -179,6 +179,6 @@ func TestAuthMiddleware_devToken_refusesInProductionEnv(t *testing.T) {
 	rec := httptest.NewRecorder()
 	r.ServeHTTP(rec, req)
 	if rec.Code != http.StatusUnauthorized {
-		t.Fatalf("APP_ENV=prod must disable bypass: got %d want 401", rec.Code)
+		t.Fatalf("ALLOW_BYPASS=false must disable bypass: got %d want 401", rec.Code)
 	}
 }

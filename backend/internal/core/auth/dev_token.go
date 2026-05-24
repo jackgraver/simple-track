@@ -10,7 +10,7 @@ import (
 
 func devTokenMatches(value string) bool {
 	secret := env.OptionalString("DEV_AUTH_TOKEN")
-	if secret == "" || isProdEnv() {
+	if secret == "" || !bypassAllowed() {
 		return false
 	}
 	return value == secret
@@ -24,6 +24,6 @@ func applyDevAuthUser(c *gin.Context) {
 	c.Next()
 }
 
-func isProdEnv() bool {
-	return false//env.StringOr("APP_ENV", "prod") == "prod"
+func bypassAllowed() bool {
+	return env.StringOr("ALLOW_BYPASS", "false") == "true"
 }
