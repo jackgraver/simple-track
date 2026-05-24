@@ -1,4 +1,4 @@
-package test
+package testutil
 
 import (
 	"be-simpletracker/internal/core/workout/models"
@@ -9,7 +9,7 @@ import (
 	"gorm.io/gorm"
 )
 
-func setupTestDB(t *testing.T) *gorm.DB {
+func SetupTestDB(t *testing.T) *gorm.DB {
 	t.Helper()
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	if err != nil {

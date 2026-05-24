@@ -1,8 +1,9 @@
-package test
+package workoutrepo_test
 
 import (
-	workoutrepo "be-simpletracker/internal/core/workout/repository"
 	"be-simpletracker/internal/core/workout/models"
+	workoutrepo "be-simpletracker/internal/core/workout/repository"
+	"be-simpletracker/internal/core/workout/testutil"
 	"context"
 	"testing"
 
@@ -10,7 +11,7 @@ import (
 )
 
 func TestUpdateWorkoutPlanID_clearsPlan(t *testing.T) {
-	db := setupTestDB(t)
+	db := testutil.SetupTestDB(t)
 	plan := models.WorkoutPlan{Name: "Temp"}
 	if err := db.Create(&plan).Error; err != nil {
 		t.Fatal(err)
@@ -32,7 +33,7 @@ func TestUpdateWorkoutPlanID_clearsPlan(t *testing.T) {
 }
 
 func TestUpdatePostMobilityChecked(t *testing.T) {
-	db := setupTestDB(t)
+	db := testutil.SetupTestDB(t)
 	wl := models.WorkoutLog{}
 	if err := db.Create(&wl).Error; err != nil {
 		t.Fatal(err)
@@ -51,7 +52,7 @@ func TestUpdatePostMobilityChecked(t *testing.T) {
 }
 
 func TestUpdatePreMobilityChecked_notFound(t *testing.T) {
-	setupTestDB(t)
+	testutil.SetupTestDB(t)
 	err := workoutrepo.UpdatePreMobilityChecked(context.Background(), 9999, []string{"a"})
 	if err != gorm.ErrRecordNotFound {
 		t.Fatalf("expected not found, got %v", err)

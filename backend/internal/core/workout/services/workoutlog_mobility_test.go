@@ -1,8 +1,9 @@
-package test
+package services_test
 
 import (
 	"be-simpletracker/internal/core/workout/models"
 	"be-simpletracker/internal/core/workout/services"
+	"be-simpletracker/internal/core/workout/testutil"
 	"be-simpletracker/internal/utils"
 	"context"
 	"strings"
@@ -10,7 +11,7 @@ import (
 )
 
 func TestUpsertMobilityPre_persistsChecked(t *testing.T) {
-	db := setupTestDB(t)
+	db := testutil.SetupTestDB(t)
 	today := utils.ZerodTime(0)
 	plan := models.WorkoutPlan{
 		Name:             "MobilityTestPlan",
@@ -40,7 +41,7 @@ func TestUpsertMobilityPre_persistsChecked(t *testing.T) {
 }
 
 func TestUpsertMobilityPost_persistsChecked(t *testing.T) {
-	db := setupTestDB(t)
+	db := testutil.SetupTestDB(t)
 	today := utils.ZerodTime(0)
 	plan := models.WorkoutPlan{
 		Name:              "MobilityTestPlan",
@@ -63,7 +64,7 @@ func TestUpsertMobilityPost_persistsChecked(t *testing.T) {
 }
 
 func TestUpsertMobilityPre_errorsWhenNothingPlanned(t *testing.T) {
-	setupTestDB(t)
+	testutil.SetupTestDB(t)
 	_, err := services.UpsertMobilityPre(context.Background(), 0, []string{"A"})
 	if err == nil || !strings.Contains(err.Error(), "no pre-workout mobility planned") {
 		t.Fatalf("expected no mobility error, got %v", err)

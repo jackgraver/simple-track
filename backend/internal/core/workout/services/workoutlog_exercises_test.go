@@ -1,8 +1,9 @@
-package test
+package services_test
 
 import (
 	"be-simpletracker/internal/core/workout/models"
 	"be-simpletracker/internal/core/workout/services"
+	"be-simpletracker/internal/core/workout/testutil"
 	"be-simpletracker/internal/utils"
 	"context"
 	"testing"
@@ -11,7 +12,7 @@ import (
 )
 
 func TestCreateExercise_andGetAllExercises(t *testing.T) {
-	setupTestDB(t)
+	testutil.SetupTestDB(t)
 	created, err := services.CreateExercise("Bench Press", 12, "squeeze")
 	if err != nil {
 		t.Fatal(err)
@@ -33,7 +34,7 @@ func TestCreateExercise_andGetAllExercises(t *testing.T) {
 }
 
 func TestUpdateExercise_andUpdateExerciseCues(t *testing.T) {
-	setupTestDB(t)
+	testutil.SetupTestDB(t)
 	created, err := services.CreateExercise("Row", 10, "old")
 	if err != nil {
 		t.Fatal(err)
@@ -55,7 +56,7 @@ func TestUpdateExercise_andUpdateExerciseCues(t *testing.T) {
 }
 
 func TestListExercises_paginates(t *testing.T) {
-	setupTestDB(t)
+	testutil.SetupTestDB(t)
 	for _, name := range []string{"Alpha", "Beta", "Gamma"} {
 		if _, err := services.CreateExercise(name, 10, ""); err != nil {
 			t.Fatal(err)
@@ -71,7 +72,7 @@ func TestListExercises_paginates(t *testing.T) {
 }
 
 func TestLogExercise_UpdateLoggedExercise_DeleteLoggedSet(t *testing.T) {
-	db := setupTestDB(t)
+	db := testutil.SetupTestDB(t)
 	today := utils.ZerodTime(0)
 	ex, err := services.CreateExercise("Curl", 12, "")
 	if err != nil {
@@ -111,7 +112,7 @@ func TestLogExercise_UpdateLoggedExercise_DeleteLoggedSet(t *testing.T) {
 }
 
 func TestRemoveLoggedExerciseForDay(t *testing.T) {
-	db := setupTestDB(t)
+	db := testutil.SetupTestDB(t)
 	today := utils.ZerodTime(0)
 	ex, err := services.CreateExercise("Lat Raise", 15, "")
 	if err != nil {
@@ -135,9 +136,7 @@ func TestRemoveLoggedExerciseForDay(t *testing.T) {
 }
 
 func TestGetExerciseProgression(t *testing.T) {
-	db := setupTestDB(t)
-	yesterday := utils.ZerodTime(1)
-	today := utils.ZerodTime(0)
+	db := testutil.SetupTestDB(t)
 	ex, err := services.CreateExercise("OHP", 10, "")
 	if err != nil {
 		t.Fatal(err)
@@ -161,8 +160,6 @@ func TestGetExerciseProgression(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	_ = yesterday
-	_ = today
 	entries, err := services.GetExerciseProgression(ex.ID)
 	if err != nil {
 		t.Fatal(err)

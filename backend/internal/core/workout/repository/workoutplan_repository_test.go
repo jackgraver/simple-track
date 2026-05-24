@@ -1,8 +1,9 @@
-package test
+package workoutrepo_test
 
 import (
-	workoutrepo "be-simpletracker/internal/core/workout/repository"
 	"be-simpletracker/internal/core/workout/models"
+	workoutrepo "be-simpletracker/internal/core/workout/repository"
+	"be-simpletracker/internal/core/workout/testutil"
 	"strings"
 	"testing"
 
@@ -10,7 +11,7 @@ import (
 )
 
 func TestReorderPlanExercises_rejectsPartialList(t *testing.T) {
-	db := setupTestDB(t)
+	db := testutil.SetupTestDB(t)
 	plan := models.WorkoutPlan{Name: "Split"}
 	if err := db.Create(&plan).Error; err != nil {
 		t.Fatal(err)
@@ -43,7 +44,7 @@ func TestReorderPlanExercises_rejectsPartialList(t *testing.T) {
 }
 
 func TestRemoveExerciseFromPlan_notFound(t *testing.T) {
-	db := setupTestDB(t)
+	db := testutil.SetupTestDB(t)
 	plan := models.WorkoutPlan{Name: "Empty"}
 	if err := db.Create(&plan).Error; err != nil {
 		t.Fatal(err)
@@ -55,7 +56,7 @@ func TestRemoveExerciseFromPlan_notFound(t *testing.T) {
 }
 
 func TestAddExerciseToPlan_rejectsMissingPlan(t *testing.T) {
-	setupTestDB(t)
+	testutil.SetupTestDB(t)
 	err := workoutrepo.AddExerciseToPlan(9999, 1)
 	if err != gorm.ErrRecordNotFound {
 		t.Fatalf("expected not found, got %v", err)
@@ -63,7 +64,7 @@ func TestAddExerciseToPlan_rejectsMissingPlan(t *testing.T) {
 }
 
 func TestLoadPlanWithOrderedExercises_notFound(t *testing.T) {
-	setupTestDB(t)
+	testutil.SetupTestDB(t)
 	_, err := workoutrepo.LoadPlanWithOrderedExercises(9999)
 	if err != gorm.ErrRecordNotFound {
 		t.Fatalf("expected not found, got %v", err)
@@ -71,7 +72,7 @@ func TestLoadPlanWithOrderedExercises_notFound(t *testing.T) {
 }
 
 func TestRenumberPlanExerciseDisplayOrder_onRemove(t *testing.T) {
-	db := setupTestDB(t)
+	db := testutil.SetupTestDB(t)
 	plan := models.WorkoutPlan{Name: "Three"}
 	if err := db.Create(&plan).Error; err != nil {
 		t.Fatal(err)

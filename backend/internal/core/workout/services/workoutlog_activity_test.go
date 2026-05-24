@@ -1,8 +1,9 @@
-package test
+package services_test
 
 import (
 	"be-simpletracker/internal/core/workout/models"
 	"be-simpletracker/internal/core/workout/services"
+	"be-simpletracker/internal/core/workout/testutil"
 	"be-simpletracker/internal/utils"
 	"context"
 	"errors"
@@ -10,7 +11,7 @@ import (
 )
 
 func TestGetWorkoutActivity_year_includesDayWithSet(t *testing.T) {
-	db := setupTestDB(t)
+	db := testutil.SetupTestDB(t)
 	today := utils.ZerodTime(0)
 	ex := models.Exercise{Name: "Bench"}
 	if err := db.Create(&ex).Error; err != nil {
@@ -48,7 +49,7 @@ func TestGetWorkoutActivity_year_includesDayWithSet(t *testing.T) {
 }
 
 func TestGetWorkoutActivity_rolling_excludesOldDayOutsideWindow(t *testing.T) {
-	db := setupTestDB(t)
+	db := testutil.SetupTestDB(t)
 	ex := models.Exercise{Name: "Squat"}
 	if err := db.Create(&ex).Error; err != nil {
 		t.Fatal(err)
@@ -77,7 +78,7 @@ func TestGetWorkoutActivity_rolling_excludesOldDayOutsideWindow(t *testing.T) {
 }
 
 func TestGetWorkoutActivity_invalidMode(t *testing.T) {
-	setupTestDB(t)
+	testutil.SetupTestDB(t)
 	_, err := services.GetWorkoutActivity(context.Background(), "nope", 52)
 	if !errors.Is(err, services.ErrInvalidActivityMode) {
 		t.Fatalf("expected ErrInvalidActivityMode, got %v", err)

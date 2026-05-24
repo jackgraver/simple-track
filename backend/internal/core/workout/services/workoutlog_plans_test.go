@@ -1,15 +1,16 @@
-package test
+package services_test
 
 import (
 	"be-simpletracker/internal/core/workout/models"
 	"be-simpletracker/internal/core/workout/services"
+	"be-simpletracker/internal/core/workout/testutil"
 	"be-simpletracker/internal/utils"
 	"strings"
 	"testing"
 )
 
 func TestAddExerciseToPlan_RemoveExerciseFromPlan_Reorder(t *testing.T) {
-	db := setupTestDB(t)
+	db := testutil.SetupTestDB(t)
 	ex1, err := services.CreateExercise("A", 10, "")
 	if err != nil {
 		t.Fatal(err)
@@ -54,7 +55,7 @@ func TestAddExerciseToPlan_RemoveExerciseFromPlan_Reorder(t *testing.T) {
 }
 
 func TestAssignPlanToDay_andUnassign(t *testing.T) {
-	db := setupTestDB(t)
+	db := testutil.SetupTestDB(t)
 	plan := models.WorkoutPlan{Name: "Upper"}
 	if err := db.Create(&plan).Error; err != nil {
 		t.Fatal(err)
@@ -82,7 +83,7 @@ func TestAssignPlanToDay_andUnassign(t *testing.T) {
 }
 
 func TestAssignPlanToDay_rejectsInvalidDay(t *testing.T) {
-	setupTestDB(t)
+	testutil.SetupTestDB(t)
 	_, err := services.AssignPlanToDay(1, 9)
 	if err == nil || !strings.Contains(err.Error(), "day_of_week") {
 		t.Fatalf("expected day_of_week error, got %v", err)
@@ -90,7 +91,7 @@ func TestAssignPlanToDay_rejectsInvalidDay(t *testing.T) {
 }
 
 func TestSetPlannedCardioType(t *testing.T) {
-	db := setupTestDB(t)
+	db := testutil.SetupTestDB(t)
 	plan := models.WorkoutPlan{Name: "Cardio Day"}
 	if err := db.Create(&plan).Error; err != nil {
 		t.Fatal(err)
@@ -105,7 +106,7 @@ func TestSetPlannedCardioType(t *testing.T) {
 }
 
 func TestGetAllWorkoutPlans(t *testing.T) {
-	db := setupTestDB(t)
+	db := testutil.SetupTestDB(t)
 	if err := db.Create(&models.WorkoutPlan{Name: "One"}).Error; err != nil {
 		t.Fatal(err)
 	}
