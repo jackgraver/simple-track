@@ -1,4 +1,4 @@
-package routes
+package controller
 
 import (
 	"be-simpletracker/internal/core/diet/services"
@@ -8,36 +8,11 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"gorm.io/gorm"
 )
 
-type DietLogHandler struct {
-	svc *services.DietLogService
-}
-
-func NewDietLogHandler(db *gorm.DB) *DietLogHandler {
-	return &DietLogHandler{svc: services.NewDietLogService(db)}
-}
-
-func RegisterDietLogRoutes(group *gin.RouterGroup, db *gorm.DB) {
-	h := NewDietLogHandler(db)
-	logs := group.Group("/logs")
-	{
-		logs.GET("/today", utils.DayOffsetMiddleware(), h.getMealPlanToday)
-		logs.GET("/week", h.getMealPlanWeek)
-		logs.GET("/month-planned-summary", h.getMonthPlannedSummary)
-		logs.GET("/month", h.getMealPlanMonth)
-		logs.GET("/day/:id", h.getMealPlanDay)
-		logs.GET("/goals/today", h.getGoalsToday)
-	}
-}
-
-// @Summary Get today's meal plan with totals
-// @Route /diet/logs/today
-// @Method [get]
-func (h *DietLogHandler) getMealPlanToday(c *gin.Context) {
+func GetMealPlanToday(c *gin.Context) {
 	offset := utils.GetDayOffset(c)
-	day, tot, err := h.svc.MealPlanToday(c.Request.Context(), offset)
+	day, tot, err := services.MealPlanToday(c.Request.Context(), offset)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -53,11 +28,8 @@ func (h *DietLogHandler) getMealPlanToday(c *gin.Context) {
 	})
 }
 
-// @Summary Get meal plan data for the current week
-// @Route /diet/logs/week
-// @Method [get]
-func (h *DietLogHandler) getMealPlanWeek(c *gin.Context) {
-	data, err := h.svc.MealPlanWeek(c.Request.Context())
+func GetMealPlanWeek(c *gin.Context) {
+	data, err := services.MealPlanWeek(c.Request.Context())
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -68,16 +40,13 @@ func (h *DietLogHandler) getMealPlanWeek(c *gin.Context) {
 	})
 }
 
-// @Summary Get planned meal counts summary for a month
-// @Route /diet/logs/month-planned-summary
-// @Method [get]
-func (h *DietLogHandler) getMonthPlannedSummary(c *gin.Context) {
+func GetMonthPlannedSummary(c *gin.Context) {
 	offset, err := utils.ParseQueryInt(c, monthOffsetQuery)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	counts, err := h.svc.MonthPlannedSummary(c.Request.Context(), offset)
+	counts, err := services.MonthPlannedSummary(c.Request.Context(), offset)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -88,16 +57,13 @@ func (h *DietLogHandler) getMonthPlannedSummary(c *gin.Context) {
 	})
 }
 
-// @Summary Get meal plan data for a month
-// @Route /diet/logs/month
-// @Method [get]
-func (h *DietLogHandler) getMealPlanMonth(c *gin.Context) {
+func GetMealPlanMonth(c *gin.Context) {
 	offset, err := utils.ParseQueryInt(c, monthOffsetQuery)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	days, startOfMonth, endOfMonth, month, err := h.svc.MealPlanMonth(c.Request.Context(), offset)
+	days, startOfMonth, endOfMonth, month, err := services.MealPlanMonth(c.Request.Context(), offset)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -114,17 +80,14 @@ func (h *DietLogHandler) getMealPlanMonth(c *gin.Context) {
 	})
 }
 
-// @Summary Get meal plan for a specific day by ID
-// @Route /diet/logs/day/:id
-// @Method [get]
-func (h *DietLogHandler) getMealPlanDay(c *gin.Context) {
+func GetMealPlanDay(c *gin.Context) {
 	idStr := c.Param("id")
 	id64, err := strconv.ParseUint(idStr, 10, 32)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid ID"})
 		return
 	}
-	day, tot, err := h.svc.MealPlanDay(c.Request.Context(), uint(id64))
+	day, tot, err := services.MealPlanDay(c.Request.Context(), uint(id64))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -139,11 +102,8 @@ func (h *DietLogHandler) getMealPlanDay(c *gin.Context) {
 	})
 }
 
-// @Summary Get today's dietary goals
-// @Route /diet/logs/goals/today
-// @Method [get]
-func (h *DietLogHandler) getGoalsToday(c *gin.Context) {
-	goals, err := h.svc.GoalsToday()
+func GetGoalsToday(c *gin.Context) {
+	goals, err := services.GoalsToday()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

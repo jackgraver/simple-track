@@ -1,7 +1,6 @@
-package routes
+package controller
 
 import (
-	"be-simpletracker/internal/core/diet/models"
 	"be-simpletracker/internal/core/diet/services"
 	"be-simpletracker/internal/utils"
 	"errors"
@@ -12,30 +11,18 @@ import (
 	"gorm.io/gorm"
 )
 
-type DietPlanHandler struct {
-	db *gorm.DB
+type updatePlanMacrosRequest struct {
+	Calories float32 `json:"calories"`
+	Protein  float32 `json:"protein"`
+	Fiber    float32 `json:"fiber"`
+	Carbs    float32 `json:"carbs"`
+	Fat      float32 `json:"fat"`
 }
 
-func NewDietPlanHandler(db *gorm.DB) *DietPlanHandler {
-	return &DietPlanHandler{db: db}
-}
-
-func RegisterDietPlanRoutes(group *gin.RouterGroup, db *gorm.DB) {
-	h := NewDietPlanHandler(db)
-	plans := group.Group("/plans")
-	{
-		plans.GET("/plan/all", h.getAllPlans)
-		plans.PUT("/plan/:id", h.putPlanMacros)
-	}
-}
-
-// @Summary List all diet plans
-// @Route /diet/plans/plan/all
-// @Method [get]
-func (h *DietPlanHandler) getAllPlans(c *gin.Context) {
+func GetAllPlans(c *gin.Context) {
 	ctx := c.Request.Context()
 	params := utils.ParseQueryParams(c)
-	result, err := services.GetAllPlans(ctx, h.db, params)
+	result, err := services.GetAllPlans(ctx, params)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -59,18 +46,7 @@ func (h *DietPlanHandler) getAllPlans(c *gin.Context) {
 	})
 }
 
-type updatePlanMacrosRequest struct {
-	Calories float32 `json:"calories"`
-	Protein  float32 `json:"protein"`
-	Fiber    float32 `json:"fiber"`
-	Carbs    float32 `json:"carbs"`
-	Fat      float32 `json:"fat"`
-}
-
-// @Summary Update macro targets for a diet plan
-// @Route /diet/plans/plan/:id
-// @Method [put]
-func (h *DietPlanHandler) putPlanMacros(c *gin.Context) {
+func PutPlanMacros(c *gin.Context) {
 	idStr := c.Param("id")
 	id64, err := strconv.ParseUint(idStr, 10, 32)
 	if err != nil || id64 == 0 {
@@ -86,27 +62,12 @@ func (h *DietPlanHandler) putPlanMacros(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "macro targets must be non-negative"})
 		return
 	}
-	var plan models.Plan
-	if err := h.db.First(&plan, uint(id64)).Error; err != nil {
+	plan, err := services.UpdatePlanMacros(uint(id64), req.Calories, req.Protein, req.Fiber, req.Carbs, req.Fat)
+	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "plan not found"})
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-	plan.Calories = req.Calories
-	plan.Protein = req.Protein
-	plan.Fiber = req.Fiber
-	plan.Carbs = req.Carbs
-	plan.Fat = req.Fat
-	if err := h.db.Model(&plan).Updates(map[string]any{
-		"calories": req.Calories,
-		"protein":  req.Protein,
-		"fiber":    req.Fiber,
-		"carbs":    req.Carbs,
-		"fat":      req.Fat,
-	}).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
