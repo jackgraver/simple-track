@@ -3,7 +3,11 @@ import Chart from "primevue/chart";
 import { computed, ref } from "vue";
 import { useRoute } from "vue-router";
 import { useWeightLogs, useSaveWeight } from "~/api/tracking/queries";
-import { formatDateLong, parseDietDayOffsetQuery, ymdForDayOffset } from "~/utils/dateUtil";
+import {
+    formatDateLong,
+    parseDietDayOffsetQuery,
+    ymdForDayOffset,
+} from "~/utils/dateUtil";
 import { toast } from "~/composables/toast/useToast";
 import {
     buildTrackingLineChart,
@@ -31,7 +35,12 @@ const hasChartData = computed(() => weightSeries.value.values.length > 0);
 const weightLineColor = "hsl(215, 85%, 55%)";
 const weightChart = computed(() => {
     const s = weightSeries.value;
-    return buildTrackingLineChart(s.labels, s.values, "Weight (lbs)", weightLineColor);
+    return buildTrackingLineChart(
+        s.labels,
+        s.values,
+        "Weight (lbs)",
+        weightLineColor,
+    );
 });
 const handleSave = async () => {
     const w = Number.parseFloat(weightInput.value.replace(",", "."));
@@ -122,40 +131,6 @@ const saving = computed(() => saveMutation.isPending.value);
                 </div>
                 <p v-else class="m-0 text-sm text-textSecondary">
                     No history through this day yet.
-                </p>
-            </div>
-            <div class="overflow-x-auto rounded-md border border-(--color-border)">
-                <table class="w-full border-collapse text-left text-sm">
-                    <thead>
-                        <tr class="border-b border-(--color-border) bg-secondBg">
-                            <th class="px-3 py-2 font-medium text-textSecondary">
-                                Date
-                            </th>
-                            <th class="px-3 py-2 font-medium text-textSecondary">
-                                Weight (lbs)
-                            </th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr
-                            v-for="r in rows"
-                            :key="r.ID"
-                            class="border-b border-(--color-border)"
-                        >
-                            <td class="px-3 py-2 text-textPrimary">
-                                {{ formatDateLong(r.date) }}
-                            </td>
-                            <td class="px-3 py-2 text-textPrimary">
-                                {{ r.weight_lbs }}
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
-                <p
-                    v-if="!rows.length"
-                    class="m-0 px-3 py-4 text-sm text-textSecondary"
-                >
-                    No entries yet.
                 </p>
             </div>
         </template>

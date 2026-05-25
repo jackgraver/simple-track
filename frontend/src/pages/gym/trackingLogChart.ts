@@ -37,6 +37,17 @@ function formatShortLabel(dayKey: string): string {
     return d.toLocaleString("en-US", { month: "short", day: "numeric" });
 }
 
+function ymdAddDays(ymd: string, deltaDays: number): string {
+    const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(ymd);
+    if (!m) return ymd;
+    const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+    d.setDate(d.getDate() + deltaDays);
+    const y = d.getFullYear();
+    const mo = String(d.getMonth() + 1).padStart(2, "0");
+    const da = String(d.getDate()).padStart(2, "0");
+    return `${y}-${mo}-${da}`;
+}
+
 /** One point per calendar day through `selectedYmd` (inclusive); latest row wins if duplicates. */
 export function seriesThroughSelectedDay(
     rows: { date: string; value: number }[],
@@ -52,6 +63,61 @@ export function seriesThroughSelectedDay(
     return {
         labels: keys.map(formatShortLabel),
         values: keys.map((k) => byDay.get(k)!),
+    };
+}
+
+/** Fixed window of `dayCount` calendar days ending on `selectedYmd`; missing days are 0. */
+export function seriesLastDaysThroughSelectedDay(
+    rows: { date: string; value: number }[],
+    selectedYmd: string,
+    dayCount = 14,
+): { labels: string[]; values: number[] } {
+    const byDay = new Map<string, number>();
+    for (const r of rows) {
+        byDay.set(trackingDayKey(r.date), r.value);
+    }
+    const keys: string[] = [];
+    for (let i = dayCount - 1; i >= 0; i--) {
+        keys.push(ymdAddDays(selectedYmd, -i));
+    }
+    return {
+        labels: keys.map(formatShortLabel),
+        values: keys.map((k) => byDay.get(k) ?? 0),
+    };
+}
+
+const Y_AXIS_PADDING = 5;
+
+function buildTrackingScaleOptions(
+    datasetLabel: string,
+    t: ReturnType<typeof readChartTheme>,
+    values: number[],
+    yMinFixed?: number,
+) {
+    let yMin: number | undefined = yMinFixed;
+    let yMax: number | undefined;
+    if (values.length > 0) {
+        const dataMin = Math.min(...values);
+        const dataMax = Math.max(...values);
+        yMin = yMinFixed ?? dataMin - Y_AXIS_PADDING;
+        yMax = dataMax + Y_AXIS_PADDING;
+    }
+    return {
+        x: {
+            ticks: { color: t.textMuted, maxRotation: 45 },
+            grid: { color: t.grid },
+        },
+        y: {
+            ticks: { color: t.textMuted },
+            grid: { color: t.grid },
+            ...(yMin != null ? { min: yMin } : {}),
+            ...(yMax != null ? { max: yMax } : {}),
+            title: {
+                display: true,
+                text: datasetLabel,
+                color: t.textMuted,
+            },
+        },
     };
 }
 
@@ -85,21 +151,39 @@ export function buildTrackingLineChart(
         plugins: {
             legend: { labels: { color: t.textMuted } },
         },
-        scales: {
-            x: {
-                ticks: { color: t.textMuted, maxRotation: 45 },
-                grid: { color: t.grid },
+        scales: buildTrackingScaleOptions(datasetLabel, t, values),
+    };
+    return { data, options };
+}
+
+export function buildTrackingBarChart(
+    labels: string[],
+    values: number[],
+    datasetLabel: string,
+    barColor: string,
+): { data: ChartData<"bar">; options: ChartOptions<"bar"> } {
+    const t = readChartTheme();
+    const data: ChartData<"bar"> = {
+        labels,
+        datasets: [
+            {
+                label: datasetLabel,
+                data: values,
+                backgroundColor: barColor,
+                borderColor: barColor,
+                borderWidth: 0,
+                borderRadius: 4,
             },
-            y: {
-                ticks: { color: t.textMuted },
-                grid: { color: t.grid },
-                title: {
-                    display: true,
-                    text: datasetLabel,
-                    color: t.textMuted,
-                },
-            },
+        ],
+    };
+    const options: ChartOptions<"bar"> = {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: { mode: "index", intersect: false },
+        plugins: {
+            legend: { labels: { color: t.textMuted } },
         },
+        scales: buildTrackingScaleOptions(datasetLabel, t, values, 0),
     };
     return { data, options };
 }
