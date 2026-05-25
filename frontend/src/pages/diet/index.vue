@@ -4,10 +4,16 @@ import { computed } from "vue";
 import { useRoute } from "vue-router";
 import DietDayView from "./components/DietDayView.vue";
 import { CREATE_TYPE, LOG_TYPE } from "~/pages/diet/logmeal/logmealMode";
-import { parseDietDayOffsetQuery, withDietDayOffsetQuery, ymdForDayOffset } from "~/utils/dateUtil";
+import {
+    parseDietDayOffsetQuery,
+    withDietDayOffsetQuery,
+    ymdForDayOffset,
+} from "~/utils/dateUtil";
 import { dialogManager } from "~/composables/dialog/useDialog";
 import LogWaterDialog from "./components/dialog/LogWaterDialog.vue";
 import QuickLogDialog from "./components/dialog/QuickLogDialog.vue";
+import ModuleTitleBar from "~/shared/ModuleTitleBar.vue";
+import type { ModuleTitleLink } from "~/shared/ModuleTitleBar.vue";
 
 const route = useRoute();
 const isDietHome = computed(() => route.name === "diet");
@@ -38,59 +44,24 @@ async function openQuickLog() {
         },
     });
 }
+
+const dietNavLinks = computed<ModuleTitleLink[]>(() => [
+    { name: "Log meal", to: "diet-log", query: logMealLinkQuery.value },
+    {
+        name: "New saved meal",
+        to: "diet-log",
+        query: createSavedMealLinkQuery.value,
+    },
+    { name: "Macro targets", to: "diet-targets" },
+    { name: "Quick log", onClick: openQuickLog },
+    { name: "Log Water", onClick: openWaterLog },
+]);
 </script>
 
 <template>
     <div class="diet-module flex w-full flex-col gap-6">
         <template v-if="isDietHome">
-            <div
-                class="flex items-center justify-between gap-4 border-b border-(--color-border) pb-3"
-            >
-                <h1 class="m-0 text-lg font-semibold text-textPrimary">Diet</h1>
-                <nav class="flex items-center gap-3 text-sm text-textSecondary">
-                    <router-link
-                        :to="{ name: 'diet-log', query: logMealLinkQuery }"
-                        class="transition-colors hover:text-textPrimary"
-                        >Log meal</router-link
-                    >
-                    <span aria-hidden="true" class="text-textSecondary/50"
-                        >·</span
-                    >
-                    <router-link
-                        :to="{ name: 'diet-log', query: createSavedMealLinkQuery }"
-                        class="transition-colors hover:text-textPrimary"
-                        >New saved meal</router-link
-                    >
-                    <span aria-hidden="true" class="text-textSecondary/50"
-                        >·</span
-                    >
-                    <router-link
-                        :to="{ name: 'diet-targets' }"
-                        class="transition-colors hover:text-textPrimary"
-                        >Macro targets</router-link
-                    >
-                    <span aria-hidden="true" class="text-textSecondary/50"
-                        >·</span
-                    >
-                    <button
-                        class="transition-colors hover:text-textPrimary p-0!"
-                        type="button"
-                        @click="openQuickLog"
-                    >
-                        Quick log
-                    </button>
-                    <span aria-hidden="true" class="text-textSecondary/50"
-                        >·</span
-                    >
-                    <button
-                        class="transition-colors hover:text-textPrimary p-0!"
-                        type="button"
-                        @click="openWaterLog"
-                    >
-                        Log Water
-                    </button>
-                </nav>
-            </div>
+            <ModuleTitleBar title="Diet" :links="dietNavLinks" />
             <DietDayView :date-offset="dateOffset" />
         </template>
         <router-view v-else />
