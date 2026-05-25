@@ -139,7 +139,9 @@ export function useExerciseLoggingSession(options: {
             currentWeight.value = parsed.weight;
             currentReps.value = parsed.reps ?? 0;
             currentWeightSetup.value = parsed.weightSetup ?? "";
-            notes.value = parsed.notes ?? "";
+            if (typeof parsed.notes === "string" && parsed.notes.length > 0) {
+                notes.value = parsed.notes;
+            }
             draftDirty.value = true;
             return true;
         },
@@ -158,7 +160,7 @@ export function useExerciseLoggingSession(options: {
         }
 
         loggedSets.value = loggedSetsFromServer(group.logged?.sets);
-        notes.value = group.previous?.notes ?? group.logged?.notes ?? "";
+        notes.value = group.logged?.notes ?? group.previous?.notes ?? "";
         currentSetNumber.value = loggedSets.value.length + 1;
 
         const { weight, reps, weightSetup } = initializeWeightAndReps(group.logged?.sets, group.previous?.sets);
@@ -379,6 +381,7 @@ export function useExerciseLoggingSession(options: {
 
     const updateNotes = (value: string) => {
         notes.value = value;
+        draftDirty.value = true;
     };
 
     const updateWeightSetup = (value: string) => {

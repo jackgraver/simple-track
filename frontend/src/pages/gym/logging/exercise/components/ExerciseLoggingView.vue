@@ -123,12 +123,7 @@ const logSetWithRepRolloverHintDismiss = async () => {
     const hadHint = repRolloverWeightHintBase.value.length > 0;
     const maxPrev = maxPreviousWorkoutWeight.value;
     const ok = await session.addNextSet();
-    if (
-        ok &&
-        hadHint &&
-        maxPrev != null &&
-        weightLogged > maxPrev
-    ) {
+    if (ok && hadHint && maxPrev != null && weightLogged > maxPrev) {
         repRolloverHintDismissed.value = true;
     }
 };
