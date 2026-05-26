@@ -37,7 +37,11 @@ const { getUsername } = useAuth();
             class="pr-2 lg:pr-0 min-w-[90px] flex items-center justify-end gap-2 text-right"
         >
             <TrackingNotifications />
-            <span v-if="getUsername()">{{ getUsername() }}</span>
+            <router-link
+                v-if="getUsername()"
+                :to="{ name: 'settings-profile' }"
+                class="text-sm hover:underline underline-offset-4"
+            >{{ getUsername() }}</router-link>
         </div>
     </nav>
 </template>

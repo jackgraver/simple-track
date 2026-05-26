@@ -1,15 +1,16 @@
 <script setup lang="ts">
-import { useMutation, useQuery, useQueryClient } from "@tanstack/vue-query";
-import { computed, ref, watch } from "vue";
+import { useMutation, useQueryClient } from "@tanstack/vue-query";
+import { computed, watch } from "vue";
 import { useRouter } from "vue-router";
 import { updatePlanMacros } from "~/api/diet/api";
-import { fetchProfile, fetchWeightLogs, saveProfile } from "~/api/tracking/api";
-import { trackingKeys } from "~/api/tracking/keys";
-import type { ActivityLevel } from "~/api/tracking/types";
+import {
+    latestWeightLbs,
+    useProfile,
+    useWeightLogs,
+} from "~/api/tracking/queries";
 import { toast } from "~/composables/toast/useToast";
 import { homeKeys } from "~/pages/home/queries/keys";
 import { useDietLogsToday } from "~/pages/home/queries/useDietLogsToday";
-import BodyProfileCard from "./components/BodyProfileCard.vue";
 import MacroSlidersPanel from "./components/MacroSlidersPanel.vue";
 import TDEECalculator from "./components/TDEECalculator.vue";
 import { useMacroSliders } from "./useMacroSliders";
@@ -22,34 +23,14 @@ const {
     isPending: dayPending,
     error: loadError,
 } = useDietLogsToday(0);
-const { data: profileRow, isPending: profilePending } = useQuery({
-    queryKey: trackingKeys.profile,
-    queryFn: fetchProfile,
-});
-const { data: weightLogs } = useQuery({
-    queryKey: trackingKeys.weight,
-    queryFn: () => fetchWeightLogs(1),
-});
-const latestLogWeightLbs = computed(() => {
-    const first = weightLogs.value?.[0];
-    return first != null && first.weight_lbs > 0 ? first.weight_lbs : null;
-});
-const weightLbs = ref(0);
-const heightIn = ref(70);
-const age = ref(30);
-const sex = ref<"male" | "female">("male");
-const activityLevel = ref<ActivityLevel>("moderately_active");
-watch(
-    profileRow,
-    (p) => {
-        if (!p) return;
-        heightIn.value = p.height_in;
-        age.value = p.age;
-        sex.value = p.sex;
-        activityLevel.value = p.activity_level;
-    },
-    { immediate: true },
-);
+const { data: profile, isPending: profilePending } = useProfile();
+const { data: weightLogs, isPending: weightPending } = useWeightLogs();
+const latestLogWeightLbs = computed(() => latestWeightLbs(weightLogs.value));
+const weightLbs = computed(() => latestLogWeightLbs.value ?? 0);
+const heightIn = computed(() => profile.value?.height_in ?? 0);
+const age = computed(() => profile.value?.age ?? 0);
+const sex = computed(() => profile.value?.sex ?? "male");
+
 const sliders = useMacroSliders();
 watch(
     () => dayData.value?.day.plan,
@@ -68,7 +49,7 @@ const { bmr, tdee, multiplier } = useTDEE({
     heightIn: () => heightIn.value,
     age: () => age.value,
     sex: () => sex.value,
-    activity: () => activityLevel.value,
+    activity: () => "moderately_active",
 });
 const planId = computed(() => dayData.value?.day.plan.ID);
 const macrosValid = computed(() => {
@@ -83,9 +64,6 @@ const macrosValid = computed(() => {
         (n) => typeof n === "number" && !Number.isNaN(n) && n >= 0,
     );
 });
-const profileValid = computed(
-    () => heightIn.value > 0 && age.value > 0 && weightLbs.value > 0,
-);
 const saveMutation = useMutation({
     mutationFn: async () => {
         const id = planId.value;
@@ -107,30 +85,11 @@ const saveMutation = useMutation({
         toast.push("Could not save macro targets", "error");
     },
 });
-const profileMutation = useMutation({
-    mutationFn: () =>
-        saveProfile({
-            height_in: heightIn.value,
-            age: age.value,
-            sex: sex.value,
-            activity_level: activityLevel.value,
-        }),
-    onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: trackingKeys.profile });
-        toast.push("Profile saved", "success");
-    },
-    onError: () => {
-        toast.push("Could not save profile", "error");
-    },
-});
 const saving = computed(() => saveMutation.isPending.value);
-const savingProfile = computed(() => profileMutation.isPending.value);
-const isPending = computed(() => dayPending.value || profilePending.value);
+const isPending = computed(
+    () => dayPending.value || profilePending.value || weightPending.value,
+);
 const submit = () => saveMutation.mutate();
-const saveProfileAction = () => profileMutation.mutate();
-const goBack = () => {
-    router.push({ name: "diet" });
-};
 function applyTdeeCalories(n: number) {
     sliders.setCalorieTarget(n);
 }
@@ -152,39 +111,6 @@ function applyTdeeCalories(n: number) {
         </div>
         <template v-else>
             <div class="grid grid-cols-1 items-start gap-5 md:grid-cols-2">
-                <section
-                    class="flex flex-col gap-3 rounded-lg border border-zinc-700 bg-zinc-950/40 p-4"
-                >
-                    <div class="flex items-center justify-between">
-                        <h2 class="m-0 text-sm font-medium text-zinc-200">
-                            Body Profile
-                        </h2>
-                        <button
-                            type="button"
-                            class="rounded-md border border-zinc-600 bg-zinc-800 px-3 py-1.5 text-xs font-medium text-zinc-100 hover:bg-zinc-700 disabled:opacity-50"
-                            :disabled="savingProfile || !profileValid"
-                            @click="saveProfileAction"
-                        >
-                            {{ savingProfile ? "Saving…" : "Save profile" }}
-                        </button>
-                    </div>
-                    <BodyProfileCard
-                        :weight-lbs="weightLbs"
-                        :height-in="heightIn"
-                        :age="age"
-                        :sex="sex"
-                        :activity-level="activityLevel"
-                        :latest-log-weight-lbs="latestLogWeightLbs"
-                        @update:weight-lbs="weightLbs = $event"
-                        @update:height-in="heightIn = $event"
-                        @update:age="age = $event"
-                        @update:sex="sex = $event"
-                        @update:activity-level="activityLevel = $event"
-                    />
-                    <p v-if="!profileValid" class="m-0 text-xs text-zinc-500">
-                        Add weight, height, and age for TDEE.
-                    </p>
-                </section>
                 <section
                     class="flex flex-col gap-3 rounded-lg border border-zinc-700 bg-zinc-950/40 p-4"
                 >

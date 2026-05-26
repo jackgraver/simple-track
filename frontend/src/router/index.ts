@@ -130,6 +130,12 @@ const routes: RouteRecordRaw[] = [
         name: "signin",
         component: () => import("~/pages/auth/signin/index.vue"),
     },
+    {
+        path: "/settings/profile",
+        name: "settings-profile",
+        component: () => import("~/pages/settings/profile/index.vue"),
+        meta: { breadcrumb: "Profile" },
+    },
 ];
 
 export const router = createRouter({
