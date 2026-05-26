@@ -9,17 +9,67 @@ const props = defineProps<{
     weightLbs: number;
 }>();
 
-const maxP = computed(() => Math.max(1, props.sliders.calorieTarget.value / 4));
-const maxC = computed(() => Math.max(1, props.sliders.calorieTarget.value / 4));
-const maxF = computed(() => Math.max(1, props.sliders.calorieTarget.value / 9));
+const maxP = computed(() =>
+    props.sliders.maxProteinG(),
+);
+const maxC = computed(() =>
+    props.sliders.maxCarbsG(),
+);
+const maxF = computed(() =>
+    props.sliders.maxFatG(),
+);
+const minP = computed(() => props.sliders.minProteinG());
+const minC = computed(() => props.sliders.minCarbsG());
+const minF = computed(() => props.sliders.minFatG());
+const displayMaxP = computed(() => Math.max(1, props.sliders.calorieTarget.value / 4));
+const displayMaxC = computed(() => Math.max(1, props.sliders.calorieTarget.value / 4));
+const displayMaxF = computed(() => Math.max(1, props.sliders.calorieTarget.value / 9));
+const lockedCount = computed(() =>
+    [
+        props.sliders.lockProtein.value,
+        props.sliders.lockCarbs.value,
+        props.sliders.lockFat.value,
+    ].filter(Boolean).length,
+);
+const isFixed = (min: number, max: number) => Math.abs(min - max) < 0.05;
+const proteinReadonly = computed(() =>
+    lockedCount.value === 2 &&
+    !props.sliders.lockProtein.value &&
+    isFixed(minP.value, maxP.value),
+);
+const carbsReadonly = computed(() =>
+    lockedCount.value === 2 &&
+    !props.sliders.lockCarbs.value &&
+    isFixed(minC.value, maxC.value),
+);
+const fatReadonly = computed(() =>
+    lockedCount.value === 2 &&
+    !props.sliders.lockFat.value &&
+    isFixed(minF.value, maxF.value),
+);
+
+const proteinFromWeight = computed(() =>
+    props.sliders.proteinGramsFromGPerLb(
+        props.weightLbs,
+        props.sliders.proteinGPerLb.value,
+    ),
+);
+
+const proteinWeightHint = computed(() => {
+    if (props.weightLbs <= 0) return 'Log body weight to use g/lb';
+    return `${proteinFromWeight.value}g at ${props.weightLbs} lbs`;
+});
 
 const proteinMarkers = computed(() => {
     const w = props.weightLbs;
     if (w <= 0) return [];
-    return [
+    const mult = props.sliders.proteinGPerLb.value;
+    const markers = new Set([
         props.sliders.proteinGramsFromGPerLb(w, 0.8),
         props.sliders.proteinGramsFromGPerLb(w, 1.0),
-    ];
+        props.sliders.proteinGramsFromGPerLb(w, mult),
+    ]);
+    return [...markers].filter((g) => g > 0).sort((a, b) => a - b);
 });
 
 const carbsMarkers = computed(() => {
@@ -77,6 +127,15 @@ function onFiberInput(e: Event) {
     props.sliders.fiberG.value =
         Number((e.target as HTMLInputElement).value) || 0;
 }
+
+function onProteinMultiplierInput(e: Event) {
+    props.sliders.proteinGPerLb.value =
+        Number((e.target as HTMLInputElement).value) || 0;
+}
+
+function applyProteinFromWeight() {
+    props.sliders.applyProteinFromBodyWeight(props.weightLbs);
+}
 </script>
 
 <template>
@@ -115,25 +174,62 @@ function onFiberInput(e: Event) {
         >
             Calorie target was updated to match locked macros.
         </p>
+        <p
+            v-if="sliders.lockConflict.value"
+            class="m-0 text-xs text-red-400/90"
+        >
+            Locked macros ({{ Math.round(sliders.lockedMacroCalories.value) }} kcal)
+            exceed the calorie target — raise calories or unlock a macro.
+        </p>
         <div class="grid grid-cols-1 gap-4 md:grid-cols-[1fr_10rem]">
             <div class="flex flex-col gap-4">
-                <MacroSlider
-                    label="Protein (g)"
-                    :grams="sliders.proteinG.value"
-                    :max-grams="maxP"
-                    :pct="sliders.proteinCalPct.value"
-                    :locked="sliders.lockProtein.value"
-                    track-bg-class="bg-[#60a5fa]/70"
-                    :marker-grams="proteinMarkers"
-                    @update:grams="sliders.setProteinG"
-                    @toggle-lock="sliders.lockProtein.value = !sliders.lockProtein.value"
-                />
+                <div class="flex flex-col gap-2">
+                    <MacroSlider
+                        label="Protein (g)"
+                        :grams="sliders.proteinG.value"
+                        :min-grams="minP"
+                        :max-grams="maxP"
+                        :display-max-grams="displayMaxP"
+                        :pct="sliders.proteinCalPct.value"
+                        :locked="sliders.lockProtein.value"
+                        :readonly="proteinReadonly"
+                        track-bg-class="bg-[#60a5fa]/70"
+                        :marker-grams="proteinMarkers"
+                        @update:grams="sliders.setProteinG"
+                        @toggle-lock="sliders.lockProtein.value = !sliders.lockProtein.value"
+                    />
+                    <div class="flex flex-wrap items-end gap-2 pl-0.5">
+                        <label class="flex min-w-28 flex-col gap-1">
+                            <span class="text-xs font-medium text-zinc-500">Protein (g/lb)</span>
+                            <input
+                                :value="sliders.proteinGPerLb.value"
+                                type="number"
+                                min="0"
+                                step="0.05"
+                                class="max-w-24 rounded-md border border-zinc-600 bg-zinc-900 px-2 py-1 text-sm text-zinc-100 outline-none ring-amber-700/40 focus:border-amber-600 focus:ring-2"
+                                @input="onProteinMultiplierInput"
+                            />
+                        </label>
+                        <button
+                            type="button"
+                            class="rounded-md border border-zinc-600 px-2 py-1 text-xs font-medium text-zinc-300 hover:border-amber-600/60 hover:text-zinc-100 disabled:cursor-not-allowed disabled:opacity-50"
+                            :disabled="weightLbs <= 0"
+                            @click="applyProteinFromWeight"
+                        >
+                            Apply {{ proteinFromWeight }}g
+                        </button>
+                        <span class="pb-1 text-xs text-zinc-600">{{ proteinWeightHint }}</span>
+                    </div>
+                </div>
                 <MacroSlider
                     label="Carbs (g)"
                     :grams="sliders.carbsG.value"
+                    :min-grams="minC"
                     :max-grams="maxC"
+                    :display-max-grams="displayMaxC"
                     :pct="sliders.carbsCalPct.value"
                     :locked="sliders.lockCarbs.value"
+                    :readonly="carbsReadonly"
                     track-bg-class="bg-[#ef4444]/70"
                     :marker-grams="carbsMarkers"
                     @update:grams="sliders.setCarbsG"
@@ -142,9 +238,12 @@ function onFiberInput(e: Event) {
                 <MacroSlider
                     label="Fat (g)"
                     :grams="sliders.fatG.value"
+                    :min-grams="minF"
                     :max-grams="maxF"
+                    :display-max-grams="displayMaxF"
                     :pct="sliders.fatCalPct.value"
                     :locked="sliders.lockFat.value"
+                    :readonly="fatReadonly"
                     track-bg-class="bg-[#a855f7]/70"
                     :marker-grams="fatMarkers"
                     @update:grams="sliders.setFatG"

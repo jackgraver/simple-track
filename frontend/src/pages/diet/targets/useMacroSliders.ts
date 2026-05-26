@@ -12,6 +12,74 @@ const EPS = 0.05;
 
 export type MacroDriver = 'p' | 'c' | 'f';
 
+export function maxGramsForMacro(
+    macro: MacroDriver,
+    calorieTarget: number,
+    P: number,
+    C: number,
+    F: number,
+    lockP: boolean,
+    lockC: boolean,
+    lockF: boolean,
+): number {
+    const T = calorieTarget;
+    if (T <= 0) return 0;
+    if (macro === 'p') {
+        if (lockC && lockF) return Math.max(0, (T - 4 * C - 9 * F) / 4);
+        if (lockC) return Math.max(0, (T - 4 * C) / 4);
+        if (lockF) return Math.max(0, (T - 9 * F) / 4);
+        return T / 4;
+    }
+    if (macro === 'c') {
+        if (lockP && lockF) return Math.max(0, (T - 4 * P - 9 * F) / 4);
+        if (lockP) return Math.max(0, (T - 4 * P) / 4);
+        if (lockF) return Math.max(0, (T - 9 * F) / 4);
+        return T / 4;
+    }
+    if (lockP && lockC) return Math.max(0, (T - 4 * P - 4 * C) / 9);
+    if (lockP) return Math.max(0, (T - 4 * P) / 9);
+    if (lockC) return Math.max(0, (T - 4 * C) / 9);
+    return T / 9;
+}
+
+function splitRemainingCalories(
+    rem: number,
+    unlocked: MacroDriver[],
+    p: number,
+    c: number,
+    f: number,
+): { p: number; c: number; f: number } {
+    if (rem <= EPS || unlocked.length === 0) {
+        return { p, c, f };
+    }
+    if (unlocked.length === 1) {
+        const m = unlocked[0];
+        if (m === 'p') return { p: rem / 4, c, f };
+        if (m === 'c') return { p, c: rem / 4, f };
+        return { p, c, f: rem / 9 };
+    }
+    let pK = unlocked.includes('p') ? 4 * p : 0;
+    let cK = unlocked.includes('c') ? 4 * c : 0;
+    let fK = unlocked.includes('f') ? 9 * f : 0;
+    const sumK = pK + cK + fK;
+    if (sumK <= EPS) {
+        const share = rem / unlocked.length;
+        return {
+            p: unlocked.includes('p') ? share / 4 : p,
+            c: unlocked.includes('c') ? share / 4 : c,
+            f: unlocked.includes('f') ? share / 9 : f,
+        };
+    }
+    const pK2 = unlocked.includes('p') ? rem * (pK / sumK) : 0;
+    const cK2 = unlocked.includes('c') ? rem * (cK / sumK) : 0;
+    const fK2 = unlocked.includes('f') ? rem * (fK / sumK) : 0;
+    return {
+        p: unlocked.includes('p') ? pK2 / 4 : p,
+        c: unlocked.includes('c') ? cK2 / 4 : c,
+        f: unlocked.includes('f') ? fK2 / 9 : f,
+    };
+}
+
 export function redistributeMacros(
     calorieTarget: number,
     P: number,
@@ -23,121 +91,57 @@ export function redistributeMacros(
     driver: MacroDriver,
     driverVal: number,
 ): { P: number; C: number; F: number; calorieTarget: number; warning: boolean } {
-    let p = Math.max(0, driver === 'p' ? driverVal : P);
-    let c = Math.max(0, driver === 'c' ? driverVal : C);
-    let f = Math.max(0, driver === 'f' ? driverVal : F);
-    let T = calorieTarget;
-    let warning = false;
-    const remP = () => T - 4 * p;
-    const remC = () => T - 4 * c;
-    const remF = () => T - 9 * f;
-    const splitCF = (rem: number) => {
-        if (lockC && lockF) {
-            const need = 4 * c + 9 * f;
-            if (Math.abs(rem - need) > EPS) {
-                T = 4 * p + 4 * c + 9 * f;
-                warning = true;
-            }
-            return;
-        }
-        if (lockC) {
-            f = (rem - 4 * c) / 9;
-            if (f < 0) f = 0;
-            return;
-        }
-        if (lockF) {
-            c = (rem - 9 * f) / 4;
-            if (c < 0) c = 0;
-            return;
-        }
-        const cK = 4 * c;
-        const fK = 9 * f;
-        const sumK = cK + fK;
-        if (sumK <= EPS) {
-            const half = rem / 2;
-            c = half / 4;
-            f = half / 9;
-        } else {
-            const cK2 = rem * (cK / sumK);
-            const fK2 = rem * (fK / sumK);
-            c = cK2 / 4;
-            f = fK2 / 9;
-        }
-    };
-    const splitPF = (rem: number) => {
-        if (lockP && lockF) {
-            const need = 4 * p + 9 * f;
-            if (Math.abs(rem - need) > EPS) {
-                T = 4 * p + 4 * c + 9 * f;
-                warning = true;
-            }
-            return;
-        }
-        if (lockP) {
-            f = (rem - 4 * p) / 9;
-            if (f < 0) f = 0;
-            return;
-        }
-        if (lockF) {
-            p = (rem - 9 * f) / 4;
-            if (p < 0) p = 0;
-            return;
-        }
-        const pK = 4 * p;
-        const fK = 9 * f;
-        const sumK = pK + fK;
-        if (sumK <= EPS) {
-            const half = rem / 2;
-            p = half / 4;
-            f = half / 9;
-        } else {
-            const pK2 = rem * (pK / sumK);
-            const fK2 = rem * (fK / sumK);
-            p = pK2 / 4;
-            f = fK2 / 9;
-        }
-    };
-    const splitPC = (rem: number) => {
-        if (lockP && lockC) {
-            const need = 4 * p + 4 * c;
-            if (Math.abs(rem - need) > EPS) {
-                T = 4 * p + 4 * c + 9 * f;
-                warning = true;
-            }
-            return;
-        }
-        if (lockP) {
-            c = (rem - 4 * p) / 4;
-            if (c < 0) c = 0;
-            return;
-        }
-        if (lockC) {
-            p = (rem - 4 * c) / 4;
-            if (p < 0) p = 0;
-            return;
-        }
-        const pK = 4 * p;
-        const cK = 4 * c;
-        const sumK = pK + cK;
-        if (sumK <= EPS) {
-            const half = rem / 2;
-            p = half / 4;
-            c = half / 4;
-        } else {
-            const pK2 = rem * (pK / sumK);
-            const cK2 = rem * (cK / sumK);
-            p = pK2 / 4;
-            c = cK2 / 4;
-        }
-    };
-    if (driver === 'p') {
-        splitCF(remP());
-    } else if (driver === 'c') {
-        splitPF(remC());
-    } else {
-        splitPC(remF());
+    const T = Math.max(0, calorieTarget);
+    const driverLocked =
+        (driver === 'p' && lockP) ||
+        (driver === 'c' && lockC) ||
+        (driver === 'f' && lockF);
+    if (driverLocked) {
+        return { P, C, F, calorieTarget: T, warning: false };
     }
-    return { P: p, C: c, F: f, calorieTarget: Math.round(T * 10) / 10, warning };
+
+    let p = Math.max(0, P);
+    let c = Math.max(0, C);
+    let f = Math.max(0, F);
+    const lockedK =
+        (lockP ? 4 * p : 0) + (lockC ? 4 * c : 0) + (lockF ? 9 * f : 0);
+    if (lockedK > T + EPS) {
+        return { P: p, C: c, F: f, calorieTarget: T, warning: true };
+    }
+
+    const unlocked: MacroDriver[] = [];
+    if (!lockP) unlocked.push('p');
+    if (!lockC) unlocked.push('c');
+    if (!lockF) unlocked.push('f');
+    const otherUnlocked = unlocked.filter((m) => m !== driver);
+    const availableForDriver = Math.max(0, T - lockedK);
+
+    if (driver === 'p') {
+        p = Math.min(Math.max(0, driverVal), availableForDriver / 4);
+    } else if (driver === 'c') {
+        c = Math.min(Math.max(0, driverVal), availableForDriver / 4);
+    } else {
+        f = Math.min(Math.max(0, driverVal), availableForDriver / 9);
+    }
+
+    if (otherUnlocked.length === 0) {
+        const rem = T - lockedK;
+        if (driver === 'p') p = rem / 4;
+        if (driver === 'c') c = rem / 4;
+        if (driver === 'f') f = rem / 9;
+        return { P: p, C: c, F: f, calorieTarget: T, warning: false };
+    }
+
+    const driverK =
+        driver === 'p' ? 4 * p : driver === 'c' ? 4 * c : 9 * f;
+    const split = splitRemainingCalories(
+        T - lockedK - driverK,
+        otherUnlocked,
+        p,
+        c,
+        f,
+    );
+    return { P: split.p, C: split.c, F: split.f, calorieTarget: T, warning: false };
 }
 
 export function useMacroSliders(initial?: {
@@ -155,6 +159,7 @@ export function useMacroSliders(initial?: {
     const lockProtein = ref(false);
     const lockCarbs = ref(false);
     const lockFat = ref(false);
+    const proteinGPerLb = ref(0.8);
     const caloriesAdjustedByLocks = ref(false);
     const applyResult = (r: {
         P: number;
@@ -218,28 +223,90 @@ export function useMacroSliders(initial?: {
         );
     }
     function setCalorieTarget(v: number) {
-        const T = Math.max(0, v);
-        const oldK = 4 * proteinG.value + 4 * carbsG.value + 9 * fatG.value;
-        if (oldK <= EPS) {
-            applyPresetMacros('balanced', T);
+        const T = Math.max(0, Math.round(v));
+        const lp = lockProtein.value;
+        const lc = lockCarbs.value;
+        const lf = lockFat.value;
+        if (!lp && !lc && !lf) {
+            const oldK =
+                4 * proteinG.value + 4 * carbsG.value + 9 * fatG.value;
+            if (oldK <= EPS) {
+                applyPresetMacros('balanced', T);
+                caloriesAdjustedByLocks.value = false;
+                return;
+            }
+            const factor = T / oldK;
+            proteinG.value = roundG(proteinG.value * factor);
+            carbsG.value = roundG(carbsG.value * factor);
+            fatG.value = roundG(fatG.value * factor);
+            calorieTarget.value = T;
             caloriesAdjustedByLocks.value = false;
             return;
         }
-        const factor = T / oldK;
-        proteinG.value = roundG(proteinG.value * factor);
-        carbsG.value = roundG(carbsG.value * factor);
-        fatG.value = roundG(fatG.value * factor);
-        calorieTarget.value = Math.round(T);
+        calorieTarget.value = T;
+        if (lp && lc && lf) {
+            caloriesAdjustedByLocks.value =
+                Math.abs(macroCaloriesTotal.value - T) > EPS;
+            return;
+        }
+        let p = proteinG.value;
+        let c = carbsG.value;
+        let f = fatG.value;
+        const lockedK =
+            (lp ? 4 * p : 0) + (lc ? 4 * c : 0) + (lf ? 9 * f : 0);
+        const rem = T - lockedK;
+        if (rem < -EPS) {
+            caloriesAdjustedByLocks.value = true;
+            return;
+        }
+        const unlocked: MacroDriver[] = [];
+        if (!lp) unlocked.push('p');
+        if (!lc) unlocked.push('c');
+        if (!lf) unlocked.push('f');
+        const split = splitRemainingCalories(rem, unlocked, p, c, f);
+        if (!lp) p = split.p;
+        if (!lc) c = split.c;
+        if (!lf) f = split.f;
+        proteinG.value = roundG(p);
+        carbsG.value = roundG(c);
+        fatG.value = roundG(f);
         caloriesAdjustedByLocks.value = false;
     }
     function applyPresetMacros(preset: MacroPresetId, T?: number) {
         const cal = T ?? calorieTarget.value;
         const { p, c, f } = PRESET_CAL_PCTS[preset];
         const t = Math.max(0, cal);
-        proteinG.value = roundG((t * (p / 100)) / 4);
-        carbsG.value = roundG((t * (c / 100)) / 4);
-        fatG.value = roundG((t * (f / 100)) / 9);
         calorieTarget.value = Math.round(t);
+        const lockedK =
+            (lockProtein.value ? 4 * proteinG.value : 0) +
+            (lockCarbs.value ? 4 * carbsG.value : 0) +
+            (lockFat.value ? 9 * fatG.value : 0);
+        if (lockedK > t + EPS) {
+            caloriesAdjustedByLocks.value = true;
+            return;
+        }
+        const unlocked = [
+            { macro: 'p' as const, pct: p },
+            { macro: 'c' as const, pct: c },
+            { macro: 'f' as const, pct: f },
+        ].filter(({ macro }) => {
+            if (macro === 'p') return !lockProtein.value;
+            if (macro === 'c') return !lockCarbs.value;
+            return !lockFat.value;
+        });
+        if (unlocked.length === 0) {
+            caloriesAdjustedByLocks.value =
+                Math.abs(macroCaloriesTotal.value - t) > EPS;
+            return;
+        }
+        const pctTotal = unlocked.reduce((sum, item) => sum + item.pct, 0);
+        const rem = t - lockedK;
+        for (const item of unlocked) {
+            const share = pctTotal > EPS ? item.pct / pctTotal : 1 / unlocked.length;
+            if (item.macro === 'p') proteinG.value = roundG((rem * share) / 4);
+            if (item.macro === 'c') carbsG.value = roundG((rem * share) / 4);
+            if (item.macro === 'f') fatG.value = roundG((rem * share) / 9);
+        }
         caloriesAdjustedByLocks.value = false;
     }
     const proteinCalPct = computed(() => {
@@ -267,6 +334,101 @@ export function useMacroSliders(initial?: {
         if (lbs <= 0) return 0;
         return Math.round(lbs * mult * 10) / 10;
     }
+    function applyProteinFromBodyWeight(weightLbs: number) {
+        if (weightLbs <= 0) return;
+        const grams = proteinGramsFromGPerLb(weightLbs, proteinGPerLb.value);
+        applyResult(
+            redistributeMacros(
+                calorieTarget.value,
+                proteinG.value,
+                carbsG.value,
+                fatG.value,
+                false,
+                lockCarbs.value,
+                lockFat.value,
+                'p',
+                grams,
+            ),
+        );
+    }
+    function maxProteinG() {
+        return maxGramsForMacro(
+            'p',
+            calorieTarget.value,
+            proteinG.value,
+            carbsG.value,
+            fatG.value,
+            lockProtein.value,
+            lockCarbs.value,
+            lockFat.value,
+        );
+    }
+    function maxCarbsG() {
+        return maxGramsForMacro(
+            'c',
+            calorieTarget.value,
+            proteinG.value,
+            carbsG.value,
+            fatG.value,
+            lockProtein.value,
+            lockCarbs.value,
+            lockFat.value,
+        );
+    }
+    function maxFatG() {
+        return maxGramsForMacro(
+            'f',
+            calorieTarget.value,
+            proteinG.value,
+            carbsG.value,
+            fatG.value,
+            lockProtein.value,
+            lockCarbs.value,
+            lockFat.value,
+        );
+    }
+    function minGramsForMacro(macro: MacroDriver) {
+        const unlockedCount = [
+            !lockProtein.value,
+            !lockCarbs.value,
+            !lockFat.value,
+        ].filter(Boolean).length;
+        if (unlockedCount !== 1) return 0;
+        if (macro === 'p' && lockProtein.value) return 0;
+        if (macro === 'c' && lockCarbs.value) return 0;
+        if (macro === 'f' && lockFat.value) return 0;
+        return maxGramsForMacro(
+            macro,
+            calorieTarget.value,
+            proteinG.value,
+            carbsG.value,
+            fatG.value,
+            lockProtein.value,
+            lockCarbs.value,
+            lockFat.value,
+        );
+    }
+    function minProteinG() {
+        return minGramsForMacro('p');
+    }
+    function minCarbsG() {
+        return minGramsForMacro('c');
+    }
+    function minFatG() {
+        return minGramsForMacro('f');
+    }
+    const lockedMacroCalories = computed(() => {
+        let k = 0;
+        if (lockProtein.value) k += 4 * proteinG.value;
+        if (lockCarbs.value) k += 4 * carbsG.value;
+        if (lockFat.value) k += 9 * fatG.value;
+        return k;
+    });
+    const lockConflict = computed(
+        () =>
+            lockedMacroCalories.value >
+            calorieTarget.value + EPS,
+    );
     return {
         calorieTarget,
         proteinG,
@@ -276,7 +438,10 @@ export function useMacroSliders(initial?: {
         lockProtein,
         lockCarbs,
         lockFat,
+        proteinGPerLb,
         caloriesAdjustedByLocks,
+        lockConflict,
+        lockedMacroCalories,
         proteinCalPct,
         carbsCalPct,
         fatCalPct,
@@ -288,6 +453,13 @@ export function useMacroSliders(initial?: {
         setCalorieTarget,
         applyPresetMacros,
         proteinGramsFromGPerLb,
+        applyProteinFromBodyWeight,
+        minProteinG,
+        minCarbsG,
+        minFatG,
+        maxProteinG,
+        maxCarbsG,
+        maxFatG,
         presetLabels: {
             balanced: 'Balanced',
             high_protein: 'High protein',

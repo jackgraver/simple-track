@@ -1,34 +1,53 @@
 <script setup lang="ts">
-import { Lock, Unlock } from 'lucide-vue-next';
-import { computed } from 'vue';
+import { Lock, Unlock } from "lucide-vue-next";
+import { computed } from "vue";
 
 const props = defineProps<{
     label: string;
     grams: number;
+    minGrams?: number;
     maxGrams: number;
+    displayMaxGrams: number;
     pct: number;
     locked: boolean;
+    readonly?: boolean;
     trackBgClass: string;
     markerGrams?: number[];
 }>();
 
 const emit = defineEmits<{
-    'update:grams': [v: number];
+    "update:grams": [v: number];
     toggleLock: [];
 }>();
 
-const maxSafe = computed(() => Math.max(1, props.maxGrams));
+const minSafe = computed(() => Math.max(0, props.minGrams ?? 0));
+const maxSafe = computed(() => Math.max(minSafe.value, props.maxGrams, 0));
+const displayMax = computed(() => Math.max(1, props.displayMaxGrams));
+const inputDisabled = computed(() => props.locked || props.readonly);
+const trackFillPct = computed(() =>
+    Math.min(100, Math.max(0, (props.grams / displayMax.value) * 100)),
+);
+const clampGrams = (v: number) =>
+    Math.min(maxSafe.value, Math.max(minSafe.value, v));
 
 function onRangeInput(e: Event) {
-    emit('update:grams', Number((e.target as HTMLInputElement).value) || 0);
+    if (inputDisabled.value) return;
+    emit(
+        "update:grams",
+        clampGrams(Number((e.target as HTMLInputElement).value) || 0),
+    );
 }
 
 function onNumberInput(e: Event) {
-    emit('update:grams', Number((e.target as HTMLInputElement).value) || 0);
+    if (inputDisabled.value) return;
+    emit(
+        "update:grams",
+        clampGrams(Number((e.target as HTMLInputElement).value) || 0),
+    );
 }
 
 const markerStyles = computed(() => {
-    const max = maxSafe.value;
+    const max = displayMax.value;
     const markers = props.markerGrams ?? [];
     return markers
         .filter((g) => g > 0 && g <= max)
@@ -43,6 +62,12 @@ const markerStyles = computed(() => {
         <div class="flex flex-wrap items-center justify-between gap-2">
             <span class="text-sm font-medium text-zinc-300">{{ label }}</span>
             <div class="flex items-center gap-2">
+                <span
+                    v-if="readonly"
+                    class="rounded-full border border-zinc-700 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-zinc-500"
+                >
+                    Fixed
+                </span>
                 <span class="text-xs tabular-nums text-zinc-500"
                     >{{ Math.round(pct * 10) / 10 }}% kcal</span
                 >
@@ -57,44 +82,56 @@ const markerStyles = computed(() => {
                 </button>
             </div>
         </div>
-        <div class="relative pt-1 pb-1">
+        <div class="relative h-5">
             <div
-                class="pointer-events-none absolute inset-x-0 top-2 h-2 rounded-full bg-zinc-800"
+                class="pointer-events-none absolute inset-x-0 top-1/2 h-2 -translate-y-1/2 rounded-full bg-zinc-800"
             />
             <div
-                class="pointer-events-none absolute top-2 h-2 rounded-l-full"
+                class="pointer-events-none absolute left-0 top-1/2 h-2 -translate-y-1/2 rounded-l-full"
                 :class="trackBgClass"
-                :style="{ width: `${(grams / maxSafe) * 100}%` }"
+                :style="{ width: `${trackFillPct}%` }"
             />
             <span
                 v-for="(m, i) in markerStyles"
                 :key="i"
-                class="pointer-events-none absolute top-1 h-4 w-0.5 -translate-x-1/2 bg-zinc-100/80"
+                class="pointer-events-none absolute top-1/2 h-4 w-0.5 -translate-x-1/2 -translate-y-1/2 bg-zinc-100/80"
                 :style="{ left: m.left }"
+            />
+            <span
+                class="pointer-events-none absolute top-1/2 z-20 size-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-zinc-600 bg-zinc-50"
+                :class="inputDisabled ? 'opacity-60' : ''"
+                :style="{ left: `${trackFillPct}%` }"
             />
             <input
                 type="range"
-                class="macro-slider-input relative z-10 h-2 w-full cursor-pointer appearance-none bg-transparent"
-                :min="0"
-                :max="maxSafe"
+                class="absolute inset-x-0 top-0 z-10 h-5 w-full appearance-none bg-transparent opacity-0"
+                :class="inputDisabled ? 'cursor-not-allowed' : 'cursor-pointer'"
+                min="0"
+                :max="displayMax"
                 step="0.1"
                 :value="grams"
+                :disabled="inputDisabled"
                 @input="onRangeInput"
             />
         </div>
         <input
             type="number"
-            min="0"
-            :max="maxGrams"
+            :min="minSafe"
+            :max="maxSafe"
             step="0.1"
             :value="grams"
-            class="max-w-28 rounded-md border border-zinc-600 bg-zinc-900 px-2 py-1 text-sm text-zinc-100"
+            :disabled="inputDisabled"
+            class="max-w-28 rounded-md border border-zinc-600 bg-zinc-900 px-2 py-1 text-sm text-zinc-100 disabled:cursor-not-allowed disabled:opacity-60"
             @input="onNumberInput"
         />
     </div>
 </template>
 
 <style scoped>
+.macro-slider-input::-webkit-slider-runnable-track {
+    height: 8px;
+    background: transparent;
+}
 .macro-slider-input::-webkit-slider-thumb {
     appearance: none;
     height: 14px;
@@ -102,6 +139,11 @@ const markerStyles = computed(() => {
     border-radius: 9999px;
     background: #fafafa;
     border: 2px solid #52525b;
+}
+.macro-slider-input::-moz-range-track,
+.macro-slider-input::-moz-range-progress {
+    height: 8px;
+    background: transparent;
 }
 .macro-slider-input::-moz-range-thumb {
     height: 14px;
