@@ -1,10 +1,14 @@
 <script setup lang="ts">
+import { computed } from "vue";
 import { useMacroBarAnimation } from "./useMacroBarAnimation";
 import {
     calcWidth,
     determineOverflow,
     formatInt,
+    formatPercentage,
     macroFillClass,
+    percentageColorClass,
+    calcPercentage,
     type MacroBarNutrientType,
     typeLabels,
 } from "./useMacroBarStyling";
@@ -19,14 +23,24 @@ const props = defineProps<{
 }>();
 
 const { displayTotal } = useMacroBarAnimation(() => props.total ?? 0);
+const percentageValue = computed(() =>
+    calcPercentage(props.total, props.planned),
+);
+const percentage = computed(() => formatPercentage(props.total, props.planned));
+const percentageClass = computed(() =>
+    percentageColorClass(percentageValue.value),
+);
 </script>
 
 <template>
     <div class="flex min-w-0 flex-1 flex-col">
         <div
-            class="mb-0.5 pl-0.5 text-[0.65rem] font-semibold uppercase leading-[1.15] tracking-[0.02em] text-textSecondary"
+            class="mb-0.5 pl-0.5 text-[0.65rem] font-semibold uppercase leading-[1.15] tracking-[0.02em] text-textSecondary flex items-center gap-1"
         >
-            {{ typeLabels[type] }}
+            <span> {{ typeLabels[type] }} </span>
+            <span v-if="percentage" :class="percentageClass">
+                {{ percentage }}
+            </span>
         </div>
         <div class="flex-1 rounded border border-solid border-secondBg">
             <div

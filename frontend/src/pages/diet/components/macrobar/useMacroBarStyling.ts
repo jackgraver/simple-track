@@ -17,6 +17,24 @@ export function calcWidth(total: number, planned: number): number {
     return Math.min(100, (total / planned) * 100);
 }
 
+export function calcPercentage(total: number, planned: number): number | null {
+    if (!planned || Number.isNaN(total)) return null;
+    return Math.round((total / planned) * 100);
+}
+
+export function formatPercentage(total: number, planned: number): string {
+    const percent = calcPercentage(total, planned);
+    return percent == null ? "" : `(${percent}%)`;
+}
+
+export function percentageColorClass(percent: number | null): string {
+    if (percent == null) return "";
+    if (percent >= 105) return "text-(--color-cf-red)";
+    if (percent >= 95) return "text-green-600";
+    if (percent >= 85) return "text-green-400";
+    return "";
+}
+
 export function determineOverflow(
     total: number,
     planned: number,
