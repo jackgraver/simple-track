@@ -110,21 +110,21 @@ function applyTdeeCalories(n: number) {
             {{ loadError.message }}
         </div>
         <template v-else>
-            <div class="grid grid-cols-1 items-start gap-5 md:grid-cols-2">
-                <section
-                    class="flex flex-col gap-3 rounded-lg border border-zinc-700 bg-zinc-950/40 p-4"
-                >
-                    <h2 class="m-0 text-sm font-medium text-zinc-200">
-                        TDEE Estimate
-                    </h2>
-                    <TDEECalculator
-                        :bmr="bmr"
-                        :tdee="tdee"
-                        :multiplier="multiplier"
-                        @apply-calories="applyTdeeCalories"
-                    />
-                </section>
-            </div>
+            <section
+                class="flex flex-col gap-3 rounded-lg border border-zinc-700 bg-zinc-950/40 p-4"
+            >
+                <h2 class="m-0 text-sm font-medium text-zinc-200">
+                    TDEE Estimate (for {{ weightLbs }} lbs,
+                    {{ heightIn }} inches, {{ age }} years old,
+                    {{ sex }} and Moderately Active)
+                </h2>
+                <TDEECalculator
+                    :bmr="bmr"
+                    :tdee="tdee"
+                    :multiplier="multiplier"
+                    @apply-calories="applyTdeeCalories"
+                />
+            </section>
             <section
                 class="flex flex-col gap-3 rounded-lg border border-zinc-700 bg-zinc-950/40 p-4"
             >
