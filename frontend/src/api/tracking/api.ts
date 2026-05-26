@@ -17,9 +17,11 @@ export async function saveProfile(body: {
     height_in: number;
     age: number;
     sex: 'male' | 'female';
-    activity_level: UserProfile['activity_level'];
 }): Promise<UserProfile> {
-    const res = await apiPUT<{ profile: UserProfile }>('/tracking/profile', body);
+    const res = await apiPUT<{ profile: UserProfile }>('/tracking/profile', {
+        ...body,
+        activity_level: 'moderately_active',
+    });
     return res.profile;
 }
 

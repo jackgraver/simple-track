@@ -7,15 +7,40 @@ import {
     deleteWater,
     fetchDrinkSizePresets,
     fetchMissedTracking,
+    fetchProfile,
     fetchStepLogs,
     fetchWaterLogs,
     fetchWeightLogs,
+    saveProfile,
     saveSteps,
     saveWater,
     saveWeight,
     updateDrinkSizePreset,
 } from "~/api/tracking/api";
+import type { BodyWeightLog } from "~/api/tracking/types";
 import { trackingKeys } from "~/api/tracking/keys";
+
+export function latestWeightLbs(logs: BodyWeightLog[] | undefined): number | null {
+    const first = logs?.[0];
+    return first != null && first.weight_lbs > 0 ? first.weight_lbs : null;
+}
+
+export function useProfile() {
+    return useQuery({
+        queryKey: trackingKeys.profile,
+        queryFn: fetchProfile,
+    });
+}
+
+export function useSaveProfile() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: saveProfile,
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: trackingKeys.profile });
+        },
+    });
+}
 
 export function useWeightLogs() {
     return useQuery({
