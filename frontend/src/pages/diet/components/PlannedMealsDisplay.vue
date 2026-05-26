@@ -127,40 +127,40 @@ function prev() {
 
 <template>
     <div ref="containerRef" class="flex min-w-0 flex-1 flex-col gap-2 pt-2">
-        <div class="flex flex-row items-center justify-between gap-2">
+        <div class="flex h-9 items-center justify-between gap-2">
             <div class="flex min-w-0 flex-1 items-center gap-2">
-                <h2 class="mb-0 flex-1 text-lg font-semibold">
+                <h2 class="m-0 min-w-0 flex-1 text-base font-semibold leading-none">
                     Planned ({{ sortedPlannedMeals.length }})
                 </h2>
                 <button
                     type="button"
-                    class="flex items-center gap-1 rounded-md border px-2 py-1 m-0! text-sm font-medium text-zinc-200"
+                    class="inline-flex h-7 shrink-0 items-center gap-1 rounded-md border px-2 m-0! text-sm font-medium leading-none text-zinc-200 shadow-none!"
                     @click="editPlannedMeal"
                 >
-                    <Pencil :size="15" />
+                    <Pencil :size="14" />
                     Edit
                 </button>
             </div>
-            <template v-if="data && showChevrons">
+            <div v-if="data && showChevrons" class="flex shrink-0 items-center">
                 <button
                     type="button"
                     :disabled="start === 0"
-                    class="shrink-0 disabled:text-zinc-500"
+                    class="inline-flex size-9 items-center justify-center p-0! m-0! shadow-none! disabled:text-zinc-500"
                     aria-label="Previous"
                     @click="prev"
                 >
-                    <ChevronUp />
+                    <ChevronUp class="size-6" />
                 </button>
                 <button
                     type="button"
                     :disabled="start >= sortedPlannedMeals.length - maxVisible"
-                    class="shrink-0 disabled:text-zinc-500"
+                    class="inline-flex size-9 items-center justify-center p-0! m-0! shadow-none! disabled:text-zinc-500"
                     aria-label="Next"
                     @click="next"
                 >
-                    <ChevronDown />
+                    <ChevronDown class="size-6" />
                 </button>
-            </template>
+            </div>
         </div>
         <template v-if="data">
             <span v-if="visibleItems?.length === 0" class="text-zinc-500"

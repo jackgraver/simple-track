@@ -28,10 +28,7 @@ function onMediaChange(e: MediaQueryListEvent | MediaQueryList) {
 function checkOverflow() {
     if (isMobile.value || !containerRef.value) return;
     const bottom = containerRef.value.getBoundingClientRect().bottom;
-    if (
-        bottom > window.innerHeight - BOTTOM_PADDING &&
-        maxVisible.value > 1
-    ) {
+    if (bottom > window.innerHeight - BOTTOM_PADDING && maxVisible.value > 1) {
         maxVisible.value--;
     }
 }
@@ -42,8 +39,7 @@ function recalcMaxVisible() {
     const available = window.innerHeight - top - BOTTOM_PADDING;
     const estimated = Math.max(1, Math.floor(available / CARD_HEIGHT_ESTIMATE));
     const len = (data.value?.day.loggedMeals ?? []).length;
-    maxVisible.value =
-        len > 0 ? Math.min(estimated, len) : estimated;
+    maxVisible.value = len > 0 ? Math.min(estimated, len) : estimated;
     void nextTick(() => {
         checkOverflow();
     });
@@ -108,37 +104,41 @@ function prev() {
 
 <template>
     <div ref="containerRef" class="flex min-w-0 flex-1 flex-col gap-2 pt-2">
-        <div class="flex flex-row items-center justify-between gap-2">
-            <h2 class="mb-0 flex-1 text-lg font-semibold">
-                Logged ({{ loggedMeals.length }})
-            </h2>
-            <template v-if="data && showChevrons">
+        <div class="flex h-9 items-center justify-between gap-2">
+            <div class="flex min-w-0 flex-1 items-center gap-2">
+                <h2
+                    class="m-0 min-w-0 flex-1 text-base font-semibold leading-none"
+                >
+                    Logged ({{ loggedMeals.length }})
+                </h2>
+            </div>
+            <!-- <div v-if="data && showChevrons" class="flex shrink-0 items-center">
                 <button
                     type="button"
                     :disabled="start === 0"
-                    class="shrink-0 disabled:text-zinc-500"
+                    class="inline-flex size-9 items-center justify-center p-0! m-0! shadow-none! disabled:text-zinc-500"
                     aria-label="Previous"
                     @click="prev"
                 >
-                    <ChevronUp />
+                    <ChevronUp class="size-6" />
                 </button>
                 <button
                     type="button"
                     :disabled="start >= loggedMeals.length - maxVisible"
-                    class="shrink-0 disabled:text-zinc-500"
+                    class="inline-flex size-9 items-center justify-center p-0! m-0! shadow-none! disabled:text-zinc-500"
                     aria-label="Next"
                     @click="next"
                 >
-                    <ChevronDown />
+                    <ChevronDown class="size-6" />
                 </button>
-            </template>
+            </div> -->
         </div>
         <template v-if="data">
             <span v-if="loggedMeals.length === 0" class="text-zinc-500"
                 >Nothing logged yet.</span
             >
             <MealCard
-                v-for="log in visibleItems"
+                v-for="log in loggedMeals"
                 :key="log.ID"
                 :meal="log.meal"
                 :on-log-planned="logPlannedMeal"
