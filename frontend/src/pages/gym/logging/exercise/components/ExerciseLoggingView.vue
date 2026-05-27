@@ -10,7 +10,7 @@ import {
 import { pickBestLoggedSet } from "../domain/loggedSetDefaults";
 import LoggingHeader from "./LoggingHeader.vue";
 import LoggedSetsList from "./LoggedSetsList.vue";
-import NumericStepper from "./NumericStepper.vue";
+import NumberSlider from "./NumberSlider.vue";
 import { useGlobalRestTimer } from "~/composables/useGlobalRestTimer";
 import { computed, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
@@ -163,19 +163,20 @@ const editCues = async () => {
             </template>
         </LoggingHeader>
         <div class="input-group">
-            <NumericStepper
+            <NumberSlider
                 label="Weight (lbs)"
                 :model-value="session.currentWeight"
                 :hint="repRolloverWeightHint"
-                input-step="0.5"
-                :step-with="session.stepWeight"
+                :step="2.5"
+                :max="500"
                 @update:model-value="session.commitWeightFromInput"
             />
-            <NumericStepper
+            <NumberSlider
                 label="Reps"
                 :model-value="session.currentReps"
                 integer-only
-                :step-with="session.stepReps"
+                :step="1"
+                :max="50"
                 @update:model-value="session.commitRepsFromInput"
             />
             <div class="input-container">
