@@ -8,11 +8,14 @@ const props = defineProps<{
     minGrams?: number;
     maxGrams: number;
     displayMaxGrams: number;
-    pct: number;
-    locked: boolean;
+    pct?: number;
+    locked?: boolean;
     readonly?: boolean;
     trackBgClass: string;
     markerGrams?: number[];
+    hideLock?: boolean;
+    statText?: string;
+    statClass?: string;
 }>();
 
 const emit = defineEmits<{
@@ -70,10 +73,17 @@ const markerStyles = computed(() => {
                 >
                     Fixed
                 </span>
-                <span class="text-xs tabular-nums text-zinc-500"
-                    >{{ Math.round(pct * 10) / 10 }}% kcal</span
+                <span
+                    v-if="statText !== undefined"
+                    class="text-xs font-medium"
+                    :class="statClass"
+                    >{{ statText }}</span
+                >
+                <span v-else class="text-xs tabular-nums text-zinc-500"
+                    >{{ Math.round((pct ?? 0) * 10) / 10 }}% kcal</span
                 >
                 <button
+                    v-if="!hideLock"
                     type="button"
                     class="rounded p-1 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200"
                     :aria-pressed="locked"

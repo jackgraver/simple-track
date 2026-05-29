@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import Chart from "primevue/chart";
 import type { MacroSlidersApi } from "../useMacroSliders";
 import MacroSlider from "./MacroSlider.vue";
 import MacroToWeightRatio from "./MacroToWeightRatio.vue";
@@ -148,35 +147,18 @@ function fillRemainingCarbs() {
 
 <template>
     <div class="flex flex-col gap-4">
-        <div
-            class="grid gap-3 rounded-lg sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end"
-        >
-            <label class="flex max-w-56 flex-col gap-1">
-                <div class="flex items-center gap-2">
-                    <span class="text-sm font-medium text-zinc-400"
-                        >Calorie target</span
-                    >
-                    <span
-                        :class="calorieDeltaClass"
-                        class="text-xs font-medium"
-                        >{{ calorieDeltaLabel }}</span
-                    >
-                </div>
-                <input
-                    :value="sliders.calorieTarget.value"
-                    type="number"
-                    min="0"
-                    step="1"
-                    class="rounded-md border border-zinc-600 bg-zinc-900 px-3 py-1.5 text-sm text-zinc-100 outline-none ring-amber-700/40 focus:border-amber-600 focus:ring-2"
-                    @input="
-                        sliders.setCalorieTarget(
-                            Number(($event.target as HTMLInputElement).value) ||
-                                0,
-                        )
-                    "
-                />
-            </label>
-        </div>
+        <MacroSlider
+            label="Calorie target"
+            :grams="sliders.calorieTarget.value"
+            :min-grams="0"
+            :max-grams="5000"
+            :display-max-grams="5000"
+            track-bg-class="bg-amber-500/70"
+            hide-lock
+            :stat-text="calorieDeltaLabel"
+            :stat-class="calorieDeltaClass"
+            @update:grams="sliders.setCalorieTarget"
+        />
         <div class="grid grid-cols-1 gap-4 md:grid-cols-[1fr_10rem]">
             <div class="flex flex-col gap-4">
                 <div class="flex flex-col gap-2">
@@ -200,6 +182,29 @@ function fillRemainingCarbs() {
                         label="Protein"
                         :weight="weightLbs"
                         @set-ratio="applyProteinFromWeight"
+                    />
+                </div>
+
+                <div class="flex flex-col gap-2">
+                    <MacroSlider
+                        label="Fat (g)"
+                        :grams="sliders.fatG.value"
+                        :min-grams="minF"
+                        :max-grams="maxF"
+                        :display-max-grams="displayMaxF"
+                        :pct="sliders.fatCalPct.value"
+                        :locked="sliders.lockFat.value"
+                        track-bg-class="bg-[#a855f7]/70"
+                        :marker-grams="fatMarkers"
+                        @update:grams="sliders.setFatG"
+                        @toggle-lock="
+                            sliders.lockFat.value = !sliders.lockFat.value
+                        "
+                    />
+                    <MacroToWeightRatio
+                        label="Fat"
+                        :weight="weightLbs"
+                        @set-ratio="applyFatFromWeight"
                     />
                 </div>
                 <div class="flex flex-col gap-2">
@@ -278,42 +283,6 @@ function fillRemainingCarbs() {
                             }}g.
                         </p>
                     </div>
-                </div>
-                <div class="flex flex-col gap-2">
-                    <MacroSlider
-                        label="Fat (g)"
-                        :grams="sliders.fatG.value"
-                        :min-grams="minF"
-                        :max-grams="maxF"
-                        :display-max-grams="displayMaxF"
-                        :pct="sliders.fatCalPct.value"
-                        :locked="sliders.lockFat.value"
-                        track-bg-class="bg-[#a855f7]/70"
-                        :marker-grams="fatMarkers"
-                        @update:grams="sliders.setFatG"
-                        @toggle-lock="
-                            sliders.lockFat.value = !sliders.lockFat.value
-                        "
-                    />
-                    <MacroToWeightRatio
-                        label="Fat"
-                        :weight="weightLbs"
-                        @set-ratio="applyFatFromWeight"
-                    />
-                </div>
-            </div>
-            <div class="flex flex-col items-center gap-2 pt-2 md:pt-0">
-                <div class="h-36 w-36">
-                    <Chart
-                        type="doughnut"
-                        :data="chartData"
-                        :options="chartOptions"
-                        class="h-full w-full"
-                    />
-                </div>
-                <div class="text-center text-xs text-zinc-500">
-                    {{ sliders.proteinG.value }}g P /
-                    {{ sliders.carbsG.value }}g C / {{ sliders.fatG.value }}g F
                 </div>
             </div>
         </div>
