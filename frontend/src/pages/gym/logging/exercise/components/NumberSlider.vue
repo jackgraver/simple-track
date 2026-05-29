@@ -31,7 +31,9 @@ const tickValues = computed(() => {
     const values: number[] = [];
     for (let i = 0; i <= count; i++) {
         const raw = props.min + i * step;
-        const v = props.integerOnly ? Math.round(raw) : Math.round(raw * 100) / 100;
+        const v = props.integerOnly
+            ? Math.round(raw)
+            : Math.round(raw * 100) / 100;
         values.push(v);
     }
     return values;
@@ -177,10 +179,15 @@ const onTickClick = (index: number) => {
                     v-for="(tick, index) in tickValues"
                     :key="index"
                     type="button"
-                    class="flex h-full shrink-0 snap-center flex-col items-center justify-end gap-1 border-0 bg-transparent p-0 text-inherit"
-                    :style="{ width: `${TICK_WIDTH_PX}px`, scrollSnapAlign: 'center' }"
+                    class="flex h-full shrink-0 snap-center flex-col items-center justify-end gap-1 border-0 bg-transparent! shadow-none! p-0 text-inherit"
+                    :style="{
+                        width: `${TICK_WIDTH_PX}px`,
+                        scrollSnapAlign: 'center',
+                    }"
                     :aria-label="formatValue(tick)"
-                    :aria-current="index === valueToIndex(model || 0) ? 'true' : undefined"
+                    :aria-current="
+                        index === valueToIndex(model || 0) ? 'true' : undefined
+                    "
                     @click="onTickClick(index)"
                 >
                     <span
@@ -200,7 +207,8 @@ const onTickClick = (index: number) => {
                     </span>
                     <span
                         class="h-[0.85rem] text-[0.65rem] leading-none text-[rgb(120,120,120)] tabular-nums"
-                    >{{ tickLabel(tick, index) || "\u00a0" }}</span>
+                        >{{ tickLabel(tick, index) || "\u00a0" }}</span
+                    >
                 </button>
                 <div
                     class="shrink-0"

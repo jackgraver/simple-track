@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import type { Cardio, PlannedCardio } from "~/types/workout";
 import LoggingHeader from "./LoggingHeader.vue";
-import NumericStepper from "./NumericStepper.vue";
 import { ref, watch, computed } from "vue";
 import { useWorkoutStore } from "../../store/useWorkoutStore";
 import { useLoggingRouteContext } from "../../composables/useLoggingRouteContext";
 import { toast } from "~/composables/toast/useToast";
+import NumberSlider from "./NumberSlider.vue";
 
 const props = defineProps<{
     plannedCardio: PlannedCardio | null;
@@ -20,7 +20,7 @@ const cardioName = computed(
 
 const isLogged = computed(() => (props.loggedCardio?.minutes ?? 0) > 0);
 
-const currentMinutes = ref(0);
+const currentMinutes = ref(25);
 const notes = ref("");
 
 const error = ref("");
@@ -62,10 +62,14 @@ const finish = async () => {
             </template>
         </LoggingHeader>
         <div class="input-group">
-            <NumericStepper
+            <NumberSlider
                 label="Time (minutes)"
                 :model-value="currentMinutes"
                 round-to-integer
+                :min="0"
+                :max="100"
+                :step="1"
+                integer-only
                 :error="error"
                 @update:model-value="onMinutesUpdate"
             />
