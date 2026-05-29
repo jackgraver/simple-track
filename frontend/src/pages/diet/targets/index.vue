@@ -28,6 +28,10 @@ const { data: weightLogs, isPending: weightPending } = useWeightLogs();
 const latestLogWeightLbs = computed(() => latestWeightLbs(weightLogs.value));
 const weightLbs = computed(() => latestLogWeightLbs.value ?? 0);
 const heightIn = computed(() => profile.value?.height_in ?? 0);
+const heightFtIn = computed(() => {
+    const total = Math.round(heightIn.value);
+    return `${Math.floor(total / 12)}'${total % 12}"`;
+});
 const age = computed(() => profile.value?.age ?? 0);
 const sex = computed(() => profile.value?.sex ?? "male");
 
@@ -36,11 +40,13 @@ watch(
     () => dayData.value?.day.plan,
     (plan) => {
         if (!plan) return;
-        sliders.calorieTarget.value = plan.calories;
-        sliders.proteinG.value = plan.protein;
-        sliders.carbsG.value = plan.carbs;
-        sliders.fatG.value = plan.fat ?? 0;
-        sliders.fiberG.value = plan.fiber;
+        sliders.setMacroTargets({
+            calories: plan.calories,
+            protein: plan.protein,
+            carbs: plan.carbs,
+            fat: plan.fat ?? 0,
+            fiber: plan.fiber,
+        });
     },
     { immediate: true },
 );
@@ -113,11 +119,17 @@ function applyTdeeCalories(n: number) {
             <section
                 class="flex flex-col gap-3 rounded-lg border border-zinc-700 bg-zinc-950/40 p-4"
             >
-                <h2 class="m-0 text-sm font-medium text-zinc-200">
-                    TDEE Estimate (for {{ weightLbs }} lbs,
-                    {{ heightIn }} inches, {{ age }} years old,
-                    {{ sex }} and Moderately Active)
-                </h2>
+                <div
+                    class="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1"
+                >
+                    <h2 class="m-0 text-sm font-medium text-zinc-200">
+                        TDEE estimate
+                    </h2>
+                    <span class="text-xs text-zinc-500"
+                        >{{ weightLbs }} lb · {{ heightFtIn }} · {{ age }} yr ·
+                        {{ sex }}</span
+                    >
+                </div>
                 <TDEECalculator
                     :bmr="bmr"
                     :tdee="tdee"
@@ -131,15 +143,14 @@ function applyTdeeCalories(n: number) {
                 <h2 class="m-0 text-sm font-medium text-zinc-200">Macros</h2>
                 <MacroSlidersPanel :sliders="sliders" :weight-lbs="weightLbs" />
             </section>
-            <form @submit.prevent="submit">
-                <button
-                    type="submit"
-                    class="w-full rounded-md border border-amber-700/50 bg-amber-950/40 px-4 py-2.5 text-sm font-semibold text-amber-100 transition-colors hover:bg-amber-950/70 disabled:opacity-50"
-                    :disabled="saving || planId == null || !macrosValid"
-                >
-                    {{ saving ? "Saving…" : "Save targets" }}
-                </button>
-            </form>
+            <button
+                type="button"
+                class="w-full rounded-md border border-amber-700/50 bg-amber-950/40 px-4 py-2.5 text-sm font-semibold text-amber-100 transition-colors hover:bg-amber-950/70 disabled:opacity-50"
+                :disabled="saving || planId == null || !macrosValid"
+                @click="submit"
+            >
+                {{ saving ? "Saving…" : "Save targets" }}
+            </button>
         </template>
     </div>
 </template>
