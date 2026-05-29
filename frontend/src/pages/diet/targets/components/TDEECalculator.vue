@@ -37,19 +37,13 @@ function apply() {
 <template>
     <div class="flex flex-col gap-3">
         <template v-if="bmr != null && tdee != null">
-            <div class="grid grid-cols-3 gap-2 rounded-md bg-zinc-900/60 px-3 py-2.5 text-center text-xs">
-                <div>
-                    <span class="text-zinc-500">BMR</span>
-                    <p class="m-0 text-sm tabular-nums font-medium text-zinc-200">{{ Math.round(bmr) }}</p>
-                </div>
-                <div>
-                    <span class="text-zinc-500">× {{ multiplier }}</span>
-                    <p class="m-0 text-sm text-zinc-400">&nbsp;</p>
-                </div>
-                <div>
-                    <span class="text-zinc-500">TDEE</span>
-                    <p class="m-0 text-sm tabular-nums font-semibold text-zinc-100">{{ Math.round(tdee) }}</p>
-                </div>
+            <div class="flex flex-wrap items-center justify-center gap-x-2 gap-y-1 rounded-md bg-zinc-900/60 px-3 py-2.5 text-sm">
+                <span class="text-zinc-500">BMR</span>
+                <span class="tabular-nums font-medium text-zinc-200">{{ Math.round(bmr) }}</span>
+                <span class="text-zinc-500">× {{ multiplier }}</span>
+                <span class="text-zinc-600">=</span>
+                <span class="text-zinc-500">TDEE</span>
+                <span class="tabular-nums font-semibold text-zinc-100">{{ Math.round(tdee) }}</span>
             </div>
             <div class="flex flex-col gap-2">
                 <span class="text-xs font-medium text-zinc-400">Goal</span>

@@ -21,7 +21,9 @@ const emit = defineEmits<{
 }>();
 
 const minSafe = computed(() => Math.max(0, props.minGrams ?? 0));
-const maxSafe = computed(() => Math.max(minSafe.value, props.maxGrams, 0));
+const maxSafe = computed(() =>
+    Math.max(minSafe.value, props.maxGrams, props.grams, 0),
+);
 const displayMax = computed(() => Math.max(1, props.displayMaxGrams));
 const inputDisabled = computed(() => props.locked || props.readonly);
 const trackFillPct = computed(() =>
@@ -108,7 +110,7 @@ const markerStyles = computed(() => {
                 :class="inputDisabled ? 'cursor-not-allowed' : 'cursor-pointer'"
                 min="0"
                 :max="displayMax"
-                step="0.1"
+                step="1"
                 :value="grams"
                 :disabled="inputDisabled"
                 @input="onRangeInput"
@@ -118,7 +120,7 @@ const markerStyles = computed(() => {
             type="number"
             :min="minSafe"
             :max="maxSafe"
-            step="0.1"
+            step="1"
             :value="grams"
             :disabled="inputDisabled"
             class="max-w-28 rounded-md border border-zinc-600 bg-zinc-900 px-2 py-1 text-sm text-zinc-100 disabled:cursor-not-allowed disabled:opacity-60"
