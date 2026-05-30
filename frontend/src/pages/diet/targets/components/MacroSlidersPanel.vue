@@ -223,66 +223,16 @@ function fillRemainingCarbs() {
                             sliders.lockCarbs.value = !sliders.lockCarbs.value
                         "
                     />
-                    <div class="flex flex-wrap items-center gap-2 pl-0.5">
-                        <span class="text-xs text-zinc-500">
-                            Remaining fill: {{ sliders.suggestedCarbsG.value }}g
-                        </span>
-                        <button
-                            v-if="carbsNeedsFill && !sliders.lockCarbs.value"
-                            type="button"
-                            class="rounded-md border border-zinc-600 px-2 py-1 text-xs font-medium text-zinc-300 hover:border-amber-600/60 hover:text-zinc-100"
-                            @click="fillRemainingCarbs"
-                        >
-                            Fill remaining
-                        </button>
-                    </div>
-                    <div
-                        class="rounded-md border border-zinc-800 bg-zinc-950/40 p-3"
-                    >
-                        <div class="mb-2 text-xs font-medium text-zinc-400">
-                            Carb breakdown
-                        </div>
-                        <div class="grid gap-2 sm:grid-cols-3">
-                            <div class="flex flex-col gap-0.5">
-                                <span
-                                    class="text-[11px] uppercase tracking-wide text-zinc-600"
-                                    >Total carbs</span
-                                >
-                                <span class="text-sm tabular-nums text-zinc-200"
-                                    >{{ sliders.carbsG.value }}g</span
-                                >
-                            </div>
-                            <div class="flex flex-col gap-0.5">
-                                <span
-                                    class="text-[11px] uppercase tracking-wide text-zinc-600"
-                                    >Fiber</span
-                                >
-                                <input
-                                    :value="sliders.fiberG.value"
-                                    type="number"
-                                    min="0"
-                                    :max="sliders.carbsG.value"
-                                    step="1"
-                                    class="max-w-24 rounded-md border border-zinc-600 bg-zinc-900 px-2 py-1 text-sm text-zinc-100 outline-none ring-amber-700/40 focus:border-amber-600 focus:ring-2"
-                                    @input="onFiberInput"
-                                />
-                            </div>
-                            <div class="flex flex-col gap-0.5">
-                                <span
-                                    class="text-[11px] uppercase tracking-wide text-zinc-600"
-                                    >Net carbs</span
-                                >
-                                <span class="text-sm tabular-nums text-zinc-200"
-                                    >{{ sliders.netCarbsG.value }}g</span
-                                >
-                            </div>
-                        </div>
-                        <p class="mb-0 mt-2 text-xs text-zinc-500">
-                            Net carbs = carbs − fiber. Suggested fiber ~{{
-                                sliders.suggestedFiber.value
-                            }}g.
-                        </p>
-                    </div>
+                    <span class="text-xs text-zinc-500">Fiber</span>
+                    <input
+                        :value="sliders.fiberG.value"
+                        type="number"
+                        min="0"
+                        :max="sliders.carbsG.value"
+                        step="1"
+                        class="max-w-24 rounded-md border border-zinc-600 bg-zinc-900 px-2 py-1 text-sm text-zinc-100 outline-none ring-amber-700/40 focus:border-amber-600 focus:ring-2"
+                        @input="onFiberInput"
+                    />
                 </div>
             </div>
         </div>
