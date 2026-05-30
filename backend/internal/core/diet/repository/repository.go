@@ -379,26 +379,42 @@ func calendarDayRange(t time.Time) (start, end time.Time) {
 	return start, end
 }
 
-func defaultPlanID() (uint, error) {
-	var plan models.Plan
-	if err := conn().Order("id ASC").First(&plan).Error; err != nil {
-		if !errors.Is(err, gorm.ErrRecordNotFound) {
-			return 0, err
-		}
-		p := models.Plan{
-			Name:     "Default",
-			Calories: 2000,
-			Protein:  150,
-			Fiber:    30,
-			Carbs:    200,
-			Fat:      65,
-		}
-		if err := conn().Create(&p).Error; err != nil {
-			return 0, err
-		}
-		return p.ID, nil
+func createDefaultPlan(db *gorm.DB) (models.Plan, error) {
+	p := models.Plan{
+		Name:     "Default",
+		Calories: 2000,
+		Protein:  150,
+		Fiber:    30,
+		Carbs:    200,
+		Fat:      65,
 	}
-	return plan.ID, nil
+	if err := db.Create(&p).Error; err != nil {
+		return models.Plan{}, err
+	}
+	return p, nil
+}
+
+func planForDate(db *gorm.DB, t time.Time) (models.Plan, error) {
+	start, _ := calendarDayRange(t)
+	var plan models.Plan
+	err := db.
+		Where("effective_from IS NOT NULL AND effective_from <= ?", start).
+		Order("effective_from DESC, id DESC").
+		First(&plan).Error
+	if err == nil {
+		return plan, nil
+	}
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return models.Plan{}, err
+	}
+
+	if err := db.Order("id ASC").First(&plan).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return createDefaultPlan(db)
+		}
+		return models.Plan{}, err
+	}
+	return plan, nil
 }
 
 // findOrCreateDietDayForCalendarDate returns a day row for the wall-clock calendar day of t (location from t).
@@ -413,7 +429,7 @@ func findOrCreateDietDayForCalendarDate(t time.Time) (models.DietDay, error) {
 		return models.DietDay{}, err
 	}
 
-	planID, err := defaultPlanID()
+	plan, err := planForDate(conn(), t)
 	if err != nil {
 		return models.DietDay{}, err
 	}
@@ -422,7 +438,7 @@ func findOrCreateDietDayForCalendarDate(t time.Time) (models.DietDay, error) {
 	atMidnight := time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, loc)
 	day = models.DietDay{
 		Date:   atMidnight,
-		PlanID: planID,
+		PlanID: plan.ID,
 	}
 	if err := conn().Create(&day).Error; err != nil {
 		if isUniqueConstraintError(err) {
@@ -647,22 +663,32 @@ func CompositeFoodByID(id uint) (*models.CompositeFood, error) {
 }
 
 func UpdatePlanMacros(id uint, calories, protein, fiber, carbs, fat float32) (*models.Plan, error) {
+	effectiveStart, _ := calendarDayRange(utils.ZerodTime(0))
 	var plan models.Plan
-	if err := conn().First(&plan, id).Error; err != nil {
-		return nil, err
-	}
-	plan.Calories = calories
-	plan.Protein = protein
-	plan.Fiber = fiber
-	plan.Carbs = carbs
-	plan.Fat = fat
-	if err := conn().Model(&plan).Updates(map[string]any{
-		"calories": calories,
-		"protein":  protein,
-		"fiber":    fiber,
-		"carbs":    carbs,
-		"fat":      fat,
-	}).Error; err != nil {
+
+	if err := conn().Transaction(func(tx *gorm.DB) error {
+		var basePlan models.Plan
+		if err := tx.First(&basePlan, id).Error; err != nil {
+			return err
+		}
+
+		plan = models.Plan{
+			Name:          basePlan.Name,
+			Calories:      calories,
+			Protein:       protein,
+			Fiber:         fiber,
+			Carbs:         carbs,
+			Fat:           fat,
+			EffectiveFrom: &effectiveStart,
+		}
+		if err := tx.Create(&plan).Error; err != nil {
+			return err
+		}
+
+		return tx.Model(&models.DietDay{}).
+			Where("date >= ?", effectiveStart).
+			Update("plan_id", plan.ID).Error
+	}); err != nil {
 		return nil, err
 	}
 	return &plan, nil
@@ -722,23 +748,9 @@ func findOrCreateDietDayForCalendarDateInTx(tx *gorm.DB, t time.Time) (models.Di
 	if !errors.Is(err, gorm.ErrRecordNotFound) {
 		return models.DietDay{}, err
 	}
-	var plan models.Plan
-	if err := tx.Order("id ASC").First(&plan).Error; err != nil {
-		if !errors.Is(err, gorm.ErrRecordNotFound) {
-			return models.DietDay{}, err
-		}
-		p := models.Plan{
-			Name:     "Default",
-			Calories: 2000,
-			Protein:  150,
-			Fiber:    30,
-			Carbs:    200,
-			Fat:      65,
-		}
-		if err := tx.Create(&p).Error; err != nil {
-			return models.DietDay{}, err
-		}
-		plan = p
+	plan, err := planForDate(tx, t)
+	if err != nil {
+		return models.DietDay{}, err
 	}
 	loc := t.Location()
 	atMidnight := time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, loc)

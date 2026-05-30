@@ -18,6 +18,7 @@ export interface Plan extends BaseModel {
     fiber: number;
     carbs: number;
     fat: number;
+    effective_from?: string;
 }
 
 export interface PlannedMeal extends BaseModel {

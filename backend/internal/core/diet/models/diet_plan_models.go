@@ -1,16 +1,21 @@
 package models
 
-import "gorm.io/gorm"
+import (
+	"time"
+
+	"gorm.io/gorm"
+)
 
 // Plan represents a diet plan
 type Plan struct {
 	gorm.Model
-	Name     string  `json:"name"`
-	Calories float32 `json:"calories"`
-	Protein  float32 `json:"protein"`
-	Fiber    float32 `json:"fiber"`
-	Carbs    float32 `json:"carbs"`
-	Fat      float32 `json:"fat"`
+	Name          string     `json:"name"`
+	Calories      float32    `json:"calories"`
+	Protein       float32    `json:"protein"`
+	Fiber         float32    `json:"fiber"`
+	Carbs         float32    `json:"carbs"`
+	Fat           float32    `json:"fat"`
+	EffectiveFrom *time.Time `json:"effective_from,omitempty" gorm:"index"`
 }
 
 func (p Plan) GetID() uint        { return p.ID }

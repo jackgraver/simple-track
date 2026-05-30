@@ -303,7 +303,7 @@ func TestEditAndQuickLogServices(t *testing.T) {
 	oldMeal := testutil.SeedMeal(t, db, "Old", food.ID, 1)
 	testutil.SeedDayLog(t, db, day.ID, oldMeal.ID)
 	if err := services.EditLoggedMeal(day.ID, oldMeal.ID, &models.Meal{
-		Name: "Edited",
+		Name:  "Edited",
 		Items: []models.MealItem{{FoodID: food.ID, Amount: 2}},
 	}); err != nil {
 		t.Fatal(err)
@@ -347,6 +347,74 @@ func TestGetAllPlans_andUpdatePlanMacros(t *testing.T) {
 	updated, err := services.UpdatePlanMacros(all.Data[0].ID, 2100, 160, 35, 180, 70)
 	if err != nil || updated.Calories != 2100 {
 		t.Fatalf("updated %+v err %v", updated, err)
+	}
+}
+
+func TestUpdatePlanMacrosCreatesPlanSnapshotForTodayForward(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	plan := testutil.SeedPlan(t, db, "P")
+	today := testutil.Today()
+	yesterday := testutil.SeedDay(t, db, today.AddDate(0, 0, -1), plan.ID)
+	todayDay := testutil.SeedDay(t, db, today, plan.ID)
+	tomorrow := testutil.SeedDay(t, db, today.AddDate(0, 0, 1), plan.ID)
+
+	updated, err := services.UpdatePlanMacros(plan.ID, 2100, 160, 35, 180, 70)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if updated.ID == plan.ID {
+		t.Fatal("expected a new plan snapshot")
+	}
+	if updated.EffectiveFrom == nil {
+		t.Fatal("expected new plan to have an effective date")
+	}
+
+	var oldPlan models.Plan
+	if err := db.First(&oldPlan, plan.ID).Error; err != nil {
+		t.Fatal(err)
+	}
+	if oldPlan.Calories != 2000 {
+		t.Fatalf("old plan was mutated: %+v", oldPlan)
+	}
+
+	var days []models.DietDay
+	if err := db.Order("date ASC").Find(&days).Error; err != nil {
+		t.Fatal(err)
+	}
+	if days[0].ID != yesterday.ID || days[0].PlanID != plan.ID {
+		t.Fatalf("yesterday should keep old plan, got %+v", days[0])
+	}
+	if days[1].ID != todayDay.ID || days[1].PlanID != updated.ID {
+		t.Fatalf("today should use new plan, got %+v", days[1])
+	}
+	if days[2].ID != tomorrow.ID || days[2].PlanID != updated.ID {
+		t.Fatalf("future days should use new plan, got %+v", days[2])
+	}
+}
+
+func TestFindMealPlanDayUsesPlanEffectiveForDate(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	plan := testutil.SeedPlan(t, db, "P")
+
+	updated, err := services.UpdatePlanMacros(plan.ID, 2100, 160, 35, 180, 70)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	yesterday, err := services.FindMealPlanDay(testutil.Today().AddDate(0, 0, -1))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if yesterday.PlanID != plan.ID {
+		t.Fatalf("missing past day should use old plan, got %d want %d", yesterday.PlanID, plan.ID)
+	}
+
+	tomorrow, err := services.FindMealPlanDay(testutil.Today().AddDate(0, 0, 1))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if tomorrow.PlanID != updated.ID {
+		t.Fatalf("missing future day should use new plan, got %d want %d", tomorrow.PlanID, updated.ID)
 	}
 }
 
