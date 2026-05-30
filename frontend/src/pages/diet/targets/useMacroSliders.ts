@@ -37,7 +37,7 @@ export function useMacroSliders(initial?: {
     const proteinG = ref(initial?.protein ?? 0);
     const carbsG = ref(initial?.carbs ?? 0);
     const fatG = ref(initial?.fat ?? 0);
-    const fiberG = ref(initial?.fiber ?? 0);
+    const fiberG = ref(initial?.fiber ?? 38);
     const lockProtein = ref(false);
     const lockCarbs = ref(false);
     const lockFat = ref(false);
