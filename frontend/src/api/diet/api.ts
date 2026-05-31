@@ -155,6 +155,20 @@ export async function addPlannedMealFromSaved(
     return response.data;
 }
 
+export async function addPlannedMealFromLabel(
+    name: string,
+    offset = 0,
+): Promise<DietLogsTodayResponse> {
+    const response = await apiClient.post<DietLogsTodayResponse>(
+        "/diet/meals/planned/from-label",
+        {
+            name,
+            offset,
+        },
+    );
+    return response.data;
+}
+
 export async function reorderPlannedMeals(
     plannedMealIds: number[],
     offset = 0,
@@ -211,6 +225,13 @@ export async function createSavedMeal(payload: {
         payload,
     );
     return response.data;
+}
+
+export async function getAllSavedMeals(): Promise<SavedMeal[]> {
+    const response = await apiClient.get<{ saved_meals: SavedMeal[] }>(
+        "/diet/meals/saved-meal/all",
+    );
+    return response.data.saved_meals;
 }
 
 export async function getSavedMealById(id: number): Promise<SavedMeal> {

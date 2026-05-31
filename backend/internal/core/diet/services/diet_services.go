@@ -2,6 +2,8 @@ package services
 
 import (
 	"context"
+	"fmt"
+	"strings"
 	"time"
 
 	"be-simpletracker/internal/core/diet/models"
@@ -206,6 +208,14 @@ func AddPlannedMealFromSavedMeal(offset int, savedMealID uint) error {
 		return err
 	}
 	return dietrepo.AddPlannedMealFromSavedMeal(offset, savedMealID, mealFromSaved(sm))
+}
+
+func AddPlannedMealFromLabel(offset int, name string) error {
+	trimmed := strings.TrimSpace(name)
+	if trimmed == "" {
+		return fmt.Errorf("name is required")
+	}
+	return dietrepo.AddPlannedMealFromLabel(offset, &models.Meal{Name: trimmed})
 }
 
 func ReorderPlannedMeals(offset int, orderedIDs []uint) error {

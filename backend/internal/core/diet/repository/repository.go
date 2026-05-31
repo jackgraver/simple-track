@@ -707,34 +707,44 @@ func DeleteSavedMeal(id uint) error {
 	})
 }
 
+func addPlannedMealInTx(tx *gorm.DB, offset int, meal *models.Meal, savedMealID *uint) error {
+	day, err := findOrCreateDietDayForCalendarDateInTx(tx, utils.ZerodTime(offset))
+	if err != nil {
+		return err
+	}
+	for i := range meal.Items {
+		meal.Items[i].ID = 0
+	}
+	if err := tx.Create(meal).Error; err != nil {
+		return err
+	}
+	var next int
+	if err := tx.Model(&models.PlannedMeal{}).
+		Where("day_id = ? AND logged = ?", day.ID, false).
+		Select("COALESCE(MAX(display_order), -1) + 1").
+		Scan(&next).Error; err != nil {
+		return err
+	}
+	pm := models.PlannedMeal{
+		DayID:        day.ID,
+		MealID:       meal.ID,
+		SavedMealID:  savedMealID,
+		Logged:       false,
+		DisplayOrder: next,
+	}
+	return tx.Create(&pm).Error
+}
+
 func AddPlannedMealFromSavedMeal(offset int, savedMealID uint, meal *models.Meal) error {
+	sid := savedMealID
 	return conn().Transaction(func(tx *gorm.DB) error {
-		day, err := findOrCreateDietDayForCalendarDateInTx(tx, utils.ZerodTime(offset))
-		if err != nil {
-			return err
-		}
-		for i := range meal.Items {
-			meal.Items[i].ID = 0
-		}
-		if err := tx.Create(meal).Error; err != nil {
-			return err
-		}
-		var next int
-		if err := tx.Model(&models.PlannedMeal{}).
-			Where("day_id = ? AND logged = ?", day.ID, false).
-			Select("COALESCE(MAX(display_order), -1) + 1").
-			Scan(&next).Error; err != nil {
-			return err
-		}
-		sid := savedMealID
-		pm := models.PlannedMeal{
-			DayID:        day.ID,
-			MealID:       meal.ID,
-			SavedMealID:  &sid,
-			Logged:       false,
-			DisplayOrder: next,
-		}
-		return tx.Create(&pm).Error
+		return addPlannedMealInTx(tx, offset, meal, &sid)
+	})
+}
+
+func AddPlannedMealFromLabel(offset int, meal *models.Meal) error {
+	return conn().Transaction(func(tx *gorm.DB) error {
+		return addPlannedMealInTx(tx, offset, meal, nil)
 	})
 }
 

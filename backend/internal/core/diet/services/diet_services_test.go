@@ -279,6 +279,31 @@ func TestPlannedMealServices(t *testing.T) {
 	}
 }
 
+func TestAddPlannedMealFromLabel(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	plan := testutil.SeedPlan(t, db, "P")
+	testutil.SeedDay(t, db, testutil.Today(), plan.ID)
+	if err := services.AddPlannedMealFromLabel(0, "Eating out"); err != nil {
+		t.Fatal(err)
+	}
+	day, tot, err := services.MealPlanToday(context.Background(), 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(day.PlannedMeals) != 1 {
+		t.Fatalf("expected 1 planned meal, got %d", len(day.PlannedMeals))
+	}
+	if day.PlannedMeals[0].Meal.Name != "Eating out" {
+		t.Fatalf("expected Eating out, got %q", day.PlannedMeals[0].Meal.Name)
+	}
+	if day.PlannedMeals[0].SavedMealID != nil {
+		t.Fatal("expected no saved meal id")
+	}
+	if tot.Calories != 0 {
+		t.Fatalf("expected zero calories, got %v", tot.Calories)
+	}
+}
+
 func TestSetPlannedMealLogged_andDeleteLoggedMeal(t *testing.T) {
 	db := testutil.SetupTestDB(t)
 	plan := testutil.SeedPlan(t, db, "P")

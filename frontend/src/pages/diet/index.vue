@@ -52,6 +52,7 @@ const dietNavLinks = computed<ModuleTitleLink[]>(() => [
         to: "diet-log",
         query: createSavedMealLinkQuery.value,
     },
+    { name: "Plan dinners", to: "diet-week-plan" },
     { name: "Macro targets", to: "diet-targets" },
     { name: "Quick log", onClick: openQuickLog },
     { name: "Log Water", onClick: openWaterLog },

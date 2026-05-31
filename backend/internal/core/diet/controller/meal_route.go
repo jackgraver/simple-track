@@ -580,6 +580,43 @@ func PostPlannedFromSaved(c *gin.Context) {
 	c.JSON(http.StatusOK, dayWithTotalsResponse(result))
 }
 
+type AddPlannedFromLabelRequest struct {
+	Name   string `json:"name"`
+	Offset int    `json:"offset"`
+}
+
+func PostPlannedFromLabel(c *gin.Context) {
+	var req AddPlannedFromLabelRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		apierr.BadRequest(c, err.Error())
+		return
+	}
+	name := strings.TrimSpace(req.Name)
+	if name == "" {
+		apierr.BadRequest(c, "name is required")
+		return
+	}
+	if err := services.AddPlannedMealFromLabel(req.Offset, name); err != nil {
+		apierr.Internal(c, err)
+		return
+	}
+	day, err := services.FindMealPlanDay(utils.ZerodTime(req.Offset))
+	if err != nil {
+		apierr.Internal(c, err)
+		return
+	}
+	if day == nil {
+		apierr.NotFound(c, "Day not found")
+		return
+	}
+	result, err := services.ReloadDayWithTotals(day)
+	if err != nil {
+		apierr.Internal(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, dayWithTotalsResponse(result))
+}
+
 type ReorderPlannedMealsRequest struct {
 	Offset         int    `json:"offset"`
 	PlannedMealIDs []uint `json:"planned_meal_ids"`

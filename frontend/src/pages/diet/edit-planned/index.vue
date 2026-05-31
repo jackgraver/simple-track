@@ -11,7 +11,6 @@ import { computed, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useQuery, useQueryClient } from "@tanstack/vue-query";
 import { dialogManager } from "~/composables/dialog/useDialog";
-import { apiClient } from "~/api/client";
 import {
     addPlannedMealFromSaved,
     getMonthPlannedSummary,
@@ -42,6 +41,7 @@ import {
     withDietDayOffsetQuery,
 } from "~/utils/dateUtil";
 import { EDIT_SAVED_TYPE } from "~/pages/diet/logmeal/logmealMode";
+import { useSavedMeals } from "~/pages/diet/queries/useSavedMeals";
 
 type MacroSummary = {
     calories: number;
@@ -244,13 +244,7 @@ const {
     data: savedRaw,
     isPending: savedPending,
     error: savedError,
-} = useQuery({
-    queryKey: ["savedMeals", "all"],
-    queryFn: () =>
-        apiClient
-            .get<{ saved_meals: SavedMeal[] }>("/diet/meals/saved-meal/all")
-            .then((r) => r.data.saved_meals),
-});
+} = useSavedMeals();
 
 const savedMeals = computed((): SavedMeal[] => savedRaw.value ?? []);
 

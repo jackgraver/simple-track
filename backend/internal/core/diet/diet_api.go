@@ -48,6 +48,7 @@ func RegisterRoutes(router *gin.Engine, authMiddleware gin.HandlerFunc) {
 			meals.POST("/meal/editlogged", controller.PostEditLogged)
 			meals.DELETE("/meal/logged", controller.DeleteLoggedMeal)
 			meals.POST("/planned/from-saved", controller.PostPlannedFromSaved)
+			meals.POST("/planned/from-label", controller.PostPlannedFromLabel)
 			meals.POST("/planned/reorder", controller.PostPlannedReorder)
 			meals.DELETE("/planned", controller.DeletePlannedMeal)
 		}

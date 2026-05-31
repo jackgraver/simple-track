@@ -128,3 +128,73 @@ export function withDietDayOffsetQuery(
     if (offset === 0) return query;
     return { ...query, offset: String(offset) };
 }
+
+export function parseWeekOffsetQuery(raw: unknown): number {
+    const s = Array.isArray(raw) ? raw[0] : raw;
+    if (typeof s !== "string") return 0;
+    const v = Number.parseInt(s, 10);
+    return Number.isNaN(v) ? 0 : v;
+}
+
+export type DietWeekDay = {
+    dayIndex: number;
+    offset: number;
+    date: Date;
+};
+
+export function sundayOfDietWeek(weekOffset: number): Date {
+    const now = new Date();
+    const sunday = new Date(
+        now.getFullYear(),
+        now.getMonth(),
+        now.getDate() - now.getDay() + weekOffset * 7,
+        12,
+        0,
+        0,
+        0,
+    );
+    return sunday;
+}
+
+export function dietWeekDays(weekOffset: number): DietWeekDay[] {
+    const sunday = sundayOfDietWeek(weekOffset);
+    return Array.from({ length: 7 }, (_, dayIndex) => {
+        const date = new Date(
+            sunday.getFullYear(),
+            sunday.getMonth(),
+            sunday.getDate() + dayIndex,
+            12,
+            0,
+            0,
+            0,
+        );
+        return {
+            dayIndex,
+            date,
+            offset: dietDayOffsetFromLocalDate(
+                date.getFullYear(),
+                date.getMonth(),
+                date.getDate(),
+            ),
+        };
+    });
+}
+
+export function formatDietWeekRangeLabel(weekOffset: number): string {
+    const days = dietWeekDays(weekOffset);
+    const start = days[0].date;
+    const end = days[6].date;
+    const fmt = new Intl.DateTimeFormat(undefined, {
+        month: "short",
+        day: "numeric",
+    });
+    const startLabel = fmt.format(start);
+    const endLabel = fmt.format(end);
+    if (start.getFullYear() !== end.getFullYear()) {
+        return `${startLabel}, ${start.getFullYear()} – ${endLabel}, ${end.getFullYear()}`;
+    }
+    if (start.getMonth() !== end.getMonth()) {
+        return `${startLabel} – ${endLabel}, ${end.getFullYear()}`;
+    }
+    return `${startLabel} – ${endLabel}, ${end.getFullYear()}`;
+}

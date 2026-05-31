@@ -40,6 +40,12 @@ const routes: RouteRecordRaw[] = [
                 meta: { breadcrumb: "Edit planned" },
             },
             {
+                path: "week-plan",
+                name: "diet-week-plan",
+                component: () => import("~/pages/diet/week-plan/index.vue"),
+                meta: { breadcrumb: "Plan dinners" },
+            },
+            {
                 path: "targets",
                 name: "diet-targets",
                 component: () => import("~/pages/diet/targets/index.vue"),
