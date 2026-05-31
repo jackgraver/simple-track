@@ -8,10 +8,12 @@ import {
     parseDietDayOffsetQuery,
     ymdForDayOffset,
 } from "~/utils/dateUtil";
+import { dialogManager } from "~/composables/dialog/useDialog";
 import { toast } from "~/composables/toast/useToast";
 import {
     buildTrackingLineChart,
     seriesThroughSelectedDay,
+    trackingDayKey,
 } from "~/pages/gym/trackingLogChart";
 import axios from "axios";
 
@@ -25,6 +27,9 @@ const weightInput = ref("");
 const { data: logs, isPending, isError, error } = useWeightLogs();
 const saveMutation = useSaveWeight();
 const rows = computed(() => logs.value ?? []);
+const existingLogForDate = computed(() =>
+    rows.value.find((r) => trackingDayKey(r.date) === dateStr.value),
+);
 const weightSeries = computed(() =>
     seriesThroughSelectedDay(
         rows.value.map((r) => ({ date: r.date, value: r.weight_lbs })),
@@ -47,6 +52,16 @@ const handleSave = async () => {
     if (Number.isNaN(w) || w <= 0) {
         toast.push("Enter a valid weight (lbs)", "error");
         return;
+    }
+    const existing = existingLogForDate.value;
+    if (existing) {
+        const dateLabel = formatDateLong(`${dateStr.value}T12:00:00`);
+        const confirmed = await dialogManager.confirm({
+            title: "Overwrite weight?",
+            message: `You already logged ${existing.weight_lbs} lbs for ${dateLabel}. Are you sure you want to overwrite?`,
+            confirmText: "Overwrite",
+        });
+        if (!confirmed) return;
     }
     try {
         await saveMutation.mutateAsync({ date: dateStr.value, weightLbs: w });

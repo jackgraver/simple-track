@@ -8,10 +8,12 @@ import {
     parseDietDayOffsetQuery,
     ymdForDayOffset,
 } from "~/utils/dateUtil";
+import { dialogManager } from "~/composables/dialog/useDialog";
 import { toast } from "~/composables/toast/useToast";
 import {
     buildTrackingBarChart,
     seriesLastDaysThroughSelectedDay,
+    trackingDayKey,
 } from "~/pages/gym/trackingLogChart";
 import axios from "axios";
 
@@ -25,6 +27,9 @@ const stepsInput = ref("");
 const { data: logs, isPending, isError, error } = useStepLogs();
 const saveMutation = useSaveSteps();
 const rows = computed(() => logs.value ?? []);
+const existingLogForDate = computed(() =>
+    rows.value.find((r) => trackingDayKey(r.date) === dateStr.value),
+);
 const stepSeries = computed(() =>
     seriesLastDaysThroughSelectedDay(
         rows.value.map((r) => ({ date: r.date, value: r.steps })),
@@ -41,6 +46,16 @@ const handleSave = async () => {
     if (Number.isNaN(n) || n < 0) {
         toast.push("Enter a valid step count", "error");
         return;
+    }
+    const existing = existingLogForDate.value;
+    if (existing) {
+        const dateLabel = formatDateLong(`${dateStr.value}T12:00:00`);
+        const confirmed = await dialogManager.confirm({
+            title: "Overwrite steps?",
+            message: `You already logged ${existing.steps.toLocaleString()} steps for ${dateLabel}. Are you sure you want to overwrite?`,
+            confirmText: "Overwrite",
+        });
+        if (!confirmed) return;
     }
     try {
         await saveMutation.mutateAsync({ date: dateStr.value, steps: n });
