@@ -107,11 +107,13 @@ export function useGroceryItems() {
 }
 
 export function useGrocerySuggestions(query: MaybeRefOrGetter<string>) {
+    const trimmed = computed(() => toValue(query).trim());
     return useQuery({
         queryKey: computed(() =>
-            trackingKeys.grocerySuggestions(toValue(query).trim().toLowerCase()),
+            trackingKeys.grocerySuggestions(trimmed.value.toLowerCase()),
         ),
-        queryFn: () => fetchGrocerySuggestions(toValue(query).trim()),
+        queryFn: () => fetchGrocerySuggestions(trimmed.value),
+        enabled: () => trimmed.value.length > 0,
         staleTime: 5 * 60_000,
     });
 }
