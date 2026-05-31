@@ -25,6 +25,13 @@ export type StepLog = {
     steps: number;
 };
 
+export type GroceryItem = {
+    ID: number;
+    name: string;
+    completed_at: string | null;
+    CreatedAt?: string;
+};
+
 export type MissedTracking = {
     date: string;
     weight: boolean;

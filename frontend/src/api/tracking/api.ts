@@ -1,7 +1,8 @@
-import { apiDELETE, apiGET, apiPOST, apiPUT } from '~/api/client';
+import { apiDELETE, apiGET, apiPATCH, apiPOST, apiPUT } from '~/api/client';
 import type {
     BodyWeightLog,
     DrinkSizePreset,
+    GroceryItem,
     MissedTracking,
     StepLog,
     UserProfile,
@@ -43,6 +44,35 @@ export async function fetchStepLogs(limit?: number): Promise<StepLog[]> {
     const params = limit != null && limit > 0 ? { limit } : undefined;
     const res = await apiGET<{ logs: StepLog[] }>('/tracking/steps', { params });
     return res.logs ?? [];
+}
+
+export async function fetchGroceryItems(): Promise<GroceryItem[]> {
+    const res = await apiGET<{ items: GroceryItem[] }>('/tracking/grocery/items');
+    return res.items ?? [];
+}
+
+export async function createGroceryItem(name: string): Promise<GroceryItem> {
+    const res = await apiPOST<{ item: GroceryItem }>('/tracking/grocery/items', { name });
+    return res.item;
+}
+
+export async function completeGroceryItem(id: number): Promise<GroceryItem> {
+    const res = await apiPATCH<{ item: GroceryItem }>(
+        `/tracking/grocery/items/${id}/complete`,
+        {},
+    );
+    return res.item;
+}
+
+export async function deleteGroceryItem(id: number): Promise<void> {
+    await apiDELETE(`/tracking/grocery/items/${id}`);
+}
+
+export async function fetchGrocerySuggestions(query: string): Promise<string[]> {
+    const res = await apiGET<{ suggestions: string[] }>('/tracking/grocery/suggestions', {
+        params: { q: query },
+    });
+    return res.suggestions ?? [];
 }
 
 export async function fetchMissedTracking(): Promise<MissedTracking> {

@@ -126,6 +126,12 @@ const routes: RouteRecordRaw[] = [
         ],
     },
     {
+        path: "/grocery",
+        name: "grocery",
+        component: () => import("~/pages/grocery/index.vue"),
+        meta: { breadcrumb: "Grocery" },
+    },
+    {
         path: "/auth/signin",
         name: "signin",
         component: () => import("~/pages/auth/signin/index.vue"),

@@ -2,9 +2,14 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/vue-query";
 import { computed, type MaybeRefOrGetter, toValue } from "vue";
 import { isAuthenticated } from "~/composables/auth/session";
 import {
+    completeGroceryItem,
+    createGroceryItem,
     createDrinkSizePreset,
+    deleteGroceryItem,
     deleteDrinkSizePreset,
     deleteWater,
+    fetchGroceryItems,
+    fetchGrocerySuggestions,
     fetchDrinkSizePresets,
     fetchMissedTracking,
     fetchProfile,
@@ -90,6 +95,56 @@ export function useSaveSteps() {
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: trackingKeys.steps });
             queryClient.invalidateQueries({ queryKey: trackingKeys.missed });
+        },
+    });
+}
+
+export function useGroceryItems() {
+    return useQuery({
+        queryKey: trackingKeys.groceryItems,
+        queryFn: fetchGroceryItems,
+    });
+}
+
+export function useGrocerySuggestions(query: MaybeRefOrGetter<string>) {
+    return useQuery({
+        queryKey: computed(() =>
+            trackingKeys.grocerySuggestions(toValue(query).trim().toLowerCase()),
+        ),
+        queryFn: () => fetchGrocerySuggestions(toValue(query).trim()),
+        staleTime: 5 * 60_000,
+    });
+}
+
+export function useCreateGroceryItem() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: ({ name }: { name: string }) => createGroceryItem(name),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: trackingKeys.groceryItems });
+        },
+    });
+}
+
+export function useCompleteGroceryItem() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: (id: number) => completeGroceryItem(id),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: trackingKeys.groceryItems });
+            queryClient.invalidateQueries({
+                queryKey: ["tracking", "grocery", "suggestions"],
+            });
+        },
+    });
+}
+
+export function useDeleteGroceryItem() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: (id: number) => deleteGroceryItem(id),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: trackingKeys.groceryItems });
         },
     });
 }
