@@ -1,129 +1,62 @@
 package database
 
 import (
-	"bufio"
-	"bytes"
-	"fmt"
 	"log"
-	"os"
-	"os/exec"
-	"strings"
+	"time"
 
 	"be-simpletracker/internal/env"
 
-	"github.com/glebarez/sqlite"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
 )
 
+// Global database connection
 var db_conn *gorm.DB
 
+// Set the global database connection
+func SetDB(db *gorm.DB) { db_conn = db }
+
+// Get the global database connection
+func GetDB() *gorm.DB { return db_conn }
+
+// Connect to postgres
 func ConnectToPostgres() (*gorm.DB, error) {
 	if err := env.Load(); err != nil {
 		return nil, err
 	}
+	// Get prod or dev dsn
 	dsn := resolvePostgresDSN()
-	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
-	if err != nil {
-		return nil, err
+	
+	const maxAttempts = 3
+	const retryDelay = time.Second * 3 // 3s
+
+	var db *gorm.DB
+	var err error
+	// Try 3 times
+	for attempt := 1; attempt <= maxAttempts; attempt++ {
+		db, err = gorm.Open(postgres.Open(dsn), &gorm.Config{Logger: logger.Default.LogMode(logger.Silent)})
+		if err == nil {
+			db_conn = db
+			log.Printf("postgres: connected successfully")
+			return db, nil
+		}
+		// sleep to avoid hammering the database between attemps
+		if attempt < maxAttempts {
+			log.Printf("postgres failed connection: %d remaining", maxAttempts - attempt)
+			time.Sleep(retryDelay)
+		}
 	}
-
-	db_conn = db
-
-	return db, nil
-}
-
-func SetDB(db *gorm.DB) {
-	db_conn = db
-}
-
-func GetDB() *gorm.DB {
-	return db_conn
+	return nil, err
 }
 
 func resolvePostgresDSN() string {
 	if d := env.OptionalString("DATABASE_URL"); d != "" {
 		return d
 	}
-	appEnv := normalizeEnv(env.StringOr("APP_ENV", env.StringOr("GO_ENV", "development")))
-	if appEnv == "production" {
+	appEnv := env.StringOr("APP_ENV", env.StringOr("GO_ENV", "development"))
+	if appEnv == "prod" {
 		return env.StringOr("DATABASE_URL_PRODUCTION", "postgres://postgres:postgres@localhost:5433/simpletracker_prod?sslmode=disable")
 	}
 	return env.StringOr("DATABASE_URL_DEVELOPMENT", "postgres://postgres:postgres@localhost:5432/simpletracker_dev?sslmode=disable")
-}
-
-func normalizeEnv(value string) string {
-	switch strings.ToLower(strings.TrimSpace(value)) {
-	case "prod", "production":
-		return "production"
-	default:
-		return "development"
-	}
-}
-
-// Initializes a new database connection to a SQLite database
-func ConnectToSqlite(dbPath string) (*gorm.DB, error) {
-	db, err := gorm.Open(sqlite.Open(dbPath), &gorm.Config{})
-	if err != nil {
-		return nil, err
-	}
-
-	db_conn = db
-	return db, nil
-}
-
-func DumpSQLiteDB(dbPath string, dumpPath string) error {
-	cmd := exec.Command("sqlite3", dbPath, ".dump")
-	var out bytes.Buffer
-	cmd.Stdout = &out
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("dump command failed: %w", err)
-	}
-
-	lines := []string{}
-	scanner := bufio.NewScanner(&out)
-	for scanner.Scan() {
-		lines = append(lines, scanner.Text())
-	}
-	if err := scanner.Err(); err != nil {
-		return fmt.Errorf("reading dump failed: %w", err)
-	}
-
-	cleaned := []string{}
-	for i, line := range lines {
-		if i == 1 && strings.Contains(strings.ToUpper(line), "TRANSACTION") {
-			continue
-		}
-		cleaned = append(cleaned, line)
-	}
-
-	for i := len(cleaned) - 1; i >= 0; i-- {
-		if strings.TrimSpace(cleaned[i]) != "" {
-			if strings.Contains(strings.ToUpper(cleaned[i]), "COMMIT") {
-				cleaned = append(cleaned[:i], cleaned[i+1:]...)
-			}
-			break
-		}
-	}
-
-	return os.WriteFile(dumpPath, []byte(strings.Join(cleaned, "\n")), 0644)
-}
-
-func RestoreSQLiteDB(dumpPath string) error {
-	conn, err := ConnectToSqlite("st.db")
-	if err != nil {
-		return err
-	}
-	inst, _ := conn.DB()
-	defer inst.Close()
-
-	sqlBytes, err := os.ReadFile("out_dump.sql")
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	sql := string(sqlBytes)
-
-	result := conn.Session(&gorm.Session{SkipDefaultTransaction: true}).Exec(sql)
-	return result.Error
 }

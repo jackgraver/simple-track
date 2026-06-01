@@ -50,7 +50,7 @@ func main() {
 
 	db, err := database.ConnectToPostgres()
 	if err != nil {
-		panic(err)
+		panic("Database unreachable")
 	}
 
 	CreateFeatures(db, router)
