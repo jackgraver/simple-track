@@ -20,7 +20,14 @@ function isConfirmDialog(
             'top-dialog': isConfirmDialog(dialogManager.dialog.value),
         }"
     >
-        <div class="dialog-container">
+        <div
+            class="dialog-container"
+            :class="{
+                'dialog-container--wide':
+                    !isConfirmDialog(dialogManager.dialog.value) &&
+                    dialogManager.dialog.value.options.wide,
+            }"
+        >
             <header class="dialog-header">
                 <h2>
                     {{
@@ -109,6 +116,10 @@ function isConfirmDialog(
     padding: 0;
     max-height: 85vh;
     overflow: hidden;
+}
+
+.dialog-container--wide {
+    min-width: min(90vw, 42rem);
 }
 
 .dialog-container > * {

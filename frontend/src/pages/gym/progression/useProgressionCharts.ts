@@ -7,7 +7,13 @@ export type ProgressionEntry = {
     reps: number;
 };
 
-export type ProgressionRange = "3m" | "6m" | "1y" | "all";
+export type ProgressionRange = "1m" | "3m" | "6m" | "1y" | "all";
+
+export type ProgressionDayGroup = {
+    dayKey: string;
+    dateLabel: string;
+    sets: { weight: number; reps: number }[];
+};
 
 export function progressionDayKeyFromApi(dateStr: string): string {
     const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(dateStr);
@@ -34,6 +40,15 @@ export function formatShortDayLabel(dayKey: string): string {
     return d.toLocaleString("en-US", { month: "short", day: "numeric" });
 }
 
+export function formatDayLabel(dayKey: string): string {
+    const d = parseDayKeyToLocalDate(dayKey);
+    return d.toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+    });
+}
+
 export function roundWeightHalfLb(weight: number): number {
     return Math.round(weight * 2) / 2;
 }
@@ -44,7 +59,8 @@ export function progressionRangeCutoffKey(
     if (range === "all") return null;
     const now = new Date();
     const end = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const months = range === "3m" ? 3 : range === "6m" ? 6 : 12;
+    const months =
+        range === "1m" ? 1 : range === "3m" ? 3 : range === "6m" ? 6 : 12;
     const start = new Date(end);
     start.setMonth(start.getMonth() - months);
     const y = start.getFullYear();
@@ -246,10 +262,31 @@ export function useProgressionCharts(
         };
     });
 
+    const progressionDayGroups = computed<ProgressionDayGroup[]>(() => {
+        const dayMap = byDay.value;
+        return [...dayMap.keys()]
+            .sort()
+            .reverse()
+            .map((dayKey) => ({
+                dayKey,
+                dateLabel: formatDayLabel(dayKey),
+                sets: dayMap.get(dayKey)!.map((s) => ({
+                    weight: s.weightRounded,
+                    reps: s.reps,
+                })),
+            }));
+    });
+
+    const hasProgressionData = computed(
+        () => filteredRows.value.length > 0,
+    );
+
     return {
         filteredRows,
         progressionChartData,
         progressionChartOptions,
         hasProgressionChartData,
+        progressionDayGroups,
+        hasProgressionData,
     };
 }

@@ -55,6 +55,7 @@ const dietNavLinks = computed<ModuleTitleLink[]>(() => [
     { name: "Macro targets", to: "diet-targets" },
     { name: "Quick log", onClick: openQuickLog },
     { name: "Log Water", onClick: openWaterLog },
+    { name: "Grocery List", to: "grocery" },
 ]);
 </script>
 

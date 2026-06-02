@@ -17,6 +17,7 @@ import { useRoute, useRouter } from "vue-router";
 import { Pencil } from "lucide-vue-next";
 import { dialogManager } from "~/composables/dialog/useDialog";
 import EditCuesDialog from "../dialog/EditCuesDialog.vue";
+import ExerciseProgressionChartPanel from "~/pages/gym/progression/ExerciseProgressionChartPanel.vue";
 import { toast } from "~/composables/toast/useToast";
 
 const route = useRoute();
@@ -82,6 +83,13 @@ const previousPerformanceText = computed(() => {
     return sets.map((set) => `${set.weight}x${set.reps}`).join(", ");
 });
 
+const previousSets = computed(() =>
+    (session.exerciseGroup?.previous?.sets ?? []).map((set) => ({
+        weight: set.weight,
+        reps: set.reps,
+    })),
+);
+
 const exerciseName = computed(
     () =>
         session.exerciseGroup?.planned?.name ||
@@ -126,6 +134,20 @@ const logSetWithRepRolloverHintDismiss = async () => {
     if (ok && hadHint && maxPrev != null && weightLogged > maxPrev) {
         repRolloverHintDismissed.value = true;
     }
+};
+
+const openProgressionDialog = () => {
+    const id = exerciseId.value;
+    if (id == null) return;
+    void dialogManager.custom<void>({
+        title: `${exerciseName.value} Progression`,
+        component: ExerciseProgressionChartPanel,
+        componentProps: {
+            exerciseId: id,
+            lastTimeSets: previousSets.value,
+        },
+        wide: true,
+    });
 };
 
 const editCues = async () => {
@@ -241,12 +263,17 @@ const editCues = async () => {
             @delete="session.deleteSet"
             @edit="session.editSet"
         />
-        <div v-if="previousPerformanceText" class="previous-performance">
+        <button
+            v-if="previousPerformanceText"
+            type="button"
+            class="previous-performance cursor-pointer text-left transition-colors hover:border-[rgb(80,80,80)] hover:bg-[rgb(32,32,32)]"
+            @click="openProgressionDialog()"
+        >
             <span class="previous-performance-label">Last time</span>
             <span class="previous-performance-value">{{
                 previousPerformanceText
             }}</span>
-        </div>
+        </button>
         <div class="input-container">
             <label>Notes</label>
             <textarea
@@ -295,10 +322,13 @@ const editCues = async () => {
     display: flex;
     flex-direction: column;
     gap: 0.25rem;
+    width: 100%;
     padding: 0.875rem 1rem;
     border: 1px solid rgb(56, 56, 56);
     border-radius: 0.5rem;
     background: rgb(24, 24, 24);
+    color: inherit;
+    font: inherit;
 }
 
 .previous-performance-label {

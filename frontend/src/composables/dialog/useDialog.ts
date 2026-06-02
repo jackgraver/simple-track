@@ -11,6 +11,7 @@ export type CustomDialogOptions = {
     title?: string;
     component: Component;
     componentProps?: Record<string, any>;
+    wide?: boolean;
 };
 
 type DialogState =
