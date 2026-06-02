@@ -3,7 +3,6 @@ import type { Food, MealItem } from "~/types/diet";
 import { ChevronDown, Minus, Plus, Trash2 } from "lucide-vue-next";
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
 import { formatNum, itemServingAmount } from "./logmealItemFormat";
-import { mealItemsListGridClass } from "./mealItemsListGrid";
 import SimpleMacros from "~/shared/SimpleMacros.vue";
 
 const props = withDefaults(
@@ -109,19 +108,18 @@ function commitQtyEdit() {
 <template>
     <div
         :class="[
-            mealItemsListGridClass,
-            'gap-y-1 border-b border-secondBg py-2.5 transition-colors last:border-b-0',
+            'grid w-full min-w-0 grid-cols-[1.5rem_minmax(0,1fr)_minmax(2.5rem,auto)_2.25rem] items-center gap-x-2 gap-y-1 border-b border-secondBg py-2.5 transition-colors last:border-b-0 sm:grid-cols-[2rem_minmax(0,1fr)_9rem_11rem_2.5rem] sm:gap-x-3',
             selected && 'bg-thirdBg/25',
         ]"
     >
         <input
             type="checkbox"
-            class="h-4 w-4 place-self-center accent-thirdBg"
+            class="col-start-1 row-span-2 h-4 w-4 place-self-center accent-thirdBg sm:row-span-1"
             :checked="selected"
             @change="emit('toggleSelect', rowIndex)"
         />
         <div
-            class="flex min-w-0 items-center gap-1 font-medium text-textPrimary"
+            class="col-start-2 row-start-1 flex min-w-0 items-center gap-1 font-medium text-textPrimary"
             :class="compactName ? 'text-sm' : 'text-base'"
         >
             <span class="min-w-0 truncate" :title="item.food?.name">{{
@@ -166,7 +164,9 @@ function commitQtyEdit() {
                 </button>
             </div>
         </div>
-        <div class="flex items-center justify-center gap-1 tabular-nums">
+        <div
+            class="col-start-3 row-span-2 row-start-1 flex items-center justify-center gap-1 tabular-nums sm:row-span-1"
+        >
             <button
                 v-if="!qtyEditing"
                 class="hidden md:flex h-9 w-9 shrink-0 items-center justify-center rounded border border-secondBg bg-secondBg text-textPrimary transition-colors hover:border-thirdBg hover:bg-thirdBg"
@@ -198,7 +198,7 @@ function commitQtyEdit() {
                 <input
                     :id="`log-meal-qty-${rowIndex}`"
                     type="number"
-                    class="h-9 w-30 min-w-11 shrink-0 rounded border border-secondBg bg-secondBg px-1 text-center text-sm tabular-nums text-textPrimary focus:border-thirdBg focus:outline-none"
+                    class="h-9 w-20 min-w-11 shrink-0 rounded border border-secondBg bg-secondBg px-1 text-center text-sm tabular-nums text-textPrimary focus:border-thirdBg focus:outline-none sm:w-30"
                     :value="qtyDraft"
                     min="0"
                     step="any"
@@ -224,9 +224,10 @@ function commitQtyEdit() {
             </button>
         </div>
         <span
-            class="hidden md:flex min-w-0 justify-end text-sm tabular-nums text-textSecondary"
+            class="col-span-2 col-start-2 row-start-2 flex min-w-0 justify-start text-sm tabular-nums text-textSecondary sm:col-span-1 sm:col-start-4 sm:row-start-1 sm:justify-end"
         >
             <SimpleMacros
+                class="mt-0! min-w-0 flex-wrap gap-x-2! gap-y-0!"
                 :calories="item.amount * (item.food?.calories ?? 0)"
                 :protein="item.amount * (item.food?.protein ?? 0)"
                 :fat="item.amount * (item.food?.fat ?? 0)"
@@ -237,7 +238,7 @@ function commitQtyEdit() {
             />
         </span>
         <button
-            class="flex h-9 w-9 shrink-0 items-center justify-center justify-self-end rounded text-textSecondary transition-colors hover:bg-secondBg hover:text-cfRed"
+            class="col-start-4 row-span-2 row-start-1 flex h-9 w-9 shrink-0 items-center justify-center justify-self-end rounded text-textSecondary transition-colors hover:bg-secondBg hover:text-cfRed sm:col-start-5 sm:row-span-1 sm:row-start-1"
             type="button"
             aria-label="Remove item"
             @click="emit('remove', rowIndex)"

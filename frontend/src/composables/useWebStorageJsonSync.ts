@@ -28,6 +28,8 @@ export function useWebStorageJsonSync<T extends object>(options: {
     ) => boolean;
     /** If false, skips save and restore (e.g. missing entity id). */
     canPersist?: () => boolean;
+    /** When false, removes the key instead of writing (e.g. empty draft). */
+    shouldPersist?: (snapshot: T) => boolean;
 }) {
     const storage = options.storage ?? window.localStorage;
     let saveEnabled = false;
@@ -44,7 +46,12 @@ export function useWebStorageJsonSync<T extends object>(options: {
         if (options.canPersist?.() === false) return;
         const k = options.key.value;
         if (!k) return;
-        storage.setItem(k, JSON.stringify(options.getSnapshot()));
+        const snapshot = options.getSnapshot();
+        if (options.shouldPersist && !options.shouldPersist(snapshot)) {
+            storage.removeItem(k);
+            return;
+        }
+        storage.setItem(k, JSON.stringify(snapshot));
     };
 
     /** Reads JSON, runs `tryRestore`, or removes the key on parse failure. Returns whether restore applied. */
