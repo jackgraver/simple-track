@@ -107,13 +107,22 @@ watch(
     },
 );
 
-const tickLabel = (value: number, index: number) => {
+const isMajorTick = (value: number, index: number) => {
     const step = props.step > 0 ? props.step : 1;
     if (props.integerOnly) {
-        return index % 5 === 0 ? formatValue(value) : "";
+        return index % 5 === 0;
     }
-    const major = step >= 2.5 ? value % 10 === 0 : index % 5 === 0;
-    return major ? formatValue(value) : "";
+    if (step >= 2.5) {
+        return value % 10 === 0;
+    }
+    if (step < 1) {
+        return Number.isInteger(value);
+    }
+    return index % 5 === 0;
+};
+
+const tickLabel = (value: number, index: number) => {
+    return isMajorTick(value, index) ? formatValue(value) : "";
 };
 
 const onScroll = () => {
@@ -199,7 +208,7 @@ const onTickClick = (index: number) => {
                             :class="
                                 index === valueToIndex(model || 0)
                                     ? 'h-8 bg-amber-400/90'
-                                    : tickLabel(tick, index)
+                                    : isMajorTick(tick, index)
                                       ? 'h-5'
                                       : 'h-3'
                             "
