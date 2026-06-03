@@ -107,12 +107,19 @@ const repRolloverWeightHintBase = computed(() => {
     const g = session.exerciseGroup;
     const repRollover = g?.previous?.exercise?.rep_rollover;
     if (typeof repRollover !== "number") return "";
-    const previousReps = (g?.previous?.sets ?? [])
-        .map((set) => Number(set.reps))
-        .filter((reps) => Number.isFinite(reps));
-    if (previousReps.length === 0) return "";
-    const minPreviousReps = Math.min(...previousReps);
-    if (minPreviousReps < repRollover) return "";
+    const currentWeight = session.currentWeight;
+    const setsAtCurrentWeight = (g?.previous?.sets ?? [])
+        .map((set) => ({
+            weight: Number(set.weight),
+            reps: Number(set.reps),
+        }))
+        .filter(
+            (set) =>
+                set.weight === currentWeight && Number.isFinite(set.reps),
+        );
+    if (setsAtCurrentWeight.length === 0) return "";
+    if (!setsAtCurrentWeight.every((set) => set.reps >= repRollover)) return "";
+    const minPreviousReps = Math.min(...setsAtCurrentWeight.map((set) => set.reps));
     return `Previously did ${minPreviousReps} reps, consider increase the weight`;
 });
 
@@ -185,22 +192,24 @@ const editCues = async () => {
             </template>
         </LoggingHeader>
         <div class="input-group">
-            <NumberSlider
-                label="Weight (lbs)"
-                :model-value="session.currentWeight"
-                :hint="repRolloverWeightHint"
-                :step="2.5"
-                :max="500"
-                @update:model-value="session.commitWeightFromInput"
-            />
-            <NumberSlider
-                label="Reps"
-                :model-value="session.currentReps"
-                integer-only
-                :step="1"
-                :max="50"
-                @update:model-value="session.commitRepsFromInput"
-            />
+            <div class="flex flex-col gap-2">
+                <NumberSlider
+                    label="Weight (lbs)"
+                    :model-value="session.currentWeight"
+                    :hint="repRolloverWeightHint"
+                    :step="2.5"
+                    :max="500"
+                    @update:model-value="session.commitWeightFromInput"
+                />
+                <NumberSlider
+                    label="Reps"
+                    :model-value="session.currentReps"
+                    integer-only
+                    :step="1"
+                    :max="50"
+                    @update:model-value="session.commitRepsFromInput"
+                />
+            </div>
             <div class="input-container">
                 <label>Weight Setup</label>
                 <input
@@ -400,7 +409,7 @@ const editCues = async () => {
 .input-group {
     display: flex;
     flex-direction: column;
-    gap: 2rem;
+    gap: 1.25rem;
 }
 
 .input-container {

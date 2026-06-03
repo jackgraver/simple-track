@@ -25,6 +25,9 @@ const scrollDrivenUpdate = ref(false);
 
 const displayError = computed(() => props.error ?? "");
 
+const hasHintSlot = computed(() => props.hint !== undefined);
+const hintVisible = computed(() => Boolean(props.hint?.trim()));
+
 const tickValues = computed(() => {
     const step = props.step > 0 ? props.step : 1;
     const count = Math.max(0, Math.round((props.max - props.min) / step));
@@ -227,10 +230,12 @@ const onTickClick = (index: number) => {
             </div>
         </div>
         <p
-            v-if="hint"
-            class="m-0 text-[0.85rem] leading-snug text-amber-200/90"
+            v-if="hasHintSlot"
+            class="m-0 -mt-1 min-h-5 text-[0.8rem] leading-tight text-amber-200/90"
+            :class="{ invisible: !hintVisible }"
+            :aria-hidden="!hintVisible"
         >
-            {{ hint }}
+            {{ hint?.trim() ? hint : "\u00a0" }}
         </p>
         <p
             v-if="displayError"

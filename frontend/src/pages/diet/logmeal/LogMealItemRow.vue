@@ -30,16 +30,55 @@ const hasVariants = computed(
 );
 
 const variantOpen = ref(false);
-const variantRoot = ref<HTMLElement | null>(null);
+const variantAnchor = ref<HTMLElement | null>(null);
+const variantMenu = ref<HTMLElement | null>(null);
+const variantMenuStyle = ref<Record<string, string>>({});
+
+function updateVariantMenuPosition() {
+    const el = variantAnchor.value;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const minW = 224;
+    let left = rect.left;
+    const maxLeft = window.innerWidth - minW - 8;
+    if (left > maxLeft) left = Math.max(8, maxLeft);
+    variantMenuStyle.value = {
+        top: `${rect.bottom + 4}px`,
+        left: `${left}px`,
+        minWidth: `${Math.max(rect.width, minW)}px`,
+    };
+}
+
+function toggleVariantOpen() {
+    variantOpen.value = !variantOpen.value;
+    if (variantOpen.value) nextTick(updateVariantMenuPosition);
+}
+
+watch(variantOpen, (open) => {
+    if (open) nextTick(updateVariantMenuPosition);
+});
 
 function onDocClick(ev: MouseEvent) {
-    const el = variantRoot.value;
-    if (!el || el.contains(ev.target as Node)) return;
+    const target = ev.target as Node;
+    if (variantAnchor.value?.contains(target)) return;
+    if (variantMenu.value?.contains(target)) return;
     variantOpen.value = false;
 }
 
-onMounted(() => document.addEventListener("click", onDocClick));
-onUnmounted(() => document.removeEventListener("click", onDocClick));
+function closeVariantOnScroll() {
+    if (variantOpen.value) variantOpen.value = false;
+}
+
+onMounted(() => {
+    document.addEventListener("click", onDocClick);
+    window.addEventListener("scroll", closeVariantOnScroll, true);
+    window.addEventListener("resize", closeVariantOnScroll);
+});
+onUnmounted(() => {
+    document.removeEventListener("click", onDocClick);
+    window.removeEventListener("scroll", closeVariantOnScroll, true);
+    window.removeEventListener("resize", closeVariantOnScroll);
+});
 
 function pickVariant(v: Food) {
     variantOpen.value = false;
@@ -122,13 +161,39 @@ function commitQtyEdit() {
             class="col-start-2 row-start-1 flex min-w-0 items-center gap-1 font-medium text-textPrimary"
             :class="compactName ? 'text-sm' : 'text-base'"
         >
-            <span class="min-w-0 truncate" :title="item.food?.name">{{
-                item.food?.name ?? ""
-            }}</span>
-            <div v-if="hasVariants" ref="variantRoot" class="relative shrink-0">
+            <div
+                v-if="hasVariants"
+                ref="variantAnchor"
+                class="flex min-w-0 items-center gap-0.5"
+            >
+                <span
+                    class="min-w-0 truncate"
+                    :title="item.food?.name"
+                    >{{ item.food?.name ?? "" }}</span
+                >
+                <button
+                    type="button"
+                    class="m-2! flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-textSecondary transition-colors hover:bg-secondBg hover:text-textPrimary shadow-none!"
+                    :aria-expanded="variantOpen"
+                    aria-haspopup="listbox"
+                    aria-label="Swap variant"
+                    @click.stop="toggleVariantOpen"
+                >
+                    <ChevronDown :size="28" :stroke-width="2.25" />
+                </button>
+            </div>
+            <span
+                v-else
+                class="min-w-0 truncate"
+                :title="item.food?.name"
+                >{{ item.food?.name ?? "" }}</span
+            >
+            <Teleport to="body">
                 <div
-                    v-if="variantOpen"
-                    class="absolute right-0 top-full z-30 mt-1 max-h-56 min-w-56 overflow-y-auto rounded-md border border-thirdBg bg-secondBg shadow-lg"
+                    v-if="variantOpen && hasVariants"
+                    ref="variantMenu"
+                    class="fixed z-50 max-h-56 overflow-y-auto rounded-md border border-thirdBg bg-secondBg shadow-lg"
+                    :style="variantMenuStyle"
                     role="listbox"
                     @click.stop
                 >
@@ -152,17 +217,7 @@ function commitQtyEdit() {
                         />
                     </button>
                 </div>
-                <button
-                    type="button"
-                    class="m-2! flex h-9 w-9 items-center justify-center rounded-md text-textSecondary transition-colors hover:bg-secondBg hover:text-textPrimary shadow-none!"
-                    :aria-expanded="variantOpen"
-                    aria-haspopup="listbox"
-                    aria-label="Swap variant"
-                    @click.stop="variantOpen = !variantOpen"
-                >
-                    <ChevronDown :size="28" :stroke-width="2.25" />
-                </button>
-            </div>
+            </Teleport>
         </div>
         <div
             class="col-start-3 row-span-2 row-start-1 flex items-center justify-center gap-1 tabular-nums sm:row-span-1"
