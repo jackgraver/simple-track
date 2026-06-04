@@ -30,10 +30,17 @@ const emit = defineEmits<{
                 @click="set.status === 'success' && emit('edit', index)"
             >
                 <div class="set-info">
-                    <span class="set-summary">
-                        Set {{ index + 1 }}: {{ set.weight }}lbs ×
-                        {{ set.reps }}
-                    </span>
+                    <div class="min-w-0 flex flex-col gap-0.5">
+                        <span class="set-summary">
+                            Set {{ index + 1 }}: {{ set.weight }}lbs ×
+                            {{ set.reps }}
+                        </span>
+                        <span
+                            v-if="set.weight_setup?.trim()"
+                            class="truncate text-xs text-[rgb(130,130,130)]"
+                            >{{ set.weight_setup }}</span
+                        >
+                    </div>
                     <div class="set-actions">
                         <div v-if="set.status === 'pending'" class="set-status">
                             <Loader class="spinner" :size="16" />

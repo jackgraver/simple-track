@@ -17,6 +17,12 @@ import { useRoute, useRouter } from "vue-router";
 import { Pencil } from "lucide-vue-next";
 import { dialogManager } from "~/composables/dialog/useDialog";
 import EditCuesDialog from "../dialog/EditCuesDialog.vue";
+import WeightSetupDialog from "../dialog/WeightSetupDialog.vue";
+import {
+    computeBarbellTotalLbs,
+    parseWeightSetup,
+    type WeightSetupDialogResult,
+} from "../domain/weightSetup";
 import ExerciseProgressionChartPanel from "~/pages/gym/progression/ExerciseProgressionChartPanel.vue";
 import { toast } from "~/composables/toast/useToast";
 
@@ -157,6 +163,31 @@ const openProgressionDialog = () => {
     });
 };
 
+const weightSetupSummary = computed(() => {
+    const text = session.currentWeightSetup.trim();
+    if (!text) return "";
+    const parsed = parseWeightSetup(text);
+    if (!parsed.parsed) return text;
+    const total = computeBarbellTotalLbs(parsed.barLbs, parsed.platesPerSide);
+    return `${text} (${total} lbs)`;
+});
+
+const openWeightSetupDialog = async () => {
+    const result = await dialogManager.custom<WeightSetupDialogResult>({
+        title: "Weight setup",
+        component: WeightSetupDialog,
+        componentProps: {
+            currentSetup: session.currentWeightSetup,
+            targetWeightLbs: session.currentWeight,
+        },
+    });
+    if (result == null) return;
+    session.updateWeightSetup(result.weightSetup);
+    if (result.syncWeight) {
+        session.commitWeightFromInput(result.totalLbs);
+    }
+};
+
 const editCues = async () => {
     const exercise = cuesExercise.value;
     if (!exercise) {
@@ -211,18 +242,26 @@ const editCues = async () => {
                 />
             </div>
             <div class="input-container">
-                <label>Weight Setup</label>
-                <input
-                    type="text"
-                    class="weight-setup-input"
-                    :value="session.currentWeightSetup"
-                    placeholder="2x45 + 10"
-                    @input="
-                        session.updateWeightSetup(
-                            ($event.target as HTMLInputElement).value,
-                        )
-                    "
-                />
+                <label>Weight setup</label>
+                <button
+                    type="button"
+                    class="weight-setup-trigger"
+                    @click="openWeightSetupDialog()"
+                >
+                    <span
+                        class="min-w-0 truncate"
+                        :class="{
+                            'text-[rgb(120,120,120)]':
+                                !session.currentWeightSetup.trim(),
+                        }"
+                        >{{
+                            session.currentWeightSetup.trim()
+                                ? weightSetupSummary ||
+                                  session.currentWeightSetup
+                                : "Set plates per side…"
+                        }}</span
+                    >
+                </button>
             </div>
         </div>
         <div class="flex flex-row gap-2">
@@ -424,27 +463,27 @@ const editCues = async () => {
     color: rgb(150, 150, 150);
 }
 
-.weight-setup-input {
-    height: 3rem;
+.weight-setup-trigger {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    min-height: 3rem;
     padding: 0 1rem;
     border: 1px solid rgb(56, 56, 56);
     border-radius: 5px;
     background: rgb(27, 27, 27);
     color: inherit;
     font-size: 1rem;
+    text-align: left;
+    cursor: pointer;
     transition:
         border-color 0.2s,
         background-color 0.2s;
 }
 
-.weight-setup-input:focus {
-    outline: none;
+.weight-setup-trigger:hover {
     border-color: rgb(100, 100, 100);
     background: rgb(35, 35, 35);
-}
-
-.weight-setup-input::placeholder {
-    color: rgb(100, 100, 100);
 }
 
 .notes-input {
