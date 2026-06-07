@@ -136,11 +136,14 @@ func TestGetPreviousWorkoutView_includesPreviousLog(t *testing.T) {
 		t.Fatalf("expected 1 group, got %+v", res.PlannedExercises)
 	}
 	group := res.PlannedExercises[0]
-	if group.Logged == nil || group.Previous == nil {
-		t.Fatalf("expected logged and previous, got %+v", group)
+	if group.Logged == nil || group.Previous == nil || group.Max == nil {
+		t.Fatalf("expected logged, previous, and max, got %+v", group)
 	}
 	if len(group.Previous.Sets) != 1 || group.Previous.Sets[0].Weight != 140 {
 		t.Fatalf("previous sets %+v", group.Previous.Sets)
+	}
+	if len(group.Max.Sets) != 1 || group.Max.Sets[0].Weight != 140 {
+		t.Fatalf("max sets %+v", group.Max.Sets)
 	}
 }
 

@@ -12,6 +12,8 @@ const props = withDefaults(
         min?: number;
         max?: number;
         integerOnly?: boolean;
+        markerValue?: number;
+        markerLabel?: string;
     }>(),
     { step: 1, min: 0, max: 100, integerOnly: false },
 );
@@ -20,6 +22,7 @@ const model = defineModel<number>({ required: true });
 
 const scrollEl = ref<HTMLElement | null>(null);
 const padPx = ref(0);
+const scrollLeft = ref(0);
 const syncingScroll = ref(false);
 const scrollDrivenUpdate = ref(false);
 
@@ -58,6 +61,28 @@ const valueToIndex = (value: number) => {
     return Math.min(Math.max(idx, 0), tickValues.value.length - 1);
 };
 
+const markerIndex = computed(() => {
+    const value = props.markerValue;
+    if (value == null || !Number.isFinite(value)) return -1;
+    if (value < props.min || value > props.max) return -1;
+    return valueToIndex(value);
+});
+
+const markerLeftPx = computed(() => {
+    if (markerIndex.value < 0) return 0;
+    return (
+        padPx.value + markerIndex.value * TICK_WIDTH_PX + TICK_WIDTH_PX / 2
+    );
+});
+
+const markerViewportLeftPx = computed(
+    () => markerLeftPx.value - scrollLeft.value,
+);
+
+const hasMarkerLabel = computed(
+    () => markerIndex.value >= 0 && Boolean(props.markerLabel?.trim()),
+);
+
 const indexToScrollLeft = (index: number) => index * TICK_WIDTH_PX;
 
 const scrollToIndex = (index: number, smooth = false) => {
@@ -70,6 +95,7 @@ const scrollToIndex = (index: number, smooth = false) => {
     });
     requestAnimationFrame(() => {
         syncingScroll.value = false;
+        scrollLeft.value = el.scrollLeft;
     });
 };
 
@@ -88,7 +114,10 @@ onMounted(() => {
         resizeObserver = new ResizeObserver(updatePad);
         resizeObserver.observe(el);
     }
-    nextTick(() => scrollToIndex(valueToIndex(model.value || 0)));
+    nextTick(() => {
+        scrollToIndex(valueToIndex(model.value || 0));
+        scrollLeft.value = scrollEl.value?.scrollLeft ?? 0;
+    });
 });
 
 onUnmounted(() => {
@@ -129,9 +158,10 @@ const tickLabel = (value: number, index: number) => {
 };
 
 const onScroll = () => {
-    if (syncingScroll.value) return;
     const el = scrollEl.value;
     if (!el) return;
+    scrollLeft.value = el.scrollLeft;
+    if (syncingScroll.value) return;
     const index = Math.min(
         Math.max(Math.round(el.scrollLeft / TICK_WIDTH_PX), 0),
         tickValues.value.length - 1,
@@ -171,22 +201,41 @@ const onTickClick = (index: number) => {
                 displayValue
             }}</span>
         </p>
-        <div class="relative h-13 touch-pan-x">
-            <div
-                class="pointer-events-none absolute inset-y-0 left-1/2 z-10 w-0.5 -translate-x-1/2 rounded-full bg-amber-400/90"
-                aria-hidden="true"
-            />
-            <div
-                ref="scrollEl"
-                class="flex overflow-x-auto overscroll-x-contain [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-                style="scroll-snap-type: x mandatory"
-                @scroll.passive="onScroll"
-            >
+        <div :class="hasMarkerLabel ? 'pt-4' : ''">
+            <div class="relative h-13 touch-pan-x">
                 <div
-                    class="shrink-0"
-                    :style="{ width: `${padPx}px` }"
+                    class="pointer-events-none absolute inset-y-0 left-1/2 z-10 w-0.5 -translate-x-1/2 rounded-full bg-amber-400/90"
                     aria-hidden="true"
                 />
+                <div
+                    v-if="markerIndex >= 0"
+                    class="pointer-events-none absolute bottom-0 z-5 flex -translate-x-1/2 flex-col items-center justify-end gap-1"
+                    :style="{
+                        left: `${markerViewportLeftPx}px`,
+                        width: `${TICK_WIDTH_PX}px`,
+                    }"
+                    aria-hidden="true"
+                >
+                    <span
+                        v-if="hasMarkerLabel"
+                        class="text-[0.6rem] font-medium leading-none whitespace-nowrap text-green-400/90"
+                    >
+                        {{ markerLabel?.trim() }}
+                    </span>
+                    <span class="block h-8 w-px rounded-full bg-green-400/90" />
+                    <span class="h-[0.85rem]" aria-hidden="true">&nbsp;</span>
+                </div>
+                <div
+                    ref="scrollEl"
+                    class="relative flex h-full overflow-x-auto overscroll-x-contain [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                    style="scroll-snap-type: x mandatory"
+                    @scroll.passive="onScroll"
+                >
+                    <div
+                        class="shrink-0"
+                        :style="{ width: `${padPx}px` }"
+                        aria-hidden="true"
+                    />
                 <button
                     v-for="(tick, index) in tickValues"
                     :key="index"
@@ -227,6 +276,7 @@ const onTickClick = (index: number) => {
                     :style="{ width: `${padPx}px` }"
                     aria-hidden="true"
                 />
+                </div>
             </div>
         </div>
         <p

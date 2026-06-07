@@ -22,6 +22,7 @@ export type ExerciseGroup = {
     planned?: Exercise;
     logged?: LoggedExercise;
     previous?: LoggedExercise;
+    max?: LoggedExercise;
 };
 
 export type LoggedSetWithStatus = {

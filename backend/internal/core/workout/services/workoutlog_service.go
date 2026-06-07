@@ -65,6 +65,7 @@ type ExerciseGroup struct {
 	Planned  *models.Exercise       `json:"planned,omitempty"`
 	Logged   *models.LoggedExercise `json:"logged,omitempty"`
 	Previous *models.LoggedExercise `json:"previous,omitempty"`
+	Max      *models.LoggedExercise `json:"max,omitempty"`
 }
 
 type MonthRange struct {
@@ -81,14 +82,14 @@ type MonthWorkoutLogsResponse struct {
 }
 
 type PreviousWorkoutResponse struct {
-	Day                 models.WorkoutLog        `json:"day"`
-	PlannedExercises    []ExerciseGroup           `json:"planned_exercises"`
-	PlannedCardio       any                     `json:"planned_cardio"`
-	LoggedCardio        *models.Cardio          `json:"logged_cardio"`
-	PlannedPreMobility  *MobilityRoutineView    `json:"planned_pre_mobility"`
-	LoggedPreMobility   *MobilityLoggedView     `json:"logged_pre_mobility"`
-	PlannedPostMobility *MobilityRoutineView    `json:"planned_post_mobility"`
-	LoggedPostMobility  *MobilityLoggedView     `json:"logged_post_mobility"`
+	Day                 models.WorkoutLog    `json:"day"`
+	PlannedExercises    []ExerciseGroup      `json:"planned_exercises"`
+	PlannedCardio       any                  `json:"planned_cardio"`
+	LoggedCardio        *models.Cardio       `json:"logged_cardio"`
+	PlannedPreMobility  *MobilityRoutineView `json:"planned_pre_mobility"`
+	LoggedPreMobility   *MobilityLoggedView  `json:"logged_pre_mobility"`
+	PlannedPostMobility *MobilityRoutineView `json:"planned_post_mobility"`
+	LoggedPostMobility  *MobilityLoggedView  `json:"logged_post_mobility"`
 }
 
 type MobilityRoutineView struct {
@@ -320,6 +321,10 @@ func GetPreviousWorkoutView(ctx context.Context, offset int) (PreviousWorkoutRes
 		if err == nil {
 			group.Previous = &prev
 		}
+		maxLog, err := workoutrepo.GetMaxExerciseLog(ctx, today.Date, p.Name)
+		if err == nil {
+			group.Max = &maxLog
+		}
 		results = append(results, group)
 	}
 	for _, l := range loggedMap {
@@ -327,15 +332,16 @@ func GetPreviousWorkoutView(ctx context.Context, offset int) (PreviousWorkoutRes
 			results = append(results, ExerciseGroup{Logged: &l})
 			continue
 		}
+		group := ExerciseGroup{Logged: &l}
 		prev, err := workoutrepo.GetPreviousExerciseLog(ctx, today.Date, l.Exercise.Name, 0)
 		if err == nil {
-			results = append(results, ExerciseGroup{
-				Logged:   &l,
-				Previous: &prev,
-			})
-		} else {
-			results = append(results, ExerciseGroup{Logged: &l})
+			group.Previous = &prev
 		}
+		maxLog, err := workoutrepo.GetMaxExerciseLog(ctx, today.Date, l.Exercise.Name)
+		if err == nil {
+			group.Max = &maxLog
+		}
+		results = append(results, group)
 	}
 	return PreviousWorkoutResponse{
 		Day:                 today,

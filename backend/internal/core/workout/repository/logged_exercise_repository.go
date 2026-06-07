@@ -120,3 +120,28 @@ func GetPreviousExerciseLog(ctx context.Context, day time.Time, exercise string,
 	}
 	return exerciseLog, nil
 }
+
+func GetMaxExerciseLog(ctx context.Context, day time.Time, exercise string) (models.LoggedExercise, error) {
+	var exerciseLog models.LoggedExercise
+	err := conn().WithContext(ctx).
+		Joins("JOIN workout_logs ON workout_logs.id = logged_exercises.workout_log_id").
+		Joins("JOIN exercises ON exercises.id = logged_exercises.exercise_id").
+		Joins("JOIN logged_sets ON logged_sets.logged_exercise_id = logged_exercises.id").
+		Where("exercises.name = ?", exercise).
+		Where("workout_logs.date != ?", day).
+		Where("workout_logs.date < ?", day).
+		Where("workout_logs.deleted_at IS NULL").
+		Where("exercises.deleted_at IS NULL").
+		Where("logged_sets.deleted_at IS NULL").
+		Preload("Sets").
+		Preload("Exercise").
+		Order("logged_sets.weight DESC").
+		Order("logged_sets.reps DESC").
+		Order("workout_logs.date DESC").
+		Limit(1).
+		First(&exerciseLog).Error
+	if err != nil {
+		return models.LoggedExercise{}, err
+	}
+	return exerciseLog, nil
+}

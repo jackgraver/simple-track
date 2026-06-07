@@ -82,11 +82,47 @@ watch(cuesTextFromSession, (fromSession) => {
     }
 });
 
-const previousPerformanceText = computed(() => {
-    const sets = session.exerciseGroup?.previous?.sets ?? [];
-    if (sets.length === 0) return "";
+type PerformanceSummaryItem = {
+    label: string;
+    text: string;
+};
 
-    return sets.map((set) => `${set.weight}x${set.reps}`).join(", ");
+const formatLoggedSets = (
+    sets: readonly { weight: number; reps: number }[] | undefined,
+) => (sets ?? []).map((set) => `${set.weight}x${set.reps}`).join(", ");
+
+const loggedSetsMatch = (
+    first: ExerciseGroup["previous"],
+    second: ExerciseGroup["max"],
+) => {
+    if (!first || !second) return false;
+    if (first.ID > 0 && second.ID > 0 && first.ID === second.ID) return true;
+    const firstSets = first.sets ?? [];
+    const secondSets = second.sets ?? [];
+    if (firstSets.length === 0 || firstSets.length !== secondSets.length) {
+        return false;
+    }
+    return firstSets.every((set, index) => {
+        const other = secondSets[index];
+        return (
+            other != null && other.weight === set.weight && other.reps === set.reps
+        );
+    });
+};
+
+const performanceSummary = computed<PerformanceSummaryItem[]>(() => {
+    const previous = session.exerciseGroup?.previous;
+    const max = session.exerciseGroup?.max;
+    const previousText = formatLoggedSets(previous?.sets);
+    const maxText = formatLoggedSets(max?.sets);
+    if (!previousText && !maxText) return [];
+    if (previousText && maxText && loggedSetsMatch(previous, max)) {
+        return [{ label: "Last & Max", text: previousText }];
+    }
+    return [
+        previousText ? { label: "Last", text: previousText } : null,
+        maxText ? { label: "Max", text: maxText } : null,
+    ].filter((item): item is PerformanceSummaryItem => item !== null);
 });
 
 const previousSets = computed(() =>
@@ -120,12 +156,13 @@ const repRolloverWeightHintBase = computed(() => {
             reps: Number(set.reps),
         }))
         .filter(
-            (set) =>
-                set.weight === currentWeight && Number.isFinite(set.reps),
+            (set) => set.weight === currentWeight && Number.isFinite(set.reps),
         );
     if (setsAtCurrentWeight.length === 0) return "";
     if (!setsAtCurrentWeight.every((set) => set.reps >= repRollover)) return "";
-    const minPreviousReps = Math.min(...setsAtCurrentWeight.map((set) => set.reps));
+    const minPreviousReps = Math.min(
+        ...setsAtCurrentWeight.map((set) => set.reps),
+    );
     return `Previously did ${minPreviousReps} reps, consider increase the weight`;
 });
 
@@ -138,6 +175,17 @@ const maxPreviousWorkoutWeight = computed(() => {
 const repRolloverWeightHint = computed(() =>
     repRolloverHintDismissed.value ? "" : repRolloverWeightHintBase.value,
 );
+
+const repRolloverValue = computed(() => {
+    const g = session.exerciseGroup;
+    const rollover =
+        g?.planned?.rep_rollover ??
+        g?.logged?.exercise?.rep_rollover ??
+        g?.previous?.exercise?.rep_rollover;
+    return typeof rollover === "number" && Number.isFinite(rollover)
+        ? rollover
+        : undefined;
+});
 
 const logSetWithRepRolloverHintDismiss = async () => {
     const weightLogged = session.currentWeight;
@@ -235,6 +283,8 @@ const editCues = async () => {
                 <NumberSlider
                     label="Reps"
                     :model-value="session.currentReps"
+                    :marker-value="repRolloverValue"
+                    marker-label="Rollover"
                     integer-only
                     :step="1"
                     :max="50"
@@ -312,15 +362,19 @@ const editCues = async () => {
             @edit="session.editSet"
         />
         <button
-            v-if="previousPerformanceText"
+            v-if="performanceSummary.length > 0"
             type="button"
             class="previous-performance cursor-pointer text-left transition-colors hover:border-[rgb(80,80,80)] hover:bg-[rgb(32,32,32)]"
             @click="openProgressionDialog()"
         >
-            <span class="previous-performance-label">Last time</span>
-            <span class="previous-performance-value">{{
-                previousPerformanceText
-            }}</span>
+            <span
+                v-for="item in performanceSummary"
+                :key="item.label"
+                class="flex flex-col gap-1"
+            >
+                <span class="previous-performance-label">{{ item.label }}</span>
+                <span class="previous-performance-value">{{ item.text }}</span>
+            </span>
         </button>
         <div class="input-container">
             <label>Notes</label>
@@ -369,7 +423,7 @@ const editCues = async () => {
 .previous-performance {
     display: flex;
     flex-direction: column;
-    gap: 0.25rem;
+    gap: 0.75rem;
     width: 100%;
     padding: 0.875rem 1rem;
     border: 1px solid rgb(56, 56, 56);

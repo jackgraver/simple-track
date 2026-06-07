@@ -69,3 +69,56 @@ func TestGetPreviousExerciseLog_noMatch(t *testing.T) {
 		t.Fatalf("expected nil error with empty result, got %v", err)
 	}
 }
+
+func TestGetMaxExerciseLog_usesHighestWeightThenReps(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	today := utils.ZerodTime(0)
+	ex := models.Exercise{Name: "Bench"}
+	if err := db.Create(&ex).Error; err != nil {
+		t.Fatal(err)
+	}
+	older := models.WorkoutLog{Date: today.AddDate(0, 0, -3)}
+	recent := models.WorkoutLog{Date: today.AddDate(0, 0, -1)}
+	current := models.WorkoutLog{Date: today}
+	if err := db.Create(&older).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Create(&recent).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Create(&current).Error; err != nil {
+		t.Fatal(err)
+	}
+	olderExercise := models.LoggedExercise{WorkoutLogID: older.ID, ExerciseID: ex.ID}
+	recentExercise := models.LoggedExercise{WorkoutLogID: recent.ID, ExerciseID: ex.ID}
+	currentExercise := models.LoggedExercise{WorkoutLogID: current.ID, ExerciseID: ex.ID}
+	if err := db.Create(&olderExercise).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Create(&recentExercise).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Create(&currentExercise).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Create(&models.LoggedSet{LoggedExerciseID: olderExercise.ID, Weight: 100, Reps: 5}).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Create(&models.LoggedSet{LoggedExerciseID: recentExercise.ID, Weight: 100, Reps: 8}).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Create(&models.LoggedSet{LoggedExerciseID: currentExercise.ID, Weight: 125, Reps: 1}).Error; err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := workoutrepo.GetMaxExerciseLog(context.Background(), today, "Bench")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.ID != recentExercise.ID {
+		t.Fatalf("got exercise %d want %d", got.ID, recentExercise.ID)
+	}
+	if len(got.Sets) != 1 || got.Sets[0].Weight != 100 || got.Sets[0].Reps != 8 {
+		t.Fatalf("sets %+v", got.Sets)
+	}
+}
