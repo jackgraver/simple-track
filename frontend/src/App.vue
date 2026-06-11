@@ -14,7 +14,7 @@ const showDateAndBreadcrumbs = computed(
 
 <template>
     <main
-        class="dark mx-auto box-border w-full max-w-full min-h-dvh overflow-x-clip"
+        class="dark scrollbar-gutter-both mx-auto box-border w-full max-w-full min-h-dvh overflow-x-clip"
     >
         <div
             class="flex w-full flex-col items-stretch px-4 lg:px-8 xl:px-0 xl:mx-auto xl:max-w-8/12"

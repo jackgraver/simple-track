@@ -40,6 +40,7 @@ export interface LoggedExercise extends BaseModel {
     sets: LoggedSet[];
     notes: string;
     percent_change?: number;
+    log_date?: string;
 }
 
 export interface Exercise extends BaseModel {

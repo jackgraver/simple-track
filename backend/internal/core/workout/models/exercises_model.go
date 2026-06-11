@@ -2,6 +2,7 @@ package models
 
 import (
 	"be-simpletracker/internal/database/repository"
+	"time"
 
 	"gorm.io/gorm"
 )
@@ -16,6 +17,7 @@ type LoggedExercise struct {
 	Sets          []LoggedSet `json:"sets" gorm:"constraint:OnDelete:CASCADE;"`
 	Notes         string      `json:"notes"`
 	PercentChange float32     `json:"percent_change" gorm:"-"`
+	LogDate       time.Time   `json:"log_date,omitempty" gorm:"-"`
 }
 
 func (l LoggedExercise) GetID() uint        { return l.ID }

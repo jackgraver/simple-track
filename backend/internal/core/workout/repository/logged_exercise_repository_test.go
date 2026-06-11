@@ -121,4 +121,7 @@ func TestGetMaxExerciseLog_usesHighestWeightThenReps(t *testing.T) {
 	if len(got.Sets) != 1 || got.Sets[0].Weight != 100 || got.Sets[0].Reps != 8 {
 		t.Fatalf("sets %+v", got.Sets)
 	}
+	if got.LogDate.IsZero() || !got.LogDate.Equal(recent.Date) {
+		t.Fatalf("log date %+v want %+v", got.LogDate, recent.Date)
+	}
 }

@@ -25,6 +25,7 @@ import {
 } from "../domain/weightSetup";
 import ExerciseProgressionChartPanel from "~/pages/gym/progression/ExerciseProgressionChartPanel.vue";
 import { toast } from "~/composables/toast/useToast";
+import { formatDate, isSameDay } from "~/utils/dateUtil";
 
 const route = useRoute();
 const router = useRouter();
@@ -85,11 +86,22 @@ watch(cuesTextFromSession, (fromSession) => {
 type PerformanceSummaryItem = {
     label: string;
     text: string;
+    date?: string;
 };
 
 const formatLoggedSets = (
     sets: readonly { weight: number; reps: number }[] | undefined,
 ) => (sets ?? []).map((set) => `${set.weight}x${set.reps}`).join(", ");
+
+const formatPerformanceDate = (iso: string | undefined) => {
+    if (!iso) return undefined;
+    return formatDate(iso.includes("T") ? iso : `${iso}T12:00:00`);
+};
+
+const performanceDatesDiffer = (
+    first: string | undefined,
+    second: string | undefined,
+) => Boolean(first && second && !isSameDay(first, second));
 
 const loggedSetsMatch = (
     first: ExerciseGroup["previous"],
@@ -119,9 +131,18 @@ const performanceSummary = computed<PerformanceSummaryItem[]>(() => {
     if (previousText && maxText && loggedSetsMatch(previous, max)) {
         return [{ label: "Last & Max", text: previousText }];
     }
+    const showMaxDate = performanceDatesDiffer(previous?.log_date, max?.log_date);
     return [
         previousText ? { label: "Last", text: previousText } : null,
-        maxText ? { label: "Max", text: maxText } : null,
+        maxText
+            ? {
+                  label: "Max",
+                  text: maxText,
+                  date: showMaxDate
+                      ? formatPerformanceDate(max?.log_date)
+                      : undefined,
+              }
+            : null,
     ].filter((item): item is PerformanceSummaryItem => item !== null);
 });
 
@@ -372,7 +393,14 @@ const editCues = async () => {
                 :key="item.label"
                 class="flex flex-col gap-1"
             >
-                <span class="previous-performance-label">{{ item.label }}</span>
+                <span class="previous-performance-label">
+                    {{ item.label }}<span
+                        v-if="item.date"
+                        class="font-normal normal-case tracking-normal text-[rgb(100,100,100)]"
+                    >
+                        · {{ item.date }}</span
+                    >
+                </span>
                 <span class="previous-performance-value">{{ item.text }}</span>
             </span>
         </button>

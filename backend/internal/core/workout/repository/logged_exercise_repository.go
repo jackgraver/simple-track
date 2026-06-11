@@ -98,7 +98,26 @@ func RemoveLoggedExerciseForDay(ctx context.Context, day time.Time, exerciseID u
 func LoadLoggedExercise(id uint) (models.LoggedExercise, error) {
 	var exercise models.LoggedExercise
 	err := conn().Preload("Exercise").Preload("Sets").Where("id = ?", id).First(&exercise).Error
-	return exercise, err
+	if err != nil {
+		return models.LoggedExercise{}, err
+	}
+	if err := attachWorkoutLogDate(&exercise); err != nil {
+		return models.LoggedExercise{}, err
+	}
+	return exercise, nil
+}
+
+func attachWorkoutLogDate(exerciseLog *models.LoggedExercise) error {
+	if exerciseLog == nil || exerciseLog.ID == 0 {
+		return nil
+	}
+	var workoutLog models.WorkoutLog
+	err := conn().Select("date").First(&workoutLog, exerciseLog.WorkoutLogID).Error
+	if err != nil {
+		return err
+	}
+	exerciseLog.LogDate = workoutLog.Date
+	return nil
 }
 
 func GetPreviousExerciseLog(ctx context.Context, day time.Time, exercise string, offset int) (models.LoggedExercise, error) {
@@ -116,6 +135,12 @@ func GetPreviousExerciseLog(ctx context.Context, day time.Time, exercise string,
 		Limit(1).
 		Find(&exerciseLog).Error
 	if err != nil {
+		return models.LoggedExercise{}, err
+	}
+	if exerciseLog.ID == 0 {
+		return exerciseLog, nil
+	}
+	if err := attachWorkoutLogDate(&exerciseLog); err != nil {
 		return models.LoggedExercise{}, err
 	}
 	return exerciseLog, nil
@@ -141,6 +166,12 @@ func GetMaxExerciseLog(ctx context.Context, day time.Time, exercise string) (mod
 		Limit(1).
 		First(&exerciseLog).Error
 	if err != nil {
+		return models.LoggedExercise{}, err
+	}
+	if exerciseLog.ID == 0 {
+		return exerciseLog, nil
+	}
+	if err := attachWorkoutLogDate(&exerciseLog); err != nil {
 		return models.LoggedExercise{}, err
 	}
 	return exerciseLog, nil
