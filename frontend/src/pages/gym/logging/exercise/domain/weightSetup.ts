@@ -1,6 +1,5 @@
 export const STANDARD_PLATE_LBS = [45, 35, 25, 10, 5, 2.5] as const;
 export const DEFAULT_BAR_LBS = 45;
-export const BAR_WEIGHT_OPTIONS = [45, 35] as const;
 
 export type PlateCountsPerSide = Partial<Record<number, number>>;
 
@@ -45,7 +44,11 @@ export function formatWeightSetup(
     }
     const plates = parts.join(" + ");
     if (plates.length === 0) {
+        if (barLbs === 0) return "";
         return barLbs !== DEFAULT_BAR_LBS ? `bar ${barLbs}` : "";
+    }
+    if (barLbs === 0) {
+        return `${plates}, bar 0`;
     }
     if (barLbs !== DEFAULT_BAR_LBS) {
         return `${plates}, bar ${barLbs}`;
