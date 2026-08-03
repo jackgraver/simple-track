@@ -2,7 +2,7 @@
 import { useWorkoutStore } from "../store/useWorkoutStore";
 import { computed } from "vue";
 import { useRoute } from "vue-router";
-import ExerciseLoggingView from "./components/ExerciseLoggingView.vue";
+import ExerciseLoggingFlow from "./components/ExerciseLoggingFlow.vue";
 import CardioLoggingView from "./components/CardioLoggingView.vue";
 import MobilityLoggingView from "./components/MobilityLoggingView.vue";
 import LoggingPageShell from "./components/LoggingPageShell.vue";
@@ -70,27 +70,36 @@ const isEmpty = computed(() => {
     if (loggingKind.value === "mobility") return !mobilityLoggedForRoute.value;
     return false;
 });
+
 </script>
 
 <template>
     <LoggingPageShell
+        v-if="loggingKind === 'exercise'"
         :pending="pending"
         :error="error"
         :empty="isEmpty"
         :empty-message="emptyMessage"
         @back="goBackToLogging"
     >
-        <div
-            class="flex flex-col gap-4 w-full self-stretch md:p-0 md:px-2 md:py-0"
-        >
-            <ExerciseLoggingView v-if="loggingKind === 'exercise'" />
+        <ExerciseLoggingFlow />
+    </LoggingPageShell>
+    <LoggingPageShell
+        v-else
+        :pending="pending"
+        :error="error"
+        :empty="isEmpty"
+        :empty-message="emptyMessage"
+        @back="goBackToLogging"
+    >
+        <div class="flex w-full flex-col gap-4 self-stretch md:px-2">
             <CardioLoggingView
-                v-else-if="loggingKind === 'cardio'"
+                v-if="loggingKind === 'cardio'"
                 :planned-cardio="plannedCardio"
                 :logged-cardio="loggedCardio"
             />
             <MobilityLoggingView
-                v-else-if="loggingKind === 'mobility'"
+                v-else
                 :logged-pre-mobility="loggedPreMobility"
                 :logged-post-mobility="loggedPostMobility"
                 :save-pre-mobility="savePreMobility"
