@@ -52,6 +52,9 @@ func main() {
 	if err != nil {
 		panic("Database unreachable")
 	}
+	if err := workout.Migrate(db); err != nil {
+		panic(err)
+	}
 
 	CreateFeatures(db, router)
 

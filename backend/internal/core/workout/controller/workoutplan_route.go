@@ -1,13 +1,99 @@
 package controller
 
 import (
+	"be-simpletracker/internal/core/workout/models"
 	"be-simpletracker/internal/core/workout/services"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
+
+type workoutProgramRequest struct {
+	Name string `json:"name" binding:"required"`
+}
+
+type createWorkoutPlanRequest struct {
+	Name      string `json:"name" binding:"required"`
+	DayOfWeek *int   `json:"day_of_week"`
+}
+
+func GetAllWorkoutPrograms(c *gin.Context) {
+	programs, err := services.GetAllWorkoutPrograms()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"programs": programs})
+}
+
+func CreateWorkoutProgram(c *gin.Context) {
+	var body workoutProgramRequest
+	if err := c.ShouldBindJSON(&body); err != nil || strings.TrimSpace(body.Name) == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "name is required"})
+		return
+	}
+	program, err := services.CreateWorkoutProgram(body.Name)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusCreated, gin.H{"program": program})
+}
+
+func CreateWorkoutPlan(c *gin.Context) {
+	programID, err := strconv.ParseUint(c.Param("id"), 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid program ID"})
+		return
+	}
+	var body createWorkoutPlanRequest
+	if err := c.ShouldBindJSON(&body); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	plan, err := services.CreateWorkoutPlan(uint(programID), body.Name, body.DayOfWeek)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusCreated, gin.H{"plan": plan})
+}
+
+func RenameWorkoutProgram(c *gin.Context) {
+	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid program ID"})
+		return
+	}
+	var body workoutProgramRequest
+	if err := c.ShouldBindJSON(&body); err != nil || strings.TrimSpace(body.Name) == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "name is required"})
+		return
+	}
+	program, err := services.RenameWorkoutProgram(uint(id), body.Name)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"program": program})
+}
+
+func ActivateWorkoutProgram(c *gin.Context) {
+	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid program ID"})
+		return
+	}
+	program, err := services.ActivateWorkoutProgram(c.Request.Context(), uint(id))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"program": program})
+}
 
 func GetAllWorkoutPlans(c *gin.Context) {
 	workoutPlans, err := services.GetAllWorkoutPlans()
@@ -186,7 +272,17 @@ func UnassignPlanFromDay(c *gin.Context) {
 		return
 	}
 
-	plan, err := services.UnassignPlanFromDay(uint(planID))
+	var plan *models.WorkoutPlan
+	if rawDay := c.Query("day_of_week"); rawDay != "" {
+		day, parseErr := strconv.Atoi(rawDay)
+		if parseErr != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid day_of_week"})
+			return
+		}
+		plan, err = services.UnassignPlanFromSpecificDay(uint(planID), day)
+	} else {
+		plan, err = services.UnassignPlanFromDay(uint(planID))
+	}
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

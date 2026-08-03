@@ -8,7 +8,7 @@ import (
 	"be-simpletracker/internal/core/tracking/steps"
 	"be-simpletracker/internal/core/tracking/water"
 	"be-simpletracker/internal/core/tracking/weight"
-	workoutmodels "be-simpletracker/internal/core/workout/models"
+	workout "be-simpletracker/internal/core/workout"
 	"be-simpletracker/internal/database"
 	"fmt"
 	"os"
@@ -27,15 +27,7 @@ func main() {
 
 	// db.AutoMigrate(&models.User{})
 
-	if err := db.AutoMigrate(
-		&workoutmodels.Exercise{},
-		&workoutmodels.WorkoutPlan{},
-		&workoutmodels.WorkoutPlanExercise{},
-		&workoutmodels.LoggedExercise{},
-		&workoutmodels.LoggedSet{},
-		&workoutmodels.WorkoutLog{},
-		&workoutmodels.Cardio{},
-	); err != nil {
+	if err := workout.Migrate(db); err != nil {
 		fmt.Fprintf(os.Stderr, "AutoMigrate: %v\n", err)
 		os.Exit(1)
 	}
