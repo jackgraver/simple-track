@@ -89,6 +89,12 @@ export function useExerciseLoggingSession(options: {
     const notes = ref("");
     const globalTimer = useGlobalRestTimer();
     const REST_DURATION_MS = 2 * 60 * 1000;
+    const MAX_REPS = 50;
+
+    const normalizeReps = (value: number) => {
+        if (!Number.isFinite(value)) return 0;
+        return Math.min(MAX_REPS, Math.max(0, Math.round(value)));
+    };
 
     const exerciseIdentity = computed(() => {
         const group = exerciseGroup.value;
@@ -151,7 +157,7 @@ export function useExerciseLoggingSession(options: {
                 return false;
             }
             currentWeight.value = parsed.weight;
-            currentReps.value = parsed.reps ?? 0;
+            currentReps.value = normalizeReps(parsed.reps ?? 0);
             currentWeightSetup.value = parsed.weightSetup ?? "";
             if (typeof parsed.notes === "string" && parsed.notes.length > 0) {
                 notes.value = parsed.notes;
@@ -179,7 +185,7 @@ export function useExerciseLoggingSession(options: {
 
         const { weight, reps, weightSetup } = initializeWeightAndReps(group.logged?.sets, group.previous?.sets);
         currentWeight.value = weight;
-        currentReps.value = reps;
+        currentReps.value = normalizeReps(reps);
         currentWeightSetup.value = weightSetup;
 
         draftDirty.value = false;
@@ -261,9 +267,9 @@ export function useExerciseLoggingSession(options: {
     const stepReps = (direction: "plus" | "minus") => {
         draftDirty.value = true;
         if (direction === "plus") {
-            currentReps.value = (currentReps.value || 0) + 1;
+            currentReps.value = normalizeReps((currentReps.value || 0) + 1);
         } else {
-            currentReps.value = Math.max(0, (currentReps.value || 0) - 1);
+            currentReps.value = normalizeReps((currentReps.value || 0) - 1);
         }
     };
 
@@ -274,11 +280,13 @@ export function useExerciseLoggingSession(options: {
 
     const commitRepsFromInput = (value: number) => {
         draftDirty.value = true;
-        currentReps.value = value;
+        currentReps.value = normalizeReps(value);
     };
 
     const addNextSet = async (): Promise<boolean> => {
-        if (currentReps.value <= 0) {
+        const reps = normalizeReps(currentReps.value);
+        currentReps.value = reps;
+        if (reps <= 0) {
             toast.push("Enter reps before logging the set", "error");
             return false;
         }
@@ -381,7 +389,7 @@ export function useExerciseLoggingSession(options: {
         }
 
         currentWeight.value = set.weight;
-        currentReps.value = set.reps;
+        currentReps.value = normalizeReps(set.reps);
         currentWeightSetup.value = set.weight_setup;
         draftDirty.value = true;
 
