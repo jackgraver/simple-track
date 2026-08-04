@@ -10,12 +10,15 @@ export function getWeightProgression(
     previousSets: readonly { weight: number; reps: number }[] | undefined,
     repRollover: number | undefined,
     currentWeight: number,
+    increase = WEIGHT_PROGRESSION_INCREASE_LBS,
 ): WeightProgression | null {
     if (
         typeof repRollover !== "number" ||
         !Number.isFinite(repRollover) ||
         !Number.isFinite(currentWeight) ||
-        currentWeight <= 0
+        currentWeight <= 0 ||
+        !Number.isFinite(increase) ||
+        increase <= 0
     ) {
         return null;
     }
@@ -32,7 +35,7 @@ export function getWeightProgression(
     }
     return {
         previousWeight: currentWeight,
-        nextWeight: currentWeight + WEIGHT_PROGRESSION_INCREASE_LBS,
-        increase: WEIGHT_PROGRESSION_INCREASE_LBS,
+        nextWeight: currentWeight + increase,
+        increase,
     };
 }
