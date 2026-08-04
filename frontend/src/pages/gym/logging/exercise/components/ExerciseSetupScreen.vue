@@ -1,29 +1,49 @@
 <script setup lang="ts">
+import { useGlobalRestTimer } from "~/composables/useGlobalRestTimer";
 import LoggingHeader from "./LoggingHeader.vue";
 
 defineProps<{
     exerciseName: string;
     expectedWeight: number;
-    previousReps: number | null;
+    previousReps: number[];
     notes: string;
     cues: string;
-    machineSetupNote: string;
     weightIncrease: number | null;
+    tracksWeightSetup: boolean;
+    weightSetupSummary: string;
 }>();
 
 const emit = defineEmits<{
     (event: "back"): void;
     (event: "continue"): void;
     (event: "undo-weight-increase"): void;
+    (event: "edit-weight-setup"): void;
 }>();
+
+const {
+    displayText,
+    exerciseName: restExerciseName,
+    isActive,
+} = useGlobalRestTimer();
 </script>
 
 <template>
     <div class="flex w-full flex-col gap-6">
-        <LoggingHeader :title="exerciseName" @back="emit('back')" />
+        <LoggingHeader :title="exerciseName" @back="emit('back')">
+            <template v-if="isActive" #right>
+                <span class="block text-xs text-zinc-500">
+                    Rest since {{ restExerciseName || "last set" }}
+                </span>
+                <span class="block font-medium tabular-nums text-zinc-200">
+                    {{ displayText }}
+                </span>
+            </template>
+        </LoggingHeader>
         <div class="flex flex-col gap-5">
             <section class="flex flex-col gap-1 border-b border-zinc-700 pb-5">
-                <p class="m-0 text-xs font-semibold uppercase tracking-wide text-zinc-500">
+                <p
+                    class="m-0 text-xs font-semibold uppercase tracking-wide text-zinc-500"
+                >
                     Set the machine to
                 </p>
                 <div class="mt-2 flex items-start gap-2">
@@ -48,33 +68,54 @@ const emit = defineEmits<{
                         >
                     </button>
                 </div>
+                <button
+                    v-if="tracksWeightSetup"
+                    type="button"
+                    class="mt-4 w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-left text-zinc-300 transition-colors hover:border-zinc-500 hover:bg-zinc-800"
+                    @click="emit('edit-weight-setup')"
+                >
+                    <span
+                        class="mr-2 text-xs font-semibold uppercase tracking-wide text-zinc-500"
+                    >
+                        Weight setup
+                    </span>
+                    {{ weightSetupSummary }}
+                </button>
             </section>
             <section class="flex flex-col gap-1 border-b border-zinc-700 pb-5">
-                <p class="m-0 text-xs font-semibold uppercase tracking-wide text-zinc-500">
+                <p
+                    class="m-0 text-xs font-semibold uppercase tracking-wide text-zinc-500"
+                >
                     Previous session
                 </p>
                 <p class="m-0 mt-2 text-lg text-zinc-200">
-                    {{ previousReps != null ? `${previousReps} reps` : "No previous reps recorded" }}
+                    {{
+                        previousReps.length
+                            ? previousReps.join(", ")
+                            : "No previous reps recorded"
+                    }}
                 </p>
             </section>
             <section class="flex flex-col gap-4">
-                <div>
-                    <p class="m-0 text-xs font-semibold uppercase tracking-wide text-zinc-500">
-                        Machine setup
-                    </p>
-                    <p class="m-0 mt-2 text-zinc-300">{{ machineSetupNote }}</p>
-                </div>
                 <div v-if="notes">
-                    <p class="m-0 text-xs font-semibold uppercase tracking-wide text-zinc-500">
+                    <p
+                        class="m-0 text-xs font-semibold uppercase tracking-wide text-zinc-500"
+                    >
                         Notes
                     </p>
-                    <p class="m-0 mt-2 whitespace-pre-wrap text-zinc-300">{{ notes }}</p>
+                    <p class="m-0 mt-2 whitespace-pre-wrap text-zinc-300">
+                        {{ notes }}
+                    </p>
                 </div>
                 <div v-if="cues">
-                    <p class="m-0 text-xs font-semibold uppercase tracking-wide text-zinc-500">
+                    <p
+                        class="m-0 text-xs font-semibold uppercase tracking-wide text-zinc-500"
+                    >
                         Cues
                     </p>
-                    <p class="m-0 mt-2 whitespace-pre-wrap text-zinc-300">{{ cues }}</p>
+                    <p class="m-0 mt-2 whitespace-pre-wrap text-zinc-300">
+                        {{ cues }}
+                    </p>
                 </div>
             </section>
         </div>
