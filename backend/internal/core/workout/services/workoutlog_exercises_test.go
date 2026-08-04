@@ -31,6 +31,9 @@ func TestCreateExercise_andGetAllExercises(t *testing.T) {
 	if len(excluded) != 0 {
 		t.Fatalf("expected empty list, got %+v", excluded)
 	}
+	if created.LoadType != models.ExerciseLoadTypePlateLoadedWithBar {
+		t.Fatalf("expected default load type, got %q", created.LoadType)
+	}
 }
 
 func TestUpdateExercise_andUpdateExerciseCues(t *testing.T) {
@@ -39,11 +42,19 @@ func TestUpdateExercise_andUpdateExerciseCues(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	updated, err := services.UpdateExercise(created.ID, "Barbell Row", 8, "pull elbows back")
+	updated, err := services.UpdateExercise(
+		created.ID,
+		"Barbell Row",
+		8,
+		"pull elbows back",
+		models.ExerciseLoadTypePlateLoadedWithoutBar,
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if updated.Name != "Barbell Row" || updated.RepRollover != 8 {
+	if updated.Name != "Barbell Row" ||
+		updated.RepRollover != 8 ||
+		updated.LoadType != models.ExerciseLoadTypePlateLoadedWithoutBar {
 		t.Fatalf("got %+v", updated)
 	}
 	cued, err := services.UpdateExerciseCues(created.ID, "new cue")

@@ -15,6 +15,7 @@ import {
     markPendingSetsAsExerciseError,
 } from "../domain/exerciseLoggingPayload";
 import { initializeWeightAndReps } from "../domain/loggedSetDefaults";
+import { weightSetupForExercise } from "../domain/weightSetup";
 
 type StoredDraft = {
     weight: number;
@@ -108,6 +109,19 @@ export function useExerciseLoggingSession(options: {
         );
     });
 
+    const exerciseLoadType = computed(
+        () =>
+            exerciseGroup.value?.planned?.load_type ??
+            exerciseGroup.value?.logged?.exercise?.load_type ??
+            "plate_loaded_with_bar",
+    );
+
+    const weightSetupForSave = () =>
+        weightSetupForExercise(
+            exerciseLoadType.value,
+            currentWeightSetup.value,
+        );
+
     const draftStorageKey = computed(
         () => `gym-draft:v1:day:${dayId.value}:exercise:${exerciseIdentity.value}`,
     );
@@ -200,7 +214,7 @@ export function useExerciseLoggingSession(options: {
                 ? {
                     weight: currentWeight.value,
                     reps: currentReps.value,
-                    weight_setup: currentWeightSetup.value,
+                    weight_setup: weightSetupForSave(),
                     tempId: draftTempId,
                 }
                 : null;
@@ -274,7 +288,7 @@ export function useExerciseLoggingSession(options: {
         const newSet: LoggedSetWithStatus = {
             weight: currentWeight.value,
             reps: currentReps.value,
-            weight_setup: currentWeightSetup.value,
+            weight_setup: weightSetupForSave(),
             status: "pending",
             id: null,
             error: null,

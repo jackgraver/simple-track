@@ -1,5 +1,9 @@
 <script setup lang="ts">
 import type { ExerciseGroup } from "../../store/useWorkoutStore";
+import {
+    DEFAULT_EXERCISE_LOAD_TYPE,
+    type ExerciseLoadType,
+} from "~/types/workout";
 import { useWorkoutStore } from "../../store/useWorkoutStore";
 import { useExerciseLoggingSession } from "../composables/useExerciseLoggingSession";
 import { useLoggingRouteContext } from "../../composables/useLoggingRouteContext";
@@ -19,7 +23,8 @@ import { dialogManager } from "~/composables/dialog/useDialog";
 import EditCuesDialog from "../dialog/EditCuesDialog.vue";
 import WeightSetupDialog from "../dialog/WeightSetupDialog.vue";
 import {
-    computeBarbellTotalLbs,
+    computeExerciseLoadLbs,
+    formatExerciseWeightSetup,
     parseWeightSetup,
     type WeightSetupDialogResult,
 } from "../domain/weightSetup";
@@ -160,6 +165,17 @@ const exerciseName = computed(
         "",
 );
 
+const exerciseLoadType = computed<ExerciseLoadType>(
+    () =>
+        (session.exerciseGroup?.planned?.load_type ??
+            session.exerciseGroup?.logged?.exercise?.load_type ??
+            DEFAULT_EXERCISE_LOAD_TYPE) as ExerciseLoadType,
+);
+
+const tracksWeightSetup = computed(
+    () => exerciseLoadType.value !== "weight_stack",
+);
+
 const { isActive: timerActive, displayText: timerText } = useGlobalRestTimer();
 
 const headerText = computed(() =>
@@ -233,12 +249,20 @@ const openProgressionDialog = () => {
 };
 
 const weightSetupSummary = computed(() => {
+    if (!tracksWeightSetup.value) return "";
     const text = session.currentWeightSetup.trim();
     if (!text) return "";
     const parsed = parseWeightSetup(text);
     if (!parsed.parsed) return text;
-    const total = computeBarbellTotalLbs(parsed.barLbs, parsed.platesPerSide);
-    return `${text} (${total} lbs)`;
+    const normalizedText = formatExerciseWeightSetup(
+        exerciseLoadType.value,
+        parsed.platesPerSide,
+    );
+    const total = computeExerciseLoadLbs(
+        exerciseLoadType.value,
+        parsed.platesPerSide,
+    );
+    return `${normalizedText || "No plates"} (${total} lbs)`;
 });
 
 const openWeightSetupDialog = async () => {
@@ -248,7 +272,9 @@ const openWeightSetupDialog = async () => {
         componentProps: {
             currentSetup: session.currentWeightSetup,
             targetWeightLbs: session.currentWeight,
+            loadType: exerciseLoadType.value,
         },
+        wide: true,
     });
     if (result == null) return;
     session.updateWeightSetup(result.weightSetup);
@@ -312,7 +338,7 @@ const editCues = async () => {
                     @update:model-value="session.commitRepsFromInput"
                 />
             </div>
-            <div class="input-container">
+            <div v-if="tracksWeightSetup" class="input-container">
                 <label>Weight setup</label>
                 <button
                     type="button"

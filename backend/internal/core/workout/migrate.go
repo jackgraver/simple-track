@@ -21,6 +21,11 @@ func Migrate(db *gorm.DB) error {
 	); err != nil {
 		return err
 	}
+	if err := db.Model(&models.Exercise{}).
+		Where("load_type IS NULL OR load_type = ''").
+		Update("load_type", models.ExerciseLoadTypePlateLoadedWithBar).Error; err != nil {
+		return err
+	}
 	if db.Migrator().HasIndex(&models.WorkoutPlan{}, "idx_day_of_week") {
 		if err := db.Migrator().DropIndex(&models.WorkoutPlan{}, "idx_day_of_week"); err != nil {
 			return fmt.Errorf("drop legacy workout day index: %w", err)

@@ -55,7 +55,16 @@ export interface Exercise extends BaseModel {
     name: string;
     rep_rollover: number;
     cues: string;
+    load_type?: ExerciseLoadType;
 }
+
+export type ExerciseLoadType =
+    | "plate_loaded_with_bar"
+    | "plate_loaded_without_bar"
+    | "weight_stack";
+
+export const DEFAULT_EXERCISE_LOAD_TYPE: ExerciseLoadType =
+    "plate_loaded_with_bar";
 
 export interface Cardio extends BaseModel {
     workout_log_id: number;

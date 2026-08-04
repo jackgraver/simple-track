@@ -521,11 +521,16 @@ func ReorderPlanExercises(planID uint, exerciseIDs []uint) error {
 	return workoutrepo.ReorderPlanExercises(planID, exerciseIDs)
 }
 
-func CreateExercise(name string, repRollover uint, cues string) (*models.Exercise, error) {
+func CreateExercise(name string, repRollover uint, cues string, loadTypes ...models.ExerciseLoadType) (*models.Exercise, error) {
+	loadType := models.ExerciseLoadType("")
+	if len(loadTypes) > 0 {
+		loadType = loadTypes[0]
+	}
 	exercise := models.Exercise{
 		Name:        name,
 		RepRollover: repRollover,
 		Cues:        cues,
+		LoadType:    models.NormalizeExerciseLoadType(loadType),
 	}
 	if err := workoutrepo.CreateExercise(&exercise); err != nil {
 		return nil, err
@@ -533,8 +538,8 @@ func CreateExercise(name string, repRollover uint, cues string) (*models.Exercis
 	return &exercise, nil
 }
 
-func UpdateExercise(id uint, name string, repRollover uint, cues string) (*models.Exercise, error) {
-	return workoutrepo.UpdateExercise(id, name, repRollover, cues)
+func UpdateExercise(id uint, name string, repRollover uint, cues string, loadTypes ...models.ExerciseLoadType) (*models.Exercise, error) {
+	return workoutrepo.UpdateExercise(id, name, repRollover, cues, loadTypes...)
 }
 
 func AssignPlanToDay(planID uint, dayOfWeek int) (*models.WorkoutPlan, error) {

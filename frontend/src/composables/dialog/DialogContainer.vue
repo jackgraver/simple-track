@@ -109,6 +109,7 @@ function isConfirmDialog(
     flex-direction: column;
     min-width: 30%;
     max-width: 90vw;
+    box-sizing: border-box;
     background: rgb(26, 26, 26);
     border: 1px solid #3d3d3d;
     border-radius: 10px;
@@ -119,7 +120,8 @@ function isConfirmDialog(
 }
 
 .dialog-container--wide {
-    min-width: min(90vw, 42rem);
+    width: min(90vw, 42rem);
+    min-width: 0;
 }
 
 .dialog-container > * {
@@ -163,6 +165,7 @@ function isConfirmDialog(
 
 .template {
     flex: 1;
+    min-width: 0;
     padding: 1.25rem;
     overflow-y: auto;
     text-align: left;

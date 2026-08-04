@@ -1,9 +1,8 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
 import {
-    computeBarbellTotalLbs,
-    DEFAULT_BAR_LBS,
-    formatWeightSetup,
+    computeExerciseLoadLbs,
+    formatExerciseWeightSetup,
     parseWeightSetup,
     perSideLoadLbs,
     STANDARD_PLATE_LBS,
@@ -15,34 +14,27 @@ import {
 const props = defineProps<{
     currentSetup: string;
     targetWeightLbs: number;
+    loadType: "plate_loaded_with_bar" | "plate_loaded_without_bar";
     onResolve?: (value: WeightSetupDialogResult) => void;
 }>();
 
 const initial = parseWeightSetup(props.currentSetup);
-const setupText = ref(props.currentSetup);
+const setupText = ref(
+    initial.parsed
+        ? formatExerciseWeightSetup(props.loadType, initial.platesPerSide)
+        : props.currentSetup,
+);
 const counts = ref<PlateCountsPerSide>({ ...initial.platesPerSide });
-const countBar = ref(initial.barLbs !== 0);
 const parseFailed = ref(!initial.parsed && props.currentSetup.trim().length > 0);
 
-function effectiveBarLbs(): number {
-    return countBar.value ? DEFAULT_BAR_LBS : 0;
-}
-
 function refreshSetupText() {
-    setupText.value = formatWeightSetup(effectiveBarLbs(), counts.value);
+    setupText.value = formatExerciseWeightSetup(props.loadType, counts.value);
     parseFailed.value = false;
-}
-
-function setCountBar(next: boolean) {
-    countBar.value = next;
-    if (!parseFailed.value) {
-        refreshSetupText();
-    }
 }
 
 const totalLbs = computed(() => {
     if (parseFailed.value) return 0;
-    return computeBarbellTotalLbs(effectiveBarLbs(), counts.value);
+    return computeExerciseLoadLbs(props.loadType, counts.value);
 });
 
 const mismatchDelta = computed(() =>
@@ -72,7 +64,6 @@ function syncFromTextInput() {
     const parsed = parseWeightSetup(setupText.value);
     if (parsed.parsed) {
         counts.value = { ...parsed.platesPerSide };
-        countBar.value = parsed.barLbs !== 0;
         parseFailed.value = false;
         return;
     }
@@ -83,8 +74,12 @@ function syncFromTextInput() {
 }
 
 function save(syncWeight: boolean) {
+    const parsed = parseWeightSetup(setupText.value);
+    const weightSetup = parsed.parsed
+        ? formatExerciseWeightSetup(props.loadType, parsed.platesPerSide)
+        : setupText.value.trim();
     props.onResolve?.({
-        weightSetup: setupText.value.trim(),
+        weightSetup,
         totalLbs: totalLbs.value,
         syncWeight,
     });
@@ -92,7 +87,7 @@ function save(syncWeight: boolean) {
 </script>
 
 <template>
-    <div class="flex flex-col gap-4">
+    <div class="flex w-full min-w-0 flex-col gap-4">
         <div class="flex flex-col gap-2">
             <label
                 for="weight-setup-text"
@@ -104,7 +99,7 @@ function save(syncWeight: boolean) {
                 v-model="setupText"
                 type="text"
                 placeholder="e.g. belt, 2×45 + 10, or notes"
-                class="rounded-md border border-[rgb(56,56,56)] bg-[rgb(27,27,27)] px-3 py-2 text-sm outline-none focus:border-[rgb(100,100,100)]"
+                class="w-full min-w-0 rounded-md border border-[rgb(56,56,56)] bg-[rgb(27,27,27)] px-3 py-2 text-sm outline-none focus:border-[rgb(100,100,100)]"
                 @input="syncFromTextInput"
             />
             <p
@@ -114,22 +109,13 @@ function save(syncWeight: boolean) {
                 Free text — use the plate picker below to build barbell notation.
             </p>
         </div>
-        <label
-            class="flex cursor-pointer items-center gap-2 text-sm text-[rgb(180,180,180)]"
-        >
-            <input
-                type="checkbox"
-                class="h-4 w-4 rounded border-[rgb(56,56,56)] bg-[rgb(27,27,27)]"
-                :checked="countBar"
-                @change="setCountBar(($event.target as HTMLInputElement).checked)"
-            />
-            Include 45 lb bar in total
-        </label>
         <div class="flex flex-col gap-2">
             <span class="text-sm font-medium text-[rgb(150,150,150)]">{{
-                countBar ? "Plates per side (45 lb bar)" : "Plates per side"
+                props.loadType === "plate_loaded_with_bar"
+                    ? "Plates per side (45 lb bar included)"
+                    : "Plates per side (bar not counted)"
             }}</span>
-            <ul class="m-0 flex list-none flex-col gap-1.5 p-0">
+            <ul class="m-0 flex w-full min-w-0 list-none flex-col gap-1.5 p-0">
                 <li
                     v-for="plate in STANDARD_PLATE_LBS"
                     :key="plate"
@@ -169,9 +155,7 @@ function save(syncWeight: boolean) {
                 v-if="!parseFailed"
                 class="flex flex-wrap items-baseline justify-between gap-2"
             >
-                <span class="text-sm text-[rgb(150,150,150)]">{{
-                    countBar ? "Total on bar" : "Total load"
-                }}</span>
+                <span class="text-sm text-[rgb(150,150,150)]">Total load</span>
                 <span class="text-lg font-medium tabular-nums"
                     >{{ totalLbs }} lbs</span
                 >
@@ -183,10 +167,10 @@ function save(syncWeight: boolean) {
                 {{ setupText.trim() }}
             </p>
             <p
-                v-else-if="!hasPlates && countBar"
+                v-else-if="!hasPlates && props.loadType === 'plate_loaded_with_bar'"
                 class="m-0 text-sm text-[rgb(120,120,120)]"
             >
-                Bar only ({{ DEFAULT_BAR_LBS }} lbs)
+                Bar only (45 lbs)
             </p>
             <p
                 v-else-if="!hasPlates"
@@ -203,7 +187,7 @@ function save(syncWeight: boolean) {
                 }}{{ mismatchDelta }} lbs vs plates)
             </p>
         </div>
-        <div class="flex flex-col gap-2 sm:flex-row">
+        <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
             <button
                 type="button"
                 class="flex-1 rounded-md border border-[rgb(56,56,56)] bg-[rgb(35,35,35)] px-4 py-2 text-sm hover:bg-[rgb(50,50,50)]"
@@ -212,9 +196,9 @@ function save(syncWeight: boolean) {
                 Save setup
             </button>
             <button
-                v-if="!parseFailed && totalLbs > 0"
                 type="button"
-                class="flex-1 rounded-md bg-green-600 px-4 py-2 text-sm text-white hover:bg-green-500"
+                class="rounded-md bg-green-600 px-4 py-2 text-sm text-white hover:bg-green-500 disabled:cursor-not-allowed disabled:opacity-40"
+                :disabled="parseFailed || totalLbs <= 0"
                 @click="save(true)"
             >
                 Save & set weight to {{ totalLbs }} lbs
