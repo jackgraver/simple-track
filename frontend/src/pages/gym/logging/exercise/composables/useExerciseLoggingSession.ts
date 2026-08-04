@@ -16,6 +16,10 @@ import {
 } from "../domain/exerciseLoggingPayload";
 import { initializeWeightAndReps } from "../domain/loggedSetDefaults";
 import { weightSetupForExercise } from "../domain/weightSetup";
+import {
+    getWeightProgression,
+    type WeightProgression,
+} from "../domain/weightProgression";
 
 type StoredDraft = {
     weight: number;
@@ -34,6 +38,7 @@ export type ExerciseLoggingSessionViewModel = {
     currentReps: number;
     currentWeightSetup: string;
     notes: string;
+    weightProgression: WeightProgression | null;
     stepWeight: (direction: "plus" | "minus") => void;
     stepReps: (direction: "plus" | "minus") => void;
     commitWeightFromInput: (value: number) => void;
@@ -46,6 +51,7 @@ export type ExerciseLoggingSessionViewModel = {
     goBackToList: () => void;
     updateNotes: (value: string) => void;
     updateWeightSetup: (value: string) => void;
+    undoWeightProgression: () => void;
 };
 
 type LogExerciseFn = (
@@ -81,6 +87,7 @@ export function useExerciseLoggingSession(options: {
     const currentReps = ref(0);
     const currentWeightSetup = ref("");
     const currentSetNumber = ref(1);
+    const weightProgression = ref<WeightProgression | null>(null);
 
     const loggedSets = ref<LoggedSetWithStatus[]>([]);
     let tempIdCounter = 0;
@@ -183,14 +190,27 @@ export function useExerciseLoggingSession(options: {
         notes.value = group.logged?.notes ?? group.previous?.notes ?? "";
         currentSetNumber.value = loggedSets.value.length + 1;
 
-        const { weight, reps, weightSetup } = initializeWeightAndReps(group.logged?.sets, group.previous?.sets);
-        currentWeight.value = weight;
+        const { weight, reps, weightSetup } = initializeWeightAndReps(
+            group.logged?.sets,
+            group.previous?.sets,
+        );
+        weightProgression.value =
+            (group.logged?.sets?.length ?? 0) === 0
+                ? getWeightProgression(
+                      group.previous?.sets,
+                      group.previous?.exercise?.rep_rollover,
+                      weight,
+                  )
+                : null;
+        currentWeight.value = weightProgression.value?.nextWeight ?? weight;
         currentReps.value = normalizeReps(reps);
         currentWeightSetup.value = weightSetup;
 
         draftDirty.value = false;
 
-        draftStorage.restore();
+        if (draftStorage.restore()) {
+            weightProgression.value = null;
+        }
         draftStorage.setSaveEnabled(true);
     };
 
@@ -411,6 +431,13 @@ export function useExerciseLoggingSession(options: {
         draftDirty.value = true;
     };
 
+    const undoWeightProgression = () => {
+        if (!weightProgression.value) return;
+        currentWeight.value = weightProgression.value.previousWeight;
+        weightProgression.value = null;
+        draftDirty.value = true;
+    };
+
     return reactive({
         exerciseGroup,
         currentSetNumber,
@@ -419,6 +446,7 @@ export function useExerciseLoggingSession(options: {
         currentReps,
         currentWeightSetup,
         notes,
+        weightProgression,
         stepWeight,
         stepReps,
         commitWeightFromInput,
@@ -431,5 +459,6 @@ export function useExerciseLoggingSession(options: {
         goBackToList,
         updateNotes,
         updateWeightSetup,
+        undoWeightProgression,
     }) as ExerciseLoggingSessionViewModel;
 }
