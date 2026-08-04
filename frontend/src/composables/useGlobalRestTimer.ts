@@ -1,26 +1,27 @@
 import { computed, ref } from "vue";
 
 type StoredGlobalTimer = {
-    endsAt: number;
+    startedAt: number;
     exerciseName: string;
 };
 
 const STORAGE_KEY = "gym-rest-timer:global";
 const TICK_MS = 250;
+const MAX_REST_MS = 5 * 60 * 1000;
 
-const endsAt = ref<number | null>(null);
+const startedAt = ref<number | null>(null);
 const timerExerciseName = ref("");
-const remainingMs = ref(0);
+const elapsedMs = ref(0);
 
 let intervalId: number | null = null;
 
 function persist() {
-    if (endsAt.value === null) {
+    if (startedAt.value === null) {
         window.localStorage.removeItem(STORAGE_KEY);
         return;
     }
     const payload: StoredGlobalTimer = {
-        endsAt: endsAt.value,
+        startedAt: startedAt.value,
         exerciseName: timerExerciseName.value,
     };
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
@@ -34,18 +35,16 @@ function clearTick() {
 }
 
 function tick() {
-    if (endsAt.value === null) {
-        remainingMs.value = 0;
+    if (startedAt.value === null) {
+        elapsedMs.value = 0;
         return;
     }
-    const next = Math.max(0, endsAt.value - Date.now());
-    remainingMs.value = next;
-    if (next <= 0) {
-        endsAt.value = null;
-        timerExerciseName.value = "";
-        clearTick();
-        persist();
+    const elapsed = Math.max(0, Date.now() - startedAt.value);
+    if (elapsed >= MAX_REST_MS) {
+        clear();
+        return;
     }
+    elapsedMs.value = elapsed;
 }
 
 function ensureTick() {
@@ -53,8 +52,8 @@ function ensureTick() {
     intervalId = window.setInterval(tick, TICK_MS);
 }
 
-function start(durationMs: number, name: string) {
-    endsAt.value = Date.now() + durationMs;
+function start(name: string) {
+    startedAt.value = Date.now();
     timerExerciseName.value = name;
     persist();
     tick();
@@ -62,9 +61,9 @@ function start(durationMs: number, name: string) {
 }
 
 function clear() {
-    endsAt.value = null;
+    startedAt.value = null;
     timerExerciseName.value = "";
-    remainingMs.value = 0;
+    elapsedMs.value = 0;
     clearTick();
     persist();
 }
@@ -75,17 +74,17 @@ function restore() {
     try {
         const parsed = JSON.parse(raw) as Partial<StoredGlobalTimer>;
         if (
-            typeof parsed.endsAt !== "number" ||
-            !Number.isFinite(parsed.endsAt)
+            typeof parsed.startedAt !== "number" ||
+            !Number.isFinite(parsed.startedAt)
         ) {
             window.localStorage.removeItem(STORAGE_KEY);
             return;
         }
-        if (parsed.endsAt <= Date.now()) {
+        if (parsed.startedAt > Date.now()) {
             window.localStorage.removeItem(STORAGE_KEY);
             return;
         }
-        endsAt.value = parsed.endsAt;
+        startedAt.value = parsed.startedAt;
         timerExerciseName.value = parsed.exerciseName ?? "";
         tick();
         ensureTick();
@@ -96,11 +95,11 @@ function restore() {
 
 restore();
 
-const isActive = computed(() => remainingMs.value > 0);
+const isActive = computed(() => startedAt.value !== null);
 
 const displayText = computed(() => {
-    if (remainingMs.value <= 0) return "";
-    const totalSeconds = Math.ceil(remainingMs.value / 1000);
+    if (elapsedMs.value <= 0) return "0:00";
+    const totalSeconds = Math.floor(elapsedMs.value / 1000);
     const minutes = Math.floor(totalSeconds / 60);
     const seconds = totalSeconds % 60;
     return `${minutes}:${seconds.toString().padStart(2, "0")}`;
@@ -108,7 +107,7 @@ const displayText = computed(() => {
 
 export function useGlobalRestTimer() {
     return {
-        remainingMs,
+        elapsedMs,
         isActive,
         displayText,
         exerciseName: timerExerciseName,

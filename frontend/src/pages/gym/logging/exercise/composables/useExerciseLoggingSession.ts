@@ -2,7 +2,10 @@ import type { ComputedRef, Ref } from "vue";
 import { computed, reactive, ref, watch } from "vue";
 import type { Router } from "vue-router";
 import { buildLoggingListQuery } from "../../composables/useLoggingRouteContext";
-import type { ExerciseGroup, LoggedSetWithStatus } from "../../store/useWorkoutStore";
+import type {
+    ExerciseGroup,
+    LoggedSetWithStatus,
+} from "../../store/useWorkoutStore";
 import type { LoggedExercise } from "~/types/workout";
 import { toast } from "~/composables/toast/useToast";
 import { useGlobalRestTimer } from "~/composables/useGlobalRestTimer";
@@ -20,6 +23,10 @@ import {
     getWeightProgression,
     type WeightProgression,
 } from "../domain/weightProgression";
+import {
+    useGymWeightPrefs,
+    type GymWeightIncrement,
+} from "./useGymWeightPrefs";
 
 type StoredDraft = {
     weight: number;
@@ -27,6 +34,7 @@ type StoredDraft = {
     weightSetup: string;
     notes: string;
     dirty: boolean;
+    editingSetIndex: number | null;
 };
 
 /** Plain shape for templates (refs unwrapped via reactive session object). */
@@ -39,12 +47,14 @@ export type ExerciseLoggingSessionViewModel = {
     currentWeightSetup: string;
     notes: string;
     weightProgression: WeightProgression | null;
+    editingSetIndex: number | null;
+    weightIncrement: GymWeightIncrement;
     stepWeight: (direction: "plus" | "minus") => void;
     stepReps: (direction: "plus" | "minus") => void;
     commitWeightFromInput: (value: number) => void;
     commitRepsFromInput: (value: number) => void;
     addNextSet: () => Promise<boolean>;
-    finishLogging: () => Promise<void>;
+    finishLogging: () => Promise<boolean>;
     retrySet: (setIndex: number) => Promise<void>;
     deleteSet: (setIndex: number) => Promise<void>;
     editSet: (setIndex: number) => void;
@@ -52,6 +62,7 @@ export type ExerciseLoggingSessionViewModel = {
     updateNotes: (value: string) => void;
     updateWeightSetup: (value: string) => void;
     undoWeightProgression: () => void;
+    setWeightIncrement: (value: GymWeightIncrement) => void;
 };
 
 type LogExerciseFn = (
@@ -88,6 +99,8 @@ export function useExerciseLoggingSession(options: {
     const currentWeightSetup = ref("");
     const currentSetNumber = ref(1);
     const weightProgression = ref<WeightProgression | null>(null);
+    const editingSetIndex = ref<number | null>(null);
+    const { weightIncrement, setWeightIncrement } = useGymWeightPrefs();
 
     const loggedSets = ref<LoggedSetWithStatus[]>([]);
     let tempIdCounter = 0;
@@ -95,7 +108,6 @@ export function useExerciseLoggingSession(options: {
     const draftDirty = ref(false);
     const notes = ref("");
     const globalTimer = useGlobalRestTimer();
-    const REST_DURATION_MS = 2 * 60 * 1000;
     const MAX_REPS = 50;
 
     const normalizeReps = (value: number) => {
@@ -115,11 +127,7 @@ export function useExerciseLoggingSession(options: {
 
     const exerciseDisplayName = computed(() => {
         const group = exerciseGroup.value;
-        return (
-            group?.planned?.name ??
-            group?.logged?.exercise?.name ??
-            ""
-        );
+        return group?.planned?.name ?? group?.logged?.exercise?.name ?? "";
     });
 
     const exerciseLoadType = computed(
@@ -136,7 +144,8 @@ export function useExerciseLoggingSession(options: {
         );
 
     const draftStorageKey = computed(
-        () => `gym-draft:v1:day:${dayId.value}:exercise:${exerciseIdentity.value}`,
+        () =>
+            `gym-draft:v1:day:${dayId.value}:exercise:${exerciseIdentity.value}`,
     );
 
     const draftStorage = useWebStorageJsonSync<StoredDraft>({
@@ -148,6 +157,7 @@ export function useExerciseLoggingSession(options: {
             currentWeightSetup,
             notes,
             draftDirty,
+            editingSetIndex,
         ],
         getSnapshot: () => ({
             weight: currentWeight.value,
@@ -155,6 +165,7 @@ export function useExerciseLoggingSession(options: {
             weightSetup: currentWeightSetup.value,
             notes: notes.value,
             dirty: draftDirty.value,
+            editingSetIndex: editingSetIndex.value,
         }),
         canPersist: () => exerciseIdentity.value !== 0,
         tryRestore: (parsed, { remove }) => {
@@ -170,12 +181,17 @@ export function useExerciseLoggingSession(options: {
                 notes.value = parsed.notes;
             }
             draftDirty.value = true;
+            editingSetIndex.value =
+                typeof parsed.editingSetIndex === "number" &&
+                Number.isInteger(parsed.editingSetIndex) &&
+                parsed.editingSetIndex >= 0
+                    ? parsed.editingSetIndex
+                    : null;
             return true;
         },
     });
 
-    const hasDraftSet = () =>
-        currentWeight.value > 0 || currentReps.value > 0;
+    const hasDraftSet = () => currentWeight.value > 0 || currentReps.value > 0;
 
     const initializeExercise = () => {
         if (pending.value) return;
@@ -189,6 +205,7 @@ export function useExerciseLoggingSession(options: {
         loggedSets.value = loggedSetsFromServer(group.logged?.sets);
         notes.value = group.logged?.notes ?? group.previous?.notes ?? "";
         currentSetNumber.value = loggedSets.value.length + 1;
+        editingSetIndex.value = null;
 
         const { weight, reps, weightSetup } = initializeWeightAndReps(
             group.logged?.sets,
@@ -200,6 +217,7 @@ export function useExerciseLoggingSession(options: {
                       group.previous?.sets,
                       group.previous?.exercise?.rep_rollover,
                       weight,
+                      weightIncrement.value,
                   )
                 : null;
         currentWeight.value = weightProgression.value?.nextWeight ?? weight;
@@ -210,6 +228,14 @@ export function useExerciseLoggingSession(options: {
 
         if (draftStorage.restore()) {
             weightProgression.value = null;
+            if (
+                editingSetIndex.value == null ||
+                editingSetIndex.value >= loggedSets.value.length
+            ) {
+                editingSetIndex.value = null;
+            } else {
+                currentSetNumber.value = editingSetIndex.value + 1;
+            }
         }
         draftStorage.setSaveEnabled(true);
     };
@@ -230,7 +256,9 @@ export function useExerciseLoggingSession(options: {
         { immediate: true },
     );
 
-    const saveCurrentExercise = async (includeDraft: boolean): Promise<boolean> => {
+    const saveCurrentExercise = async (
+        includeDraft: boolean,
+    ): Promise<boolean> => {
         const group = exerciseGroup.value;
         if (!group) return false;
 
@@ -238,11 +266,11 @@ export function useExerciseLoggingSession(options: {
         const draft =
             includeDraft && currentReps.value > 0
                 ? {
-                    weight: currentWeight.value,
-                    reps: currentReps.value,
-                    weight_setup: weightSetupForSave(),
-                    tempId: draftTempId,
-                }
+                      weight: currentWeight.value,
+                      reps: currentReps.value,
+                      weight_setup: weightSetupForSave(),
+                      tempId: draftTempId,
+                  }
                 : null;
 
         const allSets = buildAllSetsForSave(loggedSets.value, draft);
@@ -278,9 +306,13 @@ export function useExerciseLoggingSession(options: {
     const stepWeight = (direction: "plus" | "minus") => {
         draftDirty.value = true;
         if (direction === "plus") {
-            currentWeight.value = (currentWeight.value || 0) + 2.5;
+            currentWeight.value =
+                (currentWeight.value || 0) + weightIncrement.value;
         } else {
-            currentWeight.value = Math.max(0, (currentWeight.value || 0) - 2.5);
+            currentWeight.value = Math.max(
+                0,
+                (currentWeight.value || 0) - weightIncrement.value,
+            );
         }
     };
 
@@ -310,38 +342,51 @@ export function useExerciseLoggingSession(options: {
             toast.push("Enter reps before logging the set", "error");
             return false;
         }
-        globalTimer.start(REST_DURATION_MS, exerciseDisplayName.value);
-
-        const tempId = `temp-${Date.now()}-${tempIdCounter++}`;
-        const newSet: LoggedSetWithStatus = {
-            weight: currentWeight.value,
-            reps: currentReps.value,
-            weight_setup: weightSetupForSave(),
-            status: "pending",
-            id: null,
-            error: null,
-            tempId,
-        };
-
-        loggedSets.value.push(newSet);
-        currentSetNumber.value++;
+        const editingIndex = editingSetIndex.value;
+        if (editingIndex != null) {
+            const set = loggedSets.value[editingIndex];
+            if (!set) return false;
+            set.weight = currentWeight.value;
+            set.reps = currentReps.value;
+            set.weight_setup = weightSetupForSave();
+            set.status = "pending";
+            set.error = null;
+        } else {
+            const tempId = `temp-${Date.now()}-${tempIdCounter++}`;
+            loggedSets.value.push({
+                weight: currentWeight.value,
+                reps: currentReps.value,
+                weight_setup: weightSetupForSave(),
+                status: "pending",
+                id: null,
+                error: null,
+                tempId,
+            });
+            currentSetNumber.value++;
+        }
 
         const success = await saveCurrentExercise(false);
         if (success) {
             draftDirty.value = false;
+            editingSetIndex.value = null;
+            currentSetNumber.value = loggedSets.value.length + 1;
+            globalTimer.start(exerciseDisplayName.value);
         }
         return success;
     };
 
-    const finishLogging = async () => {
+    const finishLogging = async (): Promise<boolean> => {
         if (loggedSets.value.length === 0 && !hasDraftSet()) {
             toast.push("Please log at least one set", "error");
-            return;
+            return false;
         }
 
         if (currentWeight.value > 0 && currentReps.value === 0) {
-            toast.push("Add reps or clear the draft set before finishing", "error");
-            return;
+            toast.push(
+                "Add reps or clear the draft set before finishing",
+                "error",
+            );
+            return false;
         }
 
         const shouldIncludeDraft =
@@ -351,11 +396,12 @@ export function useExerciseLoggingSession(options: {
 
         if (!success) {
             toast.push("Failed to save exercise. Please try again.", "error");
-            return;
+            return false;
         }
 
         draftStorage.clear();
         router.push(loggingRoute());
+        return true;
     };
 
     const retrySet = async (setIndex: number) => {
@@ -413,8 +459,8 @@ export function useExerciseLoggingSession(options: {
         currentWeightSetup.value = set.weight_setup;
         draftDirty.value = true;
 
-        loggedSets.value.splice(setIndex, 1);
-        currentSetNumber.value = loggedSets.value.length + 1;
+        editingSetIndex.value = setIndex;
+        currentSetNumber.value = setIndex + 1;
     };
 
     const goBackToList = () => {
@@ -447,6 +493,8 @@ export function useExerciseLoggingSession(options: {
         currentWeightSetup,
         notes,
         weightProgression,
+        editingSetIndex,
+        weightIncrement,
         stepWeight,
         stepReps,
         commitWeightFromInput,
@@ -460,5 +508,6 @@ export function useExerciseLoggingSession(options: {
         updateNotes,
         updateWeightSetup,
         undoWeightProgression,
+        setWeightIncrement,
     }) as ExerciseLoggingSessionViewModel;
 }
