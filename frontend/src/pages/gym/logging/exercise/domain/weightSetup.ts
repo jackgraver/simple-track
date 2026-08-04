@@ -5,6 +5,13 @@ export const DEFAULT_BAR_LBS = 45;
 
 export type PlateCountsPerSide = Partial<Record<number, number>>;
 
+export function isPlateLoadedExercise(loadType: ExerciseLoadType): boolean {
+    return (
+        loadType === "plate_loaded_with_bar" ||
+        loadType === "plate_loaded_without_bar"
+    );
+}
+
 export type ParsedWeightSetup = {
     barLbs: number;
     platesPerSide: PlateCountsPerSide;
@@ -40,7 +47,7 @@ export function computeExerciseLoadLbs(
     loadType: ExerciseLoadType,
     platesPerSide: PlateCountsPerSide,
 ): number {
-    if (loadType === "weight_stack") return 0;
+    if (!isPlateLoadedExercise(loadType)) return 0;
     return computeBarbellTotalLbs(
         barLbsForExercise(loadType),
         platesPerSide,
@@ -77,7 +84,7 @@ export function formatExerciseWeightSetup(
     loadType: ExerciseLoadType,
     platesPerSide: PlateCountsPerSide,
 ): string {
-    if (loadType === "weight_stack") return "";
+    if (!isPlateLoadedExercise(loadType)) return "";
     return formatWeightSetup(barLbsForExercise(loadType), platesPerSide);
 }
 
@@ -85,7 +92,7 @@ export function weightSetupForExercise(
     loadType: ExerciseLoadType,
     setup: string,
 ): string {
-    return loadType === "weight_stack" ? "" : setup;
+    return isPlateLoadedExercise(loadType) ? setup : "";
 }
 
 export function weightSetupMismatchLbs(

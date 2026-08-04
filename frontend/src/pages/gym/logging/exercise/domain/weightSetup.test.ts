@@ -4,6 +4,7 @@ import {
     computeExerciseLoadLbs,
     formatWeightSetup,
     formatExerciseWeightSetup,
+    isPlateLoadedExercise,
     parseWeightSetup,
     perSideLoadLbs,
     weightSetupMismatchLbs,
@@ -41,6 +42,13 @@ describe("exercise load types", () => {
         expect(computeExerciseLoadLbs("weight_stack", { 45: 2 })).toBe(0);
         expect(formatExerciseWeightSetup("weight_stack", { 45: 2 })).toBe("");
         expect(weightSetupForExercise("weight_stack", "old setup")).toBe("");
+    });
+
+    it("treats free weights as numeric weight without a plate setup", () => {
+        expect(isPlateLoadedExercise("free_weights")).toBe(false);
+        expect(computeExerciseLoadLbs("free_weights", { 45: 2 })).toBe(0);
+        expect(formatExerciseWeightSetup("free_weights", { 45: 2 })).toBe("");
+        expect(weightSetupForExercise("free_weights", "old setup")).toBe("");
     });
 
     it("formats plate setups from the exercise load type", () => {

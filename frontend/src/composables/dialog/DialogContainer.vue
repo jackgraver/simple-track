@@ -4,6 +4,17 @@ import {
     type DialogOptions,
 } from "~/composables/dialog/useDialog";
 import { X } from "lucide-vue-next";
+import { onMounted, onUnmounted } from "vue";
+
+const handleKeydown = (event: KeyboardEvent) => {
+    if (event.key === "Escape" && dialogManager.dialog.value) {
+        event.preventDefault();
+        dialogManager.cancel();
+    }
+};
+
+onMounted(() => window.addEventListener("keydown", handleKeydown));
+onUnmounted(() => window.removeEventListener("keydown", handleKeydown));
 
 function isConfirmDialog(
     d: typeof dialogManager.dialog.value,

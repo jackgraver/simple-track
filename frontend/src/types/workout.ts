@@ -61,7 +61,8 @@ export interface Exercise extends BaseModel {
 export type ExerciseLoadType =
     | "plate_loaded_with_bar"
     | "plate_loaded_without_bar"
-    | "weight_stack";
+    | "weight_stack"
+    | "free_weights";
 
 export const DEFAULT_EXERCISE_LOAD_TYPE: ExerciseLoadType =
     "plate_loaded_with_bar";

@@ -25,6 +25,7 @@ import WeightSetupDialog from "../dialog/WeightSetupDialog.vue";
 import {
     computeExerciseLoadLbs,
     formatExerciseWeightSetup,
+    isPlateLoadedExercise,
     parseWeightSetup,
     type WeightSetupDialogResult,
 } from "../domain/weightSetup";
@@ -173,7 +174,7 @@ const exerciseLoadType = computed<ExerciseLoadType>(
 );
 
 const tracksWeightSetup = computed(
-    () => exerciseLoadType.value !== "weight_stack",
+    () => isPlateLoadedExercise(exerciseLoadType.value),
 );
 
 const { isActive: timerActive, displayText: timerText } = useGlobalRestTimer();

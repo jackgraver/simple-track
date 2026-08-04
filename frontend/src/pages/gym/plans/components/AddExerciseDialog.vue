@@ -55,6 +55,7 @@ const createExercise = async (name: string) => {
             :onSelect="addExerciseToPlan"
             :onCreate="createExercise"
             :prefilter="plan.exercises.map((e) => e.ID)"
+            auto-focus
         />
     </div>
 </template>
