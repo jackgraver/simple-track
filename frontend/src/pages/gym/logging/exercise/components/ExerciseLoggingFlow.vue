@@ -79,9 +79,11 @@ watch(exerciseId, () => {
         :previous-reps="previousReps"
         :notes="session.notes"
         :cues="cues"
+        :weight-increase="session.weightProgression?.increase ?? null"
         machine-setup-note="Machine setup notes are not saved yet. Add pin, seat, or handle settings here for now."
         @back="session.goBackToList()"
         @continue="transition('startLogging')"
+        @undo-weight-increase="session.undoWeightProgression()"
     />
     <ExerciseRepsScreen
         v-else-if="step === 'reps'"

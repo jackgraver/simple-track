@@ -8,11 +8,13 @@ defineProps<{
     notes: string;
     cues: string;
     machineSetupNote: string;
+    weightIncrease: number | null;
 }>();
 
 const emit = defineEmits<{
     (event: "back"): void;
     (event: "continue"): void;
+    (event: "undo-weight-increase"): void;
 }>();
 </script>
 
@@ -24,9 +26,28 @@ const emit = defineEmits<{
                 <p class="m-0 text-xs font-semibold uppercase tracking-wide text-zinc-500">
                     Set the machine to
                 </p>
-                <p class="m-0 mt-2 text-4xl font-semibold tabular-nums">
-                    {{ expectedWeight }} lbs
-                </p>
+                <div class="mt-2 flex items-start gap-2">
+                    <p class="m-0 text-4xl font-semibold tabular-nums">
+                        {{ expectedWeight }} lbs
+                    </p>
+                    <button
+                        v-if="weightIncrease != null"
+                        type="button"
+                        class="group relative top-0.5 min-w-12 rounded-full bg-green-950 px-2 py-1 text-xs font-semibold tabular-nums text-green-400 transition-colors hover:bg-green-900 focus-visible:bg-green-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-500"
+                        aria-label="Undo automatic weight increase"
+                        title="Rep target met last session. Click to undo."
+                        @click="emit('undo-weight-increase')"
+                    >
+                        <span
+                            class="group-hover:hidden group-focus-visible:hidden"
+                            >+{{ weightIncrease }}</span
+                        >
+                        <span
+                            class="hidden group-hover:inline group-focus-visible:inline"
+                            >Undo</span
+                        >
+                    </button>
+                </div>
             </section>
             <section class="flex flex-col gap-1 border-b border-zinc-700 pb-5">
                 <p class="m-0 text-xs font-semibold uppercase tracking-wide text-zinc-500">
