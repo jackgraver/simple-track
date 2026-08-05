@@ -191,9 +191,11 @@ const onTickClick = (index: number) => {
 
 <template>
     <div class="flex flex-col gap-3">
-        <label class="text-[0.9rem] font-medium text-[rgb(150,150,150)]">{{
-            label
-        }}</label>
+        <label
+            v-if="label.trim()"
+            class="text-[0.9rem] font-medium text-[rgb(150,150,150)]"
+            >{{ label }}</label
+        >
         <p
             class="m-0 flex h-8 items-center justify-center text-[2rem] font-medium leading-none tabular-nums"
         >

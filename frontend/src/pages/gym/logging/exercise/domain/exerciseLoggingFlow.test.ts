@@ -15,9 +15,21 @@ describe("transitionExerciseLoggingFlow", () => {
         expect(step).toBe("reps");
     });
 
+    it("returns to setup from reps or rest", () => {
+        expect(transitionExerciseLoggingFlow("reps", "backToSetup")).toBe(
+            "setup",
+        );
+        expect(transitionExerciseLoggingFlow("rest", "backToSetup")).toBe(
+            "setup",
+        );
+    });
+
     it("does not advance for actions that do not belong to the current screen", () => {
         expect(transitionExerciseLoggingFlow("setup", "setLogged")).toBe("setup");
         expect(transitionExerciseLoggingFlow("reps", "nextSet")).toBe("reps");
         expect(transitionExerciseLoggingFlow("rest", "startLogging")).toBe("rest");
+        expect(transitionExerciseLoggingFlow("setup", "backToSetup")).toBe(
+            "setup",
+        );
     });
 });

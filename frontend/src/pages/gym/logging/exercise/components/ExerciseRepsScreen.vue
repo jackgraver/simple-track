@@ -6,7 +6,7 @@ import NumberSlider from "./NumberSlider.vue";
 const props = defineProps<{
     exerciseName: string;
     session: ExerciseLoggingSessionViewModel;
-    previousRep: number | null;
+    repRollover: number | undefined;
 }>();
 
 const emit = defineEmits<{
@@ -32,8 +32,8 @@ const logSet = async () => {
             <NumberSlider
                 label="Reps"
                 :model-value="session.currentReps"
-                :marker-value="previousRep ?? undefined"
-                marker-label="Last time"
+                :marker-value="repRollover"
+                marker-label="Rollover"
                 integer-only
                 :max="50"
                 @update:model-value="session.commitRepsFromInput"

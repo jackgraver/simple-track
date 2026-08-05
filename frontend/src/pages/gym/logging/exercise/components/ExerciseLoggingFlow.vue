@@ -14,6 +14,7 @@ import {
 } from "../domain/exerciseRouteGroup";
 import {
     transitionExerciseLoggingFlow,
+    type ExerciseLoggingFlowAction,
     type ExerciseLoggingFlowStep,
 } from "../domain/exerciseLoggingFlow";
 import {
@@ -64,9 +65,6 @@ const previousSets = computed(() =>
     })),
 );
 const previousReps = computed(() => previousSets.value.map((set) => set.reps));
-const previousRepForCurrentSet = computed(
-    () => previousReps.value[session.currentSetNumber - 1] ?? null,
-);
 const cues = computed(
     () =>
         session.exerciseGroup?.planned?.cues ??
@@ -93,11 +91,24 @@ const weightSetupSummary = computed(() => {
     );
     return formatted || "No plates";
 });
+const repRollover = computed(() => {
+    const g = session.exerciseGroup;
+    const rollover =
+        g?.planned?.rep_rollover ??
+        g?.logged?.exercise?.rep_rollover ??
+        g?.previous?.exercise?.rep_rollover;
+    return typeof rollover === "number" && Number.isFinite(rollover)
+        ? rollover
+        : undefined;
+});
+const continueLabel = computed(() =>
+    session.loggedSets.length > 0 ? "Continue logging" : "Start logging",
+);
 const flowStorageKey = computed(
     () => `gym-flow:v1:day:${dayId.value}:exercise:${exerciseId.value ?? 0}`,
 );
 
-const transition = (action: "startLogging" | "setLogged" | "nextSet") => {
+const transition = (action: ExerciseLoggingFlowAction) => {
     step.value = transitionExerciseLoggingFlow(step.value, action);
 };
 
@@ -152,34 +163,39 @@ watch(step, (value) => {
     <ExerciseSetupScreen
         v-if="step === 'setup'"
         :exercise-name="exerciseName"
-        :expected-weight="session.currentWeight"
+        :weight="session.currentWeight"
+        :weight-step="session.weightIncrement"
         :previous-reps="previousReps"
         :notes="session.notes"
         :cues="cues"
         :weight-increase="session.weightProgression?.increase ?? null"
         :tracks-weight-setup="tracksWeightSetup"
         :weight-setup-summary="weightSetupSummary"
+        :continue-label="continueLabel"
         @back="session.goBackToList()"
         @continue="transition('startLogging')"
         @undo-weight-increase="session.undoWeightProgression()"
         @edit-weight-setup="openWeightSetupDialog()"
+        @update:weight="session.commitWeightFromInput"
     />
     <ExerciseRepsScreen
         v-else-if="step === 'reps'"
         :exercise-name="exerciseName"
         :session="session"
-        :previous-rep="previousRepForCurrentSet"
-        @back="session.goBackToList()"
+        :rep-rollover="repRollover"
+        @back="transition('backToSetup')"
         @logged="transition('setLogged')"
     />
     <ExerciseRestScreen
         v-else
         :exercise-name="exerciseName"
         :set-number="session.currentSetNumber"
+        :current-weight="session.currentWeight"
         :session="session"
-        @back="session.goBackToList()"
+        @back="transition('backToSetup')"
         @next="transition('nextSet')"
         @finish="finish"
         @edit="editSet"
+        @edit-setup="transition('backToSetup')"
     />
 </template>

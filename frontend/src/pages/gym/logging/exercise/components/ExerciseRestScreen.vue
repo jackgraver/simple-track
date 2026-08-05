@@ -7,6 +7,7 @@ import LoggedSetsList from "./LoggedSetsList.vue";
 defineProps<{
     exerciseName: string;
     setNumber: number;
+    currentWeight: number;
     session: ExerciseLoggingSessionViewModel;
 }>();
 
@@ -15,6 +16,7 @@ const emit = defineEmits<{
     (event: "next"): void;
     (event: "finish"): void;
     (event: "edit", index: number): void;
+    (event: "edit-setup"): void;
 }>();
 
 const { displayText, isActive, clear } = useGlobalRestTimer();
@@ -53,6 +55,22 @@ const back = () => {
             </p>
             <p class="m-0 text-zinc-400">Time since your last set.</p>
         </div>
+        <button
+            type="button"
+            class="flex w-full items-center justify-between gap-3 rounded-md border border-zinc-700 bg-zinc-900 px-3 py-3 text-left transition-colors hover:border-zinc-500 hover:bg-zinc-800"
+            @click="emit('edit-setup')"
+        >
+            <span>
+                <span
+                    class="mr-2 text-xs font-semibold uppercase tracking-wide text-zinc-500"
+                    >Weight</span
+                >
+                <span class="tabular-nums text-zinc-200"
+                    >{{ currentWeight }} lbs</span
+                >
+            </span>
+            <span class="text-sm text-zinc-400">Change</span>
+        </button>
         <LoggedSetsList
             :logged-sets="session.loggedSets"
             @retry="session.retrySet"
