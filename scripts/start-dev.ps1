@@ -1,7 +1,7 @@
 $ProjectRoot = "C:\Users\Jacks Desktop\Desktop\Coding\simpletracker"
 $BackendDir = Join-Path $ProjectRoot "backend"
 $FrontendDir = Join-Path $ProjectRoot "frontend"
-$PostgresContainer = "simpletracker-postgres-prod-1"
+$PostgresContainer = "simpletracker-postgres-dev-1"
 $DockerDesktop = Join-Path ${env:ProgramFiles} "Docker\Docker\Docker Desktop.exe"
 
 function Test-DockerRunning {
@@ -33,7 +33,7 @@ function Start-Postgres {
     if ($LASTEXITCODE -ne 0) {
         Write-Host "Creating postgres container via docker compose..."
         Push-Location $ProjectRoot
-        docker compose up -d postgres-prod
+        docker compose up -d postgres-dev
         Pop-Location
         return
     }
@@ -76,6 +76,6 @@ Start-DevTerminal -Title "SimpleTracker Frontend" -Directory $FrontendDir -Comma
 
 Write-Host ""
 Write-Host "Dev environment started."
-Write-Host "  Postgres: localhost:5433 (simpletracker_prod)"
+Write-Host "  Postgres: localhost:5432 (simpletracker_dev)"
 Write-Host "  Backend:  air in new terminal"
 Write-Host "  Frontend: npm run dev in new terminal"
