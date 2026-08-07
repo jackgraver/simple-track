@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { computed } from "vue";
 import type { ExerciseLoggingSessionViewModel } from "../composables/useExerciseLoggingSession";
 import LoggingHeader from "./LoggingHeader.vue";
 import NumberSlider from "./NumberSlider.vue";
@@ -6,6 +7,7 @@ import NumberSlider from "./NumberSlider.vue";
 const props = defineProps<{
     exerciseName: string;
     session: ExerciseLoggingSessionViewModel;
+    previousRep: number | null;
     repRollover: number | undefined;
 }>();
 
@@ -13,6 +15,17 @@ const emit = defineEmits<{
     (event: "back"): void;
     (event: "logged"): void;
 }>();
+
+const sliderMarkers = computed(() => {
+    const markers: { value: number; label: string }[] = [];
+    if (props.previousRep != null && Number.isFinite(props.previousRep)) {
+        markers.push({ value: props.previousRep, label: "Last time" });
+    }
+    if (props.repRollover != null && Number.isFinite(props.repRollover)) {
+        markers.push({ value: props.repRollover, label: "Rollover" });
+    }
+    return markers;
+});
 
 const logSet = async () => {
     if (await props.session.addNextSet()) emit("logged");
@@ -32,8 +45,7 @@ const logSet = async () => {
             <NumberSlider
                 label="Reps"
                 :model-value="session.currentReps"
-                :marker-value="repRollover"
-                marker-label="Rollover"
+                :markers="sliderMarkers"
                 integer-only
                 :max="50"
                 @update:model-value="session.commitRepsFromInput"

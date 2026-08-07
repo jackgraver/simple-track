@@ -3,6 +3,7 @@ import { computed } from "vue";
 import axios from "axios";
 import {
     useWorkoutPlansAll,
+    useWorkoutPrograms,
     useSwitchWorkoutPlan,
 } from "~/api/workout/queries";
 import { toast } from "~/composables/toast/useToast";
@@ -14,14 +15,28 @@ const props = defineProps<{
 }>();
 
 const plansQuery = useWorkoutPlansAll();
+const programsQuery = useWorkoutPrograms();
 const switchPlanMutation = useSwitchWorkoutPlan(() => props.dayOffset);
 
-const planOptions = computed(() =>
-    (plansQuery.data.value?.plans ?? []).map((p) => ({
-        id: p.ID,
-        name: p.name,
-    })),
-);
+const planGroups = computed(() => {
+    const plans = plansQuery.data.value?.plans ?? [];
+    const programs = programsQuery.data.value?.programs ?? [];
+    const groupedPlanIds = new Set<number>();
+    const groups = programs
+        .map((program) => {
+            const programPlans = plans.filter(
+                (plan) => plan.workout_program_id === program.ID,
+            );
+            for (const plan of programPlans) groupedPlanIds.add(plan.ID);
+            return { id: program.ID, name: program.name, plans: programPlans };
+        })
+        .filter((group) => group.plans.length > 0);
+    const ungroupedPlans = plans.filter((plan) => !groupedPlanIds.has(plan.ID));
+    if (ungroupedPlans.length) {
+        groups.push({ id: 0, name: "Other plans", plans: ungroupedPlans });
+    }
+    return groups;
+});
 
 const planSelectValue = computed(() => {
     const id = props.currentPlanId;
@@ -63,7 +78,7 @@ const handleSwitchPlan = async (e: Event) => {
             >Today's plan</label
         >
         <select
-            v-if="planOptions.length"
+            v-if="planGroups.length"
             id="gym-plan-switch"
             class="w-full rounded-md border border-(--color-border) bg-firstBg px-3 py-2 text-sm text-textPrimary transition-colors hover:bg-secondBg disabled:opacity-50"
             :value="planSelectValue"
@@ -71,13 +86,19 @@ const handleSwitchPlan = async (e: Event) => {
             @change="handleSwitchPlan"
         >
             <option value="">No plan</option>
-            <option
-                v-for="p in planOptions"
-                :key="p.id"
-                :value="String(p.id)"
+            <optgroup
+                v-for="group in planGroups"
+                :key="group.id"
+                :label="group.name"
             >
-                {{ p.name }}
-            </option>
+                <option
+                    v-for="plan in group.plans"
+                    :key="plan.ID"
+                    :value="String(plan.ID)"
+                >
+                    {{ plan.name }}
+                </option>
+            </optgroup>
         </select>
         <p v-else class="m-0 text-sm text-textSecondary">
             No plans yet.
