@@ -37,14 +37,33 @@ type LoggedSet struct {
 func (l LoggedSet) GetID() uint       { return l.ID }
 func (l LoggedSet) TableName() string { return "logged_sets" }
 
+type ExerciseLoadType string
+
+const (
+	ExerciseLoadTypePlateLoadedWithBar    ExerciseLoadType = "plate_loaded_with_bar"
+	ExerciseLoadTypePlateLoadedWithoutBar ExerciseLoadType = "plate_loaded_without_bar"
+	ExerciseLoadTypeWeightStack           ExerciseLoadType = "weight_stack"
+	ExerciseLoadTypeFreeWeights           ExerciseLoadType = "free_weights"
+)
+
+func NormalizeExerciseLoadType(loadType ExerciseLoadType) ExerciseLoadType {
+	switch loadType {
+	case ExerciseLoadTypePlateLoadedWithoutBar, ExerciseLoadTypeWeightStack, ExerciseLoadTypeFreeWeights:
+		return loadType
+	default:
+		return ExerciseLoadTypePlateLoadedWithBar
+	}
+}
+
 // Exercise represents a type of exercise that can be performed in workouts
 // Can be associated with multiple workout plans via many-to-many relationship
 type Exercise struct {
 	gorm.Model
-	Name         string        `gorm:"uniqueIndex;not null" json:"name"`
-	RepRollover  uint          `json:"rep_rollover"`
-	Cues         string        `json:"cues"`
-	WorkoutPlans []WorkoutPlan `gorm:"many2many:workout_plan_exercises;" json:"workout_plans"`
+	Name         string           `gorm:"uniqueIndex;not null" json:"name"`
+	RepRollover  uint             `json:"rep_rollover"`
+	Cues         string           `json:"cues"`
+	LoadType     ExerciseLoadType `gorm:"type:text;not null;default:plate_loaded_with_bar" json:"load_type"`
+	WorkoutPlans []WorkoutPlan    `gorm:"many2many:workout_plan_exercises;" json:"workout_plans"`
 }
 
 func (e Exercise) GetID() uint        { return e.ID }

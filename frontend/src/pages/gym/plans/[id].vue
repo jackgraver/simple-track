@@ -54,6 +54,9 @@ const getDayName = (dayOfWeek: number | null): string => {
     return dayNames[dayOfWeek] ?? "Unknown";
 };
 
+const assignedDays = (p: WorkoutPlan): number[] =>
+    p.assigned_days ?? (p.day_of_week === null ? [] : [p.day_of_week]);
+
 const plannedCardioInput = ref("");
 watch(
     plan,
@@ -78,24 +81,14 @@ const savePlannedCardio = async () => {
     }
 };
 
-const getAssignedDays = computed(() => {
-    const assigned: number[] = [];
-    plans.value.forEach((p) => {
-        if (p.day_of_week !== null) {
-            assigned.push(p.day_of_week);
-        }
-    });
-    return assigned;
-});
-
 const isDayAssigned = (
     dayOfWeek: number,
     currentPlan: WorkoutPlan,
 ): boolean => {
     return (
-        getAssignedDays.value.includes(dayOfWeek) &&
-        plans.value.find((p) => p.day_of_week === dayOfWeek)?.ID !==
-            currentPlan.ID
+        plans.value.some(
+            (p) => p.ID !== currentPlan.ID && assignedDays(p).includes(dayOfWeek),
+        )
     );
 };
 
@@ -104,7 +97,7 @@ const getAssignedPlanName = (
     currentPlan: WorkoutPlan,
 ): string => {
     const assignedPlan = plans.value.find(
-        (p) => p.day_of_week === dayOfWeek && p.ID !== currentPlan.ID,
+        (p) => p.ID !== currentPlan.ID && assignedDays(p).includes(dayOfWeek),
     );
     return assignedPlan?.name || "Assigned";
 };
@@ -170,8 +163,8 @@ const openEditExerciseDialog = (exercise: Exercise) => {
 const handleDayChange = async (p: WorkoutPlan, event: Event) => {
     const select = event.target as HTMLSelectElement;
     const day = parseInt(select.value);
-    const previousValue =
-        p.day_of_week !== null ? p.day_of_week.toString() : "";
+    const currentDays = assignedDays(p);
+    const previousValue = currentDays.length > 0 ? currentDays[0]!.toString() : "";
 
     if (isNaN(day)) {
         select.value = previousValue;
@@ -179,7 +172,7 @@ const handleDayChange = async (p: WorkoutPlan, event: Event) => {
     }
 
     const currentlyAssignedPlan = plans.value.find(
-        (x) => x.day_of_week === day && x.ID !== p.ID,
+        (x) => x.ID !== p.ID && assignedDays(x).includes(day),
     );
 
     if (currentlyAssignedPlan) {
@@ -311,9 +304,9 @@ const moveExerciseInPlan = async (
                 </h1>
                 <div class="flex flex-wrap items-center gap-2">
                     <span
-                        v-if="plan.day_of_week !== null"
+                        v-if="assignedDays(plan).length"
                         class="rounded-md bg-secondBg px-2 py-0.5 text-xs font-medium text-textPrimary"
-                        >{{ getDayName(plan.day_of_week) }}</span
+                        >{{ assignedDays(plan).map(getDayName).join(", ") }}</span
                     >
                     <span
                         v-else
@@ -350,7 +343,7 @@ const moveExerciseInPlan = async (
                 <div class="flex flex-wrap gap-2">
                     <select
                         :value="
-                            plan.day_of_week !== null ? plan.day_of_week : ''
+                            assignedDays(plan)[0] ?? ''
                         "
                         class="min-w-48 flex-1 rounded-md border border-(--color-border) bg-firstBg px-3 py-2 text-sm text-textPrimary transition-colors hover:bg-secondBg focus:outline-none focus:ring-2 focus:ring-(--color-cf-red)/40"
                         @change="handleDayChange(plan, $event)"
@@ -370,7 +363,7 @@ const moveExerciseInPlan = async (
                         </option>
                     </select>
                     <button
-                        v-if="plan.day_of_week !== null"
+                        v-if="assignedDays(plan).length"
                         type="button"
                         class="rounded-md border border-(--color-border) bg-secondBg px-3 py-2 text-sm font-medium text-textPrimary transition-colors hover:bg-thirdBg"
                         @click="unassignPlanFromDay(plan)"

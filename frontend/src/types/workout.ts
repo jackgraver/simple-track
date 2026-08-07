@@ -15,11 +15,19 @@ export interface PlannedExercise extends BaseModel {
 
 export interface WorkoutPlan extends BaseModel {
     name: string;
+    workout_program_id?: number | null;
     day_of_week: number | null; // 0=Sunday, 1=Monday, ..., 6=Saturday, null=unassigned
+    assigned_days?: number[];
     planned_cardio_type?: string;
     pre_mobility_items?: string[];
     post_mobility_items?: string[];
     exercises: Exercise[];
+}
+
+export interface WorkoutProgram extends BaseModel {
+    name: string;
+    is_active: boolean;
+    plans: WorkoutPlan[];
 }
 
 export interface PlannedCardio {
@@ -47,7 +55,17 @@ export interface Exercise extends BaseModel {
     name: string;
     rep_rollover: number;
     cues: string;
+    load_type?: ExerciseLoadType;
 }
+
+export type ExerciseLoadType =
+    | "plate_loaded_with_bar"
+    | "plate_loaded_without_bar"
+    | "weight_stack"
+    | "free_weights";
+
+export const DEFAULT_EXERCISE_LOAD_TYPE: ExerciseLoadType =
+    "plate_loaded_with_bar";
 
 export interface Cardio extends BaseModel {
     workout_log_id: number;

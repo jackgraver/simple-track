@@ -1,7 +1,7 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/vue-query';
 import { computed, toValue, type MaybeRefOrGetter } from 'vue';
 import { apiDELETE, apiGET, apiPOST } from '~/api/client';
-import { switchWorkoutPlan, type WorkoutActivityResponse, WorkoutLogsPreviousResponse } from '~/api/workout/api';
+import { activateWorkoutProgram, createWorkoutPlan, createWorkoutProgram, getWorkoutPrograms, renameWorkoutProgram, switchWorkoutPlan, type WorkoutActivityResponse, WorkoutLogsPreviousResponse } from '~/api/workout/api';
 import { liveworkoutKeys } from '~/api/workout/keys';
 import { homeKeys } from '~/pages/home/queries/keys';
 import type { Cardio, Exercise, LoggedExercise, MobilityLogged, WorkoutPlan } from '~/types/workout';
@@ -117,6 +117,57 @@ export function useWorkoutPlansAll() {
         queryKey: ['workout', 'plans', 'all'] as const,
         queryFn: () => apiGET<{ plans: WorkoutPlan[] }>('/workout/plans/all'),
         staleTime: 1000 * 60 * 10,
+    });
+}
+
+export const workoutProgramsQueryKey = ['workout', 'programs'] as const;
+
+export function useWorkoutPrograms() {
+    return useQuery({
+        queryKey: workoutProgramsQueryKey,
+        queryFn: getWorkoutPrograms,
+        staleTime: 1000 * 60 * 10,
+    });
+}
+
+function invalidateWorkoutPrograms(queryClient: ReturnType<typeof useQueryClient>) {
+    queryClient.invalidateQueries({ queryKey: workoutProgramsQueryKey });
+    queryClient.invalidateQueries({ queryKey: ['workout', 'plans'] });
+}
+
+export function useCreateWorkoutProgram() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: (name: string) => createWorkoutProgram(name),
+        onSuccess: () => invalidateWorkoutPrograms(queryClient),
+    });
+}
+
+export function useRenameWorkoutProgram() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: ({ id, name }: { id: number; name: string }) => renameWorkoutProgram(id, name),
+        onSuccess: () => invalidateWorkoutPrograms(queryClient),
+    });
+}
+
+export function useActivateWorkoutProgram() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: (id: number) => activateWorkoutProgram(id),
+        onSuccess: () => {
+            invalidateWorkoutPrograms(queryClient);
+            queryClient.invalidateQueries({ queryKey: liveworkoutKeys.workouts.all });
+        },
+    });
+}
+
+export function useCreateWorkoutPlan() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: ({ programId, name, dayOfWeek }: { programId: number; name: string; dayOfWeek: number | null }) =>
+            createWorkoutPlan(programId, name, dayOfWeek),
+        onSuccess: () => invalidateWorkoutPrograms(queryClient),
     });
 }
 
