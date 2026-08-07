@@ -25,7 +25,6 @@ import {
 } from "../domain/weightProgression";
 import {
     useGymWeightPrefs,
-    type GymWeightIncrement,
 } from "./useGymWeightPrefs";
 
 type StoredDraft = {
@@ -48,7 +47,7 @@ export type ExerciseLoggingSessionViewModel = {
     notes: string;
     weightProgression: WeightProgression | null;
     editingSetIndex: number | null;
-    weightIncrement: GymWeightIncrement;
+    weightIncrement: number;
     stepWeight: (direction: "plus" | "minus") => void;
     stepReps: (direction: "plus" | "minus") => void;
     commitWeightFromInput: (value: number) => void;
@@ -62,7 +61,7 @@ export type ExerciseLoggingSessionViewModel = {
     updateNotes: (value: string) => void;
     updateWeightSetup: (value: string) => void;
     undoWeightProgression: () => void;
-    setWeightIncrement: (value: GymWeightIncrement) => void;
+    setWeightIncrement: (value: number) => void;
 };
 
 type LogExerciseFn = (

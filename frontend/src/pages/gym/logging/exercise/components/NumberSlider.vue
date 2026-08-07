@@ -3,6 +3,11 @@ import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
 
 const TICK_WIDTH_PX = 44;
 
+export type NumberSliderMarker = {
+    value: number;
+    label?: string;
+};
+
 const props = withDefaults(
     defineProps<{
         label: string;
@@ -14,6 +19,7 @@ const props = withDefaults(
         integerOnly?: boolean;
         markerValue?: number;
         markerLabel?: string;
+        markers?: NumberSliderMarker[];
     }>(),
     { step: 1, min: 0, max: 100, integerOnly: false },
 );
@@ -61,26 +67,41 @@ const valueToIndex = (value: number) => {
     return Math.min(Math.max(idx, 0), tickValues.value.length - 1);
 };
 
-const markerIndex = computed(() => {
-    const value = props.markerValue;
-    if (value == null || !Number.isFinite(value)) return -1;
-    if (value < props.min || value > props.max) return -1;
-    return valueToIndex(value);
+const resolvedMarkers = computed(() => {
+    const list: NumberSliderMarker[] = [...(props.markers ?? [])];
+    if (
+        props.markerValue != null &&
+        Number.isFinite(props.markerValue) &&
+        !list.some((marker) => marker.value === props.markerValue)
+    ) {
+        list.push({
+            value: props.markerValue,
+            label: props.markerLabel,
+        });
+    }
+    return list;
 });
 
-const markerLeftPx = computed(() => {
-    if (markerIndex.value < 0) return 0;
-    return (
-        padPx.value + markerIndex.value * TICK_WIDTH_PX + TICK_WIDTH_PX / 2
-    );
+const visibleMarkers = computed(() => {
+    const byIndex = new Map<number, string[]>();
+    for (const marker of resolvedMarkers.value) {
+        if (!Number.isFinite(marker.value)) continue;
+        if (marker.value < props.min || marker.value > props.max) continue;
+        const index = valueToIndex(marker.value);
+        const labels = byIndex.get(index) ?? [];
+        const label = marker.label?.trim();
+        if (label && !labels.includes(label)) labels.push(label);
+        byIndex.set(index, labels);
+    }
+    return [...byIndex.entries()].map(([index, labels]) => ({
+        index,
+        label: labels.join(" · "),
+        leftPx: padPx.value + index * TICK_WIDTH_PX + TICK_WIDTH_PX / 2,
+    }));
 });
 
-const markerViewportLeftPx = computed(
-    () => markerLeftPx.value - scrollLeft.value,
-);
-
-const hasMarkerLabel = computed(
-    () => markerIndex.value >= 0 && Boolean(props.markerLabel?.trim()),
+const hasMarkerLabel = computed(() =>
+    visibleMarkers.value.some((marker) => Boolean(marker.label)),
 );
 
 const indexToScrollLeft = (index: number) => index * TICK_WIDTH_PX;
@@ -210,19 +231,20 @@ const onTickClick = (index: number) => {
                     aria-hidden="true"
                 />
                 <div
-                    v-if="markerIndex >= 0"
+                    v-for="marker in visibleMarkers"
+                    :key="marker.index"
                     class="pointer-events-none absolute bottom-0 z-5 flex -translate-x-1/2 flex-col items-center justify-end gap-1"
                     :style="{
-                        left: `${markerViewportLeftPx}px`,
+                        left: `${marker.leftPx - scrollLeft}px`,
                         width: `${TICK_WIDTH_PX}px`,
                     }"
                     aria-hidden="true"
                 >
                     <span
-                        v-if="hasMarkerLabel"
+                        v-if="marker.label"
                         class="text-[0.6rem] font-medium leading-none whitespace-nowrap text-green-400/90"
                     >
-                        {{ markerLabel?.trim() }}
+                        {{ marker.label }}
                     </span>
                     <span class="block h-8 w-px rounded-full bg-green-400/90" />
                     <span class="h-[0.85rem]" aria-hidden="true">&nbsp;</span>
@@ -238,46 +260,48 @@ const onTickClick = (index: number) => {
                         :style="{ width: `${padPx}px` }"
                         aria-hidden="true"
                     />
-                <button
-                    v-for="(tick, index) in tickValues"
-                    :key="index"
-                    type="button"
-                    class="flex h-full shrink-0 touch-pan-x snap-center flex-col items-center justify-end gap-1 border-0 bg-transparent! shadow-none! p-0 text-inherit"
-                    :style="{
-                        width: `${TICK_WIDTH_PX}px`,
-                        scrollSnapAlign: 'center',
-                    }"
-                    :aria-label="formatValue(tick)"
-                    :aria-current="
-                        index === valueToIndex(model || 0) ? 'true' : undefined
-                    "
-                    @click="onTickClick(index)"
-                >
-                    <span
-                        class="flex h-8 items-end justify-center"
-                        aria-hidden="true"
+                    <button
+                        v-for="(tick, index) in tickValues"
+                        :key="index"
+                        type="button"
+                        class="flex h-full shrink-0 touch-pan-x snap-center flex-col items-center justify-end gap-1 border-0 bg-transparent! shadow-none! p-0 text-inherit"
+                        :style="{
+                            width: `${TICK_WIDTH_PX}px`,
+                            scrollSnapAlign: 'center',
+                        }"
+                        :aria-label="formatValue(tick)"
+                        :aria-current="
+                            index === valueToIndex(model || 0)
+                                ? 'true'
+                                : undefined
+                        "
+                        @click="onTickClick(index)"
                     >
                         <span
-                            class="block w-px rounded-full bg-[rgb(80,80,80)]"
-                            :class="
-                                index === valueToIndex(model || 0)
-                                    ? 'h-8 bg-amber-400/90'
-                                    : isMajorTick(tick, index)
-                                      ? 'h-5'
-                                      : 'h-3'
-                            "
-                        />
-                    </span>
-                    <span
-                        class="h-[0.85rem] text-[0.65rem] leading-none text-[rgb(120,120,120)] tabular-nums"
-                        >{{ tickLabel(tick, index) || "\u00a0" }}</span
-                    >
-                </button>
-                <div
-                    class="shrink-0"
-                    :style="{ width: `${padPx}px` }"
-                    aria-hidden="true"
-                />
+                            class="flex h-8 items-end justify-center"
+                            aria-hidden="true"
+                        >
+                            <span
+                                class="block w-px rounded-full bg-[rgb(80,80,80)]"
+                                :class="
+                                    index === valueToIndex(model || 0)
+                                        ? 'h-8 bg-amber-400/90'
+                                        : isMajorTick(tick, index)
+                                          ? 'h-5'
+                                          : 'h-3'
+                                "
+                            />
+                        </span>
+                        <span
+                            class="h-[0.85rem] text-[0.65rem] leading-none text-[rgb(120,120,120)] tabular-nums"
+                            >{{ tickLabel(tick, index) || "\u00a0" }}</span
+                        >
+                    </button>
+                    <div
+                        class="shrink-0"
+                        :style="{ width: `${padPx}px` }"
+                        aria-hidden="true"
+                    />
                 </div>
             </div>
         </div>

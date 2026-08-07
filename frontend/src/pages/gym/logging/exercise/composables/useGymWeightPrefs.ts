@@ -1,10 +1,9 @@
 import { computed, ref } from "vue";
 import { useWebStorageJsonSync } from "~/composables/useWebStorageJsonSync";
 
-export type GymWeightIncrement = 2.5 | 5;
 
 const STORAGE_KEY = "simpletracker:gym-weight-prefs";
-const weightIncrement = ref<GymWeightIncrement>(5);
+const weightIncrement = ref(2.5);
 let initialized = false;
 
 export function useGymWeightPrefs() {
@@ -15,10 +14,7 @@ export function useGymWeightPrefs() {
             watchSources: [weightIncrement],
             getSnapshot: () => ({ weightIncrement: weightIncrement.value }),
             tryRestore: (parsed) => {
-                if (
-                    parsed.weightIncrement === 2.5 ||
-                    parsed.weightIncrement === 5
-                ) {
+                if (parsed.weightIncrement === 2.5) {
                     weightIncrement.value = parsed.weightIncrement;
                 }
                 return true;
@@ -29,7 +25,7 @@ export function useGymWeightPrefs() {
         initialized = true;
     }
 
-    const setWeightIncrement = (value: GymWeightIncrement) => {
+    const setWeightIncrement = (value: number) => {
         weightIncrement.value = value;
     };
 

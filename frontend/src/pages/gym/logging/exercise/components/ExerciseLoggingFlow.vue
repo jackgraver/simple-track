@@ -65,6 +65,9 @@ const previousSets = computed(() =>
     })),
 );
 const previousReps = computed(() => previousSets.value.map((set) => set.reps));
+const previousRepForCurrentSet = computed(
+    () => previousReps.value[session.currentSetNumber - 1] ?? null,
+);
 const cues = computed(
     () =>
         session.exerciseGroup?.planned?.cues ??
@@ -182,6 +185,7 @@ watch(step, (value) => {
         v-else-if="step === 'reps'"
         :exercise-name="exerciseName"
         :session="session"
+        :previous-rep="previousRepForCurrentSet"
         :rep-rollover="repRollover"
         @back="transition('backToSetup')"
         @logged="transition('setLogged')"
