@@ -17,9 +17,19 @@ const emit = defineEmits<{
 }>();
 
 const sliderMarkers = computed(() => {
-    const markers: { value: number; label: string }[] = [];
+    const markers: {
+        value: number;
+        label: string;
+        color?: "orange";
+        labelPosition?: "bottom";
+    }[] = [];
     if (props.previousRep != null && Number.isFinite(props.previousRep)) {
-        markers.push({ value: props.previousRep, label: "Last time" });
+        markers.push({
+            value: props.previousRep,
+            label: "Last time",
+            color: "orange",
+            labelPosition: "bottom",
+        });
     }
     if (props.repRollover != null && Number.isFinite(props.repRollover)) {
         markers.push({ value: props.repRollover, label: "Rollover" });

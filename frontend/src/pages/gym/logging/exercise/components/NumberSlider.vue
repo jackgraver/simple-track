@@ -6,6 +6,8 @@ const TICK_WIDTH_PX = 44;
 export type NumberSliderMarker = {
     value: number;
     label?: string;
+    color?: "green" | "orange";
+    labelPosition?: "top" | "bottom";
 };
 
 const props = withDefaults(
@@ -83,25 +85,37 @@ const resolvedMarkers = computed(() => {
 });
 
 const visibleMarkers = computed(() => {
-    const byIndex = new Map<number, string[]>();
+    const markers = [];
     for (const marker of resolvedMarkers.value) {
         if (!Number.isFinite(marker.value)) continue;
         if (marker.value < props.min || marker.value > props.max) continue;
         const index = valueToIndex(marker.value);
-        const labels = byIndex.get(index) ?? [];
-        const label = marker.label?.trim();
-        if (label && !labels.includes(label)) labels.push(label);
-        byIndex.set(index, labels);
+        markers.push({
+            index,
+            label: marker.label?.trim() ?? "",
+            color: marker.color ?? "green",
+            labelPosition: marker.labelPosition ?? "top",
+        });
     }
-    return [...byIndex.entries()].map(([index, labels]) => ({
-        index,
-        label: labels.join(" · "),
-        leftPx: padPx.value + index * TICK_WIDTH_PX + TICK_WIDTH_PX / 2,
+    return markers.map((marker) => ({
+        ...marker,
+        leftPx:
+            padPx.value +
+            marker.index * TICK_WIDTH_PX +
+            TICK_WIDTH_PX / 2,
     }));
 });
 
-const hasMarkerLabel = computed(() =>
-    visibleMarkers.value.some((marker) => Boolean(marker.label)),
+const hasTopMarkerLabel = computed(() =>
+    visibleMarkers.value.some(
+        (marker) => marker.label && marker.labelPosition === "top",
+    ),
+);
+
+const hasBottomMarkerLabel = computed(() =>
+    visibleMarkers.value.some(
+        (marker) => marker.label && marker.labelPosition === "bottom",
+    ),
 );
 
 const indexToScrollLeft = (index: number) => index * TICK_WIDTH_PX;
@@ -224,7 +238,12 @@ const onTickClick = (index: number) => {
                 displayValue
             }}</span>
         </p>
-        <div :class="hasMarkerLabel ? 'pt-4' : ''">
+        <div
+            :class="[
+                hasTopMarkerLabel ? 'pt-4' : '',
+                hasBottomMarkerLabel ? 'pb-4' : '',
+            ]"
+        >
             <div class="relative h-13">
                 <div
                     class="pointer-events-none absolute inset-y-0 left-1/2 z-10 w-0.5 -translate-x-1/2 rounded-full bg-amber-400/90"
@@ -232,7 +251,7 @@ const onTickClick = (index: number) => {
                 />
                 <div
                     v-for="marker in visibleMarkers"
-                    :key="marker.index"
+                    :key="`${marker.index}-${marker.label}-${marker.labelPosition}`"
                     class="pointer-events-none absolute bottom-0 z-5 flex -translate-x-1/2 flex-col items-center justify-end gap-1"
                     :style="{
                         left: `${marker.leftPx - scrollLeft}px`,
@@ -241,13 +260,40 @@ const onTickClick = (index: number) => {
                     aria-hidden="true"
                 >
                     <span
-                        v-if="marker.label"
-                        class="text-[0.6rem] font-medium leading-none whitespace-nowrap text-green-400/90"
+                        v-if="
+                            marker.label && marker.labelPosition === 'top'
+                        "
+                        class="text-[0.6rem] font-medium leading-none whitespace-nowrap"
+                        :class="
+                            marker.color === 'orange'
+                                ? 'text-orange-400/90'
+                                : 'text-green-400/90'
+                        "
                     >
                         {{ marker.label }}
                     </span>
-                    <span class="block h-8 w-px rounded-full bg-green-400/90" />
+                    <span
+                        class="block h-8 w-px rounded-full"
+                        :class="
+                            marker.color === 'orange'
+                                ? 'bg-orange-400/90'
+                                : 'bg-green-400/90'
+                        "
+                    />
                     <span class="h-[0.85rem]" aria-hidden="true">&nbsp;</span>
+                    <span
+                        v-if="
+                            marker.label && marker.labelPosition === 'bottom'
+                        "
+                        class="absolute top-full mt-1 text-[0.6rem] font-medium leading-none whitespace-nowrap"
+                        :class="
+                            marker.color === 'orange'
+                                ? 'text-orange-400/90'
+                                : 'text-green-400/90'
+                        "
+                    >
+                        {{ marker.label }}
+                    </span>
                 </div>
                 <div
                     ref="scrollEl"
