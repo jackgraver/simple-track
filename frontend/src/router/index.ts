@@ -72,6 +72,12 @@ const routes: RouteRecordRaw[] = [
                 meta: { breadcrumb: "Plan" },
             },
             {
+                path: "plans/:programId(\\d+)/days/:id(\\d+)",
+                name: "gym-program-day-detail",
+                component: () => import("~/pages/gym/plans/[id].vue"),
+                meta: { breadcrumb: "Plan day" },
+            },
+            {
                 path: "logging",
                 name: "logging",
                 component: () => import("~/pages/gym/logging/index.vue"),

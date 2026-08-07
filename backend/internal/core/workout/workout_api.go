@@ -12,6 +12,14 @@ func RegisterRoutes(router *gin.Engine, authMiddleware gin.HandlerFunc) {
 
 	group := router.Group("/workout", authMiddleware)
 	{
+		programs := group.Group("/programs")
+		{
+			programs.GET("", controller.GetAllWorkoutPrograms)
+			programs.POST("", controller.CreateWorkoutProgram)
+			programs.PATCH("/:id", controller.RenameWorkoutProgram)
+			programs.POST("/:id/activate", controller.ActivateWorkoutProgram)
+			programs.POST("/:id/plans", controller.CreateWorkoutPlan)
+		}
 		plans := group.Group("/plans")
 		{
 			plans.GET("/all", controller.GetAllWorkoutPlans)

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Plus, Loader } from "lucide-vue-next";
-import { computed, ref, nextTick } from "vue";
+import { computed, nextTick, onMounted, ref, watch } from "vue";
 import type { Component } from "vue";
 import { useQuery } from "@tanstack/vue-query";
 import { apiClient } from "~/api/client";
@@ -12,11 +12,14 @@ const props = defineProps<{
     onCreate?: (name: string) => Promise<boolean>;
     displayComponent?: Component;
     prefilter?: any[];
+    autoFocus?: boolean;
     /** When set, TanStack Query uses this key (e.g. share cache with useWorkoutExercisesAllQuery). */
     queryKey?: readonly unknown[];
 }>();
 
 const search = ref("");
+const searchInput = ref<HTMLInputElement | null>(null);
+const hasAutoFocused = ref(false);
 const itemsContainer = ref<HTMLElement | null>(null);
 const isHovering = ref(false);
 const isFocused = ref(false);
@@ -151,6 +154,24 @@ function onInputKeydown(e: KeyboardEvent) {
 const refresh = () => {
     refetch();
 };
+
+const focusSearchInput = () => {
+    if (
+        !props.autoFocus ||
+        hasAutoFocused.value ||
+        isPending.value ||
+        !searchInput.value
+    ) {
+        return;
+    }
+    hasAutoFocused.value = true;
+    nextTick(() => searchInput.value?.focus());
+};
+
+onMounted(focusSearchInput);
+watch(isPending, (pending) => {
+    if (!pending) focusSearchInput();
+});
 </script>
 
 <template>
@@ -166,6 +187,7 @@ const refresh = () => {
     >
         <div class="search-input-wrapper">
             <input
+                ref="searchInput"
                 type="text"
                 v-model="search"
                 placeholder="Search"

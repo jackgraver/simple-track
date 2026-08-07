@@ -34,7 +34,28 @@ func LoadPlanWithOrderedExercises(planID uint) (*models.WorkoutPlan, error) {
 		return nil, err
 	}
 	plan.Exercises = ex
+	if err := loadAssignedDays(&plan); err != nil {
+		return nil, err
+	}
 	return &plan, nil
+}
+
+func loadAssignedDays(plan *models.WorkoutPlan) error {
+	var rows []models.WorkoutPlanDay
+	if err := conn().Where("workout_plan_id = ?", plan.ID).Order("day_of_week ASC").Find(&rows).Error; err != nil {
+		return err
+	}
+	plan.AssignedDays = make([]int, 0, len(rows))
+	for _, row := range rows {
+		plan.AssignedDays = append(plan.AssignedDays, row.DayOfWeek)
+	}
+	if len(plan.AssignedDays) > 0 {
+		day := plan.AssignedDays[0]
+		plan.DayOfWeek = &day
+	} else {
+		plan.DayOfWeek = nil
+	}
+	return nil
 }
 
 func FindAllWorkoutPlans() ([]models.WorkoutPlan, error) {
@@ -44,13 +65,74 @@ func FindAllWorkoutPlans() ([]models.WorkoutPlan, error) {
 		return []models.WorkoutPlan{}, err
 	}
 	for i := range workoutPlans {
-		ex, err := LoadExercisesOrderedForPlan(workoutPlans[i].ID)
+		loaded, err := LoadPlanWithOrderedExercises(workoutPlans[i].ID)
 		if err != nil {
 			return nil, err
 		}
-		workoutPlans[i].Exercises = ex
+		workoutPlans[i] = *loaded
 	}
 	return workoutPlans, nil
+}
+
+func FindAllWorkoutPrograms() ([]models.WorkoutProgram, error) {
+	var programs []models.WorkoutProgram
+	if err := conn().Order("id ASC").Find(&programs).Error; err != nil {
+		return nil, err
+	}
+	for i := range programs {
+		plans, err := FindWorkoutPlansByProgram(programs[i].ID)
+		if err != nil {
+			return nil, err
+		}
+		programs[i].Plans = plans
+	}
+	return programs, nil
+}
+
+func FindWorkoutPlansByProgram(programID uint) ([]models.WorkoutPlan, error) {
+	var plans []models.WorkoutPlan
+	if err := conn().Where("workout_program_id = ?", programID).Order("id ASC").Find(&plans).Error; err != nil {
+		return nil, err
+	}
+	for i := range plans {
+		loaded, err := LoadPlanWithOrderedExercises(plans[i].ID)
+		if err != nil {
+			return nil, err
+		}
+		plans[i] = *loaded
+	}
+	return plans, nil
+}
+
+func CreateWorkoutProgram(program *models.WorkoutProgram) error {
+	return conn().Create(program).Error
+}
+
+func CreateWorkoutPlan(plan *models.WorkoutPlan) error {
+	return conn().Create(plan).Error
+}
+
+func FindWorkoutProgramByID(id uint) (models.WorkoutProgram, error) {
+	var program models.WorkoutProgram
+	return program, conn().First(&program, id).Error
+}
+
+func FindActiveWorkoutProgram() (models.WorkoutProgram, error) {
+	var program models.WorkoutProgram
+	return program, conn().Where("is_active = ?", true).Order("id ASC").First(&program).Error
+}
+
+func UpdateWorkoutProgramName(id uint, name string) error {
+	return conn().Model(&models.WorkoutProgram{}).Where("id = ?", id).Update("name", name).Error
+}
+
+func ActivateWorkoutProgram(id uint) error {
+	return conn().Transaction(func(tx *gorm.DB) error {
+		if err := tx.Model(&models.WorkoutProgram{}).Where("id = ?", id).Update("is_active", true).Error; err != nil {
+			return err
+		}
+		return tx.Model(&models.WorkoutProgram{}).Where("id != ?", id).Update("is_active", false).Error
+	})
 }
 
 func WorkoutPlanExists(ctx context.Context, planID uint) (bool, error) {
@@ -61,7 +143,22 @@ func WorkoutPlanExists(ctx context.Context, planID uint) (bool, error) {
 
 func FindWorkoutPlanByDayOfWeek(dayOfWeek int) (models.WorkoutPlan, error) {
 	var plan models.WorkoutPlan
-	err := conn().Where("day_of_week = ?", dayOfWeek).First(&plan).Error
+	err := conn().Joins("INNER JOIN workout_plan_days AS wpd ON wpd.workout_plan_id = workout_plans.id").
+		Where("wpd.day_of_week = ?", dayOfWeek).First(&plan).Error
+	if err == gorm.ErrRecordNotFound {
+		err = conn().Where("day_of_week = ?", dayOfWeek).First(&plan).Error
+	}
+	return plan, err
+}
+
+func FindWorkoutPlanByProgramAndDay(programID uint, dayOfWeek int) (models.WorkoutPlan, error) {
+	var plan models.WorkoutPlan
+	err := conn().Joins("INNER JOIN workout_plan_days AS wpd ON wpd.workout_plan_id = workout_plans.id").
+		Where("workout_plans.workout_program_id = ? AND wpd.day_of_week = ?", programID, dayOfWeek).
+		First(&plan).Error
+	if err == gorm.ErrRecordNotFound {
+		err = conn().Where("workout_program_id = ? AND day_of_week = ?", programID, dayOfWeek).First(&plan).Error
+	}
 	return plan, err
 }
 
@@ -71,19 +168,66 @@ func UpdatePlannedCardioType(planID uint, cardioType string) error {
 		Update("planned_cardio_type", cardioType).Error
 }
 
+func AssignWorkoutPlanToProgram(planID uint, programID uint) error {
+	return conn().Model(&models.WorkoutPlan{}).Where("id = ?", planID).Update("workout_program_id", programID).Error
+}
+
 func UnassignOtherPlansFromDay(dayOfWeek int, planID uint) error {
 	return conn().Model(&models.WorkoutPlan{}).
 		Where("day_of_week = ? AND id != ?", dayOfWeek, planID).
 		Update("day_of_week", nil).Error
 }
 
+func UnassignOtherPlansFromProgramDay(programID uint, dayOfWeek int, planID uint) error {
+	var plans []models.WorkoutPlan
+	if err := conn().Where("workout_program_id = ? AND id != ?", programID, planID).Find(&plans).Error; err != nil {
+		return err
+	}
+	for _, plan := range plans {
+		if err := conn().Where("workout_plan_id = ? AND day_of_week = ?", plan.ID, dayOfWeek).
+			Delete(&models.WorkoutPlanDay{}).Error; err != nil {
+			return err
+		}
+		if err := refreshLegacyDay(plan.ID); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func AssignWorkoutPlanToDay(planID uint, dayOfWeek int) error {
-	dayOfWeekPtr := &dayOfWeek
-	return conn().Model(&models.WorkoutPlan{}).Where("id = ?", planID).Update("day_of_week", dayOfWeekPtr).Error
+	if err := conn().Where("workout_plan_id = ? AND day_of_week = ?", planID, dayOfWeek).
+		FirstOrCreate(&models.WorkoutPlanDay{WorkoutPlanID: planID, DayOfWeek: dayOfWeek}).Error; err != nil {
+		return err
+	}
+	return refreshLegacyDay(planID)
 }
 
 func ClearWorkoutPlanDay(planID uint) error {
-	return conn().Model(&models.WorkoutPlan{}).Where("id = ?", planID).Update("day_of_week", nil).Error
+	if err := conn().Where("workout_plan_id = ?", planID).Delete(&models.WorkoutPlanDay{}).Error; err != nil {
+		return err
+	}
+	return refreshLegacyDay(planID)
+}
+
+func ClearWorkoutPlanDayOfWeek(planID uint, dayOfWeek int) error {
+	if err := conn().Where("workout_plan_id = ? AND day_of_week = ?", planID, dayOfWeek).
+		Delete(&models.WorkoutPlanDay{}).Error; err != nil {
+		return err
+	}
+	return refreshLegacyDay(planID)
+}
+
+func refreshLegacyDay(planID uint) error {
+	var row models.WorkoutPlanDay
+	err := conn().Where("workout_plan_id = ?", planID).Order("day_of_week ASC").First(&row).Error
+	if err == gorm.ErrRecordNotFound {
+		return conn().Model(&models.WorkoutPlan{}).Where("id = ?", planID).Update("day_of_week", nil).Error
+	}
+	if err != nil {
+		return err
+	}
+	return conn().Model(&models.WorkoutPlan{}).Where("id = ?", planID).Update("day_of_week", row.DayOfWeek).Error
 }
 
 func AddExerciseToPlan(planID uint, exerciseID uint) error {

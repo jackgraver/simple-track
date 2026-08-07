@@ -1,4 +1,4 @@
-import { apiPATCH } from "~/api/client";
+import { apiGET, apiPATCH, apiPOST } from "~/api/client";
 import type {
     WorkoutLog,
     Exercise,
@@ -7,7 +7,41 @@ import type {
     Cardio,
     MobilityRoutine,
     MobilityLogged,
+    WorkoutPlan,
+    WorkoutProgram,
 } from "~/types/workout";
+
+export async function getWorkoutPrograms(): Promise<{ programs: WorkoutProgram[] }> {
+    return apiGET<{ programs: WorkoutProgram[] }>("/workout/programs");
+}
+
+export async function createWorkoutProgram(name: string): Promise<{ program: WorkoutProgram }> {
+    return apiPOST<{ program: WorkoutProgram }>("/workout/programs", { name });
+}
+
+export async function renameWorkoutProgram(
+    id: number,
+    name: string,
+): Promise<{ program: WorkoutProgram }> {
+    return apiPATCH<{ program: WorkoutProgram }>(`/workout/programs/${id}`, { name });
+}
+
+export async function activateWorkoutProgram(
+    id: number,
+): Promise<{ program: WorkoutProgram }> {
+    return apiPOST<{ program: WorkoutProgram }>(`/workout/programs/${id}/activate`);
+}
+
+export async function createWorkoutPlan(
+    programId: number,
+    name: string,
+    dayOfWeek: number | null,
+): Promise<{ plan: WorkoutPlan }> {
+    return apiPOST<{ plan: WorkoutPlan }>(`/workout/programs/${programId}/plans`, {
+        name,
+        ...(dayOfWeek === null ? {} : { day_of_week: dayOfWeek }),
+    });
+}
 
 export type ExerciseGroup = {
     planned?: Exercise;
