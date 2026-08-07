@@ -202,7 +202,7 @@ const onTickClick = (index: number) => {
             }}</span>
         </p>
         <div :class="hasMarkerLabel ? 'pt-4' : ''">
-            <div class="relative h-13 touch-pan-x">
+            <div class="relative h-13">
                 <div
                     class="pointer-events-none absolute inset-y-0 left-1/2 z-10 w-0.5 -translate-x-1/2 rounded-full bg-amber-400/90"
                     aria-hidden="true"
@@ -227,7 +227,7 @@ const onTickClick = (index: number) => {
                 </div>
                 <div
                     ref="scrollEl"
-                    class="relative flex h-full overflow-x-auto overscroll-x-contain [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                    class="relative flex h-full touch-pan-x overflow-x-auto overflow-y-hidden overscroll-x-contain overscroll-y-none [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
                     style="scroll-snap-type: x mandatory"
                     @scroll.passive="onScroll"
                 >
@@ -240,7 +240,7 @@ const onTickClick = (index: number) => {
                     v-for="(tick, index) in tickValues"
                     :key="index"
                     type="button"
-                    class="flex h-full shrink-0 snap-center flex-col items-center justify-end gap-1 border-0 bg-transparent! shadow-none! p-0 text-inherit"
+                    class="flex h-full shrink-0 touch-pan-x snap-center flex-col items-center justify-end gap-1 border-0 bg-transparent! shadow-none! p-0 text-inherit"
                     :style="{
                         width: `${TICK_WIDTH_PX}px`,
                         scrollSnapAlign: 'center',

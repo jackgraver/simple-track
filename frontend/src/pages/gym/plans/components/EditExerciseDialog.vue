@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import type { Exercise } from "~/types/workout";
+import type { Exercise, ExerciseLoadType } from "~/types/workout";
+import { DEFAULT_EXERCISE_LOAD_TYPE } from "~/types/workout";
 import { toast } from "~/composables/toast/useToast";
 import { useQueryClient } from "@tanstack/vue-query";
 import { apiClient } from "~/api/client";
@@ -14,6 +15,7 @@ const queryClient = useQueryClient();
 const name = ref("");
 const repRollover = ref(10);
 const cues = ref("");
+const loadType = ref<ExerciseLoadType>(DEFAULT_EXERCISE_LOAD_TYPE);
 const submitting = ref(false);
 
 watch(
@@ -22,6 +24,7 @@ watch(
         name.value = e.name;
         repRollover.value = e.rep_rollover || 10;
         cues.value = e.cues ?? "";
+        loadType.value = e.load_type ?? DEFAULT_EXERCISE_LOAD_TYPE;
     },
     { immediate: true },
 );
@@ -40,6 +43,7 @@ const submit = async () => {
                 name: n,
                 rep_rollover: repRollover.value || 10,
                 cues: cues.value.trim(),
+                load_type: loadType.value,
             },
         );
         toast.push(`Updated ${n}`, "success");
@@ -74,6 +78,19 @@ const submit = async () => {
                 min="1"
                 class="input"
             />
+        </label>
+        <label class="field">
+            <span>Weight type</span>
+            <select v-model="loadType" class="input">
+                <option value="plate_loaded_with_bar">
+                    Plate loaded — count 45 lb bar
+                </option>
+                <option value="plate_loaded_without_bar">
+                    Plate loaded — do not count bar
+                </option>
+                <option value="weight_stack">Weight stack machine</option>
+                <option value="free_weights">Free weights</option>
+            </select>
         </label>
         <label class="field">
             <span>Cues</span>

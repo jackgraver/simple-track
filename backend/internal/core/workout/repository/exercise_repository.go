@@ -80,15 +80,20 @@ func CreateExercise(exercise *models.Exercise) error {
 	return conn().Create(exercise).Error
 }
 
-func UpdateExercise(id uint, name string, repRollover uint, cues string) (*models.Exercise, error) {
+func UpdateExercise(id uint, name string, repRollover uint, cues string, loadTypes ...models.ExerciseLoadType) (*models.Exercise, error) {
 	var exercise models.Exercise
 	if err := conn().First(&exercise, id).Error; err != nil {
 		return nil, err
+	}
+	loadType := models.NormalizeExerciseLoadType(exercise.LoadType)
+	if len(loadTypes) > 0 {
+		loadType = models.NormalizeExerciseLoadType(loadTypes[0])
 	}
 	if err := conn().Model(&exercise).Updates(map[string]interface{}{
 		"name":         name,
 		"rep_rollover": repRollover,
 		"cues":         cues,
+		"load_type":    loadType,
 	}).Error; err != nil {
 		return nil, err
 	}

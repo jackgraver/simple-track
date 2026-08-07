@@ -17,13 +17,18 @@ func SetupTestDB(t *testing.T) *gorm.DB {
 	}
 	if err := db.AutoMigrate(
 		&models.Exercise{},
+		&models.WorkoutProgram{},
 		&models.WorkoutPlan{},
+		&models.WorkoutPlanDay{},
 		&models.WorkoutPlanExercise{},
 		&models.WorkoutLog{},
 		&models.LoggedExercise{},
 		&models.LoggedSet{},
 		&models.Cardio{},
 	); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Create(&models.WorkoutProgram{Name: "Test Program", IsActive: true}).Error; err != nil {
 		t.Fatal(err)
 	}
 	database.SetDB(db)

@@ -2,25 +2,70 @@
 import type { WorkoutPlan } from "~/types/workout";
 import { toast } from "~/composables/toast/useToast";
 import { dialogManager } from "~/composables/dialog/useDialog";
-import { computed, ref } from "vue";
+import { computed, ref, watch } from "vue";
 import { useRouter } from "vue-router";
-import { useQuery } from "@tanstack/vue-query";
 import { apiClient } from "~/api/client";
+import {
+    useActivateWorkoutProgram,
+    useCreateWorkoutPlan,
+    useCreateWorkoutProgram,
+    useRenameWorkoutProgram,
+    useWorkoutPrograms,
+} from "~/api/workout/queries";
 
 const router = useRouter();
 
-const { data, isPending, refetch } = useQuery({
-    queryKey: ["workout", "plans", "all"],
-    queryFn: async () => {
-        const res = await apiClient.get<{ plans: WorkoutPlan[] }>(
-            "/workout/plans/all",
-        );
-        return res.data;
+const { data, isPending, refetch } = useWorkoutPrograms();
+const createProgram = useCreateWorkoutProgram();
+const renameProgram = useRenameWorkoutProgram();
+const activateProgram = useActivateWorkoutProgram();
+const createPlan = useCreateWorkoutPlan();
+const selectedProgramId = ref<number | null>(null);
+const selectedProgram = computed(() =>
+    data.value?.programs.find((program) => program.ID === selectedProgramId.value) ??
+    data.value?.programs.find((program) => program.is_active) ??
+    data.value?.programs[0],
+);
+watch(
+    () => selectedProgram.value?.ID,
+    (id) => {
+        if (id) selectedProgramId.value = id;
     },
-});
-
-const plans = computed(() => data.value?.plans || []);
+    { immediate: true },
+);
+const plans = computed(() => selectedProgram.value?.plans || []);
 const refresh = () => refetch();
+
+const promptCreateProgram = async () => {
+    const name = window.prompt("Workout plan name");
+    if (name?.trim()) await createProgram.mutateAsync(name.trim());
+};
+const promptRenameProgram = async () => {
+    if (!selectedProgram.value) return;
+    const name = window.prompt("Rename workout plan", selectedProgram.value.name);
+    if (name?.trim()) await renameProgram.mutateAsync({ id: selectedProgram.value.ID, name: name.trim() });
+};
+const promptCreateDay = async (dayOfWeek: number | null = null) => {
+    if (!selectedProgram.value) return;
+    const name = window.prompt(
+        dayOfWeek === null
+            ? "Routine name"
+            : `Routine name for ${dayNames[dayOfWeek]}`,
+    );
+    if (!name?.trim()) return;
+    try {
+        await createPlan.mutateAsync({
+            programId: selectedProgram.value.ID,
+            name: name.trim(),
+            dayOfWeek,
+        });
+        await refresh();
+        toast.push(`Created ${name.trim()}`, "success");
+    } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : String(err);
+        toast.push("Failed to create day: " + message, "error");
+    }
+};
 
 const dayNames = [
     "Sunday",
@@ -47,19 +92,21 @@ const getDayName = (dayOfWeek: number | null): string | undefined => {
     return dayNames[dayOfWeek];
 };
 
+const assignedDays = (plan: WorkoutPlan) =>
+    plan.assigned_days ?? (plan.day_of_week === null ? [] : [plan.day_of_week]);
+
 const planByDay = computed(() => {
     const m: Partial<Record<number, WorkoutPlan>> = {};
     for (const p of plans.value) {
-        if (p.day_of_week !== null) {
-            m[p.day_of_week] = p;
+        const days = p.assigned_days ?? (p.day_of_week === null ? [] : [p.day_of_week]);
+        for (const day of days) {
+            m[day] = p;
         }
     }
     return m;
 });
 
-const unassignedPlans = computed(() =>
-    plans.value.filter((p) => p.day_of_week === null),
-);
+const planDays = computed(() => plans.value);
 
 const draggingPlanId = ref<number | null>(null);
 const dropTargetKey = ref<number | "pool" | null>(null);
@@ -77,6 +124,16 @@ const onHandleMouseDown = () => {
 const todayDow = () => new Date().getDay();
 
 const goDetail = (id: number) => {
+    if (selectedProgram.value) {
+        router.push({
+            name: "gym-program-day-detail",
+            params: {
+                programId: String(selectedProgram.value.ID),
+                id: String(id),
+            },
+        });
+        return;
+    }
     router.push({ name: "gym-plan-detail", params: { id: String(id) } });
 };
 
@@ -148,7 +205,7 @@ const onDropDay = async (dow: number) => {
     draggingPlanId.value = null;
     if (rawId === null) return;
     const draggedPlan = plans.value.find((p) => p.ID === rawId);
-    if (!draggedPlan || draggedPlan.day_of_week === dow) return;
+    if (!draggedPlan || assignedDays(draggedPlan).includes(dow)) return;
     const occupant = plans.value.find(
         (p) => p.day_of_week === dow && p.ID !== draggedPlan.ID,
     );
@@ -178,7 +235,7 @@ const onDropPool = async () => {
     draggingPlanId.value = null;
     if (rawId === null) return;
     const draggedPlan = plans.value.find((p) => p.ID === rawId);
-    if (!draggedPlan || draggedPlan.day_of_week === null) return;
+    if (!draggedPlan || assignedDays(draggedPlan).length === 0) return;
     await unassignPlanFromDay(draggedPlan);
 };
 
@@ -199,18 +256,53 @@ const exerciseCountLabel = (n: number) => `${n} exercise${n === 1 ? "" : "s"}`;
                 Workout schedule
             </h1>
             <p class="m-0 text-sm text-textSecondary">
-                Grab the handle to drag plans between days. Click a plan to view
-                exercises.
+                Choose an active plan, then arrange its routines through the week.
             </p>
         </div>
+        <div v-if="data?.programs?.length" class="flex flex-wrap items-center gap-2">
+            <select
+                v-model="selectedProgramId"
+                class="rounded-md border border-(--color-border) bg-firstBg px-3 py-2 text-sm text-textPrimary"
+            >
+                <option v-for="program in data.programs" :key="program.ID" :value="program.ID">
+                    {{ program.name }}{{ program.is_active ? " (Active)" : "" }}
+                </option>
+            </select>
+            <button
+                class="rounded-md border border-(--color-border) px-3 py-2 text-sm text-textPrimary"
+                :disabled="selectedProgram?.is_active"
+                @click="selectedProgram && activateProgram.mutate(selectedProgram.ID)"
+            >
+                Make active
+            </button>
+            <button
+                class="rounded-md border border-(--color-border) px-3 py-2 text-sm text-textPrimary"
+                @click="promptRenameProgram"
+            >
+                Rename
+            </button>
+            <button
+                class="rounded-md bg-(--color-cf-red) px-3 py-2 text-sm font-medium text-white"
+                @click="promptCreateProgram"
+            >
+                New workout plan
+            </button>
+        </div>
+        <button
+            v-else-if="!isPending"
+            class="self-start rounded-md bg-(--color-cf-red) px-3 py-2 text-sm font-medium text-white"
+            @click="promptCreateProgram"
+        >
+            Create your first workout plan
+        </button>
         <div v-if="isPending" class="text-center text-sm text-textSecondary">
             Loading…
         </div>
         <div
-            v-else-if="!plans.length"
+            v-else-if="!selectedProgram"
             class="rounded-lg border border-(--color-border) bg-firstBg p-8 text-center text-sm text-textSecondary"
         >
-            No workout plans yet.
+            No workout plans yet. Create one above to configure its week.
         </div>
         <template v-else>
             <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-7">
@@ -308,15 +400,28 @@ const exerciseCountLabel = (n: number) => `${n} exercise${n === 1 ? "" : "s"}`;
                     <div
                         v-else
                         class="flex flex-1 items-center justify-center rounded-md border border-dashed border-(--color-border) px-2 py-6 text-center text-xs text-textSecondary"
+                        role="button"
+                        tabindex="0"
+                        @click="promptCreateDay(slot.dow)"
+                        @keydown.enter="promptCreateDay(slot.dow)"
                     >
-                        Drop a plan here
+                        Add a routine
                     </div>
                 </div>
             </div>
             <section class="flex flex-col gap-2">
-                <h2 class="m-0 text-sm font-semibold text-textPrimary">
-                    Unassigned
-                </h2>
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                    <h2 class="m-0 text-sm font-semibold text-textPrimary">
+                        Plan Days
+                    </h2>
+                    <button
+                        type="button"
+                        class="rounded-md bg-(--color-cf-red) px-3 py-1.5 text-xs font-medium text-white"
+                        @click="promptCreateDay()"
+                    >
+                        Create day
+                    </button>
+                </div>
                 <div
                     class="flex min-h-18 flex-wrap content-start gap-2 rounded-lg border border-(--color-border) bg-firstBg p-3 transition-shadow"
                     :class="
@@ -328,14 +433,13 @@ const exerciseCountLabel = (n: number) => `${n} exercise${n === 1 ? "" : "s"}`;
                     @drop.prevent="onDropPool()"
                 >
                     <p
-                        v-if="unassignedPlans.length === 0"
+                        v-if="planDays.length === 0"
                         class="m-0 w-full text-center text-xs text-textSecondary"
                     >
-                        No unassigned plans — drag a scheduled plan here to
-                        remove its weekday.
+                        No plan days yet — create one to add it to the week.
                     </p>
                     <div
-                        v-for="p in unassignedPlans"
+                        v-for="p in planDays"
                         :key="p.ID"
                         role="button"
                         tabindex="0"

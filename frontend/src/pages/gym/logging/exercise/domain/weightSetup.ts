@@ -1,8 +1,16 @@
+import type { ExerciseLoadType } from "~/types/workout";
+
 export const STANDARD_PLATE_LBS = [45, 35, 25, 10, 5, 2.5] as const;
 export const DEFAULT_BAR_LBS = 45;
-export const BAR_WEIGHT_OPTIONS = [45, 35] as const;
 
 export type PlateCountsPerSide = Partial<Record<number, number>>;
+
+export function isPlateLoadedExercise(loadType: ExerciseLoadType): boolean {
+    return (
+        loadType === "plate_loaded_with_bar" ||
+        loadType === "plate_loaded_without_bar"
+    );
+}
 
 export type ParsedWeightSetup = {
     barLbs: number;
@@ -31,6 +39,21 @@ export function computeBarbellTotalLbs(
     return roundWeightHalfLb(barLbs + 2 * perSideLoadLbs(platesPerSide));
 }
 
+export function barLbsForExercise(loadType: ExerciseLoadType): number {
+    return loadType === "plate_loaded_with_bar" ? DEFAULT_BAR_LBS : 0;
+}
+
+export function computeExerciseLoadLbs(
+    loadType: ExerciseLoadType,
+    platesPerSide: PlateCountsPerSide,
+): number {
+    if (!isPlateLoadedExercise(loadType)) return 0;
+    return computeBarbellTotalLbs(
+        barLbsForExercise(loadType),
+        platesPerSide,
+    );
+}
+
 export function formatWeightSetup(
     barLbs: number,
     platesPerSide: PlateCountsPerSide,
@@ -45,12 +68,31 @@ export function formatWeightSetup(
     }
     const plates = parts.join(" + ");
     if (plates.length === 0) {
+        if (barLbs === 0) return "";
         return barLbs !== DEFAULT_BAR_LBS ? `bar ${barLbs}` : "";
+    }
+    if (barLbs === 0) {
+        return `${plates}, bar 0`;
     }
     if (barLbs !== DEFAULT_BAR_LBS) {
         return `${plates}, bar ${barLbs}`;
     }
     return plates;
+}
+
+export function formatExerciseWeightSetup(
+    loadType: ExerciseLoadType,
+    platesPerSide: PlateCountsPerSide,
+): string {
+    if (!isPlateLoadedExercise(loadType)) return "";
+    return formatWeightSetup(barLbsForExercise(loadType), platesPerSide);
+}
+
+export function weightSetupForExercise(
+    loadType: ExerciseLoadType,
+    setup: string,
+): string {
+    return isPlateLoadedExercise(loadType) ? setup : "";
 }
 
 export function weightSetupMismatchLbs(

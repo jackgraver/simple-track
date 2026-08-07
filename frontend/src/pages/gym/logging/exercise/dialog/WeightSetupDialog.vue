@@ -1,9 +1,8 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
 import {
-    BAR_WEIGHT_OPTIONS,
-    computeBarbellTotalLbs,
-    formatWeightSetup,
+    computeExerciseLoadLbs,
+    formatExerciseWeightSetup,
     parseWeightSetup,
     perSideLoadLbs,
     STANDARD_PLATE_LBS,
@@ -15,24 +14,33 @@ import {
 const props = defineProps<{
     currentSetup: string;
     targetWeightLbs: number;
+    loadType: "plate_loaded_with_bar" | "plate_loaded_without_bar";
     onResolve?: (value: WeightSetupDialogResult) => void;
 }>();
 
 const initial = parseWeightSetup(props.currentSetup);
-const barLbs = ref(initial.barLbs);
+const setupText = ref(
+    initial.parsed
+        ? formatExerciseWeightSetup(props.loadType, initial.platesPerSide)
+        : props.currentSetup,
+);
 const counts = ref<PlateCountsPerSide>({ ...initial.platesPerSide });
 const parseFailed = ref(!initial.parsed && props.currentSetup.trim().length > 0);
 
-const totalLbs = computed(() =>
-    computeBarbellTotalLbs(barLbs.value, counts.value),
-);
+function refreshSetupText() {
+    setupText.value = formatExerciseWeightSetup(props.loadType, counts.value);
+    parseFailed.value = false;
+}
 
-const formattedSetup = computed(() =>
-    formatWeightSetup(barLbs.value, counts.value),
-);
+const totalLbs = computed(() => {
+    if (parseFailed.value) return 0;
+    return computeExerciseLoadLbs(props.loadType, counts.value);
+});
 
 const mismatchDelta = computed(() =>
-    weightSetupMismatchLbs(totalLbs.value, props.targetWeightLbs),
+    !parseFailed.value
+        ? weightSetupMismatchLbs(totalLbs.value, props.targetWeightLbs)
+        : null,
 );
 
 const hasPlates = computed(() => perSideLoadLbs(counts.value) > 0);
@@ -49,11 +57,29 @@ function changePlate(plate: number, delta: number) {
     } else {
         counts.value = { ...counts.value, [plate]: next };
     }
+    refreshSetupText();
+}
+
+function syncFromTextInput() {
+    const parsed = parseWeightSetup(setupText.value);
+    if (parsed.parsed) {
+        counts.value = { ...parsed.platesPerSide };
+        parseFailed.value = false;
+        return;
+    }
+    parseFailed.value = setupText.value.trim().length > 0;
+    if (!setupText.value.trim()) {
+        counts.value = {};
+    }
 }
 
 function save(syncWeight: boolean) {
+    const parsed = parseWeightSetup(setupText.value);
+    const weightSetup = parsed.parsed
+        ? formatExerciseWeightSetup(props.loadType, parsed.platesPerSide)
+        : setupText.value.trim();
     props.onResolve?.({
-        weightSetup: formattedSetup.value,
+        weightSetup,
         totalLbs: totalLbs.value,
         syncWeight,
     });
@@ -61,38 +87,35 @@ function save(syncWeight: boolean) {
 </script>
 
 <template>
-    <div class="flex flex-col gap-4">
-        <p
-            v-if="parseFailed"
-            class="m-0 rounded-md border border-amber-900/60 bg-amber-950/40 px-3 py-2 text-sm text-amber-200"
-        >
-            Could not read the current setup. Plate counts start empty; saving
-            replaces the old text.
-        </p>
+    <div class="flex w-full min-w-0 flex-col gap-4">
         <div class="flex flex-col gap-2">
-            <span class="text-sm font-medium text-[rgb(150,150,150)]">Bar</span>
-            <div class="flex flex-row gap-2">
-                <button
-                    v-for="bar in BAR_WEIGHT_OPTIONS"
-                    :key="bar"
-                    type="button"
-                    class="flex-1 rounded-md border px-3 py-2 text-sm transition-colors"
-                    :class="
-                        barLbs === bar
-                            ? 'border-[rgb(100,100,100)] bg-[rgb(40,40,40)]'
-                            : 'border-[rgb(56,56,56)] bg-[rgb(27,27,27)] hover:bg-[rgb(35,35,35)]'
-                    "
-                    @click="barLbs = bar"
-                >
-                    {{ bar }} lb
-                </button>
-            </div>
+            <label
+                for="weight-setup-text"
+                class="text-sm font-medium text-[rgb(150,150,150)]"
+                >Setup text</label
+            >
+            <input
+                id="weight-setup-text"
+                v-model="setupText"
+                type="text"
+                placeholder="e.g. belt, 2×45 + 10, or notes"
+                class="w-full min-w-0 rounded-md border border-[rgb(56,56,56)] bg-[rgb(27,27,27)] px-3 py-2 text-sm outline-none focus:border-[rgb(100,100,100)]"
+                @input="syncFromTextInput"
+            />
+            <p
+                v-if="parseFailed"
+                class="m-0 text-xs text-amber-300"
+            >
+                Free text — use the plate picker below to build barbell notation.
+            </p>
         </div>
         <div class="flex flex-col gap-2">
-            <span class="text-sm font-medium text-[rgb(150,150,150)]"
-                >Plates per side</span
-            >
-            <ul class="m-0 flex list-none flex-col gap-1.5 p-0">
+            <span class="text-sm font-medium text-[rgb(150,150,150)]">{{
+                props.loadType === "plate_loaded_with_bar"
+                    ? "Plates per side (45 lb bar included)"
+                    : "Plates per side (bar not counted)"
+            }}</span>
+            <ul class="m-0 flex w-full min-w-0 list-none flex-col gap-1.5 p-0">
                 <li
                     v-for="plate in STANDARD_PLATE_LBS"
                     :key="plate"
@@ -128,20 +151,32 @@ function save(syncWeight: boolean) {
         <div
             class="flex flex-col gap-1 rounded-md border border-[rgb(56,56,56)] bg-[rgb(24,24,24)] px-3 py-2.5"
         >
-            <div class="flex flex-wrap items-baseline justify-between gap-2">
-                <span class="text-sm text-[rgb(150,150,150)]">Total on bar</span>
+            <div
+                v-if="!parseFailed"
+                class="flex flex-wrap items-baseline justify-between gap-2"
+            >
+                <span class="text-sm text-[rgb(150,150,150)]">Total load</span>
                 <span class="text-lg font-medium tabular-nums"
                     >{{ totalLbs }} lbs</span
                 >
             </div>
             <p
-                v-if="formattedSetup"
+                v-else-if="setupText.trim()"
                 class="m-0 text-sm text-[rgb(180,180,180)]"
             >
-                {{ formattedSetup }}
+                {{ setupText.trim() }}
             </p>
-            <p v-else-if="!hasPlates" class="m-0 text-sm text-[rgb(120,120,120)]">
-                Bar only ({{ barLbs }} lbs)
+            <p
+                v-else-if="!hasPlates && props.loadType === 'plate_loaded_with_bar'"
+                class="m-0 text-sm text-[rgb(120,120,120)]"
+            >
+                Bar only (45 lbs)
+            </p>
+            <p
+                v-else-if="!hasPlates"
+                class="m-0 text-sm text-[rgb(120,120,120)]"
+            >
+                No plates
             </p>
             <p
                 v-if="targetWeightLbs > 0 && mismatchDelta != null"
@@ -152,7 +187,7 @@ function save(syncWeight: boolean) {
                 }}{{ mismatchDelta }} lbs vs plates)
             </p>
         </div>
-        <div class="flex flex-col gap-2 sm:flex-row">
+        <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
             <button
                 type="button"
                 class="flex-1 rounded-md border border-[rgb(56,56,56)] bg-[rgb(35,35,35)] px-4 py-2 text-sm hover:bg-[rgb(50,50,50)]"
@@ -161,9 +196,9 @@ function save(syncWeight: boolean) {
                 Save setup
             </button>
             <button
-                v-if="totalLbs > 0"
                 type="button"
-                class="flex-1 rounded-md bg-green-600 px-4 py-2 text-sm text-white hover:bg-green-500"
+                class="rounded-md bg-green-600 px-4 py-2 text-sm text-white hover:bg-green-500 disabled:cursor-not-allowed disabled:opacity-40"
+                :disabled="parseFailed || totalLbs <= 0"
                 @click="save(true)"
             >
                 Save & set weight to {{ totalLbs }} lbs

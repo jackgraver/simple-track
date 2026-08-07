@@ -211,9 +211,10 @@ func GetExerciseProgression(c *gin.Context) {
 }
 
 type CreateExerciseRequest struct {
-	Name        string `json:"name"`
-	RepRollover uint   `json:"rep_rollover"`
-	Cues        string `json:"cues"`
+	Name        string                  `json:"name"`
+	RepRollover uint                    `json:"rep_rollover"`
+	Cues        string                  `json:"cues"`
+	LoadType    models.ExerciseLoadType `json:"load_type"`
 }
 
 func CreateExercise(c *gin.Context) {
@@ -232,7 +233,7 @@ func CreateExercise(c *gin.Context) {
 		request.RepRollover = 10
 	}
 
-	exercise, err := services.CreateExercise(request.Name, request.RepRollover, request.Cues)
+	exercise, err := services.CreateExercise(request.Name, request.RepRollover, request.Cues, request.LoadType)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -242,9 +243,10 @@ func CreateExercise(c *gin.Context) {
 }
 
 type updateExerciseRequest struct {
-	Name        string `json:"name"`
-	RepRollover uint   `json:"rep_rollover"`
-	Cues        string `json:"cues"`
+	Name        string                  `json:"name"`
+	RepRollover uint                    `json:"rep_rollover"`
+	Cues        string                  `json:"cues"`
+	LoadType    models.ExerciseLoadType `json:"load_type"`
 }
 
 func UpdateExercise(c *gin.Context) {
@@ -266,7 +268,7 @@ func UpdateExercise(c *gin.Context) {
 	if req.RepRollover == 0 {
 		req.RepRollover = 10
 	}
-	exercise, err := services.UpdateExercise(uint(id64), req.Name, req.RepRollover, req.Cues)
+	exercise, err := services.UpdateExercise(uint(id64), req.Name, req.RepRollover, req.Cues, req.LoadType)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Exercise not found"})

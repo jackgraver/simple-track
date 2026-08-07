@@ -435,6 +435,80 @@ func GetAllWorkoutPlans() ([]models.WorkoutPlan, error) {
 	return workoutrepo.FindAllWorkoutPlans()
 }
 
+func GetAllWorkoutPrograms() ([]models.WorkoutProgram, error) {
+	return workoutrepo.FindAllWorkoutPrograms()
+}
+
+func CreateWorkoutProgram(name string) (*models.WorkoutProgram, error) {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return nil, fmt.Errorf("program name is required")
+	}
+	program := &models.WorkoutProgram{Name: name}
+	if _, err := workoutrepo.FindActiveWorkoutProgram(); err != nil && errors.Is(err, gorm.ErrRecordNotFound) {
+		program.IsActive = true
+	}
+	if err := workoutrepo.CreateWorkoutProgram(program); err != nil {
+		return nil, err
+	}
+	return program, nil
+}
+
+func CreateWorkoutPlan(programID uint, name string, dayOfWeek *int) (*models.WorkoutPlan, error) {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return nil, fmt.Errorf("plan name is required")
+	}
+	if _, err := workoutrepo.FindWorkoutProgramByID(programID); err != nil {
+		return nil, fmt.Errorf("program not found: %w", err)
+	}
+	if dayOfWeek != nil && (*dayOfWeek < 0 || *dayOfWeek > 6) {
+		return nil, fmt.Errorf("day_of_week must be between 0 and 6")
+	}
+	plan := &models.WorkoutPlan{Name: name, WorkoutProgramID: &programID}
+	if err := workoutrepo.CreateWorkoutPlan(plan); err != nil {
+		return nil, err
+	}
+	if dayOfWeek != nil {
+		if _, err := AssignPlanToDay(plan.ID, *dayOfWeek); err != nil {
+			return nil, err
+		}
+	}
+	return workoutrepo.LoadPlanWithOrderedExercises(plan.ID)
+}
+
+func RenameWorkoutProgram(id uint, name string) (*models.WorkoutProgram, error) {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return nil, fmt.Errorf("program name is required")
+	}
+	if err := workoutrepo.UpdateWorkoutProgramName(id, name); err != nil {
+		return nil, err
+	}
+	program, err := workoutrepo.FindWorkoutProgramByID(id)
+	if err != nil {
+		return nil, err
+	}
+	return &program, nil
+}
+
+func ActivateWorkoutProgram(ctx context.Context, id uint) (*models.WorkoutProgram, error) {
+	if _, err := workoutrepo.FindWorkoutProgramByID(id); err != nil {
+		return nil, fmt.Errorf("program not found: %w", err)
+	}
+	if _, err := GetOrCreateToday(ctx, 0); err != nil {
+		return nil, err
+	}
+	if err := workoutrepo.ActivateWorkoutProgram(id); err != nil {
+		return nil, err
+	}
+	program, err := workoutrepo.FindWorkoutProgramByID(id)
+	if err != nil {
+		return nil, err
+	}
+	return &program, nil
+}
+
 func AddExerciseToPlan(planID uint, exerciseID uint) error {
 	return workoutrepo.AddExerciseToPlan(planID, exerciseID)
 }
@@ -447,11 +521,16 @@ func ReorderPlanExercises(planID uint, exerciseIDs []uint) error {
 	return workoutrepo.ReorderPlanExercises(planID, exerciseIDs)
 }
 
-func CreateExercise(name string, repRollover uint, cues string) (*models.Exercise, error) {
+func CreateExercise(name string, repRollover uint, cues string, loadTypes ...models.ExerciseLoadType) (*models.Exercise, error) {
+	loadType := models.ExerciseLoadType("")
+	if len(loadTypes) > 0 {
+		loadType = loadTypes[0]
+	}
 	exercise := models.Exercise{
 		Name:        name,
 		RepRollover: repRollover,
 		Cues:        cues,
+		LoadType:    models.NormalizeExerciseLoadType(loadType),
 	}
 	if err := workoutrepo.CreateExercise(&exercise); err != nil {
 		return nil, err
@@ -459,18 +538,29 @@ func CreateExercise(name string, repRollover uint, cues string) (*models.Exercis
 	return &exercise, nil
 }
 
-func UpdateExercise(id uint, name string, repRollover uint, cues string) (*models.Exercise, error) {
-	return workoutrepo.UpdateExercise(id, name, repRollover, cues)
+func UpdateExercise(id uint, name string, repRollover uint, cues string, loadTypes ...models.ExerciseLoadType) (*models.Exercise, error) {
+	return workoutrepo.UpdateExercise(id, name, repRollover, cues, loadTypes...)
 }
 
 func AssignPlanToDay(planID uint, dayOfWeek int) (*models.WorkoutPlan, error) {
 	if dayOfWeek < 0 || dayOfWeek > 6 {
 		return nil, fmt.Errorf("day_of_week must be between 0 (Sunday) and 6 (Saturday)")
 	}
-	if _, err := workoutrepo.FindWorkoutPlanByID(planID); err != nil {
+	plan, err := workoutrepo.FindWorkoutPlanByID(planID)
+	if err != nil {
 		return nil, fmt.Errorf("plan not found: %w", err)
 	}
-	if err := workoutrepo.UnassignOtherPlansFromDay(dayOfWeek, planID); err != nil {
+	if plan.WorkoutProgramID == nil {
+		program, err := workoutrepo.FindActiveWorkoutProgram()
+		if err != nil {
+			return nil, fmt.Errorf("active program not found: %w", err)
+		}
+		if err := workoutrepo.AssignWorkoutPlanToProgram(planID, program.ID); err != nil {
+			return nil, err
+		}
+		plan.WorkoutProgramID = &program.ID
+	}
+	if err := workoutrepo.UnassignOtherPlansFromProgramDay(*plan.WorkoutProgramID, dayOfWeek, planID); err != nil {
 		return nil, fmt.Errorf("failed to unassign existing plan: %w", err)
 	}
 	if err := workoutrepo.AssignWorkoutPlanToDay(planID, dayOfWeek); err != nil {
@@ -484,10 +574,27 @@ func AssignPlanToDay(planID uint, dayOfWeek int) (*models.WorkoutPlan, error) {
 }
 
 func UnassignPlanFromDay(planID uint) (*models.WorkoutPlan, error) {
+	return unassignPlanFromDay(planID, nil)
+}
+
+func UnassignPlanFromSpecificDay(planID uint, dayOfWeek int) (*models.WorkoutPlan, error) {
+	if dayOfWeek < 0 || dayOfWeek > 6 {
+		return nil, fmt.Errorf("day_of_week must be between 0 (Sunday) and 6 (Saturday)")
+	}
+	return unassignPlanFromDay(planID, &dayOfWeek)
+}
+
+func unassignPlanFromDay(planID uint, dayOfWeek *int) (*models.WorkoutPlan, error) {
 	if _, err := workoutrepo.FindWorkoutPlanByID(planID); err != nil {
 		return nil, fmt.Errorf("plan not found: %w", err)
 	}
-	if err := workoutrepo.ClearWorkoutPlanDay(planID); err != nil {
+	var err error
+	if dayOfWeek == nil {
+		err = workoutrepo.ClearWorkoutPlanDay(planID)
+	} else {
+		err = workoutrepo.ClearWorkoutPlanDayOfWeek(planID, *dayOfWeek)
+	}
+	if err != nil {
 		return nil, fmt.Errorf("failed to unassign plan from day: %w", err)
 	}
 	reloaded, err := workoutrepo.LoadPlanWithOrderedExercises(planID)
@@ -501,12 +608,32 @@ func GetPlanByDay(dayOfWeek int) (*models.WorkoutPlan, error) {
 	if dayOfWeek < 0 || dayOfWeek > 6 {
 		return nil, fmt.Errorf("day_of_week must be between 0 (Sunday) and 6 (Saturday)")
 	}
-	plan, err := workoutrepo.FindWorkoutPlanByDayOfWeek(dayOfWeek)
+	program, err := workoutrepo.FindActiveWorkoutProgram()
 	if err != nil {
 		if err == gorm.ErrRecordNotFound {
 			return nil, nil
 		}
 		return nil, err
+	}
+	plan, err := workoutrepo.FindWorkoutPlanByProgramAndDay(program.ID, dayOfWeek)
+	if err != nil {
+		if err == gorm.ErrRecordNotFound {
+			legacy, legacyErr := workoutrepo.FindWorkoutPlanByDayOfWeek(dayOfWeek)
+			if legacyErr == gorm.ErrRecordNotFound {
+				return nil, nil
+			}
+			if legacyErr != nil {
+				return nil, legacyErr
+			}
+			if legacy.WorkoutProgramID == nil {
+				if err := workoutrepo.AssignWorkoutPlanToProgram(legacy.ID, program.ID); err != nil {
+					return nil, err
+				}
+			}
+			plan = legacy
+		} else {
+			return nil, err
+		}
 	}
 	return workoutrepo.LoadPlanWithOrderedExercises(plan.ID)
 }
