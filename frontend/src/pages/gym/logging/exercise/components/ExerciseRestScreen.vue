@@ -15,6 +15,7 @@ const emit = defineEmits<{
     (event: "back"): void;
     (event: "next"): void;
     (event: "finish"): void;
+    (event: "progression"): void;
     (event: "edit", index: number): void;
     (event: "edit-setup"): void;
 }>();
@@ -93,5 +94,12 @@ const back = () => {
                 Finish exercise
             </button>
         </div>
+        <button
+            class="w-full rounded-md border border-zinc-700 px-4 py-3 text-sm font-semibold text-textSecondary transition-colors hover:border-zinc-500 hover:bg-firstBg hover:text-textPrimary"
+            type="button"
+            @click="emit('progression')"
+        >
+            View progression
+        </button>
     </div>
 </template>

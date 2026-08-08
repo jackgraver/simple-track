@@ -175,6 +175,7 @@ export function useProgressionCharts(
     const progressionChartData = computed<ChartData<"line">>(() => {
         const t = readChartTheme();
         const s = combinedSeries.value;
+        const pointRadius = s.weights.length > 20 ? 0 : 3;
         return {
             labels: s.labels,
             datasets: [
@@ -184,9 +185,9 @@ export function useProgressionCharts(
                     yAxisID: "y",
                     borderColor: t.lineWeight,
                     backgroundColor: t.lineWeight,
-                    tension: 0.2,
+                    tension: 0.15,
                     fill: false,
-                    pointRadius: 3,
+                    pointRadius,
                     pointHoverRadius: 5,
                     borderWidth: 2,
                 },
@@ -196,9 +197,9 @@ export function useProgressionCharts(
                     yAxisID: "y1",
                     borderColor: t.lineVolume,
                     backgroundColor: t.lineVolume,
-                    tension: 0.2,
+                    tension: 0.15,
                     fill: false,
-                    pointRadius: 3,
+                    pointRadius,
                     pointHoverRadius: 5,
                     borderWidth: 2,
                 },
@@ -235,7 +236,13 @@ export function useProgressionCharts(
             },
             scales: {
                 x: {
-                    ticks: { color: t.textMuted, maxRotation: 45 },
+                    ticks: {
+                        color: t.textMuted,
+                        autoSkip: true,
+                        maxTicksLimit: 6,
+                        maxRotation: 0,
+                        minRotation: 0,
+                    },
                     grid: { color: t.grid },
                 },
                 y: {

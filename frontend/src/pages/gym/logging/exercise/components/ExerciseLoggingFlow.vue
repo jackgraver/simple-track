@@ -25,6 +25,7 @@ import {
 } from "../domain/weightSetup";
 import { useExerciseLoggingSession } from "../composables/useExerciseLoggingSession";
 import WeightSetupDialog from "../dialog/WeightSetupDialog.vue";
+import ExerciseProgressionChartPanel from "~/pages/gym/progression/ExerciseProgressionChartPanel.vue";
 import ExerciseSetupScreen from "./ExerciseSetupScreen.vue";
 import ExerciseRepsScreen from "./ExerciseRepsScreen.vue";
 import ExerciseRestScreen from "./ExerciseRestScreen.vue";
@@ -162,6 +163,21 @@ const openWeightSetupDialog = async () => {
     if (result.syncWeight) session.commitWeightFromInput(result.totalLbs);
 };
 
+const openProgressionDialog = () => {
+    const id = exerciseId.value;
+    if (id == null) return;
+    void dialogManager.custom<void>({
+        title: `${exerciseName.value} Progression`,
+        component: ExerciseProgressionChartPanel,
+        componentProps: {
+            exerciseId: id,
+            lastTimeSets: previousSets.value,
+            initialRange: "6m",
+        },
+        wide: true,
+    });
+};
+
 watch(
     flowStorageKey,
     (key, previousKey) => {
@@ -221,6 +237,7 @@ onBeforeRouteLeave(clearFlowState);
         @back="goBackToSetup"
         @next="transition('nextSet')"
         @finish="finish"
+        @progression="openProgressionDialog"
         @edit="editSet"
         @edit-setup="transition('backToSetup')"
     />

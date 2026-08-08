@@ -13,16 +13,34 @@ import {
 const props = defineProps<{
     exerciseId: number;
     lastTimeSets?: { weight: number; reps: number }[];
+    initialRange?: ProgressionRange;
 }>();
 
 type ViewMode = "chart" | "text";
 
-const range = ref<ProgressionRange>("1m");
+const range = ref<ProgressionRange>(props.initialRange ?? "1m");
 const viewMode = ref<ViewMode>("chart");
+const rangeLabel = computed(
+    () =>
+        ({
+            "1m": "last month",
+            "3m": "last 3 months",
+            "6m": "last 6 months",
+            "1y": "last year",
+            all: "this exercise",
+        })[range.value],
+);
 
 const viewOptions: { id: ViewMode; label: string }[] = [
     { id: "chart", label: "Graph" },
     { id: "text", label: "List" },
+];
+const rangeOptions: { id: ProgressionRange; label: string }[] = [
+    { id: "1m", label: "1 mo" },
+    { id: "3m", label: "3 mo" },
+    { id: "6m", label: "6 mo" },
+    { id: "1y", label: "1 yr" },
+    { id: "all", label: "All" },
 ];
 
 const exerciseId = toRef(props, "exerciseId");
@@ -93,25 +111,44 @@ const lastTimeDayKey = computed(() => {
         </div>
         <template v-else-if="!hasProgressionData">
             <p class="m-0 py-4 text-center text-sm text-textSecondary">
-                No data in the last month.
+                No data in the {{ rangeLabel }}.
             </p>
         </template>
         <template v-else>
-            <div class="flex flex-wrap gap-1">
-                <button
-                    v-for="opt in viewOptions"
-                    :key="opt.id"
-                    type="button"
-                    class="rounded px-2 py-0.5 text-xs transition-colors"
-                    :class="
-                        viewMode === opt.id
-                            ? 'bg-secondBg text-textPrimary'
-                            : 'text-textSecondary hover:bg-firstBg hover:text-textPrimary'
-                    "
-                    @click="viewMode = opt.id"
-                >
-                    {{ opt.label }}
-                </button>
+            <div class="flex flex-wrap items-center justify-between gap-2">
+                <div class="flex flex-wrap items-center gap-1">
+                    <span class="mr-1 text-xs text-textSecondary">Range</span>
+                    <button
+                        v-for="opt in rangeOptions"
+                        :key="opt.id"
+                        type="button"
+                        class="rounded px-2 py-0.5 text-xs transition-colors"
+                        :class="
+                            range === opt.id
+                                ? 'bg-secondBg text-textPrimary'
+                                : 'text-textSecondary hover:bg-firstBg hover:text-textPrimary'
+                        "
+                        @click="range = opt.id"
+                    >
+                        {{ opt.label }}
+                    </button>
+                </div>
+                <div class="flex flex-wrap gap-1">
+                    <button
+                        v-for="opt in viewOptions"
+                        :key="opt.id"
+                        type="button"
+                        class="rounded px-2 py-0.5 text-xs transition-colors"
+                        :class="
+                            viewMode === opt.id
+                                ? 'bg-secondBg text-textPrimary'
+                                : 'text-textSecondary hover:bg-firstBg hover:text-textPrimary'
+                        "
+                        @click="viewMode = opt.id"
+                    >
+                        {{ opt.label }}
+                    </button>
+                </div>
             </div>
             <div
                 v-if="viewMode === 'chart'"
@@ -129,7 +166,7 @@ const lastTimeDayKey = computed(() => {
                     />
                 </div>
                 <p v-else class="m-0 text-sm text-textSecondary">
-                    No chart data in the last month.
+                    No chart data in the {{ rangeLabel }}.
                 </p>
             </div>
             <div
