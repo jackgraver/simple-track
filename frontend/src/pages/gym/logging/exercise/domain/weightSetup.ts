@@ -8,7 +8,8 @@ export type PlateCountsPerSide = Partial<Record<number, number>>;
 export function isPlateLoadedExercise(loadType: ExerciseLoadType): boolean {
     return (
         loadType === "plate_loaded_with_bar" ||
-        loadType === "plate_loaded_without_bar"
+        loadType === "plate_loaded_without_bar" ||
+        loadType === "plate_loaded_total"
     );
 }
 
@@ -48,6 +49,9 @@ export function computeExerciseLoadLbs(
     platesPerSide: PlateCountsPerSide,
 ): number {
     if (!isPlateLoadedExercise(loadType)) return 0;
+    if (loadType === "plate_loaded_total") {
+        return roundWeightHalfLb(perSideLoadLbs(platesPerSide));
+    }
     return computeBarbellTotalLbs(
         barLbsForExercise(loadType),
         platesPerSide,
@@ -58,15 +62,7 @@ export function formatWeightSetup(
     barLbs: number,
     platesPerSide: PlateCountsPerSide,
 ): string {
-    const parts: string[] = [];
-    for (const plate of STANDARD_PLATE_LBS) {
-        const count = platesPerSide[plate] ?? 0;
-        if (count <= 0) continue;
-        parts.push(
-            count === 1 ? String(plate) : `${count}×${plate}`,
-        );
-    }
-    const plates = parts.join(" + ");
+    const plates = formatPlateCounts(platesPerSide);
     if (plates.length === 0) {
         if (barLbs === 0) return "";
         return barLbs !== DEFAULT_BAR_LBS ? `bar ${barLbs}` : "";
@@ -80,11 +76,26 @@ export function formatWeightSetup(
     return plates;
 }
 
+function formatPlateCounts(platesPerSide: PlateCountsPerSide): string {
+    const parts: string[] = [];
+    for (const plate of STANDARD_PLATE_LBS) {
+        const count = platesPerSide[plate] ?? 0;
+        if (count <= 0) continue;
+        parts.push(
+            count === 1 ? String(plate) : `${count}×${plate}`,
+        );
+    }
+    return parts.join(" + ");
+}
+
 export function formatExerciseWeightSetup(
     loadType: ExerciseLoadType,
     platesPerSide: PlateCountsPerSide,
 ): string {
     if (!isPlateLoadedExercise(loadType)) return "";
+    if (loadType === "plate_loaded_total") {
+        return formatPlateCounts(platesPerSide);
+    }
     return formatWeightSetup(barLbsForExercise(loadType), platesPerSide);
 }
 

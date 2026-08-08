@@ -42,13 +42,14 @@ type ExerciseLoadType string
 const (
 	ExerciseLoadTypePlateLoadedWithBar    ExerciseLoadType = "plate_loaded_with_bar"
 	ExerciseLoadTypePlateLoadedWithoutBar ExerciseLoadType = "plate_loaded_without_bar"
+	ExerciseLoadTypePlateLoadedTotal      ExerciseLoadType = "plate_loaded_total"
 	ExerciseLoadTypeWeightStack           ExerciseLoadType = "weight_stack"
 	ExerciseLoadTypeFreeWeights           ExerciseLoadType = "free_weights"
 )
 
 func NormalizeExerciseLoadType(loadType ExerciseLoadType) ExerciseLoadType {
 	switch loadType {
-	case ExerciseLoadTypePlateLoadedWithoutBar, ExerciseLoadTypeWeightStack, ExerciseLoadTypeFreeWeights:
+	case ExerciseLoadTypePlateLoadedWithoutBar, ExerciseLoadTypePlateLoadedTotal, ExerciseLoadTypeWeightStack, ExerciseLoadTypeFreeWeights:
 		return loadType
 	default:
 		return ExerciseLoadTypePlateLoadedWithBar

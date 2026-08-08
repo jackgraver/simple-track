@@ -83,9 +83,14 @@ const exerciseLoadType = computed<ExerciseLoadType>(
 const tracksWeightSetup = computed(() =>
     isPlateLoadedExercise(exerciseLoadType.value),
 );
+const weightSetupPlaceholder = computed(() =>
+    exerciseLoadType.value === "plate_loaded_total"
+        ? "Set total plates"
+        : "Set plates per side",
+);
 const weightSetupSummary = computed(() => {
     const setup = session.currentWeightSetup.trim();
-    if (!setup) return "Set plates per side";
+    if (!setup) return weightSetupPlaceholder.value;
     const parsed = parseWeightSetup(setup);
     if (!parsed.parsed) return setup;
     const formatted = formatExerciseWeightSetup(

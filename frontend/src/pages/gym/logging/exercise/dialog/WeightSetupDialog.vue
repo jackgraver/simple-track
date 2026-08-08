@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
+import type { ExerciseLoadType } from "~/types/workout";
 import {
     computeExerciseLoadLbs,
     formatExerciseWeightSetup,
@@ -14,7 +15,7 @@ import {
 const props = defineProps<{
     currentSetup: string;
     targetWeightLbs: number;
-    loadType: "plate_loaded_with_bar" | "plate_loaded_without_bar";
+    loadType: ExerciseLoadType;
     onResolve?: (value: WeightSetupDialogResult) => void;
 }>();
 
@@ -106,13 +107,15 @@ function save(syncWeight: boolean) {
                 v-if="parseFailed"
                 class="m-0 text-xs text-amber-300"
             >
-                Free text — use the plate picker below to build barbell notation.
+                Free text — use the plate picker below to build plate notation.
             </p>
         </div>
         <div class="flex flex-col gap-2">
             <span class="text-sm font-medium text-[rgb(150,150,150)]">{{
                 props.loadType === "plate_loaded_with_bar"
                     ? "Plates per side (45 lb bar included)"
+                    : props.loadType === "plate_loaded_total"
+                      ? "Total plates (machine load)"
                     : "Plates per side (bar not counted)"
             }}</span>
             <ul class="m-0 flex w-full min-w-0 list-none flex-col gap-1.5 p-0">

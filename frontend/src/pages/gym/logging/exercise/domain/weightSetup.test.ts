@@ -38,6 +38,15 @@ describe("exercise load types", () => {
         ).toBe(180);
     });
 
+    it("uses the full plate total for plate-loaded machines", () => {
+        expect(computeExerciseLoadLbs("plate_loaded_total", { 45: 2, 10: 1 })).toBe(
+            100,
+        );
+        expect(
+            formatExerciseWeightSetup("plate_loaded_total", { 45: 2, 10: 1 }),
+        ).toBe("2×45 + 10");
+    });
+
     it("does not calculate a plate setup for weight stacks", () => {
         expect(computeExerciseLoadLbs("weight_stack", { 45: 2 })).toBe(0);
         expect(formatExerciseWeightSetup("weight_stack", { 45: 2 })).toBe("");

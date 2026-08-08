@@ -88,6 +88,9 @@ const submit = async () => {
                 <option value="plate_loaded_without_bar">
                     Plate loaded — do not count bar
                 </option>
+                <option value="plate_loaded_total">
+                    Plate-loaded machine — total plates
+                </option>
                 <option value="weight_stack">Weight stack machine</option>
                 <option value="free_weights">Free weights</option>
             </select>

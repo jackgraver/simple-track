@@ -70,6 +70,19 @@ func TestUpdateExercise_andUpdateExerciseCues(t *testing.T) {
 	if updated.LoadType != models.ExerciseLoadTypeFreeWeights {
 		t.Fatalf("expected free weights load type, got %q", updated.LoadType)
 	}
+	updated, err = services.UpdateExercise(
+		created.ID,
+		"Barbell Row",
+		8,
+		"pull elbows back",
+		models.ExerciseLoadTypePlateLoadedTotal,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if updated.LoadType != models.ExerciseLoadTypePlateLoadedTotal {
+		t.Fatalf("expected total plate load type, got %q", updated.LoadType)
+	}
 	cued, err := services.UpdateExerciseCues(created.ID, "new cue")
 	if err != nil {
 		t.Fatal(err)

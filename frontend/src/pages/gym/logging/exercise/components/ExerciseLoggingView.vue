@@ -176,6 +176,11 @@ const exerciseLoadType = computed<ExerciseLoadType>(
 const tracksWeightSetup = computed(
     () => isPlateLoadedExercise(exerciseLoadType.value),
 );
+const weightSetupPlaceholder = computed(() =>
+    exerciseLoadType.value === "plate_loaded_total"
+        ? "Set total plates…"
+        : "Set plates per side…",
+);
 
 const { isActive: timerActive, displayText: timerText } = useGlobalRestTimer();
 
@@ -356,7 +361,7 @@ const editCues = async () => {
                             session.currentWeightSetup.trim()
                                 ? weightSetupSummary ||
                                   session.currentWeightSetup
-                                : "Set plates per side…"
+                                : weightSetupPlaceholder
                         }}</span
                     >
                 </button>
