@@ -55,6 +55,9 @@ func main() {
 	if err := workout.Migrate(db); err != nil {
 		panic(err)
 	}
+	if err := auth.Migrate(db); err != nil {
+		panic(err)
+	}
 
 	CreateFeatures(db, router)
 
@@ -75,8 +78,7 @@ func splitString(s, sep string) []string {
 }
 
 func CreateFeatures(db *gorm.DB, router *gin.Engine) {
-	authHandler := auth.NewHandler(db)
-	authHandler.RegisterRoutes(router)
+	auth.RegisterRoutes(router)
 
 	authMW := auth.AuthMiddleware()
 

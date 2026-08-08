@@ -1,26 +1,45 @@
 package auth
 
 import (
+	"be-simpletracker/internal/core/auth/controller"
 	"be-simpletracker/internal/core/auth/models"
-	"be-simpletracker/internal/core/auth/routes"
+	"be-simpletracker/internal/core/auth/services"
+	"be-simpletracker/internal/env"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
 
-type Handler struct {
-	db *gorm.DB
-}
-
-func NewHandler(db *gorm.DB) *Handler {
-	return &Handler{db: db}
-}
-
-func (h *Handler) RegisterRoutes(router *gin.Engine) {
+func RegisterRoutes(router *gin.Engine) {
 	group := router.Group("/")
-	routes.RegisterAuthRoutes(group, h.db, AuthMiddleware(), GenerateToken, CookieMaxAgeSeconds(), CookieSecure(), CookieSameSite())
+	registerEnabled := env.StringOr("REGISTER_ENABLED", "false") == "true"
+	service := services.NewAuthService(GenerateToken)
+	cookie := controller.CookieConfig{
+		Name:     AuthTokenCookieName,
+		MaxAge:   CookieMaxAgeSeconds(),
+		Secure:   CookieSecure(),
+		SameSite: CookieSameSite(),
+	}
+
+	auth := group.Group("/auth")
+	{
+		if registerEnabled {
+			auth.POST("/register", func(c *gin.Context) {
+				controller.Register(c, service, cookie)
+			})
+		}
+		auth.POST("/login", func(c *gin.Context) {
+			controller.Login(c, service, cookie)
+		})
+		auth.POST("/logout", func(c *gin.Context) {
+			controller.Logout(c, cookie)
+		})
+		auth.GET("/me", AuthMiddleware(), func(c *gin.Context) {
+			controller.GetCurrentUser(c, service)
+		})
+	}
 }
 
-func (h *Handler) Migrate() error {
-	return h.db.AutoMigrate(&models.User{})
+func Migrate(db *gorm.DB) error {
+	return db.AutoMigrate(&models.User{})
 }
