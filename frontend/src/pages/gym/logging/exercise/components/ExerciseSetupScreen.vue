@@ -34,12 +34,12 @@ const {
 <template>
     <div class="flex w-full flex-col gap-6">
         <LoggingHeader :title="exerciseName" @back="emit('back')">
-            <template v-if="isActive" #right>
-                <span class="block text-xs text-zinc-500">
-                    Rest since {{ restExerciseName || "last set" }}
-                </span>
-                <span class="block font-medium tabular-nums text-zinc-200">
+            <template #right>
+                <span v-if="isActive" class="block font-medium tabular-nums text-zinc-200">
                     {{ displayText }}
+                </span>
+                <span v-else class="block font-medium tabular-nums text-zinc-200">
+                    0:00
                 </span>
             </template>
         </LoggingHeader>
