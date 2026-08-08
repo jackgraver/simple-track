@@ -1,5 +1,8 @@
 import type { LoggedExercise, LoggedSet } from "~/types/workout";
-import type { ExerciseGroup, LoggedSetWithStatus } from "../../store/useWorkoutStore";
+import type {
+    ExerciseGroup,
+    LoggedSetWithStatus,
+} from "../../store/useWorkoutStore";
 
 export function setsMatchLocalToSaved(
     local: Pick<LoggedSetWithStatus, "weight" | "reps" | "weight_setup">,
@@ -39,10 +42,7 @@ export function buildAllSetsForSave(
     } | null,
 ): LoggedSetWithStatus[] {
     const all = [...loggedSets];
-    if (
-        draft &&
-        draft.reps > 0
-    ) {
+    if (draft && draft.reps > 0) {
         all.push({
             weight: draft.weight,
             reps: draft.reps,
@@ -93,6 +93,7 @@ export function buildExerciseToLog(
             sets: [],
         };
     } else {
+        if (!group.planned) return null;
         exerciseToLog = {
             ID: 0,
             workout_log_id: dayId,
@@ -163,8 +164,7 @@ export function mergeSavedExerciseIntoLoggedSets(
 
     pendingSets.forEach((ps) => {
         const wasMatched = savedExercise.sets.some(
-            (savedSet) =>
-                savedSet && setsMatchLocalToSaved(ps, savedSet),
+            (savedSet) => savedSet && setsMatchLocalToSaved(ps, savedSet),
         );
         if (!wasMatched && ps.status === "pending") {
             ps.status = "error";
