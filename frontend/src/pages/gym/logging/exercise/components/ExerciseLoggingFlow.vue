@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
-import { useRoute, useRouter } from "vue-router";
+import { onBeforeRouteLeave, useRoute, useRouter } from "vue-router";
 import { dialogManager } from "~/composables/dialog/useDialog";
 import {
     DEFAULT_EXERCISE_LOAD_TYPE,
@@ -115,9 +115,23 @@ const transition = (action: ExerciseLoggingFlowAction) => {
     step.value = transitionExerciseLoggingFlow(step.value, action);
 };
 
+const clearFlowState = () => {
+    window.sessionStorage.removeItem(flowStorageKey.value);
+};
+
+const goBackToList = () => {
+    clearFlowState();
+    session.goBackToList();
+};
+
+const goBackToSetup = () => {
+    if (step.value === "reps") session.cancelEditingSet();
+    transition("backToSetup");
+};
+
 const finish = async () => {
     if (await session.finishLogging()) {
-        window.sessionStorage.removeItem(flowStorageKey.value);
+        clearFlowState();
     }
 };
 
@@ -145,7 +159,8 @@ const openWeightSetupDialog = async () => {
 
 watch(
     flowStorageKey,
-    (key) => {
+    (key, previousKey) => {
+        if (previousKey) window.sessionStorage.removeItem(previousKey);
         step.value = "setup";
         const stored = window.sessionStorage.getItem(key);
         if (stored === "setup" || stored === "reps" || stored === "rest") {
@@ -160,6 +175,8 @@ watch(step, (value) => {
         window.sessionStorage.setItem(flowStorageKey.value, value);
     }
 });
+
+onBeforeRouteLeave(clearFlowState);
 </script>
 
 <template>
@@ -175,7 +192,7 @@ watch(step, (value) => {
         :tracks-weight-setup="tracksWeightSetup"
         :weight-setup-summary="weightSetupSummary"
         :continue-label="continueLabel"
-        @back="session.goBackToList()"
+        @back="goBackToList"
         @continue="transition('startLogging')"
         @undo-weight-increase="session.undoWeightProgression()"
         @edit-weight-setup="openWeightSetupDialog()"
@@ -187,7 +204,7 @@ watch(step, (value) => {
         :session="session"
         :previous-rep="previousRepForCurrentSet"
         :rep-rollover="repRollover"
-        @back="transition('backToSetup')"
+        @back="goBackToSetup"
         @logged="transition('setLogged')"
     />
     <ExerciseRestScreen
@@ -196,7 +213,7 @@ watch(step, (value) => {
         :set-number="session.currentSetNumber"
         :current-weight="session.currentWeight"
         :session="session"
-        @back="transition('backToSetup')"
+        @back="goBackToSetup"
         @next="transition('nextSet')"
         @finish="finish"
         @edit="editSet"

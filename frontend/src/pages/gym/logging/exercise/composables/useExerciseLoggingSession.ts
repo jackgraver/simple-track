@@ -22,10 +22,9 @@ import { weightSetupForExercise } from "../domain/weightSetup";
 import {
     getWeightProgression,
     type WeightProgression,
+    WEIGHT_PROGRESSION_INCREASE_LBS,
 } from "../domain/weightProgression";
-import {
-    useGymWeightPrefs,
-} from "./useGymWeightPrefs";
+import { useGymWeightPrefs } from "./useGymWeightPrefs";
 
 type StoredDraft = {
     weight: number;
@@ -57,6 +56,7 @@ export type ExerciseLoggingSessionViewModel = {
     retrySet: (setIndex: number) => Promise<void>;
     deleteSet: (setIndex: number) => Promise<void>;
     editSet: (setIndex: number) => void;
+    cancelEditingSet: () => void;
     goBackToList: () => void;
     updateNotes: (value: string) => void;
     updateWeightSetup: (value: string) => void;
@@ -216,7 +216,7 @@ export function useExerciseLoggingSession(options: {
                       group.previous?.sets,
                       group.previous?.exercise?.rep_rollover,
                       weight,
-                      weightIncrement.value,
+                      WEIGHT_PROGRESSION_INCREASE_LBS,
                   )
                 : null;
         currentWeight.value = weightProgression.value?.nextWeight ?? weight;
@@ -399,6 +399,7 @@ export function useExerciseLoggingSession(options: {
         }
 
         draftStorage.clear();
+        globalTimer.clear();
         router.push(loggingRoute());
         return true;
     };
@@ -462,7 +463,14 @@ export function useExerciseLoggingSession(options: {
         currentSetNumber.value = setIndex + 1;
     };
 
+    const cancelEditingSet = () => {
+        if (editingSetIndex.value == null) return;
+        editingSetIndex.value = null;
+        currentSetNumber.value = loggedSets.value.length + 1;
+    };
+
     const goBackToList = () => {
+        globalTimer.clear();
         router.push(loggingRoute());
     };
 
@@ -503,6 +511,7 @@ export function useExerciseLoggingSession(options: {
         retrySet,
         deleteSet,
         editSet,
+        cancelEditingSet,
         goBackToList,
         updateNotes,
         updateWeightSetup,
