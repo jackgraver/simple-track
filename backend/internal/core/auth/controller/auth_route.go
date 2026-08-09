@@ -6,6 +6,7 @@ import (
 
 	"be-simpletracker/internal/core/auth/models"
 	"be-simpletracker/internal/core/auth/services"
+	"be-simpletracker/internal/env"
 
 	"github.com/gin-gonic/gin"
 )
@@ -53,16 +54,18 @@ func Register(c *gin.Context, service *services.AuthService, cookie CookieConfig
 
 	setAuthCookie(c, cookie, result.Token)
 	c.JSON(http.StatusCreated, AuthResponse{
-		Token:    result.Token,
-		User:     result.User,
-		Username: result.User.Username,
+		Token:       result.Token,
+		User:        result.User,
+		Username:    result.User.Username,
+		Environment: currentEnvironment(),
 	})
 }
 
 type AuthResponse struct {
-	Token    string      `json:"token"`
-	User     models.User `json:"user"`
-	Username string      `json:"username"`
+	Token       string      `json:"token"`
+	User        models.User `json:"user"`
+	Username    string      `json:"username"`
+	Environment string      `json:"environment"`
 }
 
 type LoginRequest struct {
@@ -95,9 +98,10 @@ func Login(c *gin.Context, service *services.AuthService, cookie CookieConfig) {
 
 	setAuthCookie(c, cookie, result.Token)
 	c.JSON(http.StatusOK, AuthResponse{
-		Token:    result.Token,
-		User:     result.User,
-		Username: result.User.Username,
+		Token:       result.Token,
+		User:        result.User,
+		Username:    result.User.Username,
+		Environment: currentEnvironment(),
 	})
 }
 
@@ -118,7 +122,11 @@ func GetCurrentUser(c *gin.Context, service *services.AuthService) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"user": user, "username": user.Username})
+	c.JSON(http.StatusOK, gin.H{
+		"user":        user,
+		"username":    user.Username,
+		"environment": currentEnvironment(),
+	})
 }
 
 func Logout(c *gin.Context, cookie CookieConfig) {
@@ -130,4 +138,8 @@ func Logout(c *gin.Context, cookie CookieConfig) {
 func setAuthCookie(c *gin.Context, cookie CookieConfig, token string) {
 	c.SetSameSite(cookie.SameSite)
 	c.SetCookie(cookie.Name, token, cookie.MaxAge, "/", "", cookie.Secure, true)
+}
+
+func currentEnvironment() string {
+	return env.StringOr("APP_ENV", env.StringOr("GO_ENV", "development"))
 }

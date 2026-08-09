@@ -5,12 +5,25 @@ import {
     isAuthenticated,
     markAuthenticated,
     markUnauthorized,
+    setEnvironment,
     username,
 } from "~/composables/auth/session";
+
+interface AuthResponse {
+    token?: string;
+    username?: string;
+    environment?: string;
+    user?: {
+        ID: number;
+        username: string;
+        email?: string;
+    };
+}
 
 interface LoginResponse {
     token: string;
     username: string;
+    environment: string;
     user: {
         ID: number;
         username: string;
@@ -21,6 +34,7 @@ interface LoginResponse {
 interface RegisterResponse {
     token: string;
     username: string;
+    environment: string;
     user: {
         ID: number;
         username: string;
@@ -37,9 +51,8 @@ export async function resolveAuthSession(): Promise<void> {
     if (!resolveInFlight) {
         resolveInFlight = (async () => {
             try {
-                const { data } = await apiClient.get<{ user?: { username: string }; username?: string }>(
-                    "/auth/me",
-                );
+                const { data } = await apiClient.get<AuthResponse>("/auth/me");
+                setEnvironment(data.environment);
                 const name = data.username ?? data.user?.username;
                 if (name) {
                     markAuthenticated(name);
@@ -66,6 +79,7 @@ export function useAuth() {
 
             const name = response.data.username ?? response.data.user?.username;
             if (name) {
+                setEnvironment(response.data.environment);
                 markAuthenticated(name);
             } else {
                 throw new Error("No user in login response");
@@ -86,6 +100,7 @@ export function useAuth() {
 
             const name = response.data.username ?? response.data.user?.username;
             if (name) {
+                setEnvironment(response.data.environment);
                 markAuthenticated(name);
             } else {
                 throw new Error("No user in registration response");
