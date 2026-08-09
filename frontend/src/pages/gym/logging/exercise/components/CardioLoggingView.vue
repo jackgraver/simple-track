@@ -19,6 +19,13 @@ const cardioName = computed(
 );
 
 const isLogged = computed(() => (props.loggedCardio?.minutes ?? 0) > 0);
+const sliderMax = computed(() =>
+    Math.max(
+        100,
+        props.plannedCardio?.minutes ?? 0,
+        props.loggedCardio?.minutes ?? 0,
+    ),
+);
 
 const currentMinutes = ref(25);
 const notes = ref("");
@@ -26,10 +33,10 @@ const notes = ref("");
 const error = ref("");
 
 watch(
-    () => props.loggedCardio,
-    (c) => {
-        currentMinutes.value = c?.minutes ?? 0;
-        notes.value = c?.notes ?? "";
+    () => [props.loggedCardio, props.plannedCardio] as const,
+    ([loggedCardio, plannedCardio]) => {
+        currentMinutes.value = loggedCardio?.minutes ?? plannedCardio?.minutes ?? 0;
+        notes.value = loggedCardio?.notes ?? "";
     },
     { immediate: true },
 );
@@ -67,7 +74,7 @@ const finish = async () => {
                 :model-value="currentMinutes"
                 round-to-integer
                 :min="0"
-                :max="100"
+                :max="sliderMax"
                 :step="1"
                 integer-only
                 :error="error"

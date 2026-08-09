@@ -162,10 +162,13 @@ func FindWorkoutPlanByProgramAndDay(programID uint, dayOfWeek int) (models.Worko
 	return plan, err
 }
 
-func UpdatePlannedCardioType(planID uint, cardioType string) error {
+func UpdatePlannedCardio(planID uint, cardioType string, minutes int) error {
 	return conn().Model(&models.WorkoutPlan{}).
 		Where("id = ?", planID).
-		Update("planned_cardio_type", cardioType).Error
+		Updates(map[string]any{
+			"planned_cardio_type":    cardioType,
+			"planned_cardio_minutes": minutes,
+		}).Error
 }
 
 func AssignWorkoutPlanToProgram(planID uint, programID uint) error {

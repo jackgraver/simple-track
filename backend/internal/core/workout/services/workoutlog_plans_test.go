@@ -90,17 +90,17 @@ func TestAssignPlanToDay_rejectsInvalidDay(t *testing.T) {
 	}
 }
 
-func TestSetPlannedCardioType(t *testing.T) {
+func TestSetPlannedCardio(t *testing.T) {
 	db := testutil.SetupTestDB(t)
 	plan := models.WorkoutPlan{Name: "Cardio Day"}
 	if err := db.Create(&plan).Error; err != nil {
 		t.Fatal(err)
 	}
-	updated, err := services.SetPlannedCardioType(plan.ID, "  Row  ")
+	updated, err := services.SetPlannedCardio(plan.ID, "  Row  ", 30)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if updated.PlannedCardioType != "Row" {
+	if updated.PlannedCardioType != "Row" || updated.PlannedCardioMinutes != 30 {
 		t.Fatalf("got %q", updated.PlannedCardioType)
 	}
 }

@@ -19,6 +19,7 @@ export interface WorkoutPlan extends BaseModel {
     day_of_week: number | null; // 0=Sunday, 1=Monday, ..., 6=Saturday, null=unassigned
     assigned_days?: number[];
     planned_cardio_type?: string;
+    planned_cardio_minutes?: number;
     pre_mobility_items?: string[];
     post_mobility_items?: string[];
     exercises: Exercise[];
@@ -32,6 +33,7 @@ export interface WorkoutProgram extends BaseModel {
 
 export interface PlannedCardio {
     type: string;
+    minutes: number;
 }
 
 export interface LoggedSet extends BaseModel {

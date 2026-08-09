@@ -241,7 +241,8 @@ func AssignPlanToDay(c *gin.Context) {
 }
 
 type plannedCardioBody struct {
-	Type string `json:"type"`
+	Type    string `json:"type"`
+	Minutes int    `json:"minutes"`
 }
 
 func SetPlannedCardio(c *gin.Context) {
@@ -256,7 +257,7 @@ func SetPlannedCardio(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	plan, err := services.SetPlannedCardioType(uint(planID), body.Type)
+	plan, err := services.SetPlannedCardio(uint(planID), body.Type, body.Minutes)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

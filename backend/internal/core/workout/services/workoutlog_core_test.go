@@ -47,7 +47,7 @@ func TestSwitchPlan_updatesPlanAndReturnsView(t *testing.T) {
 	db := testutil.SetupTestDB(t)
 	today := utils.ZerodTime(0)
 	dow := int(today.Weekday())
-	plan := models.WorkoutPlan{Name: "Legs", DayOfWeek: &dow, PlannedCardioType: "Run"}
+	plan := models.WorkoutPlan{Name: "Legs", DayOfWeek: &dow, PlannedCardioType: "Run", PlannedCardioMinutes: 30}
 	if err := db.Create(&plan).Error; err != nil {
 		t.Fatal(err)
 	}
@@ -72,6 +72,10 @@ func TestSwitchPlan_updatesPlanAndReturnsView(t *testing.T) {
 	}
 	if res.PlannedCardio == nil {
 		t.Fatal("expected planned cardio")
+	}
+	cardio, ok := res.PlannedCardio.(map[string]any)
+	if !ok || cardio["minutes"] != 30 {
+		t.Fatalf("planned cardio %+v", res.PlannedCardio)
 	}
 	if len(res.PlannedExercises) != 1 || res.PlannedExercises[0].Planned.Name != "Squat" {
 		t.Fatalf("planned exercises %+v", res.PlannedExercises)

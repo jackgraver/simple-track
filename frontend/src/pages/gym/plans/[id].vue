@@ -58,10 +58,12 @@ const assignedDays = (p: WorkoutPlan): number[] =>
     p.assigned_days ?? (p.day_of_week === null ? [] : [p.day_of_week]);
 
 const plannedCardioInput = ref("");
+const plannedCardioMinutesInput = ref<number | null>(null);
 watch(
     plan,
     (p) => {
         plannedCardioInput.value = p?.planned_cardio_type?.trim() ?? "";
+        plannedCardioMinutesInput.value = p?.planned_cardio_minutes ?? null;
     },
     { immediate: true },
 );
@@ -72,6 +74,10 @@ const savePlannedCardio = async () => {
     try {
         await apiPUT(`workout/plans/${p.ID}/planned-cardio`, {
             type: plannedCardioInput.value.trim(),
+            minutes: Math.max(
+                0,
+                Math.round(Number(plannedCardioMinutesInput.value) || 0),
+            ),
         });
         toast.push("Planned cardio saved", "success");
         await refresh();
@@ -382,7 +388,7 @@ const moveExerciseInPlan = async (
             >
                 <label
                     class="mb-2 block text-xs font-medium uppercase tracking-wide text-textSecondary"
-                    >Planned cardio (type)</label
+                    >Planned cardio</label
                 >
                 <div class="flex flex-wrap gap-2">
                     <input
@@ -390,6 +396,15 @@ const moveExerciseInPlan = async (
                         type="text"
                         class="min-w-0 flex-1 rounded-md border border-(--color-border) bg-firstBg px-3 py-2 text-sm text-textPrimary placeholder:text-textSecondary/60 hover:bg-secondBg focus:outline-none focus:ring-2 focus:ring-(--color-cf-red)/40"
                         placeholder="e.g. Bike, Run"
+                    />
+                    <input
+                        v-model.number="plannedCardioMinutesInput"
+                        type="number"
+                        min="0"
+                        step="1"
+                        class="w-28 rounded-md border border-(--color-border) bg-firstBg px-3 py-2 text-sm text-textPrimary placeholder:text-textSecondary/60 hover:bg-secondBg focus:outline-none focus:ring-2 focus:ring-(--color-cf-red)/40"
+                        placeholder="Minutes"
+                        aria-label="Planned cardio minutes"
                     />
                     <button
                         type="button"

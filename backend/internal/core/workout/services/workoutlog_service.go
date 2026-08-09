@@ -176,7 +176,10 @@ func plannedCardioFromPlan(plan *models.WorkoutPlan) any {
 	if t == "" {
 		return nil
 	}
-	return map[string]any{"type": t}
+	return map[string]any{
+		"type":    t,
+		"minutes": plan.PlannedCardioMinutes,
+	}
 }
 
 func GetMonthWorkoutLogs(ctx context.Context, monthOffset int) (MonthWorkoutLogsResponse, error) {
@@ -652,8 +655,15 @@ func LoadLoggedExercise(id uint) (models.LoggedExercise, error) {
 	return workoutrepo.LoadLoggedExercise(id)
 }
 
-func SetPlannedCardioType(planID uint, cardioType string) (*models.WorkoutPlan, error) {
-	if err := workoutrepo.UpdatePlannedCardioType(planID, strings.TrimSpace(cardioType)); err != nil {
+func SetPlannedCardio(planID uint, cardioType string, minutes int) (*models.WorkoutPlan, error) {
+	if minutes < 0 {
+		return nil, errors.New("planned cardio minutes cannot be negative")
+	}
+	cardioType = strings.TrimSpace(cardioType)
+	if cardioType == "" {
+		minutes = 0
+	}
+	if err := workoutrepo.UpdatePlannedCardio(planID, cardioType, minutes); err != nil {
 		return nil, err
 	}
 	return workoutrepo.LoadPlanWithOrderedExercises(planID)
