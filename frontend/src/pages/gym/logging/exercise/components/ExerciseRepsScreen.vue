@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
+import { useGlobalRestTimer } from "~/composables/useGlobalRestTimer";
 import type { ExerciseLoggingSessionViewModel } from "../composables/useExerciseLoggingSession";
 import LoggingHeader from "./LoggingHeader.vue";
 import NumberSlider from "./NumberSlider.vue";
@@ -13,8 +14,10 @@ const props = defineProps<{
 
 const emit = defineEmits<{
     (event: "back"): void;
-    (event: "logged"): void;
+    (event: "logged", setNumber: number): void;
 }>();
+
+const { displayText, isActive } = useGlobalRestTimer();
 
 const sliderMarkers = computed(() => {
     const markers: {
@@ -38,17 +41,22 @@ const sliderMarkers = computed(() => {
 });
 
 const logSet = async () => {
-    if (await props.session.addNextSet()) emit("logged");
+    const setNumber = props.session.currentSetNumber;
+    if (await props.session.addNextSet()) emit("logged", setNumber);
 };
 </script>
 
 <template>
     <div class="flex w-full flex-col gap-6">
-        <LoggingHeader :title="exerciseName" @back="emit('back')">
+        <LoggingHeader
+            :title="exerciseName"
+            :subtitle="`Set ${session.currentSetNumber}`"
+            @back="emit('back')"
+        >
             <template #right>
-                <span class="text-sm text-zinc-500"
-                    >Set {{ session.currentSetNumber }}</span
-                >
+                <span class="font-medium tabular-nums text-zinc-200">
+                    {{ isActive ? displayText : "0:00" }}
+                </span>
             </template>
         </LoggingHeader>
         <div class="flex flex-col gap-5">

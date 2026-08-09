@@ -5,6 +5,7 @@ import NumberSlider from "./NumberSlider.vue";
 
 defineProps<{
     exerciseName: string;
+    setNumber: number;
     weight: number;
     weightStep: number;
     previousReps: number[];
@@ -29,19 +30,14 @@ const { displayText, isActive } = useGlobalRestTimer();
 
 <template>
     <div class="flex w-full flex-col gap-6">
-        <LoggingHeader :title="exerciseName" @back="emit('back')">
+        <LoggingHeader
+            :title="exerciseName"
+            :subtitle="`Set ${setNumber}`"
+            @back="emit('back')"
+        >
             <template #right>
-                <span
-                    v-if="isActive"
-                    class="block font-medium tabular-nums text-zinc-200"
-                >
-                    {{ displayText }}
-                </span>
-                <span
-                    v-else
-                    class="block font-medium tabular-nums text-zinc-200"
-                >
-                    0:00
+                <span class="font-medium tabular-nums text-zinc-200">
+                    {{ isActive ? displayText : "0:00" }}
                 </span>
             </template>
         </LoggingHeader>

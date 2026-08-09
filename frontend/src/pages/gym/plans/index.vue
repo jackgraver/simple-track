@@ -21,10 +21,13 @@ const renameProgram = useRenameWorkoutProgram();
 const activateProgram = useActivateWorkoutProgram();
 const createPlan = useCreateWorkoutPlan();
 const selectedProgramId = ref<number | null>(null);
-const selectedProgram = computed(() =>
-    data.value?.programs.find((program) => program.ID === selectedProgramId.value) ??
-    data.value?.programs.find((program) => program.is_active) ??
-    data.value?.programs[0],
+const selectedProgram = computed(
+    () =>
+        data.value?.programs.find(
+            (program) => program.ID === selectedProgramId.value,
+        ) ??
+        data.value?.programs.find((program) => program.is_active) ??
+        data.value?.programs[0],
 );
 watch(
     () => selectedProgram.value?.ID,
@@ -42,8 +45,15 @@ const promptCreateProgram = async () => {
 };
 const promptRenameProgram = async () => {
     if (!selectedProgram.value) return;
-    const name = window.prompt("Rename workout plan", selectedProgram.value.name);
-    if (name?.trim()) await renameProgram.mutateAsync({ id: selectedProgram.value.ID, name: name.trim() });
+    const name = window.prompt(
+        "Rename workout plan",
+        selectedProgram.value.name,
+    );
+    if (name?.trim())
+        await renameProgram.mutateAsync({
+            id: selectedProgram.value.ID,
+            name: name.trim(),
+        });
 };
 const promptCreateDay = async (dayOfWeek: number | null = null) => {
     if (!selectedProgram.value) return;
@@ -98,7 +108,8 @@ const assignedDays = (plan: WorkoutPlan) =>
 const planByDay = computed(() => {
     const m: Partial<Record<number, WorkoutPlan>> = {};
     for (const p of plans.value) {
-        const days = p.assigned_days ?? (p.day_of_week === null ? [] : [p.day_of_week]);
+        const days =
+            p.assigned_days ?? (p.day_of_week === null ? [] : [p.day_of_week]);
         for (const day of days) {
             m[day] = p;
         }
@@ -109,6 +120,7 @@ const planByDay = computed(() => {
 const planDays = computed(() => plans.value);
 
 const draggingPlanId = ref<number | null>(null);
+const draggingSourceDay = ref<number | null>(null);
 const dropTargetKey = ref<number | "pool" | null>(null);
 const dragHandleActive = ref(false);
 
@@ -137,12 +149,17 @@ const goDetail = (id: number) => {
     router.push({ name: "gym-plan-detail", params: { id: String(id) } });
 };
 
-const onDragStart = (e: DragEvent, plan: WorkoutPlan) => {
+const onDragStart = (
+    e: DragEvent,
+    plan: WorkoutPlan,
+    sourceDay: number | null,
+) => {
     if (!dragHandleActive.value) {
         e.preventDefault();
         return;
     }
     draggingPlanId.value = plan.ID;
+    draggingSourceDay.value = sourceDay;
     e.dataTransfer?.setData("text/plain", String(plan.ID));
     if (e.dataTransfer) {
         e.dataTransfer.effectAllowed = "move";
@@ -151,6 +168,7 @@ const onDragStart = (e: DragEvent, plan: WorkoutPlan) => {
 
 const onDragEnd = () => {
     draggingPlanId.value = null;
+    draggingSourceDay.value = null;
     dropTargetKey.value = null;
 };
 
@@ -183,13 +201,14 @@ const assignPlanToDay = async (plan: WorkoutPlan, dayOfWeek: number) => {
     }
 };
 
-const unassignPlanFromDay = async (plan: WorkoutPlan) => {
+const unassignPlanFromDay = async (plan: WorkoutPlan, dayOfWeek: number) => {
     try {
         await apiClient.delete<{ plan: WorkoutPlan }>(
             `workout/plans/${plan.ID}/assign-day`,
+            { params: { day_of_week: dayOfWeek } },
         );
         toast.push(
-            `Unassigned ${plan.name} from ${getDayName(plan.day_of_week) ?? "day"}`,
+            `Unassigned ${plan.name} from ${getDayName(dayOfWeek) ?? "day"}`,
             "success",
         );
         await refresh();
@@ -207,7 +226,7 @@ const onDropDay = async (dow: number) => {
     const draggedPlan = plans.value.find((p) => p.ID === rawId);
     if (!draggedPlan || assignedDays(draggedPlan).includes(dow)) return;
     const occupant = plans.value.find(
-        (p) => p.day_of_week === dow && p.ID !== draggedPlan.ID,
+        (p) => assignedDays(p).includes(dow) && p.ID !== draggedPlan.ID,
     );
     if (occupant) {
         const confirmed = await dialogManager.confirm({
@@ -231,12 +250,14 @@ const onDropDay = async (dow: number) => {
 
 const onDropPool = async () => {
     const rawId = draggingPlanId.value;
+    const sourceDay = draggingSourceDay.value;
     dropTargetKey.value = null;
     draggingPlanId.value = null;
-    if (rawId === null) return;
+    draggingSourceDay.value = null;
+    if (rawId === null || sourceDay === null) return;
     const draggedPlan = plans.value.find((p) => p.ID === rawId);
-    if (!draggedPlan || assignedDays(draggedPlan).length === 0) return;
-    await unassignPlanFromDay(draggedPlan);
+    if (!draggedPlan || !assignedDays(draggedPlan).includes(sourceDay)) return;
+    await unassignPlanFromDay(draggedPlan, sourceDay);
 };
 
 const planCardClasses =
@@ -256,22 +277,33 @@ const exerciseCountLabel = (n: number) => `${n} exercise${n === 1 ? "" : "s"}`;
                 Workout schedule
             </h1>
             <p class="m-0 text-sm text-textSecondary">
-                Choose an active plan, then arrange its routines through the week.
+                Choose an active plan, then arrange its routines through the
+                week.
             </p>
         </div>
-        <div v-if="data?.programs?.length" class="flex flex-wrap items-center gap-2">
+        <div
+            v-if="data?.programs?.length"
+            class="flex flex-wrap items-center gap-2"
+        >
             <select
                 v-model="selectedProgramId"
                 class="rounded-md border border-(--color-border) bg-firstBg px-3 py-2 text-sm text-textPrimary"
             >
-                <option v-for="program in data.programs" :key="program.ID" :value="program.ID">
+                <option
+                    v-for="program in data.programs"
+                    :key="program.ID"
+                    :value="program.ID"
+                >
                     {{ program.name }}{{ program.is_active ? " (Active)" : "" }}
                 </option>
             </select>
             <button
                 class="rounded-md border border-(--color-border) px-3 py-2 text-sm text-textPrimary"
                 :disabled="selectedProgram?.is_active"
-                @click="selectedProgram && activateProgram.mutate(selectedProgram.ID)"
+                @click="
+                    selectedProgram &&
+                    activateProgram.mutate(selectedProgram.ID)
+                "
             >
                 Make active
             </button>
@@ -338,7 +370,11 @@ const exerciseCountLabel = (n: number) => `${n} exercise${n === 1 ? "" : "s"}`;
                                 planDraggingClass(planByDay[slot.dow]!.ID),
                             ]"
                             @dragstart="
-                                onDragStart($event, planByDay[slot.dow]!)
+                                onDragStart(
+                                    $event,
+                                    planByDay[slot.dow]!,
+                                    slot.dow,
+                                )
                             "
                             @dragend="onDragEnd"
                             @click="goDetail(planByDay[slot.dow]!.ID)"
@@ -445,7 +481,7 @@ const exerciseCountLabel = (n: number) => `${n} exercise${n === 1 ? "" : "s"}`;
                         tabindex="0"
                         draggable="true"
                         :class="[planCardClasses, planDraggingClass(p.ID)]"
-                        @dragstart="onDragStart($event, p)"
+                        @dragstart="onDragStart($event, p, null)"
                         @dragend="onDragEnd"
                         @click="goDetail(p.ID)"
                         @keydown.enter="goDetail(p.ID)"

@@ -1,4 +1,6 @@
-import { LoggedSet } from "~/types/workout";
+import type { LoggedSet } from "~/types/workout";
+
+export const DEFAULT_REPS_AFTER_WEIGHT_CHANGE = 6;
 
 export type LoggedSetForDefaults = {
     weight: number;
@@ -6,17 +8,16 @@ export type LoggedSetForDefaults = {
     weight_setup?: string;
 };
 
-
-export function initializeWeightAndReps(loggedSets: readonly LoggedSet[] | undefined, previousSets: readonly LoggedSet[] | undefined): { weight: number; reps: number; weightSetup: string; notes: string } {
+export function initializeWeightAndReps(
+    loggedSets: readonly LoggedSet[] | undefined,
+    previousSets: readonly LoggedSet[] | undefined,
+): { weight: number; reps: number; weightSetup: string; notes: string } {
     let weight = 0;
     let reps = 0;
     let weightSetup = "";
     let notes = "";
 
-    if (
-        loggedSets &&
-        loggedSets.length > 0
-    ) {
+    if (loggedSets && loggedSets.length > 0) {
         weight = loggedSets[loggedSets.length - 1].weight;
         reps = loggedSets[loggedSets.length - 1].reps;
         weightSetup = loggedSets[loggedSets.length - 1].weight_setup || "";
@@ -28,6 +29,17 @@ export function initializeWeightAndReps(loggedSets: readonly LoggedSet[] | undef
     }
 
     return { weight, reps, weightSetup, notes };
+}
+
+export function previousRepsForSetAtWeight(
+    sets: readonly LoggedSetForDefaults[] | undefined,
+    setIndex: number,
+    weight: number,
+): number | null {
+    const set = sets?.[setIndex];
+    if (!set || set.weight !== weight || !Number.isFinite(set.reps))
+        return null;
+    return set.reps;
 }
 
 /**
@@ -47,9 +59,11 @@ export function pickBestLoggedSet<T extends { weight: number; reps: number }>(
 }
 
 /** Values to seed the current-set inputs when continuing from existing logged sets. */
-export function defaultsFromLoggedSets(
-    sets: readonly LoggedSetForDefaults[],
-): { weight: number; reps: number; weight_setup: string } {
+export function defaultsFromLoggedSets(sets: readonly LoggedSetForDefaults[]): {
+    weight: number;
+    reps: number;
+    weight_setup: string;
+} {
     const maxSet = pickBestLoggedSet(sets);
     if (maxSet) {
         return {

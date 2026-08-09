@@ -96,6 +96,31 @@ func TestWorkoutPlanCanBeAssignedToMultipleWeekdays(t *testing.T) {
 	}
 }
 
+func TestUnassignWorkoutPlanFromSpecificWeekdayKeepsOtherAssignments(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	var program models.WorkoutProgram
+	if err := db.Where("is_active = ?", true).First(&program).Error; err != nil {
+		t.Fatal(err)
+	}
+	plan := models.WorkoutPlan{Name: "Push", WorkoutProgramID: &program.ID}
+	if err := db.Create(&plan).Error; err != nil {
+		t.Fatal(err)
+	}
+	if _, err := services.AssignPlanToDay(plan.ID, 1); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := services.AssignPlanToDay(plan.ID, 4); err != nil {
+		t.Fatal(err)
+	}
+	loaded, err := services.UnassignPlanFromSpecificDay(plan.ID, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(loaded.AssignedDays) != 1 || loaded.AssignedDays[0] != 4 {
+		t.Fatalf("expected Thursday to remain assigned, got %v", loaded.AssignedDays)
+	}
+}
+
 func TestCreateWorkoutPlanWithoutDayCreatesUnassignedRoutine(t *testing.T) {
 	testutil.SetupTestDB(t)
 	program, err := services.CreateWorkoutProgram("New Split")

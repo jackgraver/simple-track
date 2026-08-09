@@ -38,9 +38,15 @@ const back = () => {
 
 <template>
     <div class="flex w-full flex-col gap-6">
-        <LoggingHeader :title="exerciseName" @back="back">
+        <LoggingHeader
+            :title="exerciseName"
+            :subtitle="`Set ${setNumber}`"
+            @back="back"
+        >
             <template #right>
-                <span class="text-sm text-zinc-500">Set {{ setNumber }}</span>
+                <span class="font-medium tabular-nums text-zinc-200">
+                    {{ isActive ? displayText : "0:00" }}
+                </span>
             </template>
         </LoggingHeader>
         <div

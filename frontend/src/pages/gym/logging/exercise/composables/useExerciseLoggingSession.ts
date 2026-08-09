@@ -17,7 +17,11 @@ import {
     mergeSavedExerciseIntoLoggedSets,
     markPendingSetsAsExerciseError,
 } from "../domain/exerciseLoggingPayload";
-import { initializeWeightAndReps } from "../domain/loggedSetDefaults";
+import {
+    DEFAULT_REPS_AFTER_WEIGHT_CHANGE,
+    initializeWeightAndReps,
+    previousRepsForSetAtWeight,
+} from "../domain/loggedSetDefaults";
 import { weightSetupForExercise } from "../domain/weightSetup";
 import {
     getWeightProgression,
@@ -220,7 +224,10 @@ export function useExerciseLoggingSession(options: {
                   )
                 : null;
         currentWeight.value = weightProgression.value?.nextWeight ?? weight;
-        currentReps.value = normalizeReps(reps);
+        currentReps.value =
+            currentWeight.value === weight
+                ? normalizeReps(reps)
+                : DEFAULT_REPS_AFTER_WEIGHT_CHANGE;
         currentWeightSetup.value = weightSetup;
 
         draftDirty.value = false;
@@ -302,15 +309,27 @@ export function useExerciseLoggingSession(options: {
         return false;
     };
 
-    const stepWeight = (direction: "plus" | "minus") => {
+    const updateWeightAndDefaultReps = (value: number) => {
+        if (value === currentWeight.value) return;
         draftDirty.value = true;
+        currentWeight.value = value;
+        currentReps.value = normalizeReps(
+            previousRepsForSetAtWeight(
+                exerciseGroup.value?.previous?.sets,
+                currentSetNumber.value - 1,
+                value,
+            ) ?? DEFAULT_REPS_AFTER_WEIGHT_CHANGE,
+        );
+    };
+
+    const stepWeight = (direction: "plus" | "minus") => {
         if (direction === "plus") {
-            currentWeight.value =
-                (currentWeight.value || 0) + weightIncrement.value;
+            updateWeightAndDefaultReps(
+                (currentWeight.value || 0) + weightIncrement.value,
+            );
         } else {
-            currentWeight.value = Math.max(
-                0,
-                (currentWeight.value || 0) - weightIncrement.value,
+            updateWeightAndDefaultReps(
+                Math.max(0, (currentWeight.value || 0) - weightIncrement.value),
             );
         }
     };
@@ -325,8 +344,7 @@ export function useExerciseLoggingSession(options: {
     };
 
     const commitWeightFromInput = (value: number) => {
-        draftDirty.value = true;
-        currentWeight.value = value;
+        updateWeightAndDefaultReps(value);
     };
 
     const commitRepsFromInput = (value: number) => {
@@ -486,9 +504,8 @@ export function useExerciseLoggingSession(options: {
 
     const undoWeightProgression = () => {
         if (!weightProgression.value) return;
-        currentWeight.value = weightProgression.value.previousWeight;
+        updateWeightAndDefaultReps(weightProgression.value.previousWeight);
         weightProgression.value = null;
-        draftDirty.value = true;
     };
 
     return reactive({

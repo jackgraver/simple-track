@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
-import { onBeforeRouteLeave, useRoute, useRouter } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 import { dialogManager } from "~/composables/dialog/useDialog";
 import {
     DEFAULT_EXERCISE_LOAD_TYPE,
@@ -13,10 +13,12 @@ import {
     parseExerciseIdParam,
 } from "../domain/exerciseRouteGroup";
 import {
+    parseStoredExerciseLoggingFlow,
     transitionExerciseLoggingFlow,
     type ExerciseLoggingFlowAction,
     type ExerciseLoggingFlowStep,
 } from "../domain/exerciseLoggingFlow";
+import { previousRepsForSetAtWeight } from "../domain/loggedSetDefaults";
 import {
     formatExerciseWeightSetup,
     isPlateLoadedExercise,
@@ -53,6 +55,7 @@ const session = useExerciseLoggingSession({
 });
 
 const step = ref<ExerciseLoggingFlowStep>("setup");
+const restSetNumber = ref<number | null>(null);
 const exerciseName = computed(
     () =>
         session.exerciseGroup?.planned?.name ??
@@ -66,8 +69,17 @@ const previousSets = computed(() =>
     })),
 );
 const previousReps = computed(() => previousSets.value.map((set) => set.reps));
-const previousRepForCurrentSet = computed(
-    () => previousReps.value[session.currentSetNumber - 1] ?? null,
+const previousRepForCurrentSet = computed(() =>
+    previousRepsForSetAtWeight(
+        previousSets.value,
+        session.currentSetNumber - 1,
+        session.currentWeight,
+    ),
+);
+const displayedSetNumber = computed(() =>
+    step.value === "rest"
+        ? (restSetNumber.value ?? Math.max(1, session.currentSetNumber - 1))
+        : session.currentSetNumber,
 );
 const cues = computed(
     () =>
@@ -117,7 +129,12 @@ const flowStorageKey = computed(
     () => `gym-flow:v1:day:${dayId.value}:exercise:${exerciseId.value ?? 0}`,
 );
 
-const transition = (action: ExerciseLoggingFlowAction) => {
+const transition = (
+    action: ExerciseLoggingFlowAction,
+    setNumber: number | null = null,
+) => {
+    if (action === "setLogged") restSetNumber.value = setNumber;
+    if (action === "nextSet") restSetNumber.value = null;
     step.value = transitionExerciseLoggingFlow(step.value, action);
 };
 
@@ -126,7 +143,6 @@ const clearFlowState = () => {
 };
 
 const goBackToList = () => {
-    clearFlowState();
     session.goBackToList();
 };
 
@@ -143,7 +159,10 @@ const finish = async () => {
 
 const editSet = (setIndex: number) => {
     session.editSet(setIndex);
-    if (session.editingSetIndex != null) step.value = "reps";
+    if (session.editingSetIndex != null) {
+        restSetNumber.value = null;
+        step.value = "reps";
+    }
 };
 
 const openWeightSetupDialog = async () => {
@@ -180,30 +199,30 @@ const openProgressionDialog = () => {
 
 watch(
     flowStorageKey,
-    (key, previousKey) => {
-        if (previousKey) window.sessionStorage.removeItem(previousKey);
-        step.value = "setup";
-        const stored = window.sessionStorage.getItem(key);
-        if (stored === "setup" || stored === "reps" || stored === "rest") {
-            step.value = stored;
-        }
+    (key) => {
+        const stored = parseStoredExerciseLoggingFlow(
+            window.sessionStorage.getItem(key),
+        );
+        step.value = stored.step;
+        restSetNumber.value = stored.setNumber;
     },
     { immediate: true },
 );
 
-watch(step, (value) => {
-    if (exerciseId.value != null && dayId.value > 0) {
-        window.sessionStorage.setItem(flowStorageKey.value, value);
-    }
+watch([step, restSetNumber], ([currentStep, setNumber]) => {
+    if (exerciseId.value == null || dayId.value <= 0) return;
+    window.sessionStorage.setItem(
+        flowStorageKey.value,
+        JSON.stringify({ step: currentStep, setNumber }),
+    );
 });
-
-onBeforeRouteLeave(clearFlowState);
 </script>
 
 <template>
     <ExerciseSetupScreen
         v-if="step === 'setup'"
         :exercise-name="exerciseName"
+        :set-number="displayedSetNumber"
         :weight="session.currentWeight"
         :weight-step="session.weightIncrement"
         :previous-reps="previousReps"
@@ -226,12 +245,12 @@ onBeforeRouteLeave(clearFlowState);
         :previous-rep="previousRepForCurrentSet"
         :rep-rollover="repRollover"
         @back="goBackToSetup"
-        @logged="transition('setLogged')"
+        @logged="(setNumber) => transition('setLogged', setNumber)"
     />
     <ExerciseRestScreen
         v-else
         :exercise-name="exerciseName"
-        :set-number="session.currentSetNumber"
+        :set-number="displayedSetNumber"
         :current-weight="session.currentWeight"
         :session="session"
         @back="goBackToSetup"

@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import type { LoggedSet } from "~/types/workout";
-import { initializeWeightAndReps } from "./loggedSetDefaults";
+import {
+    initializeWeightAndReps,
+    previousRepsForSetAtWeight,
+} from "./loggedSetDefaults";
 
 function loggedSet(partial: {
     weight: number;
@@ -95,5 +98,21 @@ describe("initializeWeightAndReps", () => {
             weightSetup: "",
             notes: "",
         });
+    });
+});
+
+describe("previousRepsForSetAtWeight", () => {
+    const sets = [
+        { weight: 100, reps: 6 },
+        { weight: 100, reps: 5 },
+    ];
+
+    it("returns reps from the matching set number and weight", () => {
+        expect(previousRepsForSetAtWeight(sets, 0, 100)).toBe(6);
+        expect(previousRepsForSetAtWeight(sets, 1, 100)).toBe(5);
+    });
+
+    it("hides previous reps when the weight changed", () => {
+        expect(previousRepsForSetAtWeight(sets, 0, 105)).toBeNull();
     });
 });

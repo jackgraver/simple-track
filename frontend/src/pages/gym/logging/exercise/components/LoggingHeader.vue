@@ -4,6 +4,7 @@ import { useSlots } from "vue";
 
 defineProps<{
     title?: string;
+    subtitle?: string;
 }>();
 
 const emit = defineEmits<{
@@ -24,11 +25,22 @@ const slots = useSlots();
         >
             <ArrowLeft :size="20" />
         </button>
-        <div class="min-w-0 text-center @container">
+        <div
+            class="min-w-0 text-center @container"
+            :class="{ 'flex h-10 flex-col justify-center': subtitle }"
+        >
             <slot v-if="slots.center" name="center" />
-            <h2 v-else-if="title" class="m-0 truncate text-lg font-medium">
-                {{ title }}
-            </h2>
+            <template v-else-if="title">
+                <h2
+                    class="m-0 truncate font-medium"
+                    :class="subtitle ? 'text-base leading-5' : 'text-lg'"
+                >
+                    {{ title }}
+                </h2>
+                <span v-if="subtitle" class="text-xs leading-4 text-zinc-500">
+                    {{ subtitle }}
+                </span>
+            </template>
         </div>
         <div class="min-w-0 shrink-0 text-right text-sm">
             <slot name="right" />

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+    parseStoredExerciseLoggingFlow,
     transitionExerciseLoggingFlow,
     type ExerciseLoggingFlowStep,
 } from "./exerciseLoggingFlow";
@@ -25,11 +26,39 @@ describe("transitionExerciseLoggingFlow", () => {
     });
 
     it("does not advance for actions that do not belong to the current screen", () => {
-        expect(transitionExerciseLoggingFlow("setup", "setLogged")).toBe("setup");
+        expect(transitionExerciseLoggingFlow("setup", "setLogged")).toBe(
+            "setup",
+        );
         expect(transitionExerciseLoggingFlow("reps", "nextSet")).toBe("reps");
-        expect(transitionExerciseLoggingFlow("rest", "startLogging")).toBe("rest");
+        expect(transitionExerciseLoggingFlow("rest", "startLogging")).toBe(
+            "rest",
+        );
         expect(transitionExerciseLoggingFlow("setup", "backToSetup")).toBe(
             "setup",
         );
+    });
+});
+
+describe("parseStoredExerciseLoggingFlow", () => {
+    it("restores the screen and set number", () => {
+        expect(
+            parseStoredExerciseLoggingFlow(
+                JSON.stringify({ step: "rest", setNumber: 2 }),
+            ),
+        ).toEqual({ step: "rest", setNumber: 2 });
+    });
+
+    it("supports previously stored step-only values", () => {
+        expect(parseStoredExerciseLoggingFlow("reps")).toEqual({
+            step: "reps",
+            setNumber: null,
+        });
+    });
+
+    it("falls back safely for invalid state", () => {
+        expect(parseStoredExerciseLoggingFlow("{")).toEqual({
+            step: "setup",
+            setNumber: null,
+        });
     });
 });

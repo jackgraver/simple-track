@@ -85,10 +85,8 @@ const isDayAssigned = (
     dayOfWeek: number,
     currentPlan: WorkoutPlan,
 ): boolean => {
-    return (
-        plans.value.some(
-            (p) => p.ID !== currentPlan.ID && assignedDays(p).includes(dayOfWeek),
-        )
+    return plans.value.some(
+        (p) => p.ID !== currentPlan.ID && assignedDays(p).includes(dayOfWeek),
     );
 };
 
@@ -164,10 +162,13 @@ const handleDayChange = async (p: WorkoutPlan, event: Event) => {
     const select = event.target as HTMLSelectElement;
     const day = parseInt(select.value);
     const currentDays = assignedDays(p);
-    const previousValue = currentDays.length > 0 ? currentDays[0]!.toString() : "";
 
     if (isNaN(day)) {
-        select.value = previousValue;
+        select.value = "";
+        return;
+    }
+    if (currentDays.includes(day)) {
+        select.value = "";
         return;
     }
 
@@ -192,12 +193,13 @@ const handleDayChange = async (p: WorkoutPlan, event: Event) => {
         });
 
         if (!confirmed) {
-            select.value = previousValue;
+            select.value = "";
             return;
         }
     }
 
     await assignPlanToDay(p, day);
+    select.value = "";
 };
 
 const assignPlanToDay = async (p: WorkoutPlan, dayOfWeek: number) => {
@@ -216,13 +218,14 @@ const assignPlanToDay = async (p: WorkoutPlan, dayOfWeek: number) => {
     }
 };
 
-const unassignPlanFromDay = async (p: WorkoutPlan) => {
+const unassignPlanFromDay = async (p: WorkoutPlan, dayOfWeek: number) => {
     try {
         await apiClient.delete<{ plan: WorkoutPlan }>(
             `workout/plans/${p.ID}/assign-day`,
+            { params: { day_of_week: dayOfWeek } },
         );
         toast.push(
-            `Unassigned ${p.name} from ${getDayName(p.day_of_week)}`,
+            `Unassigned ${p.name} from ${getDayName(dayOfWeek)}`,
             "success",
         );
         await refresh();
@@ -306,7 +309,9 @@ const moveExerciseInPlan = async (
                     <span
                         v-if="assignedDays(plan).length"
                         class="rounded-md bg-secondBg px-2 py-0.5 text-xs font-medium text-textPrimary"
-                        >{{ assignedDays(plan).map(getDayName).join(", ") }}</span
+                        >{{
+                            assignedDays(plan).map(getDayName).join(", ")
+                        }}</span
                     >
                     <span
                         v-else
@@ -342,9 +347,7 @@ const moveExerciseInPlan = async (
                 >
                 <div class="flex flex-wrap gap-2">
                     <select
-                        :value="
-                            assignedDays(plan)[0] ?? ''
-                        "
+                        value=""
                         class="min-w-48 flex-1 rounded-md border border-(--color-border) bg-firstBg px-3 py-2 text-sm text-textPrimary transition-colors hover:bg-secondBg focus:outline-none focus:ring-2 focus:ring-(--color-cf-red)/40"
                         @change="handleDayChange(plan, $event)"
                     >
@@ -363,12 +366,14 @@ const moveExerciseInPlan = async (
                         </option>
                     </select>
                     <button
-                        v-if="assignedDays(plan).length"
+                        v-for="day in assignedDays(plan)"
+                        :key="day"
                         type="button"
-                        class="rounded-md border border-(--color-border) bg-secondBg px-3 py-2 text-sm font-medium text-textPrimary transition-colors hover:bg-thirdBg"
-                        @click="unassignPlanFromDay(plan)"
+                        class="inline-flex items-center gap-1 rounded-md border border-(--color-border) bg-secondBg px-3 py-2 text-sm font-medium text-textPrimary transition-colors hover:bg-thirdBg"
+                        @click="unassignPlanFromDay(plan, day)"
                     >
-                        Clear
+                        {{ getDayName(day) }}
+                        <X class="size-3.5" />
                     </button>
                 </div>
             </section>
