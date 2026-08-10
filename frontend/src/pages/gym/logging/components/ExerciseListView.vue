@@ -180,7 +180,7 @@ const isLogged = (exerciseGroup: ExerciseGroup): boolean => {
                 <div class="exercise-content">
                     <div class="exercise-title-section">
                         <span class="exercise-name">{{
-                            loggedPreMobility?.title ?? "Pre-workout mobility"
+                            loggedPreMobility?.title ?? "Dynamic warmup"
                         }}</span>
                     </div>
                 </div>
@@ -256,7 +256,7 @@ const isLogged = (exerciseGroup: ExerciseGroup): boolean => {
                 <div class="exercise-content">
                     <div class="exercise-title-section">
                         <span class="exercise-name">{{
-                            loggedPostMobility?.title ?? "Post-workout mobility"
+                            loggedPostMobility?.title ?? "Static stretching"
                         }}</span>
                     </div>
                 </div>

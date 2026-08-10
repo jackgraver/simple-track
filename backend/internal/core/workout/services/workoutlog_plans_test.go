@@ -5,6 +5,7 @@ import (
 	"be-simpletracker/internal/core/workout/services"
 	"be-simpletracker/internal/core/workout/testutil"
 	"be-simpletracker/internal/utils"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -102,6 +103,35 @@ func TestSetPlannedCardio(t *testing.T) {
 	}
 	if updated.PlannedCardioType != "Row" || updated.PlannedCardioMinutes != 30 {
 		t.Fatalf("got %q", updated.PlannedCardioType)
+	}
+}
+
+func TestSetPlannedMobility(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	plan := models.WorkoutPlan{Name: "Recovery Day"}
+	if err := db.Create(&plan).Error; err != nil {
+		t.Fatal(err)
+	}
+	updated, err := services.SetPlannedMobility(
+		plan.ID,
+		[]string{" Leg swings ", "", "leg swings", "Arm circles"},
+		[]string{"Hamstring stretch", " Quad stretch "},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(updated.PreMobilityItems, []string{"Leg swings", "Arm circles"}) {
+		t.Fatalf("dynamic warmup got %#v", updated.PreMobilityItems)
+	}
+	if !slices.Equal(updated.PostMobilityItems, []string{"Hamstring stretch", "Quad stretch"}) {
+		t.Fatalf("static stretching got %#v", updated.PostMobilityItems)
+	}
+	cleared, err := services.SetPlannedMobility(plan.ID, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(cleared.PreMobilityItems) != 0 || len(cleared.PostMobilityItems) != 0 {
+		t.Fatalf("mobility items not cleared: %#v %#v", cleared.PreMobilityItems, cleared.PostMobilityItems)
 	}
 }
 

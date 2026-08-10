@@ -104,8 +104,8 @@ type MobilityLoggedView struct {
 }
 
 const (
-	preMobilityTitle  = "Pre-workout mobility"
-	postMobilityTitle = "Post-workout mobility"
+	preMobilityTitle  = "Dynamic warmup"
+	postMobilityTitle = "Static stretching"
 )
 
 func plannedPreMobilityFromPlan(plan *models.WorkoutPlan) *MobilityRoutineView {
@@ -368,7 +368,7 @@ func UpsertMobilityPre(ctx context.Context, offset int, checked []string) (*Mobi
 		items = append([]string{}, t.WorkoutPlan.PreMobilityItems...)
 	}
 	if len(items) == 0 {
-		return nil, fmt.Errorf("no pre-workout mobility planned for this day")
+		return nil, fmt.Errorf("no dynamic warmup planned for this day")
 	}
 	filtered := filterCheckedToItems(items, checked)
 	if err := workoutrepo.UpdatePreMobilityChecked(ctx, t.ID, filtered); err != nil {
@@ -391,7 +391,7 @@ func UpsertMobilityPost(ctx context.Context, offset int, checked []string) (*Mob
 		items = append([]string{}, t.WorkoutPlan.PostMobilityItems...)
 	}
 	if len(items) == 0 {
-		return nil, fmt.Errorf("no post-workout mobility planned for this day")
+		return nil, fmt.Errorf("no static stretching planned for this day")
 	}
 	filtered := filterCheckedToItems(items, checked)
 	if err := workoutrepo.UpdatePostMobilityChecked(ctx, t.ID, filtered); err != nil {
@@ -664,6 +664,32 @@ func SetPlannedCardio(planID uint, cardioType string, minutes int) (*models.Work
 		minutes = 0
 	}
 	if err := workoutrepo.UpdatePlannedCardio(planID, cardioType, minutes); err != nil {
+		return nil, err
+	}
+	return workoutrepo.LoadPlanWithOrderedExercises(planID)
+}
+
+func SetPlannedMobility(planID uint, preItems, postItems []string) (*models.WorkoutPlan, error) {
+	normalize := func(items []string) []string {
+		result := make([]string, 0, len(items))
+		seen := make(map[string]struct{}, len(items))
+		for _, item := range items {
+			item = strings.TrimSpace(item)
+			if item == "" {
+				continue
+			}
+			key := strings.ToLower(item)
+			if _, exists := seen[key]; exists {
+				continue
+			}
+			seen[key] = struct{}{}
+			result = append(result, item)
+		}
+		return result
+	}
+	preItems = normalize(preItems)
+	postItems = normalize(postItems)
+	if err := workoutrepo.UpdateMobilityItems(planID, preItems, postItems); err != nil {
 		return nil, err
 	}
 	return workoutrepo.LoadPlanWithOrderedExercises(planID)

@@ -5,6 +5,7 @@ import { dialogManager } from "~/composables/dialog/useDialog";
 import AddExerciseDialog from "~/pages/gym/plans/components/AddExerciseDialog.vue";
 import CreateExerciseForPlanDialog from "~/pages/gym/plans/components/CreateExerciseForPlanDialog.vue";
 import EditExerciseDialog from "~/pages/gym/plans/components/EditExerciseDialog.vue";
+import MobilityItemEditor from "~/pages/gym/plans/components/MobilityItemEditor.vue";
 import { X, Plus, ChevronUp, ChevronDown, Pencil } from "lucide-vue-next";
 import { computed, ref, watch } from "vue";
 import { useRoute } from "vue-router";
@@ -59,11 +60,16 @@ const assignedDays = (p: WorkoutPlan): number[] =>
 
 const plannedCardioInput = ref("");
 const plannedCardioMinutesInput = ref<number | null>(null);
+const dynamicWarmupItems = ref<string[]>([]);
+const staticStretchingItems = ref<string[]>([]);
+const mobilitySaving = ref(false);
 watch(
     plan,
     (p) => {
         plannedCardioInput.value = p?.planned_cardio_type?.trim() ?? "";
         plannedCardioMinutesInput.value = p?.planned_cardio_minutes ?? null;
+        dynamicWarmupItems.value = [...(p?.pre_mobility_items ?? [])];
+        staticStretchingItems.value = [...(p?.post_mobility_items ?? [])];
     },
     { immediate: true },
 );
@@ -84,6 +90,25 @@ const savePlannedCardio = async () => {
     } catch (err: unknown) {
         const message = err instanceof Error ? err.message : String(err);
         toast.push("Failed to save planned cardio: " + message, "error");
+    }
+};
+
+const savePlannedMobility = async () => {
+    const p = plan.value;
+    if (!p || mobilitySaving.value) return;
+    mobilitySaving.value = true;
+    try {
+        await apiPUT(`workout/plans/${p.ID}/planned-mobility`, {
+            pre_mobility_items: dynamicWarmupItems.value,
+            post_mobility_items: staticStretchingItems.value,
+        });
+        toast.push("Mobility plan saved", "success");
+        await refresh();
+    } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : String(err);
+        toast.push("Failed to save mobility plan: " + message, "error");
+    } finally {
+        mobilitySaving.value = false;
     }
 };
 
@@ -415,6 +440,28 @@ const moveExerciseInPlan = async (
                     </button>
                 </div>
             </section>
+            <div class="flex flex-col gap-3">
+                <MobilityItemEditor
+                    v-model="dynamicWarmupItems"
+                    title="Dynamic warmup"
+                    description="Movements to complete before the workout."
+                    placeholder="Add a warmup movement…"
+                />
+                <MobilityItemEditor
+                    v-model="staticStretchingItems"
+                    title="Static stretching"
+                    description="Stretches to complete after the workout."
+                    placeholder="Add a stretch…"
+                />
+                <button
+                    type="button"
+                    class="self-end rounded-md bg-secondBg px-4 py-2 text-sm font-medium text-textPrimary transition-colors hover:bg-thirdBg disabled:cursor-not-allowed disabled:opacity-50"
+                    :disabled="mobilitySaving"
+                    @click="savePlannedMobility"
+                >
+                    {{ mobilitySaving ? "Saving…" : "Save mobility" }}
+                </button>
+            </div>
             <section class="flex flex-col gap-2">
                 <h2 class="m-0 text-sm font-semibold text-textPrimary">
                     Exercises

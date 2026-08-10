@@ -29,6 +29,7 @@ func RegisterRoutes(router *gin.Engine, authMiddleware gin.HandlerFunc) {
 			plans.POST("/:id/assign-day", controller.AssignPlanToDay)
 			plans.DELETE("/:id/assign-day", controller.UnassignPlanFromDay)
 			plans.PUT("/:id/planned-cardio", controller.SetPlannedCardio)
+			plans.PUT("/:id/planned-mobility", controller.SetPlannedMobility)
 		}
 		exercises := group.Group("/exercises")
 		{

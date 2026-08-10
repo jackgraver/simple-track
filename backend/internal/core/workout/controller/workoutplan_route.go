@@ -265,6 +265,30 @@ func SetPlannedCardio(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"plan": plan})
 }
 
+type plannedMobilityBody struct {
+	PreMobilityItems  []string `json:"pre_mobility_items"`
+	PostMobilityItems []string `json:"post_mobility_items"`
+}
+
+func SetPlannedMobility(c *gin.Context) {
+	planID, err := strconv.ParseUint(c.Param("id"), 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid plan ID"})
+		return
+	}
+	var body plannedMobilityBody
+	if err := c.ShouldBindJSON(&body); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	plan, err := services.SetPlannedMobility(uint(planID), body.PreMobilityItems, body.PostMobilityItems)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"plan": plan})
+}
+
 func UnassignPlanFromDay(c *gin.Context) {
 	planIDStr := c.Param("id")
 	planID, err := strconv.ParseUint(planIDStr, 10, 32)

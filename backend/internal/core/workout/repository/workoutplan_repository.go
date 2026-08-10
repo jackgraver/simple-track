@@ -171,6 +171,18 @@ func UpdatePlannedCardio(planID uint, cardioType string, minutes int) error {
 		}).Error
 }
 
+func UpdateMobilityItems(planID uint, preItems, postItems []string) error {
+	var plan models.WorkoutPlan
+	if err := conn().First(&plan, planID).Error; err != nil {
+		return err
+	}
+	plan.PreMobilityItems = preItems
+	plan.PostMobilityItems = postItems
+	return conn().Model(&plan).
+		Select("PreMobilityItems", "PostMobilityItems").
+		Updates(&plan).Error
+}
+
 func AssignWorkoutPlanToProgram(planID uint, programID uint) error {
 	return conn().Model(&models.WorkoutPlan{}).Where("id = ?", planID).Update("workout_program_id", programID).Error
 }

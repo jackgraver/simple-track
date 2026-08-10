@@ -31,6 +31,9 @@ func TestUpsertMobilityPre_persistsChecked(t *testing.T) {
 	if len(view.Checked) != 2 || view.Checked[0] != "A" || view.Checked[1] != "C" {
 		t.Fatalf("unexpected view %+v", view)
 	}
+	if view.Title != "Dynamic warmup" {
+		t.Fatalf("title got %q", view.Title)
+	}
 	var reloaded models.WorkoutLog
 	if err := db.First(&reloaded, wl.ID).Error; err != nil {
 		t.Fatal(err)
@@ -61,12 +64,15 @@ func TestUpsertMobilityPost_persistsChecked(t *testing.T) {
 	if len(view.Checked) != 1 || view.Checked[0] != "Y" {
 		t.Fatalf("unexpected view %+v", view)
 	}
+	if view.Title != "Static stretching" {
+		t.Fatalf("title got %q", view.Title)
+	}
 }
 
 func TestUpsertMobilityPre_errorsWhenNothingPlanned(t *testing.T) {
 	testutil.SetupTestDB(t)
 	_, err := services.UpsertMobilityPre(context.Background(), 0, []string{"A"})
-	if err == nil || !strings.Contains(err.Error(), "no pre-workout mobility planned") {
+	if err == nil || !strings.Contains(err.Error(), "no dynamic warmup planned") {
 		t.Fatalf("expected no mobility error, got %v", err)
 	}
 }
