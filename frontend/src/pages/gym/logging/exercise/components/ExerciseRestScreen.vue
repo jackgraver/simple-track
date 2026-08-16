@@ -20,10 +20,9 @@ const emit = defineEmits<{
     (event: "edit-setup"): void;
 }>();
 
-const { displayText, isActive, clear } = useGlobalRestTimer();
+const { displayText, isActive } = useGlobalRestTimer();
 
 const nextSet = () => {
-    clear();
     emit("next");
 };
 

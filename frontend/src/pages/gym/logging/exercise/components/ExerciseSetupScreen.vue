@@ -8,7 +8,7 @@ defineProps<{
     setNumber: number;
     weight: number;
     weightStep: number;
-    previousReps: number[];
+    previousSets: { weight: number; reps: number }[];
     notes: string;
     cues: string;
     weightIncrease: number | null;
@@ -96,9 +96,11 @@ const { displayText, isActive } = useGlobalRestTimer();
                 </p>
                 <p class="m-0 mt-2 text-lg text-zinc-200">
                     {{
-                        previousReps.length
-                            ? previousReps.join(", ")
-                            : "No previous reps recorded"
+                        previousSets.length
+                            ? previousSets
+                                  .map((set) => `${set.weight} × ${set.reps}`)
+                                  .join(", ")
+                            : "No previous sets recorded"
                     }}
                 </p>
             </section>

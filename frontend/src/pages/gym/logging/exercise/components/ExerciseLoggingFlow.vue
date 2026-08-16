@@ -68,7 +68,6 @@ const previousSets = computed(() =>
         reps: set.reps,
     })),
 );
-const previousReps = computed(() => previousSets.value.map((set) => set.reps));
 const previousRepForCurrentSet = computed(() =>
     previousRepsForSetAtWeight(
         previousSets.value,
@@ -225,7 +224,7 @@ watch([step, restSetNumber], ([currentStep, setNumber]) => {
         :set-number="displayedSetNumber"
         :weight="session.currentWeight"
         :weight-step="session.weightIncrement"
-        :previous-reps="previousReps"
+        :previous-sets="previousSets"
         :notes="session.notes"
         :cues="cues"
         :weight-increase="session.weightProgression?.increase ?? null"

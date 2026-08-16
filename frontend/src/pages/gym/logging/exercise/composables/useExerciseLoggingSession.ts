@@ -417,7 +417,6 @@ export function useExerciseLoggingSession(options: {
         }
 
         draftStorage.clear();
-        globalTimer.clear();
         router.push(loggingRoute());
         return true;
     };
@@ -488,7 +487,6 @@ export function useExerciseLoggingSession(options: {
     };
 
     const goBackToList = () => {
-        globalTimer.clear();
         router.push(loggingRoute());
     };
 
