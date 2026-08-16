@@ -11,6 +11,21 @@ import (
 	"gorm.io/gorm"
 )
 
+var planQueryPolicy = utils.QueryPolicy{
+	SortableFields: map[string]string{
+		"id":             "id",
+		"name":           "name",
+		"created_at":     "created_at",
+		"updated_at":     "updated_at",
+		"effective_from": "effective_from",
+	},
+	FilterableFields: map[string]string{
+		"id":             "id",
+		"name":           "name",
+		"effective_from": "effective_from",
+	},
+}
+
 type updatePlanMacrosRequest struct {
 	Calories float32 `json:"calories"`
 	Protein  float32 `json:"protein"`
@@ -21,7 +36,11 @@ type updatePlanMacrosRequest struct {
 
 func GetAllPlans(c *gin.Context) {
 	ctx := c.Request.Context()
-	params := utils.ParseQueryParams(c)
+	params, err := utils.ParseQueryParams(c, planQueryPolicy)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
 	result, err := services.GetAllPlans(ctx, params)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})

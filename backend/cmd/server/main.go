@@ -25,10 +25,15 @@ func main() {
 	if _, err := env.String("JWT_SECRET"); err != nil {
 		log.Fatalf("config: %v", err)
 	}
+	if err := auth.ValidateProductionConfig(); err != nil {
+		log.Fatalf("config: %v", err)
+	}
 	gin.SetMode(gin.ReleaseMode)
 	router := gin.Default()
 
-	router.Use(utils.BenchmarkMiddleware(router))
+	if !env.IsProduction() {
+		router.Use(utils.BenchmarkMiddleware(router))
+	}
 
 	defaultCORS := "http://localhost:5173,http://localhost:3000,http://192.168.4.78:3000,http://192.168.4.64:3000"
 	corsOrigins := env.StringOr("CORS_ORIGINS", defaultCORS)
@@ -43,7 +48,13 @@ func main() {
 		MaxAge:           12 * time.Hour,
 	}))
 
-	router.SetTrustedProxies(nil)
+	trustedProxies := env.SliceOr("TRUSTED_PROXIES", ",", nil)
+	if err := router.SetTrustedProxies(trustedProxies); err != nil {
+		log.Fatalf("config: invalid TRUSTED_PROXIES: %v", err)
+	}
+	if env.IsProduction() && len(trustedProxies) == 0 {
+		log.Printf("config: TRUSTED_PROXIES is empty; login protection will use the direct peer IP")
+	}
 	router.GET("/health", func(c *gin.Context) {
 		c.JSON(200, gin.H{"status": "ok"})
 	})

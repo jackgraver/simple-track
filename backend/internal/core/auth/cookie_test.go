@@ -26,3 +26,21 @@ func TestCookieMaxAgeSeconds_invalidEnvUsesDefault(t *testing.T) {
 		t.Fatalf("zero env: got %d want default %d", got, defaultCookieMaxAgeSec)
 	}
 }
+
+func TestCookieSecureAlwaysTrueInProduction(t *testing.T) {
+	t.Setenv("APP_ENV", "production")
+	t.Setenv("AUTH_COOKIE_SECURE", "false")
+	t.Setenv("AUTH_COOKIE_SAMESITE", "lax")
+	if !CookieSecure() {
+		t.Fatal("production cookie must be secure")
+	}
+}
+
+func TestCookieSecureDefaultsFalseInDevelopment(t *testing.T) {
+	t.Setenv("APP_ENV", "development")
+	t.Setenv("AUTH_COOKIE_SECURE", "")
+	t.Setenv("AUTH_COOKIE_SAMESITE", "lax")
+	if CookieSecure() {
+		t.Fatal("development cookie should allow HTTP")
+	}
+}

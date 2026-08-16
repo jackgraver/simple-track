@@ -10,7 +10,6 @@ import {
 } from "~/composables/auth/session";
 
 interface AuthResponse {
-    token?: string;
     username?: string;
     environment?: string;
     user?: {
@@ -21,7 +20,6 @@ interface AuthResponse {
 }
 
 interface LoginResponse {
-    token: string;
     username: string;
     environment: string;
     user: {
@@ -32,7 +30,6 @@ interface LoginResponse {
 }
 
 interface RegisterResponse {
-    token: string;
     username: string;
     environment: string;
     user: {

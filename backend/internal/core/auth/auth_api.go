@@ -12,8 +12,9 @@ import (
 
 func RegisterRoutes(router *gin.Engine) {
 	group := router.Group("/")
-	registerEnabled := env.StringOr("REGISTER_ENABLED", "false") == "true"
+	registerEnabled := !env.IsProduction() && env.StringOr("REGISTER_ENABLED", "false") == "true"
 	service := services.NewAuthService(GenerateToken)
+	loginProtection := controller.NewLoginProtection(controller.LoginProtectionConfigFromEnv(), nil)
 	cookie := controller.CookieConfig{
 		Name:     AuthTokenCookieName,
 		MaxAge:   CookieMaxAgeSeconds(),
@@ -29,7 +30,7 @@ func RegisterRoutes(router *gin.Engine) {
 			})
 		}
 		auth.POST("/login", func(c *gin.Context) {
-			controller.Login(c, service, cookie)
+			controller.Login(c, service, cookie, loginProtection)
 		})
 		auth.POST("/logout", func(c *gin.Context) {
 			controller.Logout(c, cookie)

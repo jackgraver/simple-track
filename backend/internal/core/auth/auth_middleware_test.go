@@ -116,6 +116,7 @@ func TestAuthMiddleware_devToken_unsetAllowBypass_disabled(t *testing.T) {
 }
 
 func TestAuthMiddleware_devToken_cookieAuthorizes(t *testing.T) {
+	t.Setenv("APP_ENV", "development")
 	t.Setenv("ALLOW_BYPASS", "true")
 	t.Setenv("DEV_AUTH_TOKEN", testDevAuthToken)
 	gin.SetMode(gin.TestMode)
@@ -138,6 +139,22 @@ func TestAuthMiddleware_devToken_cookieAuthorizes(t *testing.T) {
 	}
 	if body.U != "dev" {
 		t.Fatalf("dev user: got %q want %q", body.U, "dev")
+	}
+}
+
+func TestAuthMiddleware_devTokenNeverAuthorizesInProduction(t *testing.T) {
+	t.Setenv("APP_ENV", "production")
+	t.Setenv("ALLOW_BYPASS", "true")
+	t.Setenv("DEV_AUTH_TOKEN", testDevAuthToken)
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	r.GET("/", AuthMiddleware(), func(c *gin.Context) {})
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.AddCookie(&http.Cookie{Name: AuthTokenCookieName, Value: testDevAuthToken})
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("production bypass must be disabled: got %d want 401", rec.Code)
 	}
 }
 

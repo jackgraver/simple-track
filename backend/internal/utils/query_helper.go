@@ -3,7 +3,9 @@ package utils
 import (
 	"be-simpletracker/internal/database/repository"
 	"context"
+	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -21,8 +23,13 @@ type QueryParams struct {
 	UseDefaultPreloads bool
 }
 
-// ParseQueryParams extracts query parameters from gin.Context
-func ParseQueryParams(c *gin.Context) QueryParams {
+type QueryPolicy struct {
+	SortableFields   map[string]string
+	FilterableFields map[string]string
+	AllowedPreloads  map[string]string
+}
+
+func ParseQueryParams(c *gin.Context, policy QueryPolicy) (QueryParams, error) {
 	params := QueryParams{
 		Filters:            make(map[string]string),
 		UseDefaultPreloads: true,
@@ -34,20 +41,25 @@ func ParseQueryParams(c *gin.Context) QueryParams {
 	params.Page, _ = strconv.Atoi(pageStr)
 	params.PageSize, _ = strconv.Atoi(pageSizeStr)
 
-	// Parse sorting
-	params.OrderBy = c.Query("orderBy")
+	if orderBy := c.Query("orderBy"); orderBy != "" {
+		field, ok := policy.SortableFields[orderBy]
+		if !ok {
+			return QueryParams{}, fmt.Errorf("unsupported sort field %q", orderBy)
+		}
+		params.OrderBy = field
+	}
 	orderDescStr := c.DefaultQuery("orderDesc", "false")
 	params.OrderDesc = orderDescStr == "true"
 
-	// Parse filters - support multiple filter formats
-	// Format 1: ?name=value
-	// Format 2: ?filter=field:value (for future expansion)
 	for key, values := range c.Request.URL.Query() {
 		if key != "page" && key != "pageSize" && key != "orderBy" && key != "orderDesc" &&
 			key != "exclude" && key != "preloads" && key != "useDefaultPreloads" {
-			// Treat other query params as filters
 			if len(values) > 0 {
-				params.Filters[key] = values[0]
+				field, ok := policy.FilterableFields[key]
+				if !ok {
+					return QueryParams{}, fmt.Errorf("unsupported filter field %q", key)
+				}
+				params.Filters[field] = values[0]
 			}
 		}
 	}
@@ -63,9 +75,15 @@ func ParseQueryParams(c *gin.Context) QueryParams {
 		params.ExcludeIDs = ids
 	}
 
-	// Parse preloads
 	if preloadsStr := c.Query("preloads"); preloadsStr != "" {
-		params.Preloads = []string{preloadsStr} // Could split by comma for multiple
+		for _, requested := range strings.Split(preloadsStr, ",") {
+			requested = strings.TrimSpace(requested)
+			preload, ok := policy.AllowedPreloads[requested]
+			if !ok {
+				return QueryParams{}, fmt.Errorf("unsupported preload %q", requested)
+			}
+			params.Preloads = append(params.Preloads, preload)
+		}
 		params.UseDefaultPreloads = false
 	}
 
@@ -73,7 +91,7 @@ func ParseQueryParams(c *gin.Context) QueryParams {
 		params.UseDefaultPreloads = false
 	}
 
-	return params
+	return params, nil
 }
 
 // BuildQueryOptions converts QueryParams to repository.QueryOption slice
@@ -127,15 +145,18 @@ type GetAllResult[T repository.Entity] struct {
 // 4. Return results
 func GetAllWithOptions[T repository.Entity](
 	ctx context.Context,
-	// repo repository.Repository[T],
 	db *gorm.DB,
 	c *gin.Context,
 	defaultOrderBy string,
 	defaultOrderDesc bool,
+	policy QueryPolicy,
 ) (*GetAllResult[T], error) {
 	repo := repository.NewGormRepository[T](db)
 
-	params := ParseQueryParams(c)
+	params, err := ParseQueryParams(c, policy)
+	if err != nil {
+		return nil, err
+	}
 	opts := BuildQueryOptions(params, defaultOrderBy, defaultOrderDesc)
 
 	// Use paginated query if pagination params are provided

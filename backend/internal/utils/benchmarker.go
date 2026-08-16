@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"be-simpletracker/internal/env"
 	"bufio"
 	"encoding/json"
 	"log"
@@ -29,10 +30,13 @@ type benchmarkLogEntry struct {
 }
 
 var benchmarkLogCh chan benchmarkLogEntry
+var benchmarkLogOnce sync.Once
 
-func init() {
-	benchmarkLogCh = make(chan benchmarkLogEntry, benchmarkLogChanSize)
-	go runBenchmarkLogWriter()
+func startBenchmarkLogWriter() {
+	benchmarkLogOnce.Do(func() {
+		benchmarkLogCh = make(chan benchmarkLogEntry, benchmarkLogChanSize)
+		go runBenchmarkLogWriter()
+	})
 }
 
 // runBenchmarkLogWriter owns the benchmark log file for the lifetime of the
@@ -93,6 +97,12 @@ const benchmarkRoutePath = "/benchmark"
 // BenchmarkMiddleware records per-route timing and registers GET /benchmark for stats.
 // Query: none → all routes; path=… exact; q=… substring; sort=path|avg|time|total (default path asc); order=asc|desc (time sorts default desc).
 func BenchmarkMiddleware(router *gin.Engine) gin.HandlerFunc {
+	if env.IsProduction() {
+		return func(c *gin.Context) {
+			c.Next()
+		}
+	}
+	startBenchmarkLogWriter()
 	benchmarker := &Benchmarker{Benchmarks: make(map[string]*Benchmark)}
 
 	router.GET(benchmarkRoutePath, func(c *gin.Context) {
@@ -137,10 +147,10 @@ func BenchmarkMiddleware(router *gin.Engine) gin.HandlerFunc {
 }
 
 type Benchmark struct {
-	Path         string  `json:"path"`
-	TotalHits    int     `json:"totalHits"`
-	TotalTimeMs  float64 `json:"totalTimeMs"`
-	AverageMs    float64 `json:"averageMs"`
+	Path        string  `json:"path"`
+	TotalHits   int     `json:"totalHits"`
+	TotalTimeMs float64 `json:"totalTimeMs"`
+	AverageMs   float64 `json:"averageMs"`
 }
 
 type Benchmarker struct {
@@ -170,10 +180,10 @@ func (b *Benchmarker) AddBenchmark(path string, durationMs float64) {
 
 func statsRow(be *Benchmark) gin.H {
 	return gin.H{
-		"path":         be.Path,
-		"totalHits":    be.TotalHits,
-		"totalTimeMs":  be.TotalTimeMs,
-		"averageMs":    be.AverageMs,
+		"path":        be.Path,
+		"totalHits":   be.TotalHits,
+		"totalTimeMs": be.TotalTimeMs,
+		"averageMs":   be.AverageMs,
 	}
 }
 

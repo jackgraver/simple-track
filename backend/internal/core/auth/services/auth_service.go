@@ -19,6 +19,14 @@ var (
 	ErrTokenGeneration    = errors.New("failed to generate token")
 )
 
+var dummyPasswordHash = func() []byte {
+	hash, err := bcrypt.GenerateFromPassword([]byte("invalid-login-password"), bcrypt.DefaultCost)
+	if err != nil {
+		panic(err)
+	}
+	return hash
+}()
+
 type TokenGenerator func(string) (string, error)
 
 type AuthService struct {
@@ -81,6 +89,7 @@ func (s *AuthService) Login(input LoginInput) (AuthResult, error) {
 	user, err := authrepo.FindUserByUsername(input.Username)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
+			_ = bcrypt.CompareHashAndPassword(dummyPasswordHash, []byte(input.Password))
 			return AuthResult{}, ErrInvalidCredentials
 		}
 		return AuthResult{}, err

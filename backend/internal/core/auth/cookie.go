@@ -27,7 +27,7 @@ func CookieSameSite() http.SameSite {
 }
 
 func CookieSecure() bool {
-	if CookieSameSite() == http.SameSiteNoneMode {
+	if env.IsProduction() || CookieSameSite() == http.SameSiteNoneMode {
 		return true
 	}
 	s := env.OptionalString("AUTH_COOKIE_SECURE")

@@ -31,6 +31,20 @@ func TestStringOr_fallback(t *testing.T) {
 	}
 }
 
+func TestIsProduction(t *testing.T) {
+	t.Setenv("GO_ENV", "")
+	for _, value := range []string{"prod", "production", " Production "} {
+		t.Setenv("APP_ENV", value)
+		if !IsProduction() {
+			t.Fatalf("expected %q to be production", value)
+		}
+	}
+	t.Setenv("APP_ENV", "development")
+	if IsProduction() {
+		t.Fatal("development must not be production")
+	}
+}
+
 func TestIntOr_invalidUsesFallback(t *testing.T) {
 	t.Setenv("ENV_TEST_I", "not-a-number")
 	if got := IntOr("ENV_TEST_I", 99); got != 99 {

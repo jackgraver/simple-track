@@ -29,6 +29,8 @@ type CRUDConfig[T repository.Entity] struct {
 	DefaultPageSize  int    // Default: 20
 	DefaultOrderBy   string // Default: "id"
 	DefaultOrderDesc bool   // Default: true
+	SortableFields   map[string]string
+	FilterableFields map[string]string
 
 	// Preloads
 	UseDefaultPreloads bool // Default: true
@@ -65,6 +67,8 @@ func DefaultCRUDConfig[T repository.Entity](basePath, resourceName string) CRUDC
 		DefaultPageSize:    20,
 		DefaultOrderBy:     "id",
 		DefaultOrderDesc:   true,
+		SortableFields:     map[string]string{"id": "id"},
+		FilterableFields:   map[string]string{},
 		UseDefaultPreloads: true,
 	}
 }
@@ -118,8 +122,12 @@ func (h *GenericCRUDHandler[T]) GetAll(c *gin.Context) {
 	if h.config.BuildQueryOptions != nil {
 		opts = h.config.BuildQueryOptions(c)
 	} else {
-		// Build default query options
-		opts = h.buildDefaultQueryOptions(c)
+		var err error
+		opts, err = h.buildDefaultQueryOptions(c)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
 	}
 
 	// Execute query with pagination or without
@@ -368,7 +376,7 @@ func (h *GenericCRUDHandler[T]) Delete(c *gin.Context) {
 }
 
 // buildDefaultQueryOptions builds query options from request parameters
-func (h *GenericCRUDHandler[T]) buildDefaultQueryOptions(c *gin.Context) []repository.QueryOption {
+func (h *GenericCRUDHandler[T]) buildDefaultQueryOptions(c *gin.Context) ([]repository.QueryOption, error) {
 	var opts []repository.QueryOption
 
 	// Add preloads
@@ -379,8 +387,12 @@ func (h *GenericCRUDHandler[T]) buildDefaultQueryOptions(c *gin.Context) []repos
 	// Add sorting
 	orderBy := c.Query("orderBy")
 	if orderBy != "" {
+		field, ok := h.config.SortableFields[orderBy]
+		if !ok {
+			return nil, fmt.Errorf("unsupported sort field %q", orderBy)
+		}
 		orderDesc := c.DefaultQuery("orderDesc", "false") == "true"
-		opts = append(opts, repository.WithOrderBy(orderBy, orderDesc))
+		opts = append(opts, repository.WithOrderBy(field, orderDesc))
 	} else if h.config.DefaultOrderBy != "" {
 		opts = append(opts, repository.WithOrderBy(h.config.DefaultOrderBy, h.config.DefaultOrderDesc))
 	}
@@ -398,7 +410,11 @@ func (h *GenericCRUDHandler[T]) buildDefaultQueryOptions(c *gin.Context) []repos
 
 	for key, values := range c.Request.URL.Query() {
 		if !reservedParams[key] && len(values) > 0 {
-			opts = append(opts, repository.WithFilter(key, values[0]))
+			field, ok := h.config.FilterableFields[key]
+			if !ok {
+				return nil, fmt.Errorf("unsupported filter field %q", key)
+			}
+			opts = append(opts, repository.WithFilter(field, values[0]))
 		}
 	}
 
@@ -415,5 +431,5 @@ func (h *GenericCRUDHandler[T]) buildDefaultQueryOptions(c *gin.Context) []repos
 		}
 	}
 
-	return opts
+	return opts, nil
 }

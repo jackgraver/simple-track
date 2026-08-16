@@ -2,6 +2,7 @@ package auth
 
 import (
 	"be-simpletracker/internal/env"
+	"crypto/subtle"
 	"log"
 	"time"
 
@@ -13,7 +14,7 @@ func devTokenMatches(value string) bool {
 	if secret == "" || !bypassAllowed() {
 		return false
 	}
-	return value == secret
+	return subtle.ConstantTimeCompare([]byte(value), []byte(secret)) == 1
 }
 
 func applyDevAuthUser(c *gin.Context) {
@@ -25,5 +26,5 @@ func applyDevAuthUser(c *gin.Context) {
 }
 
 func bypassAllowed() bool {
-	return env.StringOr("ALLOW_BYPASS", "false") == "true"
+	return !env.IsProduction() && env.StringOr("ALLOW_BYPASS", "false") == "true"
 }

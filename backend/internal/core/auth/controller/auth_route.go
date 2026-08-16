@@ -3,6 +3,8 @@ package controller
 import (
 	"errors"
 	"net/http"
+	"strconv"
+	"time"
 
 	"be-simpletracker/internal/core/auth/models"
 	"be-simpletracker/internal/core/auth/services"
@@ -19,12 +21,14 @@ type CookieConfig struct {
 }
 
 type RegisterRequest struct {
-	Username string `json:"username" binding:"required"`
-	Password string `json:"password" binding:"required"`
-	Email    string `json:"email"`
+	Username string `json:"username" binding:"required,max=128"`
+	Password string `json:"password" binding:"required,max=72"`
+	Email    string `json:"email" binding:"max=254"`
 }
 
 func Register(c *gin.Context, service *services.AuthService, cookie CookieConfig) {
+	setAuthResponseHeaders(c)
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 16*1024)
 	var req RegisterRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -54,7 +58,6 @@ func Register(c *gin.Context, service *services.AuthService, cookie CookieConfig
 
 	setAuthCookie(c, cookie, result.Token)
 	c.JSON(http.StatusCreated, AuthResponse{
-		Token:       result.Token,
 		User:        result.User,
 		Username:    result.User.Username,
 		Environment: currentEnvironment(),
@@ -62,21 +65,36 @@ func Register(c *gin.Context, service *services.AuthService, cookie CookieConfig
 }
 
 type AuthResponse struct {
-	Token       string      `json:"token"`
 	User        models.User `json:"user"`
 	Username    string      `json:"username"`
 	Environment string      `json:"environment"`
 }
 
 type LoginRequest struct {
-	Username string `json:"username" binding:"required"`
-	Password string `json:"password" binding:"required"`
+	Username string `json:"username" binding:"required,max=128"`
+	Password string `json:"password" binding:"required,max=72"`
 }
 
-func Login(c *gin.Context, service *services.AuthService, cookie CookieConfig) {
+func Login(c *gin.Context, service *services.AuthService, cookie CookieConfig, protection *LoginProtection) {
+	setAuthResponseHeaders(c)
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 16*1024)
 	var req LoginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid login request"})
+		return
+	}
+
+	clientIP := c.ClientIP()
+	decision := protection.Allow(clientIP, req.Username)
+	if !decision.Allowed {
+		if decision.LogRejection {
+			outcome := "rate_limited"
+			if decision.Reason == "credential_spray" {
+				outcome = "credential_spray_blocked"
+			}
+			protection.LogAttempt(c.Request.Context(), outcome, clientIP, req.Username)
+		}
+		respondLoginRateLimited(c, decision.RetryAfter)
 		return
 	}
 
@@ -87,18 +105,30 @@ func Login(c *gin.Context, service *services.AuthService, cookie CookieConfig) {
 	if err != nil {
 		switch {
 		case errors.Is(err, services.ErrInvalidCredentials):
+			sprayDecision := protection.RecordFailure(clientIP, req.Username)
+			if !sprayDecision.Allowed {
+				if sprayDecision.LogRejection {
+					protection.LogAttempt(c.Request.Context(), "credential_spray_blocked", clientIP, req.Username)
+				}
+				respondLoginRateLimited(c, sprayDecision.RetryAfter)
+				return
+			}
+			protection.LogAttempt(c.Request.Context(), "invalid_credentials", clientIP, req.Username)
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid username or password"})
 		case errors.Is(err, services.ErrTokenGeneration):
+			protection.LogAttempt(c.Request.Context(), "server_error", clientIP, req.Username)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate token"})
 		default:
+			protection.LogAttempt(c.Request.Context(), "server_error", clientIP, req.Username)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Database error"})
 		}
 		return
 	}
 
 	setAuthCookie(c, cookie, result.Token)
+	protection.RecordSuccess(clientIP, result.User.Username)
+	protection.LogAttempt(c.Request.Context(), "success", clientIP, result.User.Username)
 	c.JSON(http.StatusOK, AuthResponse{
-		Token:       result.Token,
 		User:        result.User,
 		Username:    result.User.Username,
 		Environment: currentEnvironment(),
@@ -106,6 +136,7 @@ func Login(c *gin.Context, service *services.AuthService, cookie CookieConfig) {
 }
 
 func GetCurrentUser(c *gin.Context, service *services.AuthService) {
+	setAuthResponseHeaders(c)
 	username, exists := c.Get("username")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Not authenticated"})
@@ -138,6 +169,20 @@ func Logout(c *gin.Context, cookie CookieConfig) {
 func setAuthCookie(c *gin.Context, cookie CookieConfig, token string) {
 	c.SetSameSite(cookie.SameSite)
 	c.SetCookie(cookie.Name, token, cookie.MaxAge, "/", "", cookie.Secure, true)
+}
+
+func setAuthResponseHeaders(c *gin.Context) {
+	c.Header("Cache-Control", "no-store")
+	c.Header("Pragma", "no-cache")
+}
+
+func respondLoginRateLimited(c *gin.Context, retryAfter time.Duration) {
+	retryAfterSeconds := int((retryAfter + time.Second - 1) / time.Second)
+	if retryAfterSeconds < 1 {
+		retryAfterSeconds = 1
+	}
+	c.Header("Retry-After", strconv.Itoa(retryAfterSeconds))
+	c.JSON(http.StatusTooManyRequests, gin.H{"error": "Too many login attempts. Try again later"})
 }
 
 func currentEnvironment() string {

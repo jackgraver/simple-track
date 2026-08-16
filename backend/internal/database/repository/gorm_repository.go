@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 var (
@@ -58,7 +59,10 @@ func (r *GormRepository[T]) applyOptions(tx *gorm.DB, entity T, opts *QueryOptio
 
 	// Apply filters
 	for field, value := range opts.Filters {
-		tx = tx.Where(field+" = ?", value)
+		tx = tx.Where(clause.Eq{
+			Column: clause.Column{Name: field},
+			Value:  value,
+		})
 	}
 
 	// Apply exclude IDs
@@ -68,21 +72,24 @@ func (r *GormRepository[T]) applyOptions(tx *gorm.DB, entity T, opts *QueryOptio
 
 	// Apply date range
 	if opts.DateStart != nil {
-		tx = tx.Where(r.dateField+" >= ?", *opts.DateStart)
+		tx = tx.Where(clause.Gte{
+			Column: clause.Column{Name: r.dateField},
+			Value:  *opts.DateStart,
+		})
 	}
 	if opts.DateEnd != nil {
-		tx = tx.Where(r.dateField+" <= ?", *opts.DateEnd)
+		tx = tx.Where(clause.Lte{
+			Column: clause.Column{Name: r.dateField},
+			Value:  *opts.DateEnd,
+		})
 	}
 
 	// Apply ordering
 	if opts.OrderBy != "" {
-		order := opts.OrderBy
-		if opts.OrderDesc {
-			order += " DESC"
-		} else {
-			order += " ASC"
-		}
-		tx = tx.Order(order)
+		tx = tx.Order(clause.OrderByColumn{
+			Column: clause.Column{Name: opts.OrderBy},
+			Desc:   opts.OrderDesc,
+		})
 	}
 
 	// Apply pagination

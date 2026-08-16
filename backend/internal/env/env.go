@@ -43,6 +43,11 @@ func OptionalString(key string) string {
 	return strings.TrimSpace(os.Getenv(key))
 }
 
+func IsProduction() bool {
+	appEnv := strings.ToLower(StringOr("APP_ENV", StringOr("GO_ENV", "development")))
+	return appEnv == "prod" || appEnv == "production"
+}
+
 func Int(key string) (int, error) {
 	s, err := String(key)
 	if err != nil {
