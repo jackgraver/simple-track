@@ -38,6 +38,9 @@ func RegisterRoutes(router *gin.Engine) {
 		auth.GET("/me", AuthMiddleware(), func(c *gin.Context) {
 			controller.GetCurrentUser(c, service)
 		})
+		auth.PATCH("/me", AuthMiddleware(), func(c *gin.Context) {
+			controller.UpdateCurrentUser(c, service)
+		})
 	}
 }
 

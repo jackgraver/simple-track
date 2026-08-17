@@ -85,3 +85,20 @@ func TestAuthServiceLoginRejectsInvalidCredentials(t *testing.T) {
 		t.Fatalf("error: got %v want %v", err, ErrInvalidCredentials)
 	}
 }
+
+func TestAuthServiceUpdatesBirthYear(t *testing.T) {
+	setupTestDB(t)
+	service := NewAuthService(func(string) (string, error) {
+		return "token", nil
+	})
+	if _, err := service.Register(RegisterInput{Username: "wanda", Password: "secret"}); err != nil {
+		t.Fatal(err)
+	}
+	user, err := service.UpdateBirthYear("wanda", 2000)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if user.BirthYear == nil || *user.BirthYear != 2000 {
+		t.Fatalf("birth year = %v, want 2000", user.BirthYear)
+	}
+}

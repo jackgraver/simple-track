@@ -160,6 +160,28 @@ func GetCurrentUser(c *gin.Context, service *services.AuthService) {
 	})
 }
 
+type updateProfileRequest struct {
+	BirthYear *int `json:"birth_year"`
+}
+
+func UpdateCurrentUser(c *gin.Context, service *services.AuthService) {
+	var req updateProfileRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if req.BirthYear == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "birth_year is required"})
+		return
+	}
+	user, err := service.UpdateBirthYear(c.GetString("username"), *req.BirthYear)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"user": user})
+}
+
 func Logout(c *gin.Context, cookie CookieConfig) {
 	c.SetSameSite(cookie.SameSite)
 	c.SetCookie(cookie.Name, "", -1, "/", "", cookie.Secure, true)

@@ -5,9 +5,10 @@ import "gorm.io/gorm"
 // User represents a user account
 type User struct {
 	gorm.Model
-	Username string `json:"username" gorm:"not null;uniqueIndex"`
-	Password string `json:"-" gorm:"not null"`
-	Email    string `json:"email" gorm:"uniqueIndex"`
+	Username  string `json:"username" gorm:"not null;uniqueIndex"`
+	Password  string `json:"-" gorm:"not null"`
+	Email     string `json:"email" gorm:"uniqueIndex"`
+	BirthYear *int   `json:"birth_year"`
 }
 
 func (u User) GetID() uint       { return u.ID }
