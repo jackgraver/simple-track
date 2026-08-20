@@ -124,6 +124,14 @@ const repRollover = computed(() => {
 const continueLabel = computed(() =>
     session.loggedSets.length > 0 ? "Continue logging" : "Start logging",
 );
+const navigationSteps: {
+    id: ExerciseLoggingFlowStep;
+    label: string;
+}[] = [
+    { id: "setup", label: "Setup" },
+    { id: "reps", label: "Log" },
+    { id: "rest", label: "Rest" },
+];
 const flowStorageKey = computed(
     () => `gym-flow:v1:day:${dayId.value}:exercise:${exerciseId.value ?? 0}`,
 );
@@ -145,9 +153,15 @@ const goBackToList = () => {
     session.goBackToList();
 };
 
-const goBackToSetup = () => {
+const selectStep = (nextStep: ExerciseLoggingFlowStep) => {
+    if (nextStep === step.value) return;
     if (step.value === "reps") session.cancelEditingSet();
-    transition("backToSetup");
+    if (nextStep === "rest") {
+        restSetNumber.value = Math.max(1, session.currentSetNumber - 1);
+    } else {
+        restSetNumber.value = null;
+    }
+    step.value = nextStep;
 };
 
 const finish = async () => {
@@ -218,45 +232,71 @@ watch([step, restSetNumber], ([currentStep, setNumber]) => {
 </script>
 
 <template>
-    <ExerciseSetupScreen
-        v-if="step === 'setup'"
-        :exercise-name="exerciseName"
-        :set-number="displayedSetNumber"
-        :weight="session.currentWeight"
-        :weight-step="session.weightIncrement"
-        :previous-sets="previousSets"
-        :notes="session.notes"
-        :cues="cues"
-        :weight-increase="session.weightProgression?.increase ?? null"
-        :tracks-weight-setup="tracksWeightSetup"
-        :weight-setup-summary="weightSetupSummary"
-        :continue-label="continueLabel"
-        @back="goBackToList"
-        @continue="transition('startLogging')"
-        @undo-weight-increase="session.undoWeightProgression()"
-        @edit-weight-setup="openWeightSetupDialog()"
-        @update:weight="session.commitWeightFromInput"
-    />
-    <ExerciseRepsScreen
-        v-else-if="step === 'reps'"
-        :exercise-name="exerciseName"
-        :session="session"
-        :previous-rep="previousRepForCurrentSet"
-        :rep-rollover="repRollover"
-        @back="goBackToSetup"
-        @logged="(setNumber) => transition('setLogged', setNumber)"
-    />
-    <ExerciseRestScreen
-        v-else
-        :exercise-name="exerciseName"
-        :set-number="displayedSetNumber"
-        :current-weight="session.currentWeight"
-        :session="session"
-        @back="goBackToSetup"
-        @next="transition('nextSet')"
-        @finish="finish"
-        @progression="openProgressionDialog"
-        @edit="editSet"
-        @edit-setup="transition('backToSetup')"
-    />
+    <div class="pb-[calc(5.5rem_+_env(safe-area-inset-bottom))]">
+        <ExerciseSetupScreen
+            v-if="step === 'setup'"
+            :exercise-name="exerciseName"
+            :set-number="displayedSetNumber"
+            :weight="session.currentWeight"
+            :weight-step="session.weightIncrement"
+            :previous-sets="previousSets"
+            :notes="session.notes"
+            :cues="cues"
+            :weight-increase="session.weightProgression?.increase ?? null"
+            :tracks-weight-setup="tracksWeightSetup"
+            :weight-setup-summary="weightSetupSummary"
+            :continue-label="continueLabel"
+            @back="goBackToList"
+            @continue="transition('startLogging')"
+            @undo-weight-increase="session.undoWeightProgression()"
+            @edit-weight-setup="openWeightSetupDialog()"
+            @update:weight="session.commitWeightFromInput"
+        />
+        <ExerciseRepsScreen
+            v-else-if="step === 'reps'"
+            :exercise-name="exerciseName"
+            :session="session"
+            :previous-rep="previousRepForCurrentSet"
+            :rep-rollover="repRollover"
+            @back="goBackToList"
+            @logged="(setNumber) => transition('setLogged', setNumber)"
+        />
+        <ExerciseRestScreen
+            v-else
+            :exercise-name="exerciseName"
+            :set-number="displayedSetNumber"
+            :current-weight="session.currentWeight"
+            :session="session"
+            @back="goBackToList"
+            @next="transition('nextSet')"
+            @finish="finish"
+            @progression="openProgressionDialog"
+            @edit="editSet"
+            @edit-setup="transition('backToSetup')"
+        />
+    </div>
+    <nav
+        aria-label="Exercise logging steps"
+        class="fixed inset-x-0 bottom-0 z-auto border-t border-zinc-800 bg-mainBg pb-[env(safe-area-inset-bottom)]"
+    >
+        <div class="flex w-full border-x border-zinc-800 md:mx-auto md:max-w-md">
+            <button
+                v-for="navigationStep in navigationSteps"
+                :key="navigationStep.id"
+                type="button"
+                class="m-0 flex-1 border-b-2 border-r border-zinc-800 border-b-transparent px-3 py-3 text-xs font-medium transition-colors last:border-r-0"
+                :class="
+                    navigationStep.id === step
+                        ? 'border-b-zinc-100 text-zinc-100'
+                        : 'text-zinc-500 hover:text-zinc-300'
+                "
+                :aria-current="
+                    navigationStep.id === step ? 'step' : undefined
+                "
+                @click="selectStep(navigationStep.id)"
+            >
+                {{ navigationStep.label }}
+            </button>
+        </div>
+    </nav>
 </template>
