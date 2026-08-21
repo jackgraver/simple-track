@@ -36,6 +36,12 @@ const { getUsername } = useAuth();
                 active-class="underline underline-offset-4"
                 >Diet</router-link
             >
+            <router-link
+                :to="{ name: 'finance' }"
+                class="hover:bg-secondBg rounded-md p-2 text-sm"
+                active-class="underline underline-offset-4"
+                >Finance</router-link
+            >
         </div>
         <div
             class="pr-2 lg:pr-0 min-w-22.5 flex items-center justify-end gap-2 text-right"
