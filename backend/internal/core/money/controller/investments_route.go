@@ -103,8 +103,8 @@ func (h *InvestmentHandler) deleteAccount(c *gin.Context) {
 }
 
 type accountTypeBody struct {
-	Name                 string `json:"name"`
-	ContributionStartAge *int   `json:"contribution_start_age"`
+	Name                  string `json:"name"`
+	ContributionStartYear *int   `json:"contribution_start_year"`
 }
 
 func (h *InvestmentHandler) listAccountTypes(c *gin.Context) {
@@ -126,7 +126,7 @@ func (h *InvestmentHandler) createAccountType(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	accountType, err := service.CreateInvestmentAccountType(h.db, body.Name, body.ContributionStartAge)
+	accountType, err := service.CreateInvestmentAccountType(h.db, body.Name, body.ContributionStartYear)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -144,7 +144,7 @@ func (h *InvestmentHandler) updateAccountType(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	accountType, err := service.UpdateInvestmentAccountType(h.db, id, body.Name, body.ContributionStartAge)
+	accountType, err := service.UpdateInvestmentAccountType(h.db, id, body.Name, body.ContributionStartYear)
 	if err != nil {
 		respondAccountError(c, err)
 		return

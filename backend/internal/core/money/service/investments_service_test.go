@@ -29,9 +29,9 @@ func setupTestDB(t *testing.T) *gorm.DB {
 
 func TestInvestmentAccountSummaryTracksProfitAndContributionRoom(t *testing.T) {
 	db := setupTestDB(t)
-	startAge := 18
+	startYear := 2025
 	birthYear := 2000
-	accountType, err := CreateInvestmentAccountType(db, "TFSA", &startAge)
+	accountType, err := CreateInvestmentAccountType(db, "TFSA", &startYear)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -64,9 +64,6 @@ func TestInvestmentAccountSummaryTracksProfitAndContributionRoom(t *testing.T) {
 	if _, err := UpsertContributionRule(db, accountType.ID, 2025, 6_000); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := UpsertContributionRule(db, accountType.ID, 2017, 5_000); err != nil {
-		t.Fatal(err)
-	}
 	summary, err := GetInvestmentAccountSummary(db, account.ID, &birthYear)
 	if err != nil {
 		t.Fatal(err)
@@ -77,8 +74,8 @@ func TestInvestmentAccountSummaryTracksProfitAndContributionRoom(t *testing.T) {
 	if summary.Profit != 300 {
 		t.Fatalf("profit = %v, want 300", summary.Profit)
 	}
-	if len(summary.ContributionStatus) != 3 {
-		t.Fatalf("contribution statuses = %d, want 3", len(summary.ContributionStatus))
+	if len(summary.ContributionStatus) != 2 {
+		t.Fatalf("contribution statuses = %d, want 2", len(summary.ContributionStatus))
 	}
 	status := summary.ContributionStatus[0]
 	if status.Contributed != 1_000 || status.Remaining != 6_000 {
@@ -87,8 +84,37 @@ func TestInvestmentAccountSummaryTracksProfitAndContributionRoom(t *testing.T) {
 	if summary.ContributionRoom == nil {
 		t.Fatal("expected cumulative contribution room")
 	}
-	if summary.ContributionRoom.EligibleFromYear != 2018 || summary.ContributionRoom.EarnedRoom != 13_000 || summary.ContributionRoom.Contributed != 1_100 || summary.ContributionRoom.Remaining != 11_900 {
-		t.Fatalf("contribution room = %#v, want eligibility 2018, earned 13000, contributed 1100, remaining 11900", summary.ContributionRoom)
+	if summary.ContributionRoom.EligibleFromYear != 2025 || summary.ContributionRoom.EarnedRoom != 13_000 || summary.ContributionRoom.Contributed != 1_100 || summary.ContributionRoom.Remaining != 11_900 {
+		t.Fatalf("contribution room = %#v, want start year 2025, earned 13000, contributed 1100, remaining 11900", summary.ContributionRoom)
+	}
+}
+
+func TestContributionRuleAppliesUntilReplaced(t *testing.T) {
+	db := setupTestDB(t)
+	currentYear := time.Now().Year()
+	startYear := currentYear - 2
+	accountType, err := CreateInvestmentAccountType(db, "RRSP", &startYear)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := UpsertContributionRule(db, accountType.ID, startYear, 5_000); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := UpsertContributionRule(db, accountType.ID, currentYear-1, 6_000); err != nil {
+		t.Fatal(err)
+	}
+	summary, err := ListInvestmentAccountTypes(db, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if summary[0].ContributionRoom == nil {
+		t.Fatal("expected cumulative contribution room")
+	}
+	if summary[0].ContributionRoom.EarnedRoom != 17_000 {
+		t.Fatalf("earned room = %v, want 17000", summary[0].ContributionRoom.EarnedRoom)
+	}
+	if len(summary[0].ContributionStatus) != 3 {
+		t.Fatalf("contribution statuses = %d, want 3", len(summary[0].ContributionStatus))
 	}
 }
 

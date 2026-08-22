@@ -47,11 +47,11 @@ func ListInvestmentAccountTypes(db *gorm.DB, birthYear *int) ([]InvestmentAccoun
 	}
 	summaries := make([]InvestmentAccountTypeSummary, 0, len(accountTypes))
 	for _, accountType := range accountTypes {
-		status, err := contributionStatus(db, accountType.ID, accountType.Rules)
+		status, err := contributionStatus(db, accountType.ID, accountType.ContributionStartYear, accountType.Rules)
 		if err != nil {
 			return nil, err
 		}
-		room, err := contributionRoom(db, accountType.ID, accountType.ContributionStartAge, birthYear, accountType.Rules)
+		room, err := contributionRoom(db, accountType.ID, accountType.ContributionStartYear, accountType.Rules)
 		if err != nil {
 			return nil, err
 		}
@@ -98,11 +98,11 @@ func GetInvestmentAccountSummary(db *gorm.DB, id uint, birthYear *int) (*Investm
 	var room *ContributionRoom
 	if account.InvestmentAccountType != nil {
 		var err error
-		status, err = contributionStatus(db, account.InvestmentAccountType.ID, account.InvestmentAccountType.Rules)
+		status, err = contributionStatus(db, account.InvestmentAccountType.ID, account.InvestmentAccountType.ContributionStartYear, account.InvestmentAccountType.Rules)
 		if err != nil {
 			return nil, err
 		}
-		room, err = contributionRoom(db, account.InvestmentAccountType.ID, account.InvestmentAccountType.ContributionStartAge, birthYear, account.InvestmentAccountType.Rules)
+		room, err = contributionRoom(db, account.InvestmentAccountType.ID, account.InvestmentAccountType.ContributionStartYear, account.InvestmentAccountType.Rules)
 		if err != nil {
 			return nil, err
 		}
@@ -201,8 +201,8 @@ func DeleteInvestmentDeposit(db *gorm.DB, accountID, depositID uint) error {
 	return nil
 }
 
-func CreateInvestmentAccountType(db *gorm.DB, name string, contributionStartAge *int) (*models.InvestmentAccountType, error) {
-	accountType := models.InvestmentAccountType{Name: strings.TrimSpace(name), ContributionStartAge: contributionStartAge}
+func CreateInvestmentAccountType(db *gorm.DB, name string, contributionStartYear *int) (*models.InvestmentAccountType, error) {
+	accountType := models.InvestmentAccountType{Name: strings.TrimSpace(name), ContributionStartYear: contributionStartYear}
 	if err := validateAccountType(accountType); err != nil {
 		return nil, err
 	}
@@ -212,14 +212,14 @@ func CreateInvestmentAccountType(db *gorm.DB, name string, contributionStartAge 
 	return &accountType, nil
 }
 
-func UpdateInvestmentAccountType(db *gorm.DB, id uint, name string, contributionStartAge *int) (*models.InvestmentAccountType, error) {
+func UpdateInvestmentAccountType(db *gorm.DB, id uint, name string, contributionStartYear *int) (*models.InvestmentAccountType, error) {
 	var accountType models.InvestmentAccountType
 	if err := db.First(&accountType, id).Error; err != nil {
 		return nil, err
 	}
 	accountType.Name = strings.TrimSpace(name)
-	if contributionStartAge != nil {
-		accountType.ContributionStartAge = contributionStartAge
+	if contributionStartYear != nil {
+		accountType.ContributionStartYear = contributionStartYear
 	}
 	if err := validateAccountType(accountType); err != nil {
 		return nil, err
@@ -288,45 +288,64 @@ func DeleteContributionRule(db *gorm.DB, accountTypeID uint, year int) error {
 	return nil
 }
 
-func contributionStatus(db *gorm.DB, accountTypeID uint, rules []models.ContributionRule) ([]ContributionStatus, error) {
-	status := make([]ContributionStatus, 0, len(rules))
-	for _, rule := range rules {
-		contributed, err := contributionTotal(db, accountTypeID, rule.Year)
+func contributionStatus(db *gorm.DB, accountTypeID uint, startYear *int, rules []models.ContributionRule) ([]ContributionStatus, error) {
+	if startYear == nil {
+		return []ContributionStatus{}, nil
+	}
+	currentYear := time.Now().Year()
+	if *startYear > currentYear {
+		return []ContributionStatus{}, nil
+	}
+	status := make([]ContributionStatus, 0, currentYear-*startYear+1)
+	for year := currentYear; year >= *startYear; year-- {
+		annualLimit, ok := annualLimitForYear(rules, year)
+		if !ok {
+			continue
+		}
+		contributed, err := contributionTotal(db, accountTypeID, year)
 		if err != nil {
 			return nil, err
 		}
 		status = append(status, ContributionStatus{
-			Year:        rule.Year,
-			AnnualLimit: rule.AnnualLimit,
+			Year:        year,
+			AnnualLimit: annualLimit,
 			Contributed: contributed,
-			Remaining:   rule.AnnualLimit - contributed,
+			Remaining:   annualLimit - contributed,
 		})
 	}
 	return status, nil
 }
 
-func contributionRoom(db *gorm.DB, accountTypeID uint, contributionStartAge, birthYear *int, rules []models.ContributionRule) (*ContributionRoom, error) {
-	if contributionStartAge == nil || birthYear == nil {
+func contributionRoom(db *gorm.DB, accountTypeID uint, startYear *int, rules []models.ContributionRule) (*ContributionRoom, error) {
+	if startYear == nil {
 		return nil, nil
 	}
-	eligibleFromYear := *birthYear + *contributionStartAge
 	currentYear := time.Now().Year()
 	var earnedRoom float64
-	for _, rule := range rules {
-		if rule.Year >= eligibleFromYear && rule.Year <= currentYear {
-			earnedRoom += rule.AnnualLimit
+	for year := *startYear; year <= currentYear; year++ {
+		if annualLimit, ok := annualLimitForYear(rules, year); ok {
+			earnedRoom += annualLimit
 		}
 	}
-	contributed, err := contributionTotalThroughYear(db, accountTypeID, eligibleFromYear, currentYear)
+	contributed, err := contributionTotalThroughYear(db, accountTypeID, *startYear, currentYear)
 	if err != nil {
 		return nil, err
 	}
 	return &ContributionRoom{
-		EligibleFromYear: eligibleFromYear,
+		EligibleFromYear: *startYear,
 		EarnedRoom:       earnedRoom,
 		Contributed:      contributed,
 		Remaining:        earnedRoom - contributed,
 	}, nil
+}
+
+func annualLimitForYear(rules []models.ContributionRule, year int) (float64, bool) {
+	for _, rule := range rules {
+		if rule.Year <= year {
+			return rule.AnnualLimit, true
+		}
+	}
+	return 0, false
 }
 
 func contributionTotal(db *gorm.DB, accountTypeID uint, year int) (float64, error) {
@@ -380,8 +399,8 @@ func validateAccountType(accountType models.InvestmentAccountType) error {
 	if accountType.Name == "" {
 		return errors.New("name is required")
 	}
-	if accountType.ContributionStartAge != nil && (*accountType.ContributionStartAge < 0 || *accountType.ContributionStartAge > 120) {
-		return errors.New("contribution_start_age must be between 0 and 120")
+	if accountType.ContributionStartYear != nil && (*accountType.ContributionStartYear < 1900 || *accountType.ContributionStartYear > 9999) {
+		return errors.New("contribution_start_year must be between 1900 and 9999")
 	}
 	return nil
 }

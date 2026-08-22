@@ -138,10 +138,20 @@ const routes: RouteRecordRaw[] = [
         meta: { breadcrumb: "Grocery" },
     },
     {
+        path: "/finances",
+        name: "finances",
+        component: () => import("~/pages/finances/index.vue"),
+        meta: { breadcrumb: "Finances" },
+    },
+    {
+        path: "/finances/config",
+        name: "finance-config",
+        component: () => import("~/pages/finances/config.vue"),
+        meta: { breadcrumb: "Finance configuration" },
+    },
+    {
         path: "/finance",
-        name: "finance",
-        component: () => import("~/pages/finance/index.vue"),
-        meta: { breadcrumb: "Finance" },
+        redirect: { name: "finances" },
     },
     {
         path: "/auth/signin",

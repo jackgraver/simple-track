@@ -24,7 +24,7 @@ export type ContributionRoom = {
 export type InvestmentAccountType = {
     ID: number;
     name: string;
-    contribution_start_age?: number;
+    contribution_start_year?: number;
     rules?: ContributionRule[];
     contribution_status: ContributionStatus[];
     contribution_room?: ContributionRoom;
@@ -84,9 +84,19 @@ export async function listInvestmentAccountTypes() {
 
 export async function createInvestmentAccountType(payload: {
     name: string;
-    contribution_start_age?: number;
+    contribution_start_year?: number;
 }) {
     await apiClient.post("/money/investments/account-types", payload);
+}
+
+export async function updateInvestmentAccountType(
+    accountTypeId: number,
+    payload: { name: string; contribution_start_year?: number },
+) {
+    await apiClient.patch(
+        `/money/investments/account-types/${accountTypeId}`,
+        payload,
+    );
 }
 
 export async function deleteInvestmentAccountType(accountTypeId: number) {

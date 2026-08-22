@@ -19,9 +19,9 @@ func (InvestmentAccount) TableName() string { return "investment_accounts" }
 
 type InvestmentAccountType struct {
 	gorm.Model
-	Name                 string             `json:"name" gorm:"not null;uniqueIndex"`
-	ContributionStartAge *int               `json:"contribution_start_age,omitempty"`
-	Rules                []ContributionRule `json:"rules,omitempty" gorm:"foreignKey:InvestmentAccountTypeID;constraint:OnDelete:CASCADE"`
+	Name                  string             `json:"name" gorm:"not null;uniqueIndex"`
+	ContributionStartYear *int               `json:"contribution_start_year,omitempty"`
+	Rules                 []ContributionRule `json:"rules,omitempty" gorm:"foreignKey:InvestmentAccountTypeID;constraint:OnDelete:CASCADE"`
 }
 
 func (InvestmentAccountType) TableName() string { return "investment_account_types" }

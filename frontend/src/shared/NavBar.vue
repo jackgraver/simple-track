@@ -37,7 +37,7 @@ const { getUsername } = useAuth();
                 >Diet</router-link
             >
             <router-link
-                :to="{ name: 'finance' }"
+                :to="{ name: 'finances' }"
                 class="hover:bg-secondBg rounded-md p-2 text-sm"
                 active-class="underline underline-offset-4"
                 >Finance</router-link
