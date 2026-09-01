@@ -35,7 +35,7 @@ jobs:
         run: |
           docker build \
             -t ghcr.io/${OWNER_LC}/st-frontend:latest \
-            -f frontend/Dockerfile .
+            frontend
 
       - name: Push frontend
         run: |
@@ -45,7 +45,7 @@ jobs:
         run: |
           docker build \
             -t ghcr.io/${OWNER_LC}/st-backend:latest \
-            -f backend/Dockerfile .
+            backend
 
       - name: Push backend
         run: |

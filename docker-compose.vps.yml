@@ -19,7 +19,7 @@ services:
             retries: 5
 
     backend:
-        image: ${BACKEND_IMAGE:-ghcr.io/jackgraver/simple-track-backend:latest}
+        image: ${BACKEND_IMAGE:-ghcr.io/jackgraver/st-backend:latest}
         pull_policy: always
         ports:
             - "127.0.0.1:${BACKEND_PORT:-8080}:8080"
@@ -56,7 +56,7 @@ services:
             start_period: 10s
 
     frontend:
-        image: ${FRONTEND_IMAGE:-ghcr.io/jackgraver/simple-track-frontend:latest}
+        image: ${FRONTEND_IMAGE:-ghcr.io/jackgraver/st-frontend:latest}
         pull_policy: always
         ports:
             - "127.0.0.1:${FRONTEND_PORT:-3000}:3000"
