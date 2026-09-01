@@ -26,6 +26,7 @@ services:
         environment:
             LISTEN_ADDR: 0.0.0.0:8080
             APP_ENV: production
+            TZ: ${TZ:-America/Edmonton}
             DATABASE_URL_PRODUCTION: postgresql://${POSTGRES_USER:-simpletracker}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/${POSTGRES_DB:-simpletracker}?sslmode=disable
             DATABASE_ALLOW_INSECURE: "true"
             JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}

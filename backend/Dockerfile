@@ -13,7 +13,7 @@ FROM alpine:3.22
 
 WORKDIR /app
 
-RUN apk add --no-cache ca-certificates \
+RUN apk add --no-cache ca-certificates tzdata \
     && addgroup -S app \
     && adduser -S -G app app \
     && chown app:app /app
