@@ -19,9 +19,8 @@ services:
             retries: 5
 
     backend:
-        build:
-            context: ./backend
-            dockerfile: Dockerfile
+        image: ${BACKEND_IMAGE:-ghcr.io/jackgraver/simple-track-backend:latest}
+        pull_policy: always
         ports:
             - "127.0.0.1:${BACKEND_PORT:-8080}:8080"
         environment:
@@ -57,11 +56,8 @@ services:
             start_period: 10s
 
     frontend:
-        build:
-            context: ./frontend
-            dockerfile: Dockerfile
-            args:
-                API_BASE: /api
+        image: ${FRONTEND_IMAGE:-ghcr.io/jackgraver/simple-track-frontend:latest}
+        pull_policy: always
         ports:
             - "127.0.0.1:${FRONTEND_PORT:-3000}:3000"
         networks:
