@@ -82,9 +82,13 @@ func validateProductionPostgresDSN(dsn string) error {
 	switch mode {
 	case "require", "verify-ca", "verify-full":
 		return nil
+	case "disable":
+		if strings.EqualFold(strings.TrimSpace(env.StringOr("DATABASE_ALLOW_INSECURE", "false")), "true") {
+			return nil
+		}
 	default:
-		return fmt.Errorf("production database must use sslmode=require, verify-ca, or verify-full")
 	}
+	return fmt.Errorf("production database must use sslmode=require, verify-ca, or verify-full unless DATABASE_ALLOW_INSECURE=true")
 }
 
 func postgresSSLMode(dsn string) string {

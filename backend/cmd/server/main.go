@@ -62,7 +62,7 @@ func main() {
 
 	db, err := database.ConnectToPostgres()
 	if err != nil {
-		panic("Database unreachable")
+		log.Fatalf("database: %v", err)
 	}
 	if err := workout.Migrate(db); err != nil {
 		panic(err)
