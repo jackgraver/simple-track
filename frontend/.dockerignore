@@ -1,6 +1,9 @@
 node_modules/
-.nuxt/
-.output/
 dist/
+.vite/
+coverage/
 .git/
+.env
+.env.*
+Dockerfile*
 *.log

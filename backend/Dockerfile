@@ -1,25 +1,27 @@
-FROM golang:1.25-alpine AS builder
+FROM golang:1.25-alpine AS build
 
 WORKDIR /app
 
-RUN apk add --no-cache gcc musl-dev
-
-COPY go.mod ./
-COPY go.sum* ./
+COPY go.mod go.sum ./
 RUN go mod download
 
 COPY . .
 
-RUN CGO_ENABLED=1 GOOS=linux go build -o server ./cmd/server
+RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /server ./cmd/server
 
 FROM alpine:3.22
 
 WORKDIR /app
 
-COPY --from=builder /app/server .
+RUN apk add --no-cache ca-certificates \
+    && addgroup -S app \
+    && adduser -S -G app app \
+    && chown app:app /app
 
-RUN mkdir -p /app/api /app/database/dumps
+COPY --from=build --chown=app:app /server /app/server
+
+USER app
 
 EXPOSE 8080
 
-CMD ["./server"]
+CMD ["/app/server"]

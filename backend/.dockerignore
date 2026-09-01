@@ -1,4 +1,11 @@
+.git/
+.env
+.env.*
+Dockerfile*
+bin/
+coverage/
 *.db
 *.sql
 database/dumps/
 api/gin.log
+*.log

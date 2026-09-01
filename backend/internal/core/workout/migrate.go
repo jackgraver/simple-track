@@ -14,9 +14,9 @@ func Migrate(db *gorm.DB) error {
 		&models.WorkoutPlan{},
 		&models.WorkoutPlanDay{},
 		&models.WorkoutPlanExercise{},
+		&models.WorkoutLog{},
 		&models.LoggedExercise{},
 		&models.LoggedSet{},
-		&models.WorkoutLog{},
 		&models.Cardio{},
 	); err != nil {
 		return err
