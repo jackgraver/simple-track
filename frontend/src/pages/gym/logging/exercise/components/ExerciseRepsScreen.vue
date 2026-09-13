@@ -42,7 +42,8 @@ const sliderMarkers = computed(() => {
 
 const logSet = async () => {
     const setNumber = props.session.currentSetNumber;
-    if (await props.session.addNextSet()) emit("logged", setNumber);
+    props.session.addNextSet();
+    emit("logged", setNumber);
 };
 </script>
 
