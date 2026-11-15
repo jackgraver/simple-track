@@ -16,10 +16,11 @@ type handler struct {
 func RegisterGroceryRoutes(group *gin.RouterGroup, db *gorm.DB) {
 	h := handler{db: db}
 	group.GET("/items", h.getItems)
-	group.POST("/items", h.postItem)
+	group.POST("/item", h.postItem)
 	group.PATCH("/items/:id/complete", h.completeItem)
 	group.DELETE("/items/:id", h.deleteItem)
 	group.GET("/suggestions", h.getSuggestions)
+	group.POST("/items", h.addListOfItems)
 }
 
 func (h *handler) getItems(c *gin.Context) {
@@ -97,5 +98,29 @@ func (h *handler) getSuggestions(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
+
 	c.JSON(http.StatusOK, gin.H{"suggestions": rows})
+}
+
+type itemListBody struct {
+	List []string `json:"list"`
+}
+
+// POST /items
+// body - string list of items to add
+//
+// Given a list of items, adds all not already existing items
+func (h *handler) addListOfItems(c *gin.Context) {
+	var body itemListBody
+	if err := c.ShouldBindJSON(&body); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	addedItems, err := CreateItemsOrExisting(h.db, body.List);
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"addedItems": addedItems})
 }

@@ -3,6 +3,7 @@ package services
 import (
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"be-simpletracker/internal/core/auth/models"
@@ -87,7 +88,7 @@ func (s *AuthService) Register(input RegisterInput) (AuthResult, error) {
 }
 
 func (s *AuthService) Login(input LoginInput) (AuthResult, error) {
-	user, err := authrepo.FindUserByUsername(input.Username)
+	user, err := authrepo.FindUserByUsername(strings.ToLower(input.Username))
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			_ = bcrypt.CompareHashAndPassword(dummyPasswordHash, []byte(input.Password))

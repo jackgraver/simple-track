@@ -32,6 +32,34 @@ func CreateItem(db *gorm.DB, name string) (*GroceryItem, error) {
 	return &row, nil
 }
 
+func CreateItemsOrExisting(db *gorm.DB, list []string) ([]string, error) {
+	allItems, err := ListActiveItems(db);
+	if err != nil {
+		return nil, errors.New("Failed to load existing items")
+	}
+
+	// Create map of length of existing items list
+	//   key = string 
+	//   value = empty struct (no storage, when only care about key existence, Golang doesnt have sets so this is idiomatic way of doing it)
+	allItemsMap := make(map[string]struct{}, len(allItems));
+
+	// Populate map with keys for existing items to empty structs values
+	for _, existingItem := range(allItems) {
+		allItemsMap[strings.ToLower(existingItem.Name)] = struct{}{}
+	} 
+
+	var result []string
+	// Check all requested items to see if they already exist 
+	for _, newItem := range(list) {
+		// go map lookup returns (value, exists), but discard value and do similar to inline err check to continue when new item doesnt exist 
+		if _, exists := allItemsMap[strings.ToLower(newItem)]; !exists {
+			result = append(result, newItem);
+		}
+	}
+
+	return result, nil
+}
+
 func CompleteItem(db *gorm.DB, id uint) (*GroceryItem, error) {
 	var row GroceryItem
 	if err := db.First(&row, id).Error; err != nil {

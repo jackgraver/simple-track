@@ -4,6 +4,7 @@
 package main
 
 import (
+	usermodel "be-simpletracker/internal/core/auth/models"
 	dietmodels "be-simpletracker/internal/core/diet/models"
 	"be-simpletracker/internal/core/tracking/steps"
 	"be-simpletracker/internal/core/tracking/water"
@@ -25,7 +26,7 @@ func main() {
 	// 	os.Exit(1)
 	// }
 
-	// db.AutoMigrate(&models.User{})
+	db.AutoMigrate(&usermodel.User{})
 
 	if err := workout.Migrate(db); err != nil {
 		fmt.Fprintf(os.Stderr, "AutoMigrate: %v\n", err)
