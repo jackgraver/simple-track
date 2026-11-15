@@ -23,8 +23,8 @@ import { toast } from "~/composables/toast/useToast";
 <style scoped>
 .toast-container {
     position: fixed;
-    bottom: 1rem;
-    right: 1rem;
+    bottom: calc(1rem + env(safe-area-inset-bottom));
+    right: calc(1rem + env(safe-area-inset-right));
     z-index: 9999;
     display: flex;
     flex-direction: column;

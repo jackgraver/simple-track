@@ -42,10 +42,15 @@ html {
         Arial,
         sans-serif;
     margin: 0;
+    min-height: 100%;
+    overscroll-behavior: none;
 }
 
 body {
     margin: 0;
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+    overscroll-behavior: none;
 }
 
 .grid-container {
