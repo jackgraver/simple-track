@@ -2,7 +2,7 @@
 import MacroBar from "~/pages/diet/components/macrobar/MacroBar.vue";
 import MacroBars from "~/pages/diet/components/MacroBars.vue";
 import WaterLogsDialog from "~/pages/diet/components/dialog/WaterLogsDialog.vue";
-import { useDietLogsToday } from "~/pages/home/queries/useDietLogsToday";
+import { useDietLogsToday } from "~/api/diet/queries";
 import PlannedMealsDisplay from "./PlannedMealsDisplay.vue";
 import LoggedMealsDisplay from "./LoggedMealsDisplay.vue";
 import { useWaterLogs } from "~/api/tracking/queries";

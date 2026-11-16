@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { getApiErrorMessage } from "~/api/httpError";
 import type { Cardio, PlannedCardio } from "~/types/workout";
 import LoggingHeader from "./LoggingHeader.vue";
 import { ref, watch, computed } from "vue";
@@ -55,8 +56,8 @@ const finish = async () => {
         await saveCardio(currentMinutes.value, undefined, notes.value);
         toast.push("Cardio saved", "success");
         goBackToLogging();
-    } catch (err: any) {
-        toast.push(err.message || "Failed to save cardio", "error");
+    } catch (err) {
+        toast.push(getApiErrorMessage(err, "Failed to save cardio"), "error");
     }
 };
 </script>

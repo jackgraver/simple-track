@@ -32,15 +32,6 @@ const showDateAndBreadcrumbs = computed(
 html {
     color: rgb(218, 218, 218);
     background-color: var(--color-main-bg);
-    font-family:
-        system-ui,
-        -apple-system,
-        BlinkMacSystemFont,
-        "Segoe UI",
-        Roboto,
-        "Helvetica Neue",
-        Arial,
-        sans-serif;
     margin: 0;
     min-height: 100%;
     overscroll-behavior: none;
@@ -51,83 +42,6 @@ body {
     padding-top: env(safe-area-inset-top);
     padding-bottom: env(safe-area-inset-bottom);
     overscroll-behavior: none;
-}
-
-.grid-container {
-    display: grid;
-    grid-template-columns: auto 1fr;
-    grid-template-rows: auto 1fr;
-    height: 100%;
-    width: 100%;
-    margin: 0;
-}
-
-.grid-top-left {
-    grid-column: 1;
-    grid-row: 1;
-    border-right: 0.5px solid #a7a7a7;
-    border-bottom: 0.5px solid #a7a7a7;
-}
-
-.grid-top-right {
-    grid-column: 2;
-    grid-row: 1;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 1rem;
-    padding: 1rem;
-    border-bottom: 0.5px solid #a7a7a7;
-}
-
-.grid-top-right h1 {
-    font-size: 1.5rem;
-    margin: 0;
-}
-
-.current-date-label {
-    font-size: 1rem;
-}
-
-.grid-bottom-left {
-    grid-column: 1;
-    grid-row: 2;
-    overflow-y: auto;
-    border-right: 0.5px solid #a7a7a7;
-}
-
-.grid-bottom-right {
-    grid-column: 2;
-    grid-row: 2;
-    overflow-y: auto;
-    padding: 1rem;
-}
-
-@media (max-width: 767px) {
-    .grid-container {
-        grid-template-columns: 1fr;
-        grid-template-rows: auto auto 1fr;
-    }
-
-    .grid-top-left {
-        display: none;
-    }
-
-    .grid-top-right {
-        grid-column: 1;
-        grid-row: 1;
-        justify-content: center;
-    }
-
-    .grid-bottom-left {
-        grid-column: 1;
-        grid-row: 2;
-    }
-
-    .grid-bottom-right {
-        grid-column: 1;
-        grid-row: 3;
-    }
 }
 
 @layer base {
@@ -146,28 +60,17 @@ body {
 }
 
 button {
-    /* background: #2c2c2c; */
     padding: 6px 12px;
     margin: 4px 0px;
     border-radius: 4px;
-    border: 2px solid #a7a7a7;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-    /* color: white; */
     border: none;
     cursor: pointer;
 }
 
-/* button:disabled {
-    background: #ccc;
-} */
-
 button:disabled:hover {
     cursor: not-allowed;
 }
-
-/* button:hover:not(:disabled) {
-    background: #525252;
-} */
 
 button svg {
     vertical-align: middle;
@@ -202,5 +105,11 @@ select {
 
 input:focus {
     outline: none;
+}
+
+/* Keyboard focus indicator for links/buttons (the base reset above strips it). */
+:focus-visible {
+    outline: 2px solid var(--color-text-secondary);
+    outline-offset: 2px;
 }
 </style>

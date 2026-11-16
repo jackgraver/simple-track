@@ -1,18 +1,5 @@
 import { createApp } from 'vue'
 import { VueQueryPlugin, QueryClient } from '@tanstack/vue-query'
-import {
-  Chart as ChartJS,
-  Title,
-  Tooltip,
-  Legend,
-  LineElement,
-  PointElement,
-  CategoryScale,
-  LinearScale,
-  Filler,
-  ArcElement,
-  DoughnutController,
-} from 'chart.js'
 import { router } from './router'
 import App from './App.vue'
 import './style.css'
@@ -20,19 +7,6 @@ import PrimeVue from 'primevue/config'
 import Aura from '@primeuix/themes/aura'
 import { setUnauthorizedRedirect } from './composables/auth/session'
 import { resolveAuthSession } from './composables/auth/useAuth'
-
-ChartJS.register(
-  Title,
-  Tooltip,
-  Legend,
-  LineElement,
-  PointElement,
-  CategoryScale,
-  LinearScale,
-  Filler,
-  ArcElement,
-  DoughnutController,
-)
 
 const queryClient = new QueryClient({
   defaultOptions: {

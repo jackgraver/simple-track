@@ -1,5 +1,6 @@
 import { useRouter } from "vue-router";
 import { apiClient } from "~/api/client";
+import { getApiErrorMessage } from "~/api/httpError";
 import {
     authStatus,
     isAuthenticated,
@@ -13,26 +14,6 @@ interface AuthResponse {
     username?: string;
     environment?: string;
     user?: {
-        ID: number;
-        username: string;
-        email?: string;
-    };
-}
-
-interface LoginResponse {
-    username: string;
-    environment: string;
-    user: {
-        ID: number;
-        username: string;
-        email?: string;
-    };
-}
-
-interface RegisterResponse {
-    username: string;
-    environment: string;
-    user: {
         ID: number;
         username: string;
         email?: string;
@@ -69,7 +50,7 @@ export function useAuth() {
 
     async function login(usernameInput: string, password: string): Promise<void> {
         try {
-            const response = await apiClient.post<LoginResponse>("/auth/login", {
+            const response = await apiClient.post<AuthResponse>("/auth/login", {
                 username: usernameInput,
                 password,
             });
@@ -81,15 +62,14 @@ export function useAuth() {
             } else {
                 throw new Error("No user in login response");
             }
-        } catch (error: any) {
-            const message = error.response?.data?.error || error.message || "Login failed";
-            throw new Error(message);
+        } catch (error) {
+            throw new Error(getApiErrorMessage(error, "Login failed"));
         }
     }
 
     async function register(usernameInput: string, password: string, email?: string): Promise<void> {
         try {
-            const response = await apiClient.post<RegisterResponse>("/auth/register", {
+            const response = await apiClient.post<AuthResponse>("/auth/register", {
                 username: usernameInput,
                 password,
                 email,
@@ -102,9 +82,8 @@ export function useAuth() {
             } else {
                 throw new Error("No user in registration response");
             }
-        } catch (error: any) {
-            const message = error.response?.data?.error || error.message || "Registration failed";
-            throw new Error(message);
+        } catch (error) {
+            throw new Error(getApiErrorMessage(error, "Registration failed"));
         }
     }
 
@@ -115,7 +94,7 @@ export function useAuth() {
             console.error("Logout error:", error);
         } finally {
             markUnauthorized();
-            router.push("/signin");
+            void router.push({ name: "signin" });
         }
     }
 

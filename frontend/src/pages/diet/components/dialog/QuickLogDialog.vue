@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import axios from "axios";
+import { getApiErrorMessage } from "~/api/httpError";
 import type { Meal } from "~/types/diet";
 import { computed, ref, watch } from "vue";
 import { toast } from "~/composables/toast/useToast";
@@ -110,19 +110,7 @@ async function submit() {
         toast.push(isEditing.value ? "Updated" : "Logged", "success");
         props.onResolve?.(true);
     } catch (err: unknown) {
-        let msg = "Failed to log";
-        if (
-            axios.isAxiosError(err) &&
-            err.response?.data &&
-            typeof err.response.data === "object" &&
-            "error" in err.response.data
-        ) {
-            const e0 = (err.response.data as { error?: string }).error;
-            if (e0) msg = e0;
-        } else if (err instanceof Error) {
-            msg = err.message;
-        }
-        toast.push(msg, "error");
+        toast.push(getApiErrorMessage(err, "Failed to log"), "error");
     }
 }
 </script>
