@@ -154,6 +154,24 @@ const routes: RouteRecordRaw[] = [
         redirect: { name: "finances" },
     },
     {
+        path: "/media",
+        name: "media",
+        component: () => import("~/pages/media/index.vue"),
+        meta: { breadcrumb: "Media" },
+    },
+    {
+        path: "/media/new",
+        name: "media-new",
+        component: () => import("~/pages/media/[id].vue"),
+        meta: { breadcrumb: "Add media" },
+    },
+    {
+        path: "/media/:id(\\d+)",
+        name: "media-detail",
+        component: () => import("~/pages/media/[id].vue"),
+        meta: { breadcrumb: "Media item" },
+    },
+    {
         path: "/auth/signin",
         name: "signin",
         component: () => import("~/pages/auth/signin/index.vue"),

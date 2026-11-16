@@ -3,6 +3,7 @@ package main
 import (
 	"be-simpletracker/internal/core/auth"
 	diet "be-simpletracker/internal/core/diet"
+	media "be-simpletracker/internal/core/media"
 	money "be-simpletracker/internal/core/money"
 	tracking "be-simpletracker/internal/core/tracking"
 	workout "be-simpletracker/internal/core/workout"
@@ -109,4 +110,10 @@ func CreateFeatures(db *gorm.DB, router *gin.Engine) {
 		panic(err)
 	}
 	moneyHandler.RegisterRoutes(router, authMW)
+
+	mediaHandler := media.NewHandler(db)
+	if err := mediaHandler.Migrate(); err != nil {
+		panic(err)
+	}
+	mediaHandler.RegisterRoutes(router, authMW)
 }
