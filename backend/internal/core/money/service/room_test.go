@@ -190,3 +190,26 @@ func TestResolveStartYear(t *testing.T) {
 		})
 	}
 }
+
+func TestAnnualLimitReportedIncludingOpeningYear(t *testing.T) {
+	openingYear, openingRoom := 2025, 30000.0
+	summary := CalculateRoom(RoomRules{
+		Limits:          limits([2]float64{2009, 5000}, [2]float64{2024, 7000}),
+		OpeningRoomYear: &openingYear,
+		OpeningRoom:     &openingRoom,
+	}, nil, 2026)
+	for _, year := range []int{2025, 2026} {
+		row := yearRow(t, summary, year)
+		if row.AnnualLimit == nil || *row.AnnualLimit != 7000 {
+			t.Fatalf("%d annual limit = %v, want 7000", year, row.AnnualLimit)
+		}
+	}
+	if row := yearRow(t, summary, 2025); row.NewRoom != openingRoom {
+		t.Fatalf("2025 new room = %v, want opening room %v", row.NewRoom, openingRoom)
+	}
+
+	noLimits := CalculateRoom(RoomRules{OpeningRoomYear: &openingYear, OpeningRoom: &openingRoom}, nil, 2026)
+	if row := yearRow(t, noLimits, 2026); row.AnnualLimit != nil {
+		t.Fatalf("annual limit = %v, want nil without limit rules", *row.AnnualLimit)
+	}
+}

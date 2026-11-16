@@ -19,6 +19,8 @@ export type RoomYear = {
     year: number;
     new_room: number;
     limit_year: number | null;
+    /** Limit rule in effect this year (also set in the opening year). */
+    annual_limit: number | null;
     is_opening: boolean;
     carried_in: number;
     restored: number;

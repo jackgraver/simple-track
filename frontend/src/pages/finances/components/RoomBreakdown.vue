@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { RoomSummary } from "~/api/money/types";
-import { formatMoney } from "../format";
+import { formatMoney, yearAllowance } from "../format";
 
 defineProps<{ room: RoomSummary }>();
 
@@ -44,7 +44,12 @@ function dash(value: number) {
                         {{ formatMoney(year.available) }}
                         <span v-if="year.lifetime_capped > 0" class="block text-[0.65rem] text-amber-300">lifetime cap −{{ formatMoney(year.lifetime_capped) }}</span>
                     </td>
-                    <td class="px-2 py-1.5">{{ dash(year.contributed) }}</td>
+                    <td class="px-2 py-1.5" :class="yearAllowance(year)?.over ? 'text-amber-300' : ''">
+                        {{ dash(year.contributed) }}
+                        <span v-if="yearAllowance(year)?.over" class="block text-[0.65rem]">
+                            over {{ year.year }} limit by {{ formatMoney(year.contributed - yearAllowance(year)!.allowance) }}
+                        </span>
+                    </td>
                     <td class="px-2 py-1.5 text-textSecondary">{{ dash(year.withdrawn) }}</td>
                     <td class="py-1.5 pl-2 font-medium" :class="year.remaining < 0 ? 'text-red-400' : 'text-textPrimary'">
                         {{ formatMoney(year.remaining) }}
@@ -56,7 +61,8 @@ function dash(value: number) {
             </tbody>
         </table>
         <p class="mb-0 mt-2 text-[0.7rem] text-textSecondary">
-            Greyed new room is inherited from an earlier year's limit.
+            Greyed new room is inherited from an earlier year's limit. Amber contributions went past that year's
+            limit (plus restored withdrawals) and used room carried forward from earlier years.
             <template v-if="room.years.some((y) => y.is_opening)"> * Opening room you entered.</template>
         </p>
     </div>

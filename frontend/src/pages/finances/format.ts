@@ -1,4 +1,4 @@
-import type { AccountKind } from "~/api/money/types";
+import type { AccountKind, RoomYear } from "~/api/money/types";
 
 const moneyFormatter = new Intl.NumberFormat("en-CA", {
     style: "currency",
@@ -117,3 +117,35 @@ export const ui = {
     positive: "text-emerald-400",
     negative: "text-(--color-cf-red)",
 };
+
+export type YearAllowance = {
+    /** The annual limit for the year. */
+    limit: number;
+    /** Withdrawals from the previous year added back this year. */
+    restored: number;
+    /** limit + restored: what can go in this year without dipping into older room. */
+    allowance: number;
+    contributed: number;
+    /** Allowance left this year, never more than the total room left. */
+    left: number;
+    /** Contributed more than this year's allowance (uses carried-forward room). */
+    over: boolean;
+};
+
+/**
+ * The year's own allowance, separate from room carried forward from earlier
+ * years. Null when the type has no annual limit (e.g. RRSP opening room only).
+ */
+export function yearAllowance(year: RoomYear): YearAllowance | null {
+    if (year.annual_limit === null) return null;
+    const allowance = year.annual_limit + year.restored;
+    const left = Math.round(Math.min(allowance - year.contributed, year.remaining) * 100) / 100;
+    return {
+        limit: year.annual_limit,
+        restored: year.restored,
+        allowance,
+        contributed: year.contributed,
+        left,
+        over: year.contributed > allowance + 0.005,
+    };
+}

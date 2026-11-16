@@ -35,17 +35,21 @@ type RoomYear struct {
 	NewRoom float64 `json:"new_room"`
 	// LimitYear is the year of the limit rule that produced NewRoom, so the
 	// UI can show when a limit is inherited from an earlier year.
-	LimitYear       *int    `json:"limit_year"`
-	IsOpening       bool    `json:"is_opening"`
-	CarriedIn       float64 `json:"carried_in"`
-	Restored        float64 `json:"restored"`
-	LifetimeCapped  float64 `json:"lifetime_capped"`
-	Available       float64 `json:"available"`
-	Contributed     float64 `json:"contributed"`
-	Withdrawn       float64 `json:"withdrawn"`
-	Remaining       float64 `json:"remaining"`
-	CarriedOut      float64 `json:"carried_out"`
-	OverContributed bool    `json:"over_contributed"`
+	LimitYear *int `json:"limit_year"`
+	// AnnualLimit is the limit rule in effect for this year, even in the
+	// opening year where NewRoom is the opening room instead. nil when no
+	// limit rule applies (e.g. RRSP with opening room only).
+	AnnualLimit     *float64 `json:"annual_limit"`
+	IsOpening       bool     `json:"is_opening"`
+	CarriedIn       float64  `json:"carried_in"`
+	Restored        float64  `json:"restored"`
+	LifetimeCapped  float64  `json:"lifetime_capped"`
+	Available       float64  `json:"available"`
+	Contributed     float64  `json:"contributed"`
+	Withdrawn       float64  `json:"withdrawn"`
+	Remaining       float64  `json:"remaining"`
+	CarriedOut      float64  `json:"carried_out"`
+	OverContributed bool     `json:"over_contributed"`
 }
 
 type RoomSummary struct {
@@ -106,10 +110,15 @@ func CalculateRoom(rules RoomRules, flows map[int]YearFlow, currentYear int) Roo
 	carried := 0.0
 	for year := startYear; year <= currentYear; year++ {
 		row := RoomYear{Year: year, CarriedIn: carried}
+		limit, hasLimit := limitForYear(rules.Limits, year)
+		if hasLimit {
+			annual := limit.AnnualLimit
+			row.AnnualLimit = &annual
+		}
 		if opening && year == startYear {
 			row.NewRoom = *rules.OpeningRoom
 			row.IsOpening = true
-		} else if limit, ok := limitForYear(rules.Limits, year); ok {
+		} else if hasLimit {
 			row.NewRoom = limit.AnnualLimit
 			limitYear := limit.Year
 			row.LimitYear = &limitYear

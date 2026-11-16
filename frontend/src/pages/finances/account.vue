@@ -36,6 +36,7 @@ import {
     parseAmount,
     todayKey,
     ui,
+    yearAllowance,
 } from "./format";
 
 const route = useRoute();
@@ -54,6 +55,10 @@ const contributionTypes = computed(() => typesQuery.data.value?.contribution_typ
 const linkedType = computed(() =>
     contributionTypes.value.find((t) => t.ID === account.value?.contribution_type_id),
 );
+const linkedAllowance = computed(() => {
+    const year = linkedType.value?.room?.years[0];
+    return year ? yearAllowance(year) : null;
+});
 
 const LIST_PREVIEW = 8;
 const showAllBalances = ref(false);
@@ -313,8 +318,12 @@ const navLinks = computed<ModuleTitleLink[]>(() => [
                     class="flex flex-wrap items-center justify-between gap-2 rounded-md bg-secondBg px-3 py-2 text-sm hover:bg-thirdBg"
                 >
                     <span>Counts toward <strong>{{ linkedType.name }}</strong> room</span>
-                    <span v-if="linkedType.room" class="tabular-nums" :class="linkedType.room.available < 0 ? ui.negative : 'text-textSecondary'">
-                        {{ formatMoney(linkedType.room.available) }} available
+                    <span v-if="linkedType.room" class="tabular-nums text-textSecondary">
+                        <template v-if="linkedAllowance">
+                            <span :class="linkedAllowance.left < 0 ? ui.negative : ''">{{ formatMoney(linkedAllowance.left) }} left in {{ linkedType.room.years[0]?.year }}</span>
+                            · {{ formatMoney(linkedType.room.available) }} total
+                        </template>
+                        <span v-else :class="linkedType.room.available < 0 ? ui.negative : ''">{{ formatMoney(linkedType.room.available) }} available</span>
                     </span>
                     <span v-else class="text-amber-300">{{ linkedType.room_issue }}</span>
                 </router-link>
