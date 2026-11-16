@@ -57,10 +57,6 @@ func main() {
 	if env.IsProduction() && len(trustedProxies) == 0 {
 		log.Printf("config: TRUSTED_PROXIES is empty; login protection will use the direct peer IP")
 	}
-	router.GET("/health", func(c *gin.Context) {
-		c.JSON(200, gin.H{"status": "ok"})
-	})
-
 	db, err := database.ConnectToPostgres()
 	if err != nil {
 		log.Fatalf("database: %v", err)
@@ -73,6 +69,8 @@ func main() {
 	}
 
 	CreateFeatures(db, router)
+	// Last, after every migration: see healthHandler.
+	router.GET("/health", healthHandler(db))
 
 	addr := env.StringOr("LISTEN_ADDR", "0.0.0.0:8080")
 	fmt.Println("Server is running on port", addr)
