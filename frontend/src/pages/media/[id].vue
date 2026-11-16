@@ -48,11 +48,14 @@ const LENGTH_UNITS: Record<MediaType, string> = {
     other: "units",
 };
 
+// v-model on <input type="number"> stores a number once edited, "" when cleared.
+type NumberField = string | number;
+
 const form = reactive({
     type: "movie" as MediaType,
     title: "",
     creator: "",
-    release_year: "",
+    release_year: "" as NumberField,
     genres: "",
     cover_url: "",
     synopsis: "",
@@ -60,11 +63,11 @@ const form = reactive({
     rating: null as number | null,
     review: "",
     favorite: false,
-    progress: "",
-    length: "",
+    progress: "" as NumberField,
+    length: "" as NumberField,
     started_at: "",
     finished_at: "",
-    times_consumed: "0",
+    times_consumed: "0" as NumberField,
     source: "",
     external_id: "",
 });
@@ -154,7 +157,8 @@ function toForm(item: MediaItem) {
     coverOk.value = true;
 }
 
-function intOrNull(v: string) {
+function intOrNull(v: NumberField) {
+    if (typeof v === "number") return Number.isFinite(v) ? v : null;
     return v.trim() === "" ? null : Number(v);
 }
 
