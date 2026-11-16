@@ -42,6 +42,8 @@ services:
             LOGIN_SPRAY_MAX_USERNAMES: ${LOGIN_SPRAY_MAX_USERNAMES:-5}
             LOGIN_SPRAY_BLOCK_SEC: ${LOGIN_SPRAY_BLOCK_SEC:-86400}
             TRUSTED_PROXIES: ${TRUSTED_PROXIES:-}
+            # Media lookup for movies/TV (themoviedb.org); other media types work without it.
+            TMDB_API_KEY: ${TMDB_API_KEY:-}
         depends_on:
             postgres:
                 condition: service_healthy
