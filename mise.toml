@@ -1,0 +1,33 @@
+# Dev toolchain for simple-track. Managed by mise (https://mise.jdx.dev).
+# With `mise activate` in your shell, cd'ing here installs/pins these tools
+# and puts ./bin on PATH, so `dev` just works.
+
+[tools]
+node = "22"
+"go:github.com/air-verse/air" = "latest"
+"aqua:F1bonacc1/process-compose" = "latest"
+"github:sosedoff/pgweb" = "latest"
+# Go comes from the system install; uncomment to pin it here instead.
+# go = "1.25"
+
+# Language servers (so editors / Claude Code LSP plugins can find them on PATH)
+"go:golang.org/x/tools/gopls" = "latest"
+"npm:typescript" = "latest"
+"npm:typescript-language-server" = "latest"
+# Vue LSP pinned to 3.2.8: it still depends on volar-service-pug@0.0.70. Every stable release
+# from 3.2.9 on (incl. 3.3.14 "latest") pulls 0.0.71, which was published without npm provenance
+# (volarjs/services#124) and trips mise's trust policy. Bump once that's fixed upstream.
+"npm:@vue/language-server" = "3.2.8"
+"npm:vscode-langservers-extracted" = "latest"  # html/css/json/eslint servers
+"npm:yaml-language-server" = "latest"
+"npm:bash-language-server" = "latest"
+
+[env]
+_.path = ["{{config_root}}/bin"]
+
+[task_config]
+# Every executable in dev/tasks is a task: dev/tasks/db/psql -> `dev db:psql`
+includes = ["dev/tasks"]
+
+[settings]
+experimental = true
