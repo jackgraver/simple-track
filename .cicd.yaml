@@ -15,14 +15,15 @@ steps:
     dir: frontend
 images:
   - name: backend
-    repository: ghcr.io/jackgraver/simple-track-backend
+    repository: ghcr.io/jackgraver/st-backend
     dockerfile: backend/Dockerfile
     context: backend
   - name: frontend
-    repository: ghcr.io/jackgraver/simple-track-frontend
+    repository: ghcr.io/jackgraver/st-frontend
     dockerfile: frontend/Dockerfile
     context: frontend
 deploy:
-  host: st-vps
-  command: /usr/local/bin/j-cicd-agent
+  host: st-vps   # ~/.ssh/config alias: jack@167.172.207.46 with the deploy key
+  # The agent lives in jack's home on the VPS (no sudo needed).
+  command: J_CICD_AGENT_CONFIG=/home/jack/.config/j-cicd-agent.yaml /home/jack/.local/bin/j-cicd-agent
   timeout: 10m
