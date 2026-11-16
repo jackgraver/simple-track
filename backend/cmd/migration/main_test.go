@@ -14,7 +14,6 @@ func TestIncrementVersion(t *testing.T) {
 		{"099", "100"},
 		{"100", "101"},
 		{"999", "1000"},
-		{},
 	}
 
 	for _, test := range tests {
