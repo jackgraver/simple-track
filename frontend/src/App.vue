@@ -13,6 +13,7 @@ const showDateAndBreadcrumbs = computed(
 </script>
 
 <template>
+    <div class="status-bar-cover" aria-hidden="true"></div>
     <main
         class="dark scrollbar-gutter-both mx-auto box-border w-full max-w-full min-h-dvh overflow-x-clip"
     >
@@ -42,6 +43,19 @@ body {
     padding-top: env(safe-area-inset-top);
     padding-bottom: env(safe-area-inset-bottom);
     overscroll-behavior: none;
+}
+
+/* Solid cover behind the iOS status bar / Dynamic Island so scrolled content
+   (and iOS's own translucent edge effect) doesn't show through. */
+.status-bar-cover {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: env(safe-area-inset-top);
+    background-color: var(--color-main-bg);
+    z-index: 40;
+    pointer-events: none;
 }
 
 @layer base {
