@@ -7,6 +7,8 @@ import {
     useGrocerySuggestions,
 } from "~/api/tracking/queries";
 import { toast } from "~/composables/toast/useToast";
+import { ClipboardList } from "lucide-vue-next";
+import { openAddListDialog } from "./dialog/useListDialog";
 
 const COMPLETE_DELAY_MS = 1200;
 const COLLAPSE_MS = 500;
@@ -227,7 +229,19 @@ function onInputKeydown(event: KeyboardEvent) {
 
 <template>
     <div class="flex w-full min-w-0 flex-col gap-4">
-        <h1 class="m-0 text-lg font-semibold text-textPrimary">Grocery List</h1>
+        <div class="flex items-center gap-2">
+            <h1 class="m-0 flex-1 text-lg font-semibold text-textPrimary">
+                Grocery List
+            </h1>
+            <button
+                type="button"
+                class="flex items-center gap-1.5 rounded-md bg-zinc-800 px-2.5 py-1.5 text-sm text-zinc-200 hover:bg-zinc-700"
+                @click="openAddListDialog"
+            >
+                <ClipboardList class="size-4" aria-hidden="true" />
+                Paste list
+            </button>
+        </div>
         <div v-if="isError" class="text-sm text-(--color-cf-red)">
             {{ error?.message ?? "Failed to load grocery list" }}
         </div>

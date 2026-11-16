@@ -4,12 +4,14 @@ import { isAuthenticated } from "~/composables/auth/session";
 import {
     completeGroceryItem,
     createGroceryItem,
+    createGroceryItems,
     createDrinkSizePreset,
     deleteGroceryItem,
     deleteDrinkSizePreset,
     deleteWater,
     fetchGroceryItems,
     fetchGrocerySuggestions,
+    parseGroceryList,
     fetchDrinkSizePresets,
     fetchMissedTracking,
     fetchProfile,
@@ -122,6 +124,22 @@ export function useCreateGroceryItem() {
     const queryClient = useQueryClient();
     return useMutation({
         mutationFn: ({ name }: { name: string }) => createGroceryItem(name),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: trackingKeys.groceryItems });
+        },
+    });
+}
+
+export function useParseGroceryList() {
+    return useMutation({
+        mutationFn: (text: string) => parseGroceryList(text),
+    });
+}
+
+export function useCreateGroceryItems() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: (names: string[]) => createGroceryItems(names),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: trackingKeys.groceryItems });
         },

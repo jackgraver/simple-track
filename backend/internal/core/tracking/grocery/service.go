@@ -32,6 +32,78 @@ func CreateItem(db *gorm.DB, name string) (*GroceryItem, error) {
 	return &row, nil
 }
 
+// ParseTextList parses pasted free text into lines matched against item history.
+func ParseTextList(db *gorm.DB, text string) ([]ParsedLine, error) {
+	lines := ParseList(text)
+	if len(lines) == 0 {
+		return []ParsedLine{}, nil
+	}
+	var known []struct {
+		Name string
+		Uses int
+	}
+	if err := db.Model(&GroceryItem{}).
+		Select("name, COUNT(*) AS uses, MAX(created_at) AS last_used").
+		Group("name").
+		Order("uses DESC, last_used DESC").
+		Scan(&known).Error; err != nil {
+		return nil, err
+	}
+	knownItems := make([]KnownItem, 0, len(known))
+	for _, k := range known {
+		knownItems = append(knownItems, KnownItem{Name: k.Name, Count: k.Uses})
+	}
+	active, err := ListActiveItems(db)
+	if err != nil {
+		return nil, err
+	}
+	activeNames := make([]string, 0, len(active))
+	for _, a := range active {
+		activeNames = append(activeNames, a.Name)
+	}
+	return MatchLines(lines, knownItems, activeNames), nil
+}
+
+// CreateItems adds each name to the active list, skipping blanks and names
+// already on the list (or repeated within the request). Returns created rows
+// and the names that were skipped.
+func CreateItems(db *gorm.DB, names []string) ([]GroceryItem, []string, error) {
+	created := make([]GroceryItem, 0, len(names))
+	skipped := make([]string, 0)
+	err := db.Transaction(func(tx *gorm.DB) error {
+		active, err := ListActiveItems(tx)
+		if err != nil {
+			return err
+		}
+		seen := make(map[string]struct{}, len(active)+len(names))
+		for _, a := range active {
+			seen[strings.ToLower(a.Name)] = struct{}{}
+		}
+		for _, raw := range names {
+			name := normalizeName(raw)
+			if name == "" {
+				continue
+			}
+			key := strings.ToLower(name)
+			if _, exists := seen[key]; exists {
+				skipped = append(skipped, name)
+				continue
+			}
+			seen[key] = struct{}{}
+			row := GroceryItem{Name: name}
+			if err := tx.Create(&row).Error; err != nil {
+				return err
+			}
+			created = append(created, row)
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, nil, err
+	}
+	return created, skipped, nil
+}
+
 func CompleteItem(db *gorm.DB, id uint) (*GroceryItem, error) {
 	var row GroceryItem
 	if err := db.First(&row, id).Error; err != nil {

@@ -17,6 +17,8 @@ func RegisterGroceryRoutes(group *gin.RouterGroup, db *gorm.DB) {
 	h := handler{db: db}
 	group.GET("/items", h.getItems)
 	group.POST("/items", h.postItem)
+	group.POST("/items/parse", h.parseItems)
+	group.POST("/items/bulk", h.postItems)
 	group.PATCH("/items/:id/complete", h.completeItem)
 	group.DELETE("/items/:id", h.deleteItem)
 	group.GET("/suggestions", h.getSuggestions)
@@ -98,4 +100,42 @@ func (h *handler) getSuggestions(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"suggestions": rows})
+}
+
+type parseBody struct {
+	Text string `json:"text"`
+}
+
+// POST /items/parse — split pasted text into items matched to known names.
+func (h *handler) parseItems(c *gin.Context) {
+	var body parseBody
+	if err := c.ShouldBindJSON(&body); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	lines, err := ParseTextList(h.db, body.Text)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"lines": lines})
+}
+
+type bulkBody struct {
+	Names []string `json:"names"`
+}
+
+// POST /items/bulk — add several items, skipping ones already on the list.
+func (h *handler) postItems(c *gin.Context) {
+	var body bulkBody
+	if err := c.ShouldBindJSON(&body); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	created, skipped, err := CreateItems(h.db, body.Names)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"items": created, "skipped": skipped})
 }
