@@ -4,6 +4,7 @@ import type {
     DrinkSizePreset,
     GroceryItem,
     MissedTracking,
+    ParsedGroceryLine,
     StepLog,
     UserProfile,
     WaterLog,
@@ -54,6 +55,24 @@ export async function fetchGroceryItems(): Promise<GroceryItem[]> {
 export async function createGroceryItem(name: string): Promise<GroceryItem> {
     const res = await apiPOST<{ item: GroceryItem }>('/tracking/grocery/items', { name });
     return res.item;
+}
+
+export async function parseGroceryList(text: string): Promise<ParsedGroceryLine[]> {
+    const res = await apiPOST<{ lines: ParsedGroceryLine[] }>(
+        '/tracking/grocery/items/parse',
+        { text },
+    );
+    return res.lines ?? [];
+}
+
+export async function createGroceryItems(
+    names: string[],
+): Promise<{ items: GroceryItem[]; skipped: string[] }> {
+    const res = await apiPOST<{ items: GroceryItem[]; skipped: string[] }>(
+        '/tracking/grocery/items/bulk',
+        { names },
+    );
+    return { items: res.items ?? [], skipped: res.skipped ?? [] };
 }
 
 export async function completeGroceryItem(id: number): Promise<GroceryItem> {

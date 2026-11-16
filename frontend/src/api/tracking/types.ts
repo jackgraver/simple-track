@@ -32,6 +32,13 @@ export type GroceryItem = {
     CreatedAt?: string;
 };
 
+export type ParsedGroceryLine = {
+    input: string;
+    name: string;
+    matched: boolean;
+    on_list: boolean;
+};
+
 export type MissedTracking = {
     date: string;
     weight: boolean;
