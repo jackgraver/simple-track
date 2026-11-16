@@ -32,6 +32,8 @@ type MediaInput struct {
 	StartedAt     Optional[string]             `json:"started_at"`  // YYYY-MM-DD
 	FinishedAt    Optional[string]             `json:"finished_at"` // YYYY-MM-DD
 	TimesConsumed Optional[int]                `json:"times_consumed"`
+	Source        Optional[string]             `json:"source"`
+	ExternalID    Optional[string]             `json:"external_id"`
 }
 
 type ListFilter struct {
@@ -160,6 +162,8 @@ func applyInput(item *models.MediaItem, in MediaInput, now time.Time) error {
 	setString(&item.CoverURL, in.CoverURL)
 	setString(&item.Synopsis, in.Synopsis)
 	setString(&item.Review, in.Review)
+	setString(&item.Source, in.Source)
+	setString(&item.ExternalID, in.ExternalID)
 	setPtr(&item.ReleaseYear, in.ReleaseYear)
 	setPtr(&item.Rating, in.Rating)
 	setPtr(&item.Progress, in.Progress)
@@ -235,6 +239,9 @@ func validate(item *models.MediaItem) error {
 	}
 	if l := item.Length; l != nil && *l < 0 {
 		return invalid("length cannot be negative")
+	}
+	if len(item.Source) > 32 || len(item.ExternalID) > 64 {
+		return invalid("source/external_id too long")
 	}
 	if item.TimesConsumed < 0 {
 		return invalid("times_consumed cannot be negative")

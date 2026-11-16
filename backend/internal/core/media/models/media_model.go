@@ -59,6 +59,9 @@ type MediaItem struct {
 	StartedAt     *time.Time `json:"started_at"`
 	FinishedAt    *time.Time `json:"finished_at"`
 	TimesConsumed int        `json:"times_consumed" gorm:"not null;default:0"` // rewatch/reread count
+	// Where the metadata was looked up from (e.g. "tmdb" + "movie/949"); empty if entered by hand.
+	Source     string `json:"source" gorm:"type:varchar(32)"`
+	ExternalID string `json:"external_id" gorm:"type:varchar(64)"`
 }
 
 func (MediaItem) TableName() string { return "media_items" }

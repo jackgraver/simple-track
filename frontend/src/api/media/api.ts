@@ -62,6 +62,8 @@ export type MediaItem = {
     started_at: string | null;
     finished_at: string | null;
     times_consumed: number;
+    source: string;
+    external_id: string;
 };
 
 /** Fields accepted on create/update. Omit to leave unchanged; null clears. Dates are YYYY-MM-DD. */
@@ -120,4 +122,50 @@ export async function deleteMedia(id: number) {
 export async function getMediaStats() {
     const response = await apiClient.get<{ stats: MediaStats }>("/media/stats");
     return response.data.stats;
+}
+
+/** Media types that have an online lookup source. */
+export const LOOKUP_TYPES: ReadonlySet<MediaType> = new Set<MediaType>([
+    "movie",
+    "tv",
+    "book",
+    "anime",
+    "comic",
+    "album",
+    "podcast",
+]);
+
+export const LOOKUP_SOURCE_LABELS: Record<string, string> = {
+    tmdb: "TMDB",
+    openlibrary: "Open Library",
+    anilist: "AniList",
+    itunes: "Apple",
+};
+
+export type LookupResult = {
+    source: string;
+    external_id: string;
+    title: string;
+    creator: string;
+    release_year: number | null;
+    synopsis: string;
+    genres: string;
+    cover_url: string;
+    length: number | null;
+};
+
+export async function lookupMedia(type: MediaType, q: string) {
+    const response = await apiClient.get<{ results: LookupResult[] }>(
+        "/media/lookup",
+        { params: { type, q } },
+    );
+    return response.data.results;
+}
+
+export async function lookupMediaDetails(source: string, id: string) {
+    const response = await apiClient.get<{ result: LookupResult }>(
+        "/media/lookup/details",
+        { params: { source, id } },
+    );
+    return response.data.result;
 }

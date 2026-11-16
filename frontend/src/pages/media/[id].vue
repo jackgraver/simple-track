@@ -5,11 +5,16 @@ import {
     createMedia,
     deleteMedia,
     getMedia,
+    LOOKUP_SOURCE_LABELS,
+    LOOKUP_TYPES,
+    lookupMedia,
+    lookupMediaDetails,
     MEDIA_STATUS_LABELS,
     MEDIA_STATUSES,
     MEDIA_TYPE_LABELS,
     MEDIA_TYPES,
     updateMedia,
+    type LookupResult,
     type MediaInput,
     type MediaItem,
     type MediaStatus,
@@ -60,10 +65,70 @@ const form = reactive({
     started_at: "",
     finished_at: "",
     times_consumed: "0",
+    source: "",
+    external_id: "",
 });
 
 const unit = computed(() => LENGTH_UNITS[form.type]);
 const coverOk = ref(true);
+
+// --- Online lookup: search the title box, pick a match, fill the form ---
+const canLookup = computed(() => LOOKUP_TYPES.has(form.type));
+const lookupResults = ref<LookupResult[] | null>(null);
+const lookupError = ref("");
+const isLookingUp = ref(false);
+const applyingId = ref<string | null>(null);
+
+function closeLookup() {
+    lookupResults.value = null;
+    lookupError.value = "";
+}
+
+async function runLookup() {
+    const q = form.title.trim();
+    if (!q || !canLookup.value || isLookingUp.value) return;
+    isLookingUp.value = true;
+    lookupError.value = "";
+    try {
+        lookupResults.value = await lookupMedia(form.type, q);
+    } catch (error) {
+        lookupResults.value = [];
+        lookupError.value = getApiErrorMessage(error, "Lookup failed");
+    } finally {
+        isLookingUp.value = false;
+    }
+}
+
+async function applyLookup(result: LookupResult) {
+    if (applyingId.value) return;
+    applyingId.value = result.external_id;
+    try {
+        const d = await lookupMediaDetails(result.source, result.external_id);
+        // Overwrite descriptive fields only; status, rating, thoughts and
+        // dates are yours. Nothing is saved until you press Save.
+        Object.assign(form, {
+            title: d.title || form.title,
+            creator: d.creator || form.creator,
+            release_year: d.release_year?.toString() ?? form.release_year,
+            genres: d.genres || form.genres,
+            cover_url: d.cover_url || form.cover_url,
+            synopsis: d.synopsis || form.synopsis,
+            length: d.length?.toString() ?? form.length,
+            source: d.source,
+            external_id: d.external_id,
+        });
+        coverOk.value = true;
+        closeLookup();
+        toast.push(
+            `Filled in from ${LOOKUP_SOURCE_LABELS[d.source] ?? d.source}. Review and ${isNew.value ? "add" : "save"}.`,
+            "success",
+        );
+    } catch (error) {
+        toast.push(getApiErrorMessage(error, "Failed to load details"), "error");
+    } finally {
+        applyingId.value = null;
+    }
+}
 
 function toForm(item: MediaItem) {
     Object.assign(form, {
@@ -83,6 +148,8 @@ function toForm(item: MediaItem) {
         started_at: item.started_at?.slice(0, 10) ?? "",
         finished_at: item.finished_at?.slice(0, 10) ?? "",
         times_consumed: item.times_consumed.toString(),
+        source: item.source,
+        external_id: item.external_id,
     });
     coverOk.value = true;
 }
@@ -111,6 +178,8 @@ function toPayload(): MediaInput {
         started_at: form.started_at || (isNew.value ? undefined : null),
         finished_at: form.finished_at || (isNew.value ? undefined : null),
         times_consumed: intOrNull(form.times_consumed) ?? 0,
+        source: form.source,
+        external_id: form.external_id,
     };
 }
 
@@ -213,17 +282,55 @@ onMounted(() => void load());
             </aside>
 
             <div class="flex min-w-0 flex-col gap-5">
-                <div class="grid gap-2 sm:grid-cols-[1fr_auto]">
+                <div class="grid grid-cols-[1fr_auto] gap-2 sm:grid-cols-[1fr_auto_auto]">
                     <input
                         v-model="form.title"
                         required
                         placeholder="Title"
-                        class="rounded-md bg-thirdBg px-3 py-2 text-lg font-semibold outline-none"
+                        class="col-span-2 rounded-md bg-thirdBg px-3 py-2 text-lg font-semibold outline-none sm:col-span-1"
                     />
-                    <select v-model="form.type" class="rounded-md bg-thirdBg px-3 py-2 text-sm outline-none">
+                    <select v-model="form.type" class="rounded-md bg-thirdBg px-3 py-2 text-sm outline-none" @change="closeLookup">
                         <option v-for="t in MEDIA_TYPES" :key="t" :value="t">{{ MEDIA_TYPE_LABELS[t] }}</option>
                     </select>
+                    <button
+                        type="button"
+                        class="rounded-md bg-secondBg px-3 py-2 text-sm hover:bg-thirdBg disabled:opacity-50"
+                        :disabled="!form.title.trim() || !canLookup || isLookingUp"
+                        :title="canLookup ? 'Search online for this title and fill in the details' : `No lookup source for ${MEDIA_TYPE_LABELS[form.type]} yet`"
+                        @click="runLookup"
+                    >
+                        {{ isLookingUp ? "Looking up…" : "Look up" }}
+                    </button>
                 </div>
+
+                <section v-if="lookupResults" class="flex flex-col gap-2 rounded-lg bg-secondBg p-3">
+                    <div class="flex items-center justify-between gap-2">
+                        <h2 class="m-0 text-sm font-medium text-textSecondary">
+                            {{ lookupError ? "Lookup failed" : lookupResults.length ? "Pick a match" : "No matches found" }}
+                        </h2>
+                        <button type="button" class="text-sm text-textSecondary hover:underline" @click="closeLookup">Close</button>
+                    </div>
+                    <p v-if="lookupError" class="m-0 text-sm text-(--color-cf-red)">{{ lookupError }}</p>
+                    <button
+                        v-for="r in lookupResults"
+                        :key="r.source + r.external_id"
+                        type="button"
+                        class="flex items-center gap-3 rounded-md p-1.5 text-left hover:bg-thirdBg disabled:opacity-50"
+                        :disabled="applyingId !== null"
+                        @click="applyLookup(r)"
+                    >
+                        <div class="aspect-[2/3] w-10 shrink-0 overflow-hidden rounded bg-thirdBg">
+                            <img v-if="r.cover_url" :src="r.cover_url" alt="" loading="lazy" referrerpolicy="no-referrer" class="h-full w-full object-cover" />
+                        </div>
+                        <div class="min-w-0">
+                            <p class="m-0 truncate text-sm font-medium text-textPrimary">{{ r.title }}</p>
+                            <p class="m-0 truncate text-xs text-textSecondary">
+                                {{ [r.release_year, r.creator].filter(Boolean).join(" · ") || "\u00a0" }}
+                            </p>
+                        </div>
+                        <span v-if="applyingId === r.external_id" class="ml-auto shrink-0 text-xs text-textSecondary">Loading…</span>
+                    </button>
+                </section>
                 <div class="grid gap-2 sm:grid-cols-[1fr_7rem_1fr]">
                     <input v-model="form.creator" placeholder="Creator (director, author…)" class="rounded-md bg-thirdBg px-3 py-2 text-sm outline-none" />
                     <input v-model="form.release_year" type="number" min="0" max="9999" placeholder="Year" class="rounded-md bg-thirdBg px-3 py-2 text-sm outline-none" />

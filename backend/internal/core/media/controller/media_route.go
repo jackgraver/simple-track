@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"time"
 
+	"be-simpletracker/internal/core/media/lookup"
 	"be-simpletracker/internal/core/media/models"
 	"be-simpletracker/internal/core/media/service"
 
@@ -14,15 +15,18 @@ import (
 )
 
 type MediaHandler struct {
-	db *gorm.DB
+	db     *gorm.DB
+	lookup *lookup.Service
 }
 
-func RegisterMediaRoutes(group *gin.RouterGroup, db *gorm.DB) {
-	h := MediaHandler{db: db}
+func RegisterMediaRoutes(group *gin.RouterGroup, db *gorm.DB, lookupService *lookup.Service) {
+	h := MediaHandler{db: db, lookup: lookupService}
 	group.GET("", h.list)
 	group.POST("", h.create)
 	group.GET("/meta", h.meta)
 	group.GET("/stats", h.stats)
+	group.GET("/lookup", h.lookupSearch)
+	group.GET("/lookup/details", h.lookupDetails)
 	group.GET("/:id", h.get)
 	group.PATCH("/:id", h.update)
 	group.DELETE("/:id", h.delete)
@@ -140,4 +144,37 @@ func respondError(c *gin.Context, err error) {
 	default:
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 	}
+}
+
+// lookupSearch returns candidate matches: ?type=movie&q=heat
+func (h *MediaHandler) lookupSearch(c *gin.Context) {
+	results, err := h.lookup.Search(c.Request.Context(), models.MediaType(c.Query("type")), c.Query("q"))
+	if err != nil {
+		respondLookupError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"results": results})
+}
+
+// lookupDetails returns the full record for one match: ?source=tmdb&id=movie/949
+func (h *MediaHandler) lookupDetails(c *gin.Context) {
+	result, err := h.lookup.Details(c.Request.Context(), c.Query("source"), c.Query("id"))
+	if err != nil {
+		respondLookupError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"result": result})
+}
+
+func respondLookupError(c *gin.Context, err error) {
+	status := http.StatusBadGateway
+	switch {
+	case errors.Is(err, lookup.ErrNotConfigured):
+		status = http.StatusServiceUnavailable
+	case errors.Is(err, lookup.ErrUnsupported):
+		status = http.StatusBadRequest
+	case errors.Is(err, lookup.ErrNotFound):
+		status = http.StatusNotFound
+	}
+	c.JSON(status, gin.H{"error": err.Error()})
 }
