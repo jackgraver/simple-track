@@ -19,19 +19,6 @@ var (
 	splitRe         = regexp.MustCompile(`[\n\r,;]+`)
 )
 
-// Words dropped from the front of a line when building a match key, so that
-// "2 lbs ground beef" and "a dozen eggs" match "Ground Beef" and "Eggs".
-var quantityWords = map[string]struct{}{
-	"a": {}, "an": {}, "some": {}, "of": {}, "x": {},
-	"lb": {}, "lbs": {}, "pound": {}, "pounds": {}, "kg": {}, "kgs": {}, "g": {}, "oz": {},
-	"l": {}, "ml": {}, "litre": {}, "litres": {}, "liter": {}, "liters": {},
-	"gallon": {}, "gallons": {}, "gal": {}, "dozen": {}, "doz": {},
-	"pack": {}, "packs": {}, "pk": {}, "bag": {}, "bags": {}, "box": {}, "boxes": {},
-	"can": {}, "cans": {}, "bottle": {}, "bottles": {}, "jar": {}, "jars": {},
-	"carton": {}, "cartons": {}, "loaf": {}, "loaves": {}, "bunch": {}, "bunches": {},
-	"head": {}, "heads": {}, "container": {}, "containers": {}, "tub": {}, "tubs": {},
-}
-
 // ParseList splits free text (e.g. a pasted text message) into cleaned item
 // lines. Lines are split on newlines, commas and semicolons; bullets and
 // numbering are stripped; case-insensitive duplicates are dropped.
@@ -63,59 +50,34 @@ func ParseList(text string) []string {
 }
 
 // matchKey reduces a name to a comparison key: lowercase, punctuation removed,
-// leading quantities/units removed, each word naively singularized.
+// a leading count ("5 apples") removed, each word naively singularized.
 func matchKey(name string) string {
 	var b strings.Builder
 	for _, r := range strings.ToLower(name) {
-		switch {
-		case unicode.IsLetter(r) || unicode.IsDigit(r):
+		if unicode.IsLetter(r) || unicode.IsDigit(r) || r == '%' {
 			b.WriteRune(r)
-		case r == '/' || r == '.' || r == '%':
-			b.WriteRune(r) // keep "1/2", "1.5" intact so they're dropped as quantities
-		default:
+		} else {
 			b.WriteRune(' ')
 		}
 	}
 	words := strings.Fields(b.String())
 
-	// Drop leading quantity tokens ("2", "1/2", "2x", "a", "dozen", "lbs", "of").
-	i := 0
-	for i < len(words)-1 && isQuantityWord(words[i]) {
-		i++
+	if len(words) > 1 && isNumber(words[0]) {
+		words = words[1:]
 	}
-	words = words[i:]
-
-	for j, w := range words {
-		w = strings.Trim(w, "./")
-		words[j] = singularize(w)
+	for i, w := range words {
+		words[i] = singularize(w)
 	}
-	return strings.Join(strings.Fields(strings.Join(words, " ")), " ")
+	return strings.Join(words, " ")
 }
 
-func isQuantityWord(w string) bool {
-	if _, ok := quantityWords[w]; ok {
-		return true
-	}
-	// Numbers, fractions, decimals, "2x", "x2", "500g", "2lb".
-	digits := 0
+func isNumber(w string) bool {
 	for _, r := range w {
-		if unicode.IsDigit(r) {
-			digits++
+		if !unicode.IsDigit(r) {
+			return false
 		}
 	}
-	if digits == 0 {
-		return false
-	}
-	rest := strings.TrimLeft(w, "0123456789./")
-	rest = strings.TrimPrefix(rest, "x")
-	if rest == "" {
-		return true
-	}
-	if strings.HasPrefix(w, "x") && strings.Trim(w[1:], "0123456789") == "" {
-		return true
-	}
-	_, ok := quantityWords[rest]
-	return ok
+	return w != ""
 }
 
 func singularize(w string) string {

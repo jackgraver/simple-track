@@ -10,9 +10,9 @@ import (
 )
 
 func TestParseList(t *testing.T) {
-	text := "Hey can you grab:\n- milk\n* 2 dozen eggs, bread; Bread\n1. bananas\n2) [ ] Peanut butter.\n\n•  avocados  \n"
+	text := "Hey can you grab:\n- milk\n* 12 eggs, bread; Bread\n1. bananas\n2) [ ] Peanut butter.\n\n•  avocados  \n"
 	got := ParseList(text)
-	want := []string{"Hey can you grab", "milk", "2 dozen eggs", "bread", "bananas", "Peanut butter", "avocados"}
+	want := []string{"Hey can you grab", "milk", "12 eggs", "bread", "bananas", "Peanut butter", "avocados"}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("ParseList:\n got %q\nwant %q", got, want)
 	}
@@ -20,15 +20,16 @@ func TestParseList(t *testing.T) {
 
 func TestMatchKey(t *testing.T) {
 	cases := map[string]string{
-		"2 dozen eggs":       "egg",
+		"eggs":               "egg",
 		"Eggs":               "egg",
-		"2 lbs ground beef":  "ground beef",
-		"a bag of potatoes":  "potato",
+		"5 apples":           "apple",
+		"12 Eggs":            "egg",
+		"ground beef":        "ground beef",
+		"potatoes":           "potato",
 		"Strawberries":       "strawberry",
-		"500g pasta":         "pasta",
 		"hummus":             "hummus",
-		"x2 Greek yogurt":    "greek yogurt",
 		"2% milk":            "2% milk",
+		"7up":                "7up",
 		"Peanut Butter (PB)": "peanut butter pb",
 	}
 	for in, want := range cases {
@@ -46,10 +47,10 @@ func TestMatchLines(t *testing.T) {
 		{Name: "Almond Milk", Count: 2},
 		{Name: "Milk", Count: 8},
 	}
-	lines := []string{"2 dozen eggs", "bannanas", "ground beef", "milk", "dragonfruit", "egg"}
+	lines := []string{"12 eggs", "bannanas", "ground beef", "milk", "dragonfruit", "egg"}
 	got := MatchLines(lines, known, []string{"Milk"})
 	want := []ParsedLine{
-		{Input: "2 dozen eggs", Name: "Eggs", Matched: true},
+		{Input: "12 eggs", Name: "Eggs", Matched: true},
 		{Input: "bannanas", Name: "Banana", Matched: true},
 		{Input: "ground beef", Name: "Ground Beef", Matched: true},
 		{Input: "milk", Name: "Milk", Matched: true, OnList: true},

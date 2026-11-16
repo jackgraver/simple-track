@@ -104,7 +104,7 @@ function onTextKeydown(event: KeyboardEvent) {
                 ref="textArea"
                 v-model="text"
                 rows="8"
-                placeholder="milk&#10;2 dozen eggs&#10;bananas, bread"
+                placeholder="milk&#10;eggs&#10;5 apples, bread"
                 class="w-full resize-y rounded-md border border-zinc-600 bg-zinc-900 px-3 py-2 text-base text-zinc-100 outline-none focus:border-zinc-400"
                 @keydown="onTextKeydown"
             />
