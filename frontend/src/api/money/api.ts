@@ -1,147 +1,166 @@
 import { apiClient } from "~/api/client";
+import type {
+    Account,
+    AccountBalance,
+    AccountSettings,
+    AccountTransaction,
+    ContributionPreset,
+    ContributionType,
+    ContributionTypeSettings,
+    NetWorthPoint,
+    TransactionKind,
+} from "./types";
 
-export type ContributionRule = {
-    ID: number;
-    investment_account_type_id: number;
-    year: number;
-    annual_limit: number;
-};
+// ---- Accounts ----
 
-export type ContributionStatus = {
-    year: number;
-    annual_limit: number;
-    contributed: number;
-    remaining: number;
-};
-
-export type ContributionRoom = {
-    eligible_from_year: number;
-    earned_room: number;
-    contributed: number;
-    remaining: number;
-};
-
-export type InvestmentAccountType = {
-    ID: number;
-    name: string;
-    contribution_start_year?: number;
-    rules?: ContributionRule[];
-    contribution_status: ContributionStatus[];
-    contribution_room?: ContributionRoom;
-};
-
-export type InvestmentAccount = {
-    ID: number;
-    name: string;
-    investment_account_type_id?: number;
-    investment_account_type?: InvestmentAccountType;
-    current_balance: number;
-    total_deposits: number;
-    profit: number;
-    contribution_status: ContributionStatus[];
-    contribution_room?: ContributionRoom;
-};
-
-export type InvestmentDeposit = {
-    ID: number;
-    account_id: number;
-    amount: number;
-    date: string;
-};
-
-export async function listInvestmentAccounts() {
-    const response = await apiClient.get<{ accounts: InvestmentAccount[] }>(
-        "/money/investments",
+export async function fetchAccounts(includeArchived = false) {
+    const { data } = await apiClient.get<{ accounts: Account[] }>(
+        "/money/accounts",
+        { params: includeArchived ? { archived: "true" } : undefined },
     );
-    return response.data.accounts;
+    return data.accounts;
 }
 
-export async function createInvestmentAccount(payload: {
-    name: string;
-    investment_account_type_id?: number;
-    current_balance: number;
-}) {
-    await apiClient.post("/money/investments", payload);
+export async function fetchAccount(accountId: number) {
+    const { data } = await apiClient.get<{ account: Account }>(
+        `/money/accounts/${accountId}`,
+    );
+    return data.account;
 }
 
-export async function updateInvestmentAccount(
-    accountId: number,
-    payload: { name?: string; current_balance?: number },
+export async function createAccount(
+    payload: AccountSettings & {
+        opening_balance?: number | null;
+        balance_date?: string;
+    },
 ) {
-    await apiClient.patch(`/money/investments/${accountId}`, payload);
-}
-
-export async function deleteInvestmentAccount(accountId: number) {
-    await apiClient.delete(`/money/investments/${accountId}`);
-}
-
-export async function listInvestmentAccountTypes() {
-    const response = await apiClient.get<{
-        account_types: InvestmentAccountType[];
-    }>("/money/investments/account-types");
-    return response.data.account_types;
-}
-
-export async function createInvestmentAccountType(payload: {
-    name: string;
-    contribution_start_year?: number;
-}) {
-    await apiClient.post("/money/investments/account-types", payload);
-}
-
-export async function updateInvestmentAccountType(
-    accountTypeId: number,
-    payload: { name: string; contribution_start_year?: number },
-) {
-    await apiClient.patch(
-        `/money/investments/account-types/${accountTypeId}`,
+    const { data } = await apiClient.post<{ account: Account }>(
+        "/money/accounts",
         payload,
     );
+    return data.account;
 }
 
-export async function deleteInvestmentAccountType(accountTypeId: number) {
-    await apiClient.delete(`/money/investments/account-types/${accountTypeId}`);
+export async function updateAccount(accountId: number, payload: AccountSettings) {
+    await apiClient.put(`/money/accounts/${accountId}`, payload);
 }
 
-export async function listInvestmentDeposits(accountId: number) {
-    const response = await apiClient.get<{ deposits: InvestmentDeposit[] }>(
-        `/money/investments/${accountId}/deposits`,
+export async function deleteAccount(accountId: number) {
+    await apiClient.delete(`/money/accounts/${accountId}`);
+}
+
+// ---- Balances ----
+
+export async function fetchBalances(accountId: number) {
+    const { data } = await apiClient.get<{ balances: AccountBalance[] }>(
+        `/money/accounts/${accountId}/balances`,
     );
-    return response.data.deposits;
+    return data.balances;
 }
 
-export async function createInvestmentDeposit(
+export async function setBalance(
     accountId: number,
-    payload: { amount: number; date: string },
+    payload: { balance: number; date: string },
 ) {
-    await apiClient.post(`/money/investments/${accountId}/deposits`, payload);
+    await apiClient.put(`/money/accounts/${accountId}/balances`, payload);
 }
 
-export async function deleteInvestmentDeposit(
+export async function setBalances(payload: {
+    date: string;
+    balances: { account_id: number; balance: number }[];
+}) {
+    await apiClient.put("/money/balances", payload);
+}
+
+export async function deleteBalance(accountId: number, balanceId: number) {
+    await apiClient.delete(`/money/accounts/${accountId}/balances/${balanceId}`);
+}
+
+export async function fetchNetWorthHistory() {
+    const { data } = await apiClient.get<{ points: NetWorthPoint[] }>(
+        "/money/net-worth/history",
+    );
+    return data.points;
+}
+
+// ---- Transactions ----
+
+export async function fetchTransactions(accountId: number) {
+    const { data } = await apiClient.get<{ transactions: AccountTransaction[] }>(
+        `/money/accounts/${accountId}/transactions`,
+    );
+    return data.transactions;
+}
+
+export async function createTransaction(
     accountId: number,
-    depositId: number,
+    payload: { kind: TransactionKind; amount: number; date: string; note: string },
 ) {
+    await apiClient.post(`/money/accounts/${accountId}/transactions`, payload);
+}
+
+export async function deleteTransaction(accountId: number, transactionId: number) {
     await apiClient.delete(
-        `/money/investments/${accountId}/deposits/${depositId}`,
+        `/money/accounts/${accountId}/transactions/${transactionId}`,
     );
 }
 
-export async function upsertContributionRule(
-    accountTypeId: number,
+// ---- Contribution types ----
+
+export async function fetchContributionTypes() {
+    const { data } = await apiClient.get<{
+        contribution_types: ContributionType[];
+        birth_year: number | null;
+    }>("/money/contribution-types");
+    return data;
+}
+
+export async function fetchContributionPresets() {
+    const { data } = await apiClient.get<{ presets: ContributionPreset[] }>(
+        "/money/contribution-types/presets",
+    );
+    return data.presets;
+}
+
+export async function createContributionTypeFromPreset(payload: {
+    key: string;
+    name?: string;
+    start_year?: number | null;
+    opening_room_year?: number | null;
+    opening_room?: number | null;
+}) {
+    await apiClient.post("/money/contribution-types/presets", payload);
+}
+
+export async function createContributionType(payload: ContributionTypeSettings) {
+    await apiClient.post("/money/contribution-types", payload);
+}
+
+export async function updateContributionType(
+    id: number,
+    payload: ContributionTypeSettings,
+) {
+    await apiClient.put(`/money/contribution-types/${id}`, payload);
+}
+
+export async function deleteContributionType(id: number) {
+    await apiClient.delete(`/money/contribution-types/${id}`);
+}
+
+export async function upsertContributionLimit(
+    id: number,
     year: number,
     annualLimit: number,
 ) {
-    await apiClient.put(
-        `/money/investments/account-types/${accountTypeId}/contribution-rules/${year}`,
-        { annual_limit: annualLimit },
-    );
+    await apiClient.put(`/money/contribution-types/${id}/limits/${year}`, {
+        annual_limit: annualLimit,
+    });
 }
 
-export async function deleteContributionRule(
-    accountTypeId: number,
-    year: number,
-) {
-    await apiClient.delete(
-        `/money/investments/account-types/${accountTypeId}/contribution-rules/${year}`,
-    );
+export async function deleteContributionLimit(id: number, year: number) {
+    await apiClient.delete(`/money/contribution-types/${id}/limits/${year}`);
+}
+
+export async function saveBirthYear(birthYear: number) {
+    await apiClient.patch("/auth/me", { birth_year: birthYear });
 }
