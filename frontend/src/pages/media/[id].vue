@@ -137,8 +137,9 @@ async function save() {
             await router.replace({ name: "media-detail", params: { id: item.ID } });
             toForm(item);
         } else {
-            toForm(await updateMedia(itemId.value, toPayload()));
+            await updateMedia(itemId.value, toPayload());
             toast.push("Saved", "success");
+            await router.push({ name: "media" });
         }
     } catch (error) {
         toast.push(getApiErrorMessage(error, "Failed to save"), "error");
