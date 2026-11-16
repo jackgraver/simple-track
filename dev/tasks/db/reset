@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+#MISE description="Wipe the dev database volume (destructive)"
+set -euo pipefail
+read -rp "This deletes ALL data in simpletracker_dev. Type RESET to continue: " ans
+[[ "$ans" == RESET ]] || { echo "cancelled"; exit 0; }
+docker compose rm -sf postgres-dev
+docker volume rm "${COMPOSE_PROJECT_NAME:?run via dev db:reset}_postgres_data_dev" 2>/dev/null || true
+echo "Dev DB wiped. It will be recreated on next 'dev' (backend re-runs AutoMigrate)."

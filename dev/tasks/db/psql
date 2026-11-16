@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+#MISE description="Open a psql shell on the dev database"
+exec docker compose exec postgres-dev psql -U postgres -d simpletracker_dev "$@"

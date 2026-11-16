@@ -19,8 +19,9 @@ function redirectAfterSignIn() {
 }
 
 const isLoginMode = ref(true);
-const username = ref("");
-const password = ref("");
+// Vite dev server only: prefill the local dev account (created by `dev`, see cmd/devuser).
+const username = ref(import.meta.env.DEV ? "dev" : "");
+const password = ref(import.meta.env.DEV ? "dev" : "");
 const email = ref("");
 const isLoading = ref(false);
 const error = ref("");

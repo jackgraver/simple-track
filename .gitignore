@@ -87,3 +87,5 @@ MD/
 .cursor/
 
 test-api/
+# Local dev toggles (dev off <svc>)
+dev/.disabled

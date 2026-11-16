@@ -1,0 +1,17 @@
+# Vite dev server, http://localhost:$DEV_FRONTEND_PORT (3000 in the main checkout); proxies /api -> backend
+version: "0.5"
+processes:
+  frontend:
+    working_dir: frontend
+    # Reinstall deps only when package-lock.json changed since the last install.
+    command: |
+      [ node_modules/.package-lock.json -nt package-lock.json ] || npm install
+      exec npm run dev -- --port ${DEV_FRONTEND_PORT} --strictPort
+    readiness_probe:
+      http_get:
+        host: 127.0.0.1
+        port: ${DEV_FRONTEND_PORT}
+        path: /
+      initial_delay_seconds: 2
+      period_seconds: 2
+      failure_threshold: 150

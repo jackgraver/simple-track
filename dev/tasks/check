@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+#MISE description="Vet backend and type-check frontend"
+set -euo pipefail
+(cd backend && go vet ./...)
+(cd frontend && npm run type-check)

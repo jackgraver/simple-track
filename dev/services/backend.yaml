@@ -1,0 +1,19 @@
+# Go API with live reload (air), http://localhost:$DEV_BACKEND_PORT (8080 in the main checkout)
+version: "0.5"
+processes:
+  backend:
+    working_dir: backend
+    command: air
+    depends_on:
+      postgres:
+        condition: process_healthy
+    readiness_probe:
+      http_get:
+        host: 127.0.0.1
+        port: ${DEV_BACKEND_PORT}
+        path: /health
+      initial_delay_seconds: 2
+      period_seconds: 2
+      failure_threshold: 90
+    availability:
+      restart: on_failure

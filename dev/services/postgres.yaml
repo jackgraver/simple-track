@@ -1,0 +1,15 @@
+# Dev database (docker compose service `postgres-dev`, localhost:5432).
+version: "0.5"
+processes:
+  postgres:
+    command: docker compose up postgres-dev
+    shutdown:
+      command: docker compose stop postgres-dev
+    readiness_probe:
+      exec:
+        command: docker compose exec -T postgres-dev pg_isready -U postgres -d simpletracker_dev
+      initial_delay_seconds: 1
+      period_seconds: 2
+      failure_threshold: 30
+    availability:
+      restart: on_failure

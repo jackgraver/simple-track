@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+#MISE description="Run backend and frontend tests"
+set -euo pipefail
+(cd backend && go test ./...)
+(cd frontend && npm run test:run)

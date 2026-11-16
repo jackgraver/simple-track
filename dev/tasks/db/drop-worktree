@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+#MISE description="Remove this worktree's postgres container and volume (not allowed in the main checkout)"
+set -euo pipefail
+[[ "${DEV_SLOT:-0}" != 0 ]] || { echo "refusing: this is the main checkout (slot 0)"; exit 1; }
+docker compose down -v

@@ -1,0 +1,167 @@
+#!/usr/bin/env bash
+# simple-track dev entrypoint. Each checkout/worktree gets its own ports, DB and
+# process-compose instance (see dev/env.sh).
+#
+#   dev                  start everything in the TUI (attaches if already running)
+#   dev start [proc...]  start in the background and wait until ready (for agents/CI)
+#   dev stop             stop the background stack
+#   dev status           process list for this checkout
+#   dev logs <proc> [n]  last n (default 100) log lines of a process
+#   dev attach           open the TUI on a background stack
+#   dev env              print this checkout's slot, ports and URLs
+#   dev api <path> [curl args]   curl the backend, authenticated as the dev user
+#   dev off|on <svc>     disable/enable a service file locally
+#   dev ls               list services and tasks
+#   dev <task> [args]    run a task from dev/tasks (e.g. `dev db:psql`)
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+# Works without `mise activate`: re-run inside mise's environment so the pinned
+# tools (process-compose, air, node, pgweb) are on PATH.
+if [[ -z "${_DEV_IN_MISE:-}" ]] && ! command -v process-compose >/dev/null; then
+  command -v mise >/dev/null || { echo "dev: mise is required (https://mise.jdx.dev)" >&2; exit 1; }
+  mise install -q -C "$ROOT" >&2 || true
+  _DEV_IN_MISE=1 exec mise exec -C "$ROOT" -- "$0" "$@"
+fi
+SERVICES="$ROOT/dev/services"
+DISABLED="$ROOT/dev/.disabled"   # gitignored, one service name per line
+cd "$ROOT"
+# shellcheck source=../dev/env.sh
+source "$ROOT/dev/env.sh"
+
+pc() { process-compose -U "$@"; }
+is_running() { [[ -S "$PC_SOCKET_PATH" ]] && pc project state >/dev/null 2>&1; }
+is_disabled() { [[ -f "$DISABLED" ]] && grep -qxF "$1" "$DISABLED"; }
+
+service_files() {
+  local f name
+  for f in "$SERVICES"/*.yaml; do
+    name="$(basename "$f" .yaml)"
+    is_disabled "$name" || printf -- '-f\n%s\n' "$f"
+  done
+}
+
+env_get() { sed -n "s/^$1=//p" backend/.env | tail -1; }
+
+bootstrap() {
+  if ! command -v process-compose >/dev/null; then
+    echo "dev: tools missing, running 'mise install'..." >&2
+    mise install
+  fi
+  # First run (also in fresh worktrees): create backend/.env from the example.
+  if [[ ! -f backend/.env ]]; then
+    echo "dev: creating backend/.env from backend/.env.example" >&2
+    cp backend/.env.example backend/.env
+  fi
+  if [[ -z "$(env_get JWT_SECRET)" ]]; then
+    sed -i "s|^JWT_SECRET=.*|JWT_SECRET=$(openssl rand -hex 32)|" backend/.env
+  fi
+  # Random token for the cookie auth bypass (`dev api`, e2e). Dev-only: the
+  # backend refuses DEV_AUTH_TOKEN / ALLOW_BYPASS in production.
+  if [[ -z "$(env_get DEV_AUTH_TOKEN)" ]]; then
+    sed -i "s|^DEV_AUTH_TOKEN=.*|DEV_AUTH_TOKEN=$(openssl rand -hex 24)|" backend/.env
+  fi
+  # A stale socket from a crashed run would make process-compose refuse to start.
+  if [[ -S "$PC_SOCKET_PATH" ]] && ! is_running; then rm -f "$PC_SOCKET_PATH"; fi
+}
+
+print_env() {
+  cat <<EOF
+slot      $DEV_SLOT ($COMPOSE_PROJECT_NAME)
+frontend  $DEV_FRONTEND_URL
+backend   $DEV_BACKEND_URL
+pgweb     http://localhost:$DEV_PGWEB_PORT
+postgres  $DATABASE_URL
+login     dev / dev
+EOF
+}
+
+cmd="${1:-up}"
+[[ $# -gt 0 ]] && shift
+case "$cmd" in
+  up)
+    bootstrap
+    if is_running; then exec process-compose attach -U; fi
+    mapfile -t files < <(service_files)
+    exec process-compose -U up "${files[@]}" "$@"
+    ;;
+  start)
+    bootstrap
+    if ! is_running; then
+      mapfile -t files < <(service_files)
+      pc up -D "${files[@]}" "$@" >/dev/null
+      # The socket appears a moment after the detached server forks.
+      for _ in $(seq 1 50); do is_running && break; sleep 0.2; done
+    fi
+    if ! timeout 300 process-compose -U project is-ready --wait >/dev/null 2>&1; then
+      echo "dev: stack did not become ready; see 'dev status' and 'dev logs <proc>'" >&2
+      pc process list 2>/dev/null >&2 || true
+      exit 1
+    fi
+    # is-ready only covers readiness probes; also wait for one-shot processes
+    # (no probe, e.g. devuser) to finish, and fail if one exited non-zero.
+    for _ in $(seq 1 300); do
+      state="$(pc process list -o json | python3 -c '
+import json, sys
+ps = json.load(sys.stdin)
+failed = [p["name"] for p in ps if p["status"] == "Completed" and p.get("exit_code", 0) != 0]
+waiting = [p["name"] for p in ps if p["status"] in ("Pending", "Launching", "Restarting")
+           or (p["status"] == "Running" and p.get("is_ready") == "-")]
+print("failed " + " ".join(failed) if failed else "waiting" if waiting else "ok")')"
+      [[ "$state" == waiting ]] || break
+      sleep 1
+    done
+    if [[ "$state" != ok ]]; then
+      echo "dev: ${state:-timed out waiting for one-shot processes}; see 'dev logs <proc>'" >&2
+      exit 1
+    fi
+    print_env
+    ;;
+  stop|down)
+    if is_running; then pc down; else echo "dev: not running (slot $DEV_SLOT)"; fi
+    ;;
+  status)
+    if is_running; then pc process list -o wide; else echo "dev: not running (slot $DEV_SLOT)"; fi
+    ;;
+  logs)
+    proc="${1:?usage: dev logs <proc> [lines]}"
+    pc process logs "$proc" -n "${2:-100}"
+    ;;
+  attach)
+    exec process-compose attach -U
+    ;;
+  env)
+    print_env
+    ;;
+  api)
+    path="${1:?usage: dev api <path> [curl args]}"
+    shift
+    exec curl -sS -b "auth_token=$(env_get DEV_AUTH_TOKEN)" "$@" "$DEV_BACKEND_URL$path"
+    ;;
+  off|on)
+    svc="${1:?usage: dev $cmd <service>}"
+    [[ -f "$SERVICES/$svc.yaml" ]] || { echo "dev: no service '$svc'" >&2; exit 1; }
+    touch "$DISABLED"
+    grep -vxF "$svc" "$DISABLED" > "$DISABLED.tmp" || true
+    mv "$DISABLED.tmp" "$DISABLED"
+    [[ "$cmd" == off ]] && echo "$svc" >> "$DISABLED"
+    echo "dev: $svc $([[ $cmd == off ]] && echo disabled || echo enabled)"
+    ;;
+  ls)
+    echo "Services (dev/services):"
+    for f in "$SERVICES"/*.yaml; do
+      n="$(basename "$f" .yaml)"
+      printf '  %-12s %s\n' "$n" "$(is_disabled "$n" && echo '(off)' || echo '')"
+    done
+    echo
+    echo "Tasks (dev/tasks) — run with: dev <task>"
+    mise tasks ls
+    ;;
+  -h|--help|help)
+    sed -n '2,17p' "$0" | sed 's/^# \{0,1\}//'
+    ;;
+  *)
+    exec mise run "$cmd" "$@"
+    ;;
+esac

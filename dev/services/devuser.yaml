@@ -1,0 +1,9 @@
+# One-shot: ensure the local login dev/dev exists (after the backend has migrated the schema).
+version: "0.5"
+processes:
+  devuser:
+    working_dir: backend
+    command: go run ./cmd/devuser
+    depends_on:
+      backend:
+        condition: process_healthy
