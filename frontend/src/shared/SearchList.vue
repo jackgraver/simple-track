@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { searchListKeys } from "~/shared/searchListKeys";
 import { Plus, Loader } from "lucide-vue-next";
 import { computed, nextTick, onMounted, ref, watch } from "vue";
 import type { Component } from "vue";
@@ -42,7 +41,7 @@ const { data, isPending, error, refetch } = useQuery({
     queryKey: computed(() =>
         props.queryKey !== undefined
             ? [...props.queryKey]
-            : searchListKeys.path(requestPath.value),
+            : (["searchList", requestPath.value] as const),
     ),
     queryFn: async () => {
         const res = await apiClient.get<unknown>(requestPath.value);

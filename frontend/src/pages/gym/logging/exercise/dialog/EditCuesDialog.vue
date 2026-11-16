@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { getApiErrorMessage } from "~/api/httpError";
 import { ref } from "vue";
 import { Exercise } from "~/types/workout";
 import { apiPUT } from "~/api/client";
@@ -28,7 +27,7 @@ const saveCues = async () => {
 
         props.onResolve?.(nextCues);
     } catch (err: unknown) {
-        const message = getApiErrorMessage(err, "Something went wrong");
+        const message = err instanceof Error ? err.message : String(err);
         toast.push(message, "error");
     } finally {
         submitting.value = false;

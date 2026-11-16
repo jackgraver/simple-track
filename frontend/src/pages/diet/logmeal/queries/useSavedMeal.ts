@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/vue-query';
 import { computed, type Ref } from 'vue';
 import { getSavedMealById } from '~/api/diet/api';
-import { dietKeys } from '~/api/diet/keys';
+import { logmealKeys } from './keys';
 
 export function useSavedMeal(id: Ref<number | null> | number | null) {
     const savedMealId = computed(() => {
@@ -17,8 +17,8 @@ export function useSavedMeal(id: Ref<number | null> | number | null) {
     );
     const queryKey = computed(() =>
         savedMealId.value
-            ? dietKeys.savedMeals.detail(savedMealId.value)
-            : dietKeys.savedMeals.detail(0),
+            ? logmealKeys.savedMeals.detail(savedMealId.value)
+            : ['logmeal', 'saved-meals', 'null'],
     );
     return useQuery({
         queryKey,

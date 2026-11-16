@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { getApiErrorMessage } from "~/api/httpError";
 import type { MobilityLogged } from "~/types/workout";
 import LoggingHeader from "./LoggingHeader.vue";
 import { ref, watch, computed } from "vue";
@@ -67,9 +66,9 @@ const toggle = async (name: string) => {
         } else {
             await props.savePreMobility([...next]);
         }
-    } catch (err) {
+    } catch (err: any) {
         localChecked.value = previous;
-        toast.push(getApiErrorMessage(err, "Failed to save"), "error");
+        toast.push(err.message || "Failed to save", "error");
     }
 };
 

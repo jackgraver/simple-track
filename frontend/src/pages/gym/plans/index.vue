@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { getApiErrorMessage } from "~/api/httpError";
 import type { WorkoutPlan } from "~/types/workout";
 import { toast } from "~/composables/toast/useToast";
 import { dialogManager } from "~/composables/dialog/useDialog";
@@ -73,7 +72,7 @@ const promptCreateDay = async (dayOfWeek: number | null = null) => {
         await refresh();
         toast.push(`Created ${name.trim()}`, "success");
     } catch (err: unknown) {
-        const message = getApiErrorMessage(err, "Something went wrong");
+        const message = err instanceof Error ? err.message : String(err);
         toast.push("Failed to create day: " + message, "error");
     }
 };
@@ -197,7 +196,7 @@ const assignPlanToDay = async (plan: WorkoutPlan, dayOfWeek: number) => {
         );
         await refresh();
     } catch (err: unknown) {
-        const message = getApiErrorMessage(err, "Something went wrong");
+        const message = err instanceof Error ? err.message : String(err);
         toast.push("Failed to assign day: " + message, "error");
     }
 };
@@ -214,7 +213,7 @@ const unassignPlanFromDay = async (plan: WorkoutPlan, dayOfWeek: number) => {
         );
         await refresh();
     } catch (err: unknown) {
-        const message = getApiErrorMessage(err, "Something went wrong");
+        const message = err instanceof Error ? err.message : String(err);
         toast.push("Failed to unassign day: " + message, "error");
     }
 };

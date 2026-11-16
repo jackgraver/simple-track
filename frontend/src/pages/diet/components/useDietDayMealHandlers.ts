@@ -2,11 +2,11 @@ import type { Meal } from "~/types/diet";
 import { toast } from "~/composables/toast/useToast";
 import { dialogManager } from "~/composables/dialog/useDialog";
 import { useRouter } from "vue-router";
+import { useDietLogsToday } from "~/pages/home/queries/useDietLogsToday";
 import {
-    useDietLogsToday,
     useLogPlannedMeal,
     useDeleteLoggedMeal,
-} from "~/api/diet/queries";
+} from "~/pages/home/queries/useMealMutations";
 import { LOG_TYPE, EDIT_TYPE, EDIT_LOGGED_TYPE } from "~/pages/diet/logmeal/logmealMode";
 import { withDietDayOffsetQuery } from "~/utils/dateUtil";
 import { mealHasQuickEntryFood } from "~/utils/dietMealQuickLog";

@@ -9,8 +9,8 @@ import {
     useWeightLogs,
 } from "~/api/tracking/queries";
 import { toast } from "~/composables/toast/useToast";
-import { dietKeys } from "~/api/diet/keys";
-import { useDietLogsToday } from "~/api/diet/queries";
+import { homeKeys } from "~/pages/home/queries/keys";
+import { useDietLogsToday } from "~/pages/home/queries/useDietLogsToday";
 import MacroSlidersPanel from "./components/MacroSlidersPanel.vue";
 import TDEECalculator from "./components/TDEECalculator.vue";
 import { useMacroSliders } from "./useMacroSliders";
@@ -83,7 +83,7 @@ const saveMutation = useMutation({
         });
     },
     onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: dietKeys.days.all });
+        queryClient.invalidateQueries({ queryKey: homeKeys.diet.all });
         toast.push("Macro targets saved", "success");
         router.push({ name: "diet" });
     },

@@ -164,12 +164,6 @@ const routes: RouteRecordRaw[] = [
         component: () => import("~/pages/settings/profile/index.vue"),
         meta: { breadcrumb: "Profile" },
     },
-    {
-        path: "/:pathMatch(.*)*",
-        name: "not-found",
-        component: () => import("~/pages/not-found/index.vue"),
-        meta: { hideDateAndBreadcrumbs: true },
-    },
 ];
 
 export const router = createRouter({

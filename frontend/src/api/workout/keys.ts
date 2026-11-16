@@ -34,12 +34,3 @@ export const liveworkoutKeys = {
             [...liveworkoutKeysBase.all, 'exercises', 'paginated', search] as const,
     },
 } as const;
-
-export const workoutKeys = {
-    plans: {
-        all: ['workout', 'plans'] as const,
-        list: () => ['workout', 'plans', 'all'] as const,
-    },
-    programs: ['workout', 'programs'] as const,
-    exercisesAll: ['workout', 'exercises', 'all'] as const,
-} as const;

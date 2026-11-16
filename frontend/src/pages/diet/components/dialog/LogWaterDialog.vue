@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { getApiErrorMessage } from "~/api/httpError";
+import axios from "axios";
 import { computed, ref } from "vue";
 import { useRouter } from "vue-router";
 import type { DrinkSizePreset } from "~/api/tracking/types";
@@ -31,7 +31,19 @@ async function logPreset(p: DrinkSizePreset) {
         toast.push("Logged", "success");
         props.onResolve?.(true);
     } catch (err: unknown) {
-        toast.push(getApiErrorMessage(err, "Failed to log"), "error");
+        let msg = "Failed to log";
+        if (
+            axios.isAxiosError(err) &&
+            err.response?.data &&
+            typeof err.response.data === "object" &&
+            "error" in err.response.data
+        ) {
+            const e0 = (err.response.data as { error?: string }).error;
+            if (e0) msg = e0;
+        } else if (err instanceof Error) {
+            msg = err.message;
+        }
+        toast.push(msg, "error");
     }
 }
 
@@ -52,7 +64,19 @@ async function submitCustom() {
         customInput.value = "";
         props.onResolve?.(true);
     } catch (err: unknown) {
-        toast.push(getApiErrorMessage(err, "Failed to log"), "error");
+        let msg = "Failed to log";
+        if (
+            axios.isAxiosError(err) &&
+            err.response?.data &&
+            typeof err.response.data === "object" &&
+            "error" in err.response.data
+        ) {
+            const e0 = (err.response.data as { error?: string }).error;
+            if (e0) msg = e0;
+        } else if (err instanceof Error) {
+            msg = err.message;
+        }
+        toast.push(msg, "error");
     }
 }
 

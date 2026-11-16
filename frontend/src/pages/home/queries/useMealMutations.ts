@@ -1,6 +1,5 @@
 import {
     useMutation,
-    useQuery,
     useQueryClient,
     type QueryClient,
 } from '@tanstack/vue-query';
@@ -11,28 +10,14 @@ import {
     deletePlannedMeal,
     addPlannedMealFromSaved,
     reorderPlannedMeals,
-    getDietLogsToday,
-} from './api';
-import { dietKeys } from './keys';
+} from '~/api/diet/api';
+import { homeKeys } from './keys';
 import type { Meal } from '~/types/diet';
-import { computed, toValue, type MaybeRefOrGetter } from 'vue';
-
-export function useDietLogsToday(offset: MaybeRefOrGetter<number>) {
-    return useQuery(
-        computed(() => {
-            const o = toValue(offset);
-            return {
-                queryKey: dietKeys.days.day(o),
-                queryFn: () => getDietLogsToday(o),
-                staleTime: 1000 * 60 * 2,
-            };
-        }),
-    );
-}
+import { toValue, type MaybeRefOrGetter } from 'vue';
 
 function invalidateMonthPlannedSummaries(queryClient: QueryClient) {
     queryClient.invalidateQueries({
-        queryKey: dietKeys.days.monthPlannedSummaryAll,
+        queryKey: homeKeys.diet.monthPlannedSummaryPrefix,
     });
 }
 
@@ -43,7 +28,7 @@ export function useLogPlannedMeal(offset: MaybeRefOrGetter<number>) {
         mutationFn: (mealId: number) => logPlannedMeal(mealId),
         onSuccess: (day) => {
             queryClient.setQueryData(
-                dietKeys.days.day(toValue(offset)),
+                homeKeys.diet.today(toValue(offset)),
                 day,
             );
             invalidateMonthPlannedSummaries(queryClient);
@@ -59,7 +44,7 @@ export function useDeleteLoggedMeal(offset: MaybeRefOrGetter<number>) {
             deleteLoggedMeal(mealId, dayId),
         onSuccess: (day) => {
             queryClient.setQueryData(
-                dietKeys.days.day(toValue(offset)),
+                homeKeys.diet.today(toValue(offset)),
                 day,
             );
         },
@@ -81,7 +66,7 @@ export function useEditLoggedMeal(offset: MaybeRefOrGetter<number>) {
         }) => editLoggedMeal(meal, oldMealId, { dayId }),
         onSuccess: (day) => {
             queryClient.setQueryData(
-                dietKeys.days.day(toValue(offset)),
+                homeKeys.diet.today(toValue(offset)),
                 day,
             );
         },
@@ -96,7 +81,7 @@ export function useDeletePlannedMeal(offset: MaybeRefOrGetter<number>) {
             deletePlannedMeal(plannedMealId, toValue(offset)),
         onSuccess: () => {
             queryClient.invalidateQueries({
-                queryKey: dietKeys.days.day(toValue(offset)),
+                queryKey: homeKeys.diet.today(toValue(offset)),
             });
             invalidateMonthPlannedSummaries(queryClient);
         },
@@ -111,7 +96,7 @@ export function useAddPlannedFromSaved(offset: MaybeRefOrGetter<number>) {
             addPlannedMealFromSaved(savedMealId, toValue(offset)),
         onSuccess: () => {
             queryClient.invalidateQueries({
-                queryKey: dietKeys.days.day(toValue(offset)),
+                queryKey: homeKeys.diet.today(toValue(offset)),
             });
             invalidateMonthPlannedSummaries(queryClient);
         },
@@ -126,7 +111,7 @@ export function useReorderPlannedMeals(offset: MaybeRefOrGetter<number>) {
             reorderPlannedMeals(plannedMealIds, toValue(offset)),
         onSuccess: () => {
             queryClient.invalidateQueries({
-                queryKey: dietKeys.days.day(toValue(offset)),
+                queryKey: homeKeys.diet.today(toValue(offset)),
             });
             invalidateMonthPlannedSummaries(queryClient);
         },

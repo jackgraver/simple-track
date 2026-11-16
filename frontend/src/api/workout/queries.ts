@@ -2,7 +2,8 @@ import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tansta
 import { computed, toValue, type MaybeRefOrGetter } from 'vue';
 import { apiDELETE, apiGET, apiPOST } from '~/api/client';
 import { activateWorkoutProgram, createWorkoutPlan, createWorkoutProgram, getWorkoutPrograms, renameWorkoutProgram, switchWorkoutPlan, type WorkoutActivityResponse, WorkoutLogsPreviousResponse } from '~/api/workout/api';
-import { liveworkoutKeys, workoutKeys } from '~/api/workout/keys';
+import { liveworkoutKeys } from '~/api/workout/keys';
+import { homeKeys } from '~/pages/home/queries/keys';
 import type { Cardio, Exercise, LoggedExercise, MobilityLogged, WorkoutPlan } from '~/types/workout';
 
 export type WorkoutActivityQueryOpts = {
@@ -10,6 +11,8 @@ export type WorkoutActivityQueryOpts = {
     weeks: number | null;
     days: number | null;
 };
+
+export const workoutExercisesAllQueryKey = ['workout', 'exercises', 'all'] as const;
 
 export function normalizeExercisesListPayload(value: unknown): Exercise[] {
     if (!value) return [];
@@ -32,7 +35,7 @@ export async function fetchWorkoutExercisesAll(): Promise<unknown> {
 
 export function useWorkoutExercisesAllQuery(enabled: MaybeRefOrGetter<boolean> = true) {
     return useQuery({
-        queryKey: workoutKeys.exercisesAll,
+        queryKey: workoutExercisesAllQueryKey,
         queryFn: fetchWorkoutExercisesAll,
         enabled: computed(() => toValue(enabled)),
     });
@@ -98,25 +101,38 @@ export function useWorkoutLogsPrevious(offset: MaybeRefOrGetter<number> = 0) {
     );
 }
 
+export function useHomeWorkoutLogsPrevious(offset: number) {
+    return useQuery({
+        queryKey: homeKeys.workouts.previous(offset),
+        queryFn: () =>
+            apiGET<WorkoutLogsPreviousResponse>('/workout/logs/previous', {
+                params: { offset },
+            }),
+        staleTime: 1000 * 60 * 2,
+    });
+}
+
 export function useWorkoutPlansAll() {
     return useQuery({
-        queryKey: workoutKeys.plans.list(),
+        queryKey: ['workout', 'plans', 'all'] as const,
         queryFn: () => apiGET<{ plans: WorkoutPlan[] }>('/workout/plans/all'),
         staleTime: 1000 * 60 * 10,
     });
 }
 
+export const workoutProgramsQueryKey = ['workout', 'programs'] as const;
+
 export function useWorkoutPrograms() {
     return useQuery({
-        queryKey: workoutKeys.programs,
+        queryKey: workoutProgramsQueryKey,
         queryFn: getWorkoutPrograms,
         staleTime: 1000 * 60 * 10,
     });
 }
 
 function invalidateWorkoutPrograms(queryClient: ReturnType<typeof useQueryClient>) {
-    queryClient.invalidateQueries({ queryKey: workoutKeys.programs });
-    queryClient.invalidateQueries({ queryKey: workoutKeys.plans.all });
+    queryClient.invalidateQueries({ queryKey: workoutProgramsQueryKey });
+    queryClient.invalidateQueries({ queryKey: ['workout', 'plans'] });
 }
 
 export function useCreateWorkoutProgram() {
@@ -169,6 +185,9 @@ export function useSwitchWorkoutPlan(offset: MaybeRefOrGetter<number> = 0) {
             });
             queryClient.invalidateQueries({
                 queryKey: liveworkoutKeys.workouts.day(currentOffset),
+            });
+            queryClient.invalidateQueries({
+                queryKey: homeKeys.workouts.previous(currentOffset),
             });
         },
     });

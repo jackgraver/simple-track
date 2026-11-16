@@ -24,16 +24,16 @@ import type {
     SavedMeal,
     SavedMealItem,
 } from "~/types/diet";
+import { useDietLogsToday } from "~/pages/home/queries/useDietLogsToday";
 import {
-    useDietLogsToday,
     useAddPlannedFromSaved,
     useDeletePlannedMeal,
     useReorderPlannedMeals,
-} from "~/api/diet/queries";
+} from "~/pages/home/queries/useMealMutations";
 import { useDeleteSavedMeal } from "~/pages/diet/logmeal/queries/useMealMutations";
 import { toast } from "~/composables/toast/useToast";
 import SimpleMacros from "~/shared/SimpleMacros.vue";
-import { dietKeys } from "~/api/diet/keys";
+import { homeKeys } from "~/pages/home/queries/keys";
 import {
     dateAtDietDayOffset,
     dietDayOffsetFromLocalDate,
@@ -170,7 +170,7 @@ const dietMonthOffset = computed(() => {
 });
 const { data: monthPlannedCounts, isPending: monthPlannedPending } = useQuery({
     queryKey: computed(() =>
-        dietKeys.days.monthPlannedSummary(dietMonthOffset.value),
+        homeKeys.diet.monthPlannedSummary(dietMonthOffset.value),
     ),
     queryFn: () => getMonthPlannedSummary(dietMonthOffset.value),
     staleTime: 1000 * 60 * 2,
@@ -245,7 +245,7 @@ const {
     isPending: savedPending,
     error: savedError,
 } = useQuery({
-    queryKey: dietKeys.savedMeals.list(),
+    queryKey: ["savedMeals", "all"],
     queryFn: () =>
         apiClient
             .get<{ saved_meals: SavedMeal[] }>("/diet/meals/saved-meal/all")
@@ -401,29 +401,27 @@ async function saveBulkRange() {
     }
     bulkSaving.value = true;
     try {
-        // Days are independent, so run them in parallel; meals within a day
-        // stay sequential to preserve the chosen order.
-        const results = await Promise.allSettled(
-            offsets.map(async (off) => {
-                for (const mealId of mealIds) {
-                    await addPlannedMealFromSaved(mealId, off);
-                }
-            }),
-        );
-        const failedDays = results.filter((r) => r.status === "rejected").length;
-        if (failedDays === 0) {
-            toast.push(
-                `Added ${mealIds.length} meal(s) across ${offsets.length} day(s)`,
-                "success",
-            );
-        } else {
-            toast.push(
-                `Could not apply range (${failedDays} of ${offsets.length} day(s) failed)`,
-                "error",
-            );
+        for (const off of offsets) {
+            for (const mealId of mealIds) {
+                await addPlannedMealFromSaved(mealId, off);
+            }
         }
+        for (const off of offsets) {
+            await queryClient.invalidateQueries({
+                queryKey: homeKeys.diet.today(off),
+            });
+        }
+        await queryClient.invalidateQueries({
+            queryKey: homeKeys.diet.monthPlannedSummaryPrefix,
+        });
+        toast.push(
+            `Added ${mealIds.length} meal(s) across ${offsets.length} day(s)`,
+            "success",
+        );
+    } catch {
+        toast.push("Could not apply range", "error");
+        await queryClient.invalidateQueries({ queryKey: ["home", "diet"] });
     } finally {
-        await queryClient.invalidateQueries({ queryKey: dietKeys.days.all });
         bulkSaving.value = false;
     }
 }

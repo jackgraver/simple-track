@@ -1,4 +1,3 @@
-import { getApiErrorMessage } from "~/api/httpError";
 import type { ComputedRef, Ref } from "vue";
 import type { Meal } from "~/types/diet";
 import { toast } from "~/composables/toast/useToast";
@@ -54,7 +53,7 @@ export function useLogMealSubmit(options: {
             resetAfterDraftSubmit();
         } catch (error: unknown) {
             const message =
-                getApiErrorMessage(error, "Something went wrong");
+                error instanceof Error ? error.message : String(error);
             toast.push("Log meal failed! " + message, "error");
         }
     }
@@ -80,7 +79,7 @@ export function useLogMealSubmit(options: {
             resetAfterDraftSubmit();
         } catch (error: unknown) {
             const message =
-                getApiErrorMessage(error, "Something went wrong");
+                error instanceof Error ? error.message : String(error);
             toast.push("Could not save meal. " + message, "error");
         }
     }
@@ -101,7 +100,7 @@ export function useLogMealSubmit(options: {
             toast.push("Meal Logged Successfully!", "success");
         } catch (error: unknown) {
             const message =
-                getApiErrorMessage(error, "Something went wrong");
+                error instanceof Error ? error.message : String(error);
             toast.push("Log Edited Failed! " + message, "error");
         }
     }
@@ -118,7 +117,7 @@ export function useLogMealSubmit(options: {
             toast.push("Meal Updated Successfully!", "success");
         } catch (error: unknown) {
             const message =
-                getApiErrorMessage(error, "Something went wrong");
+                error instanceof Error ? error.message : String(error);
             toast.push("Update Failed! " + message, "error");
         }
     }
@@ -145,7 +144,7 @@ export function useLogMealSubmit(options: {
             toast.push("Saved meal updated!", "success");
         } catch (error: unknown) {
             const message =
-                getApiErrorMessage(error, "Something went wrong");
+                error instanceof Error ? error.message : String(error);
             toast.push("Could not update saved meal. " + message, "error");
         }
     }
