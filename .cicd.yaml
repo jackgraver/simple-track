@@ -1,0 +1,28 @@
+name: simple-track
+timeout: 20m
+steps:
+  - name: backend-vet
+    run: go vet ./...
+    dir: backend
+  - name: backend-test
+    run: go test ./...
+    dir: backend
+  - name: frontend-install
+    run: mise exec node@22 -- npm ci --no-audit --no-fund
+    dir: frontend
+  - name: frontend-test
+    run: mise exec node@22 -- npx vitest run
+    dir: frontend
+images:
+  - name: backend
+    repository: ghcr.io/jackgraver/simple-track-backend
+    dockerfile: backend/Dockerfile
+    context: backend
+  - name: frontend
+    repository: ghcr.io/jackgraver/simple-track-frontend
+    dockerfile: frontend/Dockerfile
+    context: frontend
+deploy:
+  host: st-vps
+  command: /usr/local/bin/j-cicd-agent
+  timeout: 10m
