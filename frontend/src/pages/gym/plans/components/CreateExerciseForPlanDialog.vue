@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { searchListKeys } from "~/shared/searchListKeys";
+import { getApiErrorMessage } from "~/api/httpError";
 import type { Exercise, ExerciseLoadType } from "~/types/workout";
 import { DEFAULT_EXERCISE_LOAD_TYPE } from "~/types/workout";
 import { toast } from "~/composables/toast/useToast";
@@ -36,10 +38,10 @@ const submit = async () => {
         );
         const exercise = createRes.data.exercise;
         toast.push(`Created ${exercise.name}`, "success");
-        await queryClient.invalidateQueries({ queryKey: ["searchList"] });
+        await queryClient.invalidateQueries({ queryKey: searchListKeys.all });
         props.onResolve?.(true);
     } catch (err: unknown) {
-        const message = err instanceof Error ? err.message : String(err);
+        const message = getApiErrorMessage(err, "Something went wrong");
         toast.push(message, "error");
     } finally {
         submitting.value = false;

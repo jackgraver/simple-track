@@ -2,6 +2,8 @@ import { useMutation, useQueryClient } from '@tanstack/vue-query';
 import { createFood } from '~/api/diet/food';
 import type { Food } from '~/types/diet';
 import { toast } from '~/composables/toast/useToast';
+import { getApiErrorMessage } from '~/api/httpError';
+import { searchListKeys } from '~/shared/searchListKeys';
 
 export function useCreateFood() {
     const queryClient = useQueryClient();
@@ -9,11 +11,11 @@ export function useCreateFood() {
         mutationFn: (vars: { food: Food; relatedFoodId?: number }) =>
             createFood(vars.food, vars.relatedFoodId),
         onSuccess: () => {
-            void queryClient.invalidateQueries({ queryKey: ["searchList"] });
+            void queryClient.invalidateQueries({ queryKey: searchListKeys.all });
             toast.push("Food Created Successfully!", "success");
         },
-        onError: (error: any) => {
-            toast.push("Create Food Failed! " + (error.message || ""), "error");
+        onError: (error) => {
+            toast.push(getApiErrorMessage(error, "Create food failed"), "error");
         },
     });
 }

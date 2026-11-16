@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import axios from "axios";
+import { getApiErrorMessage } from "~/api/httpError";
 import { computed, ref } from "vue";
 import type { WaterLog } from "~/api/tracking/types";
 import { useDeleteWater, useWaterLogs } from "~/api/tracking/queries";
@@ -45,20 +45,6 @@ const sortedLogs = computed(() =>
     [...(logs.value ?? [])].sort((a, b) => createdMs(a) - createdMs(b)),
 );
 
-function errMsg(err: unknown): string {
-    if (
-        axios.isAxiosError(err) &&
-        err.response?.data &&
-        typeof err.response.data === "object" &&
-        "error" in err.response.data
-    ) {
-        const e0 = (err.response.data as { error?: string }).error;
-        if (e0) return e0;
-    }
-    if (err instanceof Error) return err.message;
-    return "Failed to delete";
-}
-
 async function removeLog(log: WaterLog) {
     if (deletingId.value != null || deleteMutation.isPending.value) return;
     deletingId.value = log.ID;
@@ -66,7 +52,7 @@ async function removeLog(log: WaterLog) {
         await deleteMutation.mutateAsync({ id: log.ID, date: props.dateStr });
         toast.push("Removed", "success");
     } catch (err: unknown) {
-        toast.push(errMsg(err), "error");
+        toast.push(getApiErrorMessage(err, "Failed to delete"), "error");
     } finally {
         deletingId.value = null;
     }

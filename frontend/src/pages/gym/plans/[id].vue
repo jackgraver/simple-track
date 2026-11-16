@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { getApiErrorMessage } from "~/api/httpError";
 import type { WorkoutPlan, Exercise } from "~/types/workout";
 import { toast } from "~/composables/toast/useToast";
 import { dialogManager } from "~/composables/dialog/useDialog";
@@ -9,21 +10,12 @@ import MobilityItemEditor from "~/pages/gym/plans/components/MobilityItemEditor.
 import { X, Plus, ChevronUp, ChevronDown, Pencil } from "lucide-vue-next";
 import { computed, ref, watch } from "vue";
 import { useRoute } from "vue-router";
-import { apiPUT } from "~/api/client";
-import { useQuery } from "@tanstack/vue-query";
-import { apiClient } from "~/api/client";
+import { apiClient, apiPUT } from "~/api/client";
+import { useWorkoutPlansAll } from "~/api/workout/queries";
 
 const route = useRoute();
 
-const { data, isPending, refetch } = useQuery({
-    queryKey: ["workout", "plans", "all"],
-    queryFn: async () => {
-        const res = await apiClient.get<{ plans: WorkoutPlan[] }>(
-            "/workout/plans/all",
-        );
-        return res.data;
-    },
-});
+const { data, isPending, refetch } = useWorkoutPlansAll();
 
 const plans = computed(() => data.value?.plans || []);
 const refresh = () => refetch();
@@ -88,7 +80,7 @@ const savePlannedCardio = async () => {
         toast.push("Planned cardio saved", "success");
         await refresh();
     } catch (err: unknown) {
-        const message = err instanceof Error ? err.message : String(err);
+        const message = getApiErrorMessage(err, "Something went wrong");
         toast.push("Failed to save planned cardio: " + message, "error");
     }
 };
@@ -105,7 +97,7 @@ const savePlannedMobility = async () => {
         toast.push("Mobility plan saved", "success");
         await refresh();
     } catch (err: unknown) {
-        const message = err instanceof Error ? err.message : String(err);
+        const message = getApiErrorMessage(err, "Something went wrong");
         toast.push("Failed to save mobility plan: " + message, "error");
     } finally {
         mobilitySaving.value = false;
@@ -139,7 +131,7 @@ const removeExerciseFromPlan = async (p: WorkoutPlan, exercise: Exercise) => {
         toast.push(`Removed ${exercise.name} from ${p.name}`, "success");
         await refresh();
     } catch (err: unknown) {
-        const message = err instanceof Error ? err.message : String(err);
+        const message = getApiErrorMessage(err, "Something went wrong");
         toast.push("Failed to remove exercise: " + message, "error");
     }
 };
@@ -244,7 +236,7 @@ const assignPlanToDay = async (p: WorkoutPlan, dayOfWeek: number) => {
         toast.push(`Assigned ${p.name} to ${dayNames[dayOfWeek]}`, "success");
         await refresh();
     } catch (err: unknown) {
-        const message = err instanceof Error ? err.message : String(err);
+        const message = getApiErrorMessage(err, "Something went wrong");
         toast.push("Failed to assign day: " + message, "error");
     }
 };
@@ -261,7 +253,7 @@ const unassignPlanFromDay = async (p: WorkoutPlan, dayOfWeek: number) => {
         );
         await refresh();
     } catch (err: unknown) {
-        const message = err instanceof Error ? err.message : String(err);
+        const message = getApiErrorMessage(err, "Something went wrong");
         toast.push("Failed to unassign day: " + message, "error");
     }
 };
@@ -287,7 +279,7 @@ const moveExerciseInPlan = async (
         toast.push("Exercise order updated", "success");
         await refresh();
     } catch (err: unknown) {
-        const message = err instanceof Error ? err.message : String(err);
+        const message = getApiErrorMessage(err, "Something went wrong");
         toast.push("Failed to reorder: " + message, "error");
     }
 };

@@ -19,29 +19,12 @@ const displayMaxP = computed(() => Math.max(1, maxP.value));
 const displayMaxC = computed(() => Math.max(1, maxC.value));
 const displayMaxF = computed(() => Math.max(1, maxF.value));
 
-const proteinFromWeight = computed(() =>
-    props.sliders.proteinGramsFromGPerLb(
-        props.weightLbs,
-        props.sliders.proteinGPerLb.value,
-    ),
-);
-
 const fatFromWeight = computed(() =>
     props.sliders.fatGramsFromGPerLb(
         props.weightLbs,
         props.sliders.fatGPerLb.value,
     ),
 );
-
-const proteinWeightHint = computed(() => {
-    if (props.weightLbs <= 0) return "Log body weight to use g/lb";
-    return `${proteinFromWeight.value}g at ${props.weightLbs} lbs`;
-});
-
-const fatWeightHint = computed(() => {
-    if (props.weightLbs <= 0) return "Log body weight to use g/lb";
-    return `${fatFromWeight.value}g at ${props.weightLbs} lbs`;
-});
 
 const proteinMarkers = computed(() => {
     const w = props.weightLbs;
@@ -76,10 +59,6 @@ const fatMarkers = computed(() => {
     return [...markers].filter((g) => g > 0).sort((a, b) => a - b);
 });
 
-const macroCalories = computed(() =>
-    Math.round(props.sliders.macroCaloriesTotal.value),
-);
-
 const calorieDeltaLabel = computed(() => {
     const delta = props.sliders.calorieDelta.value;
     if (delta === 0) return "matches target";
@@ -93,43 +72,8 @@ const calorieDeltaClass = computed(() => {
     return "text-red-400/90";
 });
 
-const carbsNeedsFill = computed(
-    () => props.sliders.carbsG.value !== props.sliders.suggestedCarbsG.value,
-);
-
-const chartData = computed(() => {
-    const p = props.sliders.proteinG.value;
-    const c = props.sliders.carbsG.value;
-    const f = props.sliders.fatG.value;
-    return {
-        labels: ["Protein", "Carbs", "Fat"],
-        datasets: [
-            {
-                data: [4 * p, 4 * c, 9 * f],
-                backgroundColor: ["#60a5fa", "#ef4444", "#a855f7"],
-                borderWidth: 0,
-            },
-        ],
-    };
-});
-
-const chartOptions = computed(() => ({
-    plugins: { legend: { display: false } },
-    maintainAspectRatio: false,
-}));
-
 function onFiberInput(e: Event) {
     props.sliders.setFiberG(Number((e.target as HTMLInputElement).value) || 0);
-}
-
-function onProteinMultiplierInput(e: Event) {
-    props.sliders.proteinGPerLb.value =
-        Number((e.target as HTMLInputElement).value) || 0;
-}
-
-function onFatMultiplierInput(e: Event) {
-    props.sliders.fatGPerLb.value =
-        Number((e.target as HTMLInputElement).value) || 0;
 }
 
 function applyProteinFromWeight() {
@@ -138,10 +82,6 @@ function applyProteinFromWeight() {
 
 function applyFatFromWeight() {
     props.sliders.applyFatFromBodyWeight(props.weightLbs);
-}
-
-function fillRemainingCarbs() {
-    props.sliders.fillCarbsFromRemaining();
 }
 </script>
 

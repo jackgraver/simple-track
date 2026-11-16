@@ -9,7 +9,7 @@ import Input from "~/shared/input/Input.vue";
 import { computed, nextTick, watch } from "vue";
 import { useMeal } from "./queries/useMeal";
 import { useSavedMeal } from "./queries/useSavedMeal";
-import { useDietLogsToday } from "~/pages/home/queries/useDietLogsToday";
+import { useDietLogsToday } from "~/api/diet/queries";
 import MacroBars from "~/pages/diet/components/MacroBars.vue";
 import { savedMealToMeal } from "~/utils/savedMealToMeal";
 import {
