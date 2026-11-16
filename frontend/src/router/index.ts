@@ -144,10 +144,20 @@ const routes: RouteRecordRaw[] = [
         meta: { breadcrumb: "Finances" },
     },
     {
+        path: "/finances/accounts/:id(\\d+)",
+        name: "finance-account",
+        component: () => import("~/pages/finances/account.vue"),
+        meta: { breadcrumb: "Account" },
+    },
+    {
+        path: "/finances/rules",
+        name: "finance-rules",
+        component: () => import("~/pages/finances/rules.vue"),
+        meta: { breadcrumb: "Contribution room" },
+    },
+    {
         path: "/finances/config",
-        name: "finance-config",
-        component: () => import("~/pages/finances/config.vue"),
-        meta: { breadcrumb: "Finance configuration" },
+        redirect: { name: "finance-rules" },
     },
     {
         path: "/finance",
