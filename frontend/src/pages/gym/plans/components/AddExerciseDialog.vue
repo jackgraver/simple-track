@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { searchListKeys } from "~/shared/searchListKeys";
+import { getApiErrorMessage } from "~/api/httpError";
 import type { WorkoutPlan, Exercise } from "~/types/workout";
 import SearchList from "~/shared/SearchList.vue";
 import { toast } from "~/composables/toast/useToast";
@@ -22,7 +24,7 @@ const addExerciseToPlan = async (exercise: Exercise): Promise<boolean> => {
         props.onResolve?.(true);
         return true;
     } catch (err: unknown) {
-        const message = err instanceof Error ? err.message : String(err);
+        const message = getApiErrorMessage(err, "Something went wrong");
         toast.push("Failed to add exercise: " + message, "error");
         return false;
     }
@@ -38,10 +40,10 @@ const createExercise = async (name: string) => {
             cues: "",
         });
         toast.push(`Created exercise: ${name}`, "success");
-        await queryClient.invalidateQueries({ queryKey: ["searchList"] });
+        await queryClient.invalidateQueries({ queryKey: searchListKeys.all });
         return true;
     } catch (err: unknown) {
-        const message = err instanceof Error ? err.message : String(err);
+        const message = getApiErrorMessage(err, "Something went wrong");
         toast.push("Failed to create exercise: " + message, "error");
         return false;
     }

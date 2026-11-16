@@ -11,20 +11,26 @@ import {
     type QuickLogPayload,
     type SavedMealItemPayload,
 } from '~/api/diet/api';
-import { logmealKeys } from './keys';
-import { homeKeys } from '~/pages/home/queries/keys';
+import { dietKeys } from '~/api/diet/keys';
+import { searchListKeys } from '~/shared/searchListKeys';
 import { parseDietDayOffsetQuery } from '~/utils/dateUtil';
 import type { Meal } from '~/types/diet';
 import { useRouter } from 'vue-router';
 
-function invalidateDietQueries(
-    queryClient: ReturnType<typeof useQueryClient>,
-) {
-    queryClient.invalidateQueries({ queryKey: homeKeys.diet.all });
-    queryClient.invalidateQueries({ queryKey: ['savedMeals'] });
+type QueryClient = ReturnType<typeof useQueryClient>;
+
+const SAVED_MEALS_SEARCH_PATH = '/diet/meals/saved-meal/all';
+
+function invalidateSavedMeals(queryClient: QueryClient) {
+    queryClient.invalidateQueries({ queryKey: dietKeys.savedMeals.all });
     queryClient.invalidateQueries({
-        queryKey: ['searchList', '/diet/meals/saved-meal/all'],
+        queryKey: searchListKeys.path(SAVED_MEALS_SEARCH_PATH),
     });
+}
+
+function invalidateDietQueries(queryClient: QueryClient) {
+    queryClient.invalidateQueries({ queryKey: dietKeys.days.all });
+    invalidateSavedMeals(queryClient);
 }
 
 function afterMealLogNavigate(router: ReturnType<typeof useRouter>) {
@@ -62,10 +68,7 @@ export function useCreateSavedMeal() {
         mutationFn: (payload: { name: string; items: SavedMealItemPayload[] }) =>
             createSavedMeal(payload),
         onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['savedMeals'] });
-            queryClient.invalidateQueries({
-                queryKey: ['searchList', '/diet/meals/saved-meal/all'],
-            });
+            invalidateSavedMeals(queryClient);
         },
     });
 }
@@ -78,9 +81,6 @@ export function useDeleteSavedMeal() {
             deleteSavedMeal(vars.savedMealId, { force: vars.force }),
         onSuccess: () => {
             invalidateDietQueries(queryClient);
-            queryClient.invalidateQueries({
-                queryKey: homeKeys.diet.monthPlannedSummaryPrefix,
-            });
         },
     });
 }
@@ -92,7 +92,7 @@ export function useCreateCompositeFood() {
         mutationFn: (payload: { name: string; items: { food_id: number; amount: number }[] }) =>
             createCompositeFood(payload),
         onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['searchList'] });
+            queryClient.invalidateQueries({ queryKey: searchListKeys.all });
         },
     });
 }
@@ -179,12 +179,9 @@ export function useUpdateSavedMeal() {
             }),
         onSuccess: (_data, variables) => {
             queryClient.invalidateQueries({
-                queryKey: logmealKeys.savedMeals.detail(variables.savedMealId),
+                queryKey: dietKeys.savedMeals.detail(variables.savedMealId),
             });
-            queryClient.invalidateQueries({ queryKey: ['savedMeals'] });
-            queryClient.invalidateQueries({
-                queryKey: ['searchList', '/diet/meals/saved-meal/all'],
-            });
+            invalidateSavedMeals(queryClient);
         },
     });
 }

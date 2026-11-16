@@ -2,6 +2,7 @@
 import { ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useAuth } from "~/composables/auth/useAuth";
+import { getApiErrorMessage } from "~/api/httpError";
 import { toast } from "~/composables/toast/useToast";
 import Input from "~/shared/input/Input.vue";
 
@@ -42,19 +43,12 @@ const handleSubmit = async () => {
             toast.push("Registration successful!", "success");
             await router.push(redirectAfterSignIn());
         }
-    } catch (err: any) {
-        error.value = err.message || "An error occurred";
+    } catch (err) {
+        error.value = getApiErrorMessage(err, "An error occurred");
         toast.push(error.value, "error");
     } finally {
         isLoading.value = false;
     }
-};
-
-const toggleMode = () => {
-    isLoginMode.value = !isLoginMode.value;
-    error.value = "";
-    password.value = "";
-    email.value = "";
 };
 </script>
 
@@ -147,17 +141,6 @@ const toggleMode = () => {
                     }}
                 </button>
             </form>
-
-            <!-- <div class="toggle-mode">
-                <span>{{
-                    isLoginMode
-                        ? "Don't have an account?"
-                        : "Already have an account?"
-                }}</span>
-                <button type="button" @click="toggleMode" class="toggle-button">
-                    {{ isLoginMode ? "Sign Up" : "Sign In" }}
-                </button>
-            </div> -->
         </div>
     </div>
 </template>
@@ -215,29 +198,5 @@ const toggleMode = () => {
 .submit-button:disabled {
     opacity: 0.6;
     cursor: not-allowed;
-}
-
-.toggle-mode {
-    margin-top: 1.5rem;
-    padding-top: 1.5rem;
-    border-top: 1px solid rgb(56, 56, 56);
-    text-align: center;
-    color: rgb(150, 150, 150);
-    font-size: 0.9rem;
-}
-
-.toggle-button {
-    margin-left: 0.5rem;
-    background: none;
-    border: none;
-    color: rgb(100, 150, 255);
-    cursor: pointer;
-    text-decoration: underline;
-    font-size: 0.9rem;
-    padding: 0;
-}
-
-.toggle-button:hover {
-    color: rgb(150, 200, 255);
 }
 </style>
