@@ -1,4 +1,7 @@
 name: simple-track
+# Release branch: every run builds a clean checkout of main's latest commit,
+# whatever is checked out or uncommitted in the working directory.
+branch: main
 timeout: 20m
 steps:
   - name: backend-vet
