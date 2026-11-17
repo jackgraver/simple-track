@@ -40,8 +40,8 @@ Never run bare `./bin/dev` (it opens an interactive TUI). Use the background com
   `POST <frontend>/api/auth/login` with that account.
 - `dev api` uses the `DEV_AUTH_TOKEN` cookie bypass from `backend/.env` (`ALLOW_BYPASS` is
   forced on by `dev/env.sh`; the backend rejects both in production).
-- A fresh worktree starts with an empty DB: the schema is created by the backend's
-  AutoMigrate, and there's no sample data. `dev db:drop-worktree` removes a worktree's DB.
+- A fresh worktree starts with an empty DB: the one-shot `migrate` service applies every
+  migration before the backend starts, and there's no sample data. `dev db:drop-worktree` removes a worktree's DB.
 
 ### Layout (plug-and-play)
 
@@ -62,5 +62,19 @@ same as the backend.
 
 - Backend config: `backend/.env` (created by `dev` from `.env.example` with random secrets).
   Env vars exported by `dev/env.sh` take precedence over it.
-- `cmd/devuser` creates or resets the dev login and refuses to run in production. `cmd/migration` is unfinished.
-- `dev db:reset`, `dev db:drop-worktree` and `dev seed` are destructive to dev data.
+- `cmd/devuser` creates or resets the dev login and refuses to run in production.
+- `dev db:reset` and `dev db:drop-worktree` are destructive to dev data.
+
+### Database migrations
+
+The schema lives only in `backend/migrations/NNNN_name.sql` (no GORM AutoMigrate). Format and
+rules are documented in `backend/internal/migrate/file.go`. The files are embedded into the
+server, which refuses to start while any are pending, and into `cmd/migrate`, which applies them.
+
+- `./bin/dev migrate new <name>` creates the next file. Fill in `-- migrate:up` and
+  `-- migrate:down` (or `-- migrate:down irreversible`).
+- `./bin/dev migrate up | down [n] | redo | status | check`.
+- Never edit a migration that has been applied anywhere but your dev DB. Write a new one instead.
+  In dev, `migrate redo` re-runs the latest one after you've edited it.
+- Tests for `internal/migrate` need `TEST_DATABASE_URL` (`dev test` sets it). Module tests
+  still build their schema with AutoMigrate on SQLite.

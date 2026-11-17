@@ -3,7 +3,6 @@ package media
 import (
 	"be-simpletracker/internal/core/media/controller"
 	"be-simpletracker/internal/core/media/lookup"
-	"be-simpletracker/internal/core/media/models"
 	"be-simpletracker/internal/env"
 
 	"github.com/gin-gonic/gin"
@@ -16,10 +15,6 @@ type Handler struct {
 
 func NewHandler(db *gorm.DB) *Handler {
 	return &Handler{db: db}
-}
-
-func (h *Handler) Migrate() error {
-	return h.db.AutoMigrate(&models.MediaItem{})
 }
 
 func (h *Handler) RegisterRoutes(router *gin.Engine, authMiddleware gin.HandlerFunc) {

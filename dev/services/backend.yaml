@@ -5,8 +5,8 @@ processes:
     working_dir: backend
     command: air
     depends_on:
-      postgres:
-        condition: process_healthy
+      migrate:
+        condition: process_completed_successfully
     readiness_probe:
       http_get:
         host: 127.0.0.1

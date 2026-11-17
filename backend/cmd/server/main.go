@@ -9,7 +9,10 @@ import (
 	workout "be-simpletracker/internal/core/workout"
 	"be-simpletracker/internal/database"
 	"be-simpletracker/internal/env"
+	"be-simpletracker/internal/migrate"
 	"be-simpletracker/internal/utils"
+	"be-simpletracker/migrations"
+	"context"
 	"fmt"
 	"log"
 	"strings"
@@ -61,15 +64,12 @@ func main() {
 	if err != nil {
 		log.Fatalf("database: %v", err)
 	}
-	if err := workout.Migrate(db); err != nil {
-		panic(err)
-	}
-	if err := auth.Migrate(db); err != nil {
-		panic(err)
+	if err := checkSchema(db); err != nil {
+		log.Fatalf("database schema: %v", err)
 	}
 
 	CreateFeatures(db, router)
-	// Last, after every migration: see healthHandler.
+	// Last, after the schema check: see healthHandler.
 	router.GET("/health", healthHandler(db))
 
 	addr := env.StringOr("LISTEN_ADDR", "0.0.0.0:8080")
@@ -88,6 +88,23 @@ func splitString(s, sep string) []string {
 	return result
 }
 
+// checkSchema refuses to start against a database that is missing migrations
+// this binary was built with. Migrations are applied separately by
+// cmd/migrate (deploy step, or the `migrate` dev service).
+func checkSchema(db *gorm.DB) error {
+	sqlDB, err := db.DB()
+	if err != nil {
+		return err
+	}
+	m, err := migrate.New(sqlDB, migrations.FS, log.Printf)
+	if err != nil {
+		return err
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	return m.Check(ctx)
+}
+
 func CreateFeatures(db *gorm.DB, router *gin.Engine) {
 	auth.RegisterRoutes(router)
 
@@ -98,20 +115,11 @@ func CreateFeatures(db *gorm.DB, router *gin.Engine) {
 	workout.RegisterRoutes(router, authMW)
 
 	trackingHandler := tracking.NewHandler(db)
-	if err := trackingHandler.Migrate(); err != nil {
-		panic(err)
-	}
 	trackingHandler.RegisterRoutes(router, authMW)
 
 	moneyHandler := money.NewHandler(db)
-	if err := moneyHandler.Migrate(); err != nil {
-		panic(err)
-	}
 	moneyHandler.RegisterRoutes(router, authMW)
 
 	mediaHandler := media.NewHandler(db)
-	if err := mediaHandler.Migrate(); err != nil {
-		panic(err)
-	}
 	mediaHandler.RegisterRoutes(router, authMW)
 }

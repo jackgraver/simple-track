@@ -1,0 +1,11 @@
+# One-shot: apply pending SQL migrations before the backend starts. Afterwards,
+# new migrations are applied on request with `dev migrate up` (the backend
+# refuses to start while any are pending).
+version: "0.5"
+processes:
+  migrate:
+    working_dir: backend
+    command: go run ./cmd/migrate up
+    depends_on:
+      postgres:
+        condition: process_healthy

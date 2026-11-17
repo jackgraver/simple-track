@@ -2,12 +2,10 @@ package auth
 
 import (
 	"be-simpletracker/internal/core/auth/controller"
-	"be-simpletracker/internal/core/auth/models"
 	"be-simpletracker/internal/core/auth/services"
 	"be-simpletracker/internal/env"
 
 	"github.com/gin-gonic/gin"
-	"gorm.io/gorm"
 )
 
 func RegisterRoutes(router *gin.Engine) {
@@ -42,8 +40,4 @@ func RegisterRoutes(router *gin.Engine) {
 			controller.UpdateCurrentUser(c, service)
 		})
 	}
-}
-
-func Migrate(db *gorm.DB) error {
-	return db.AutoMigrate(&models.User{})
 }

@@ -4,7 +4,7 @@ tmp_dir = "tmp"
 [build]
   cmd = "go build -o ./tmp/main.exe ./cmd/server"
   bin = "tmp/main.exe"
-  include_ext = ["go"]
+  include_ext = ["go", "sql"]
   exclude_dir = ["tmp", "vendor", "node_modules"]
   include_file = [".env"]
   delay = 1000

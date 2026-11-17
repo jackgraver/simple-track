@@ -6,6 +6,8 @@ bin/
 coverage/
 *.db
 *.sql
+# ...except migrations, which are embedded into the binaries.
+!migrations/*.sql
 database/dumps/
 api/gin.log
 *.log

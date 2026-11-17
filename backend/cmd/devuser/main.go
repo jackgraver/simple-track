@@ -12,7 +12,6 @@ import (
 	"fmt"
 	"os"
 
-	"be-simpletracker/internal/core/auth"
 	"be-simpletracker/internal/core/auth/models"
 	"be-simpletracker/internal/database"
 	"be-simpletracker/internal/env"
@@ -40,9 +39,6 @@ func run() error {
 
 	db, err := database.ConnectToPostgres()
 	if err != nil {
-		return err
-	}
-	if err := auth.Migrate(db); err != nil {
 		return err
 	}
 

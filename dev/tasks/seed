@@ -1,4 +1,0 @@
-#!/usr/bin/env bash
-#MISE description="Seed the dev database (drops workout tables first)"
-#MISE dir="{{config_root}}/backend"
-exec go run ./cmd/seed "$@"

@@ -1,8 +1,0 @@
--- Something new
--- v.001
--- 08/18/2026
-
-CREATE TABLE user (
-    tre VARCHAR(15) PRIMARY KEY,
-    dadasdasd TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-);

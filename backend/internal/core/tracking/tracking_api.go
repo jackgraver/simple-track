@@ -20,17 +20,6 @@ func NewHandler(db *gorm.DB) *Handler {
 	return &Handler{db: db}
 }
 
-func (h *Handler) Migrate() error {
-	return h.db.AutoMigrate(
-		&grocery.GroceryItem{},
-		&steps.StepLog{},
-		&weight.BodyWeightLog{},
-		&water.WaterLog{},
-		&water.DrinkSizePreset{},
-		&profile.UserProfile{},
-	)
-}
-
 func (h *Handler) RegisterRoutes(router *gin.Engine, authMiddleware gin.HandlerFunc) {
 	group := router.Group("/tracking", authMiddleware)
 	missed.RegisterMissedRoutes(group, h.db)

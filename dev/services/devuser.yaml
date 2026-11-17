@@ -1,4 +1,4 @@
-# One-shot: ensure the local login dev/dev exists (after the backend has migrated the schema).
+# One-shot: ensure the local login dev/dev exists (after the backend is up).
 version: "0.5"
 processes:
   devuser:

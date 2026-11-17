@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+#MISE description="Run the migration tool against the dev DB (up, down, redo, status, new NAME, ...)"
+#MISE dir="{{config_root}}/backend"
+exec go run ./cmd/migrate "$@"
