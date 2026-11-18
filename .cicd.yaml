@@ -35,3 +35,9 @@ deploy:
   # The agent lives in jack's home on the VPS (no sudo needed).
   command: J_CICD_AGENT_CONFIG=/home/jack/.config/j-cicd-agent.yaml /home/jack/.local/bin/j-cicd-agent
   timeout: 10m
+  # Confirms the live site serves this build (frontend/nginx.conf sends
+  # no-store for this path; no CDN in front, Caddy proxies it unauthenticated).
+  verify:
+    - url: https://st.jackgraver.ca/version.json
+      expect_body_contains: "{{revision}}"
+      timeout: 2m
