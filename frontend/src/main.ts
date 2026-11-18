@@ -7,6 +7,7 @@ import PrimeVue from 'primevue/config'
 import Aura from '@primeuix/themes/aura'
 import { setUnauthorizedRedirect } from './composables/auth/session'
 import { resolveAuthSession } from './composables/auth/useAuth'
+import { disableShakeToUndo } from './utils/disableShakeToUndo'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -44,6 +45,8 @@ setUnauthorizedRedirect(() => {
     query: { redirect: router.currentRoute.value.fullPath },
   })
 })
+
+disableShakeToUndo()
 
 const app = createApp(App)
 
