@@ -35,12 +35,6 @@ const loggingRoute = computed(() => ({
     query: dayOffset.value === 0 ? {} : { offset: String(dayOffset.value) },
 }));
 
-const gymNavLinks = [
-    { name: "Manage plans", to: "gym-plans" },
-    { name: "Progression", to: "progression" },
-    { name: "Weight", to: "gym-weight", offset: true },
-    { name: "Steps", to: "gym-steps", offset: true },
-] as const;
 </script>
 
 <template>
@@ -50,11 +44,7 @@ const gymNavLinks = [
                 Error: {{ error?.message ?? "Failed to load" }}
             </div>
             <template v-else>
-                <ModuleTitleBar
-                    title="Gym"
-                    :day-offset="dayOffset"
-                    :links="[...gymNavLinks]"
-                />
+                <ModuleTitleBar title="Gym" :links="[]" />
                 <section class="flex flex-col gap-2">
                     <div class="flex items-center justify-between">
                         <h1 class="text-lg font-semibold text-textPrimary">

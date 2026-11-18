@@ -12,6 +12,10 @@ function queryForTrackingDate(ymd: string): Record<string, string> {
     return off === 0 ? {} : { offset: String(off) };
 }
 
+const props = withDefaults(defineProps<{ placement?: "below" | "above" }>(), {
+    placement: "below",
+});
+
 const { data, isPending, isError } = useMissedTracking();
 const open = ref(false);
 const root = ref<HTMLElement | null>(null);
@@ -75,7 +79,8 @@ function close() {
         </button>
         <div
             v-if="open"
-            class="absolute right-0 top-full z-30 mt-1 min-w-56 rounded-md border border-thirdBg bg-secondBg p-0 shadow-lg"
+            class="absolute right-0 z-30 min-w-56 rounded-md border border-thirdBg bg-secondBg p-0 shadow-lg"
+            :class="props.placement === 'above' ? 'bottom-full mb-1' : 'top-full mt-1'"
             role="region"
             aria-label="Missed daily logs"
             @click.stop

@@ -149,7 +149,6 @@ function openUpdateBalances() {
 }
 
 const navLinks = computed<ModuleTitleLink[]>(() => [
-    { name: "Contribution room", to: "finance-rules" },
     { name: "Update balances", onClick: openUpdateBalances },
     { name: "Add account", onClick: openAddAccount },
 ]);
