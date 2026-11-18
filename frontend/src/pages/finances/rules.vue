@@ -162,7 +162,6 @@ async function submitBirthYear() {
 }
 
 const navLinks: ModuleTitleLink[] = [
-    { name: "Accounts", to: "finances" },
     { name: "Add TFSA / RRSP / FHSA", onClick: openPreset },
     { name: "Custom type", onClick: openCustom },
 ];

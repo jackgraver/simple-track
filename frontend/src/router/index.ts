@@ -7,7 +7,10 @@ import { loadLastRoute, saveLastRoute } from "~/utils/lastRoute";
 declare module "vue-router" {
     interface RouteMeta {
         breadcrumb?: string;
-        hideDateAndBreadcrumbs?: boolean;
+        /** Show the day picker (pages that read `?offset=`). Inherited by children. */
+        dated?: boolean;
+        /** Full-screen flow: hide the app nav (sidebar, mobile header, tab bar). */
+        focus?: boolean;
     }
 }
 
@@ -32,13 +35,13 @@ const routes: RouteRecordRaw[] = [
         path: "/diet",
         name: "diet",
         component: () => import("~/pages/diet/index.vue"),
-        meta: { breadcrumb: "Diet" },
+        meta: { breadcrumb: "Diet", dated: true },
         children: [
             {
                 path: "log",
                 name: "diet-log",
                 component: () => import("~/pages/diet/logmeal/logmeal.vue"),
-                meta: { breadcrumb: "Log meal", hideDateAndBreadcrumbs: false },
+                meta: { breadcrumb: "Log meal" },
             },
             {
                 path: "edit-planned",
@@ -50,13 +53,13 @@ const routes: RouteRecordRaw[] = [
                 path: "targets",
                 name: "diet-targets",
                 component: () => import("~/pages/diet/targets/index.vue"),
-                meta: { breadcrumb: "Targets" },
+                meta: { breadcrumb: "Targets", dated: false },
             },
             {
                 path: "water-presets",
                 name: "diet-water-presets",
                 component: () => import("~/pages/diet/water-presets/index.vue"),
-                meta: { breadcrumb: "Water presets" },
+                meta: { breadcrumb: "Water presets", dated: false },
             },
         ],
     },
@@ -64,25 +67,25 @@ const routes: RouteRecordRaw[] = [
         path: "/gym",
         name: "gym",
         component: () => import("~/pages/gym/index.vue"),
-        meta: { breadcrumb: "Gym" },
+        meta: { breadcrumb: "Gym", dated: true },
         children: [
             {
                 path: "plans",
                 name: "gym-plans",
                 component: () => import("~/pages/gym/plans/index.vue"),
-                meta: { breadcrumb: "Plans" },
+                meta: { breadcrumb: "Plans", dated: false },
             },
             {
                 path: "plans/:id(\\d+)",
                 name: "gym-plan-detail",
                 component: () => import("~/pages/gym/plans/[id].vue"),
-                meta: { breadcrumb: "Plan" },
+                meta: { breadcrumb: "Plan", dated: false },
             },
             {
                 path: "plans/:programId(\\d+)/days/:id(\\d+)",
                 name: "gym-program-day-detail",
                 component: () => import("~/pages/gym/plans/[id].vue"),
-                meta: { breadcrumb: "Plan day" },
+                meta: { breadcrumb: "Plan day", dated: false },
             },
             {
                 path: "logging",
@@ -90,7 +93,7 @@ const routes: RouteRecordRaw[] = [
                 component: () => import("~/pages/gym/logging/index.vue"),
                 meta: {
                     breadcrumb: "Logging",
-                    hideDateAndBreadcrumbs: true,
+                    dated: false,
                 },
             },
             {
@@ -100,7 +103,8 @@ const routes: RouteRecordRaw[] = [
                     import("~/pages/gym/logging/exercise/[id].vue"),
                 meta: {
                     breadcrumb: "Exercise",
-                    hideDateAndBreadcrumbs: true,
+                    dated: false,
+                    focus: true,
                 },
             },
             {
@@ -122,7 +126,7 @@ const routes: RouteRecordRaw[] = [
                 name: "progression",
                 component: () =>
                     import("~/pages/gym/progression/progression.vue"),
-                meta: { breadcrumb: "Progression" },
+                meta: { breadcrumb: "Progression", dated: false },
             },
             {
                 path: "weight",
@@ -192,6 +196,7 @@ const routes: RouteRecordRaw[] = [
         path: "/auth/signin",
         name: "signin",
         component: () => import("~/pages/auth/signin/index.vue"),
+        meta: { focus: true },
     },
     {
         path: "/settings/profile",
@@ -203,7 +208,6 @@ const routes: RouteRecordRaw[] = [
         path: "/:pathMatch(.*)*",
         name: "not-found",
         component: () => import("~/pages/not-found/index.vue"),
-        meta: { hideDateAndBreadcrumbs: true },
     },
 ];
 

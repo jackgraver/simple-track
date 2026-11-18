@@ -261,7 +261,6 @@ async function removeAccount() {
 }
 
 const navLinks = computed<ModuleTitleLink[]>(() => [
-    { name: "All accounts", to: "finances" },
     { name: "Edit", onClick: editAccount },
 ]);
 </script>

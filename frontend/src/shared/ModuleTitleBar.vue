@@ -144,8 +144,10 @@ onUnmounted(() => {
     <div
         ref="rootRef"
         class="flex min-w-0 items-center gap-4 border-b border-(--color-border) pb-3"
+        :class="{ 'hidden! lg:flex!': links.length === 0 }"
     >
-        <h1 class="m-0 shrink-0 text-md font-semibold text-textSecondary">
+        <!-- On mobile the app header already shows the page title. -->
+        <h1 class="m-0 hidden shrink-0 text-md font-semibold text-textSecondary lg:block">
             {{ title }}
         </h1>
         <div

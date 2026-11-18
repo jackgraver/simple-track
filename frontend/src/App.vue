@@ -1,30 +1,55 @@
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, watchEffect } from "vue";
 import { useRoute } from "vue-router";
 import ToastContainer from "./composables/toast/ToastContainer.vue";
 import DialogContainer from "./composables/dialog/DialogContainer.vue";
-import NavBar from "./shared/NavBar.vue";
+import { isAuthenticated } from "./composables/auth/session";
 import DateAndBreadcrumbs from "./shared/DateAndBreadcrumbs.vue";
+import Breadcrumbs from "./shared/Breadcrumbs.vue";
+import SideNav from "./shared/nav/SideNav.vue";
+import MobileHeader from "./shared/nav/MobileHeader.vue";
+import BottomTabBar from "./shared/nav/BottomTabBar.vue";
+import { useNavMemory } from "./shared/nav/useNavMemory";
 
 const route = useRoute();
-const showDateAndBreadcrumbs = computed(
-    () => route.meta.hideDateAndBreadcrumbs !== true,
+useNavMemory();
+
+const showNav = computed(
+    () => isAuthenticated.value && route.meta.focus !== true,
 );
+const showDate = computed(() => route.meta.dated === true);
+
+// Lets fixed elements (toasts) sit above the mobile tab bar.
+watchEffect(() => {
+    document.documentElement.classList.toggle("has-tab-bar", showNav.value);
+});
 </script>
 
 <template>
     <div class="status-bar-cover" aria-hidden="true"></div>
-    <main
-        class="dark scrollbar-gutter-both mx-auto box-border w-full max-w-full min-h-dvh overflow-x-clip"
-    >
-        <div
-            class="flex w-full flex-col items-stretch px-4 lg:px-8 xl:px-0 xl:mx-auto xl:max-w-8/12"
+    <div class="dark min-h-dvh w-full">
+        <SideNav v-if="showNav" class="hidden! lg:flex!" />
+        <main
+            class="scrollbar-gutter-both box-border w-full overflow-x-clip"
+            :class="{ 'pb-[4.5rem] lg:pb-0': showNav }"
         >
-            <NavBar />
-            <DateAndBreadcrumbs v-if="showDateAndBreadcrumbs" />
-            <RouterView />
-        </div>
-    </main>
+            <div
+                class="mx-auto flex w-full max-w-6xl flex-col items-stretch px-4 lg:px-8"
+                :class="{ 'app-content': showNav }"
+            >
+                <template v-if="showNav">
+                    <MobileHeader class="lg:hidden" />
+                    <Breadcrumbs class="hidden pt-4 pb-1 lg:flex" />
+                </template>
+                <DateAndBreadcrumbs
+                    v-if="showDate"
+                    :class="showNav ? 'pb-4 lg:pt-4' : 'py-4'"
+                />
+                <RouterView />
+            </div>
+        </main>
+        <BottomTabBar v-if="showNav" class="lg:hidden" />
+    </div>
     <ToastContainer />
     <DialogContainer />
 </template>

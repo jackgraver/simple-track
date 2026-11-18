@@ -40,3 +40,28 @@
     --color-text-secondary: hsl(0, 0%, 50%);
     --color-border: hsl(0, 0%, 80%);
 }
+
+/* Keep toasts clear of the mobile bottom tab bar (see App.vue). */
+@media (width < 64rem) {
+    html.has-tab-bar .toast-container {
+        bottom: calc(5.5rem + env(safe-area-inset-bottom));
+    }
+}
+
+/*
+ * Desktop: the sidebar is fixed, so centre the page content on the whole
+ * window rather than the space beside the sidebar. When the window is too
+ * narrow to centre without overlapping, it sits just right of the sidebar.
+ */
+@media (width >= 64rem) {
+    .app-content {
+        --nav-w: 14rem;
+        --nav-gap: 2rem;
+        --content-w: min(56rem, 100vw - var(--nav-w) - 2 * var(--nav-gap));
+        width: var(--content-w);
+        max-width: none;
+        padding-inline: 0;
+        margin-left: max(var(--nav-w) + var(--nav-gap), (100vw - var(--content-w)) / 2);
+        margin-right: 0;
+    }
+}
