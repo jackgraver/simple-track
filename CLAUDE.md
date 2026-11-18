@@ -78,3 +78,8 @@ server, which refuses to start while any are pending, and into `cmd/migrate`, wh
   In dev, `migrate redo` re-runs the latest one after you've edited it.
 - Tests for `internal/migrate` need `TEST_DATABASE_URL` (`dev test` sets it). Module tests
   still build their schema with AutoMigrate on SQLite.
+
+## Deployment
+
+Prod deployments go through j-cicd. Don't build images or SSH to the VPS by hand
+(`.github/workflows/main.yml` and `docker-compose.vps.yml` are not the deploy path).
