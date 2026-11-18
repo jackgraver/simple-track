@@ -81,5 +81,17 @@ server, which refuses to start while any are pending, and into `cmd/migrate`, wh
 
 ## Deployment
 
-Prod deployments go through j-cicd. Don't build images or SSH to the VPS by hand
-(`.github/workflows/main.yml` and `docker-compose.vps.yml` are not the deploy path).
+Prod deployments go through j-cicd (`~/.local/bin/j-cicd`, config in `.cicd.yaml`). Don't build
+images or SSH to the VPS by hand. `docker-compose.vps.yml` is only the compose file j-cicd's
+VPS agent uses, not a deploy path.
+
+1. Commit and push to `main`. Pipelines build main's latest commit, not the working tree.
+2. `j-cicd run` from the repo root. It runs vet and tests, builds and pushes both images,
+   backs up the DB, applies migrations, swaps the containers and waits for health checks
+   (about 45s). Prod is live when it reports `run succeeded`.
+3. If it fails, read `j-cicd logs simple-track`. `j-cicd rollback` reverts the images only,
+   not the database. Pre-deploy backups are in `~/backups` on the VPS.
+
+Run bare `j-cicd` or `j-cicd run -h` to see usage. Without a TTY it prints help instead of
+opening the dashboard. `-no-deploy` pushes images without deploying. Always ask the user
+before running a prod deploy unless they already told you to deploy.
