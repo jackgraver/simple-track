@@ -8,8 +8,28 @@ vi.stubGlobal("localStorage", {
     clear: () => store.clear(),
 });
 
+let cookie = "";
+vi.stubGlobal("document", {
+    get cookie() {
+        return cookie;
+    },
+    set cookie(v: string) {
+        cookie = v.split(";")[0] ?? "";
+    },
+});
+vi.stubGlobal("location", { protocol: "https:" });
+
 describe("lastRoute", () => {
-    beforeEach(() => store.clear());
+    beforeEach(() => {
+        store.clear();
+        cookie = "";
+    });
+
+    it("falls back to the cookie when localStorage is empty", () => {
+        saveLastRoute("/finances", 1000);
+        store.clear();
+        expect(loadLastRoute(2000)).toBe("/finances");
+    });
 
     it("round-trips a path with query", () => {
         saveLastRoute("/gym/plans?x=1", 1000);

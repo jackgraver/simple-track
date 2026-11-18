@@ -230,12 +230,13 @@ export const router = createRouter({
 });
 
 router.beforeEach(async (to, from) => {
-    // Installs made before start_url moved to /launch still open at "/". Resume
-    // there too, but only for the first navigation of a standalone launch, so
-    // in-app links to "/" and plain browser visits keep going to the default page.
-    if (from === START_LOCATION && to.path === "/" && isStandalone()) {
+    // iOS may launch an installed PWA at the URL it was added from rather than
+    // the manifest start_url. Resume the last route on the first navigation of
+    // any standalone launch, whatever path it lands on. The saved route is the
+    // last page visited, so this matches what a plain reload would show.
+    if (from === START_LOCATION && to.name !== "launch" && isStandalone()) {
         const saved = resolveSavedRoute();
-        if (saved) return saved;
+        if (saved && saved !== to.fullPath) return saved;
     }
     if (to.name === "signin") {
         if (authStatus.value === "unknown") await resolveAuthSession();
