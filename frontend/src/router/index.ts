@@ -1,7 +1,8 @@
-import { createRouter, createWebHistory } from "vue-router";
+import { createRouter, createWebHistory, START_LOCATION } from "vue-router";
 import type { RouteRecordRaw } from "vue-router";
 import { authStatus } from "~/composables/auth/session";
 import { resolveAuthSession } from "~/composables/auth/useAuth";
+import { loadLastRoute, saveLastRoute } from "~/utils/lastRoute";
 
 declare module "vue-router" {
     interface RouteMeta {
@@ -14,6 +15,12 @@ const routes: RouteRecordRaw[] = [
     {
         path: "/",
         redirect: { name: "gym" },
+    },
+    {
+        // The manifest start_url. Resumes the last route, else the default page.
+        path: "/launch",
+        name: "launch",
+        redirect: () => resolveSavedRoute() ?? { name: "gym" },
     },
     {
         path: "/home",
@@ -200,12 +207,36 @@ const routes: RouteRecordRaw[] = [
     },
 ];
 
+function isStandalone(): boolean {
+    return (
+        window.matchMedia("(display-mode: standalone)").matches ||
+        (navigator as Navigator & { standalone?: boolean }).standalone === true
+    );
+}
+
+function resolveSavedRoute(): string | null {
+    const saved = loadLastRoute();
+    if (!saved) return null;
+    const target = router.resolve(saved);
+    if (!target.name || target.name === "not-found" || target.name === "signin" || target.name === "launch") {
+        return null;
+    }
+    return target.fullPath;
+}
+
 export const router = createRouter({
     history: createWebHistory(),
     routes,
 });
 
-router.beforeEach(async (to) => {
+router.beforeEach(async (to, from) => {
+    // Installs made before start_url moved to /launch still open at "/". Resume
+    // there too, but only for the first navigation of a standalone launch, so
+    // in-app links to "/" and plain browser visits keep going to the default page.
+    if (from === START_LOCATION && to.path === "/" && isStandalone()) {
+        const saved = resolveSavedRoute();
+        if (saved) return saved;
+    }
     if (to.name === "signin") {
         if (authStatus.value === "unknown") await resolveAuthSession();
         if (authStatus.value === "authenticated") {
@@ -218,4 +249,9 @@ router.beforeEach(async (to) => {
         return { name: "signin", query: { redirect: to.fullPath } };
     }
     return true;
+});
+
+router.afterEach((to, _from, failure) => {
+    if (failure || to.name === "signin" || to.name === "not-found" || to.name === "launch") return;
+    saveLastRoute(to.fullPath);
 });
