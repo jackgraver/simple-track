@@ -24,14 +24,22 @@ const { getUsername } = useAuth();
 
         <nav aria-label="Main" class="flex-1 overflow-y-auto px-3 pb-4">
             <section v-for="group in navGroups" :key="group.key" class="mb-4">
-                <h2
-                    class="m-0 flex items-center gap-2 px-2 pb-1 text-xs font-semibold tracking-wide text-textSecondary uppercase"
+                <!-- The header links to the group's home (its first item). -->
+                <router-link
+                    :to="itemLocation(group.items[0]!, route)"
+                    class="flex items-center gap-2 rounded-md px-2 py-1.5 text-xs font-semibold tracking-wide uppercase transition-colors"
+                    :class="
+                        isItemActive(group.items[0]!, route)
+                            ? 'bg-firstBg text-textPrimary'
+                            : 'text-textSecondary hover:bg-firstBg hover:text-textPrimary'
+                    "
+                    :aria-current="isItemActive(group.items[0]!, route) ? 'page' : undefined"
                 >
                     <component :is="group.icon" class="size-3.5" />
                     {{ group.label }}
-                </h2>
-                <ul class="m-0 flex list-none flex-col p-0">
-                    <li v-for="item in group.items" :key="item.to">
+                </router-link>
+                <ul v-if="group.items.length > 1" class="m-0 mt-0.5 flex list-none flex-col p-0">
+                    <li v-for="item in group.items.slice(1)" :key="item.to">
                         <router-link
                             :to="itemLocation(item, route)"
                             class="block rounded-md px-2 py-1.5 pl-7.5 text-sm transition-colors"
