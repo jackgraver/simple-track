@@ -51,3 +51,12 @@ Supersedes the earlier "drop PrimeVue" call. Candidates: PrimeVue Volt (Tailwind
 
 ## 2026-11-19: Owner accepted the charter defaults
 Blue accent, inverted neutral primary button, darker surfaces, Dark/Light/System toggle (default dark), bottom sheets below `lg`, phone-width gym logging on desktop.
+
+## 2026-11-19: Bake-off results (B1); the pick is the owner's (B2)
+`lab/` built gym logging (390) and finances (1280) with PrimeVue Volt, PrimeVue 4 styled + a token preset, and Reka UI + own Tailwind, on the TOKENS.md values, both themes, stock toggle. Page: https://claude.ai/artifact/4buX5k9LpVSCJ36o8LEMux.
+- Looks (impeccable critique, PRINCIPLES as the standard): Reka 28/40, Volt 24, styled 24. Once themed all three look close; Reka alone hits the desktop density (14px, 40px rows) without overrides. Aura's proportions show through styled; Volt's secondary buttons read as disabled after the remap.
+- Effort: styled = one 125-line preset (plus a CSS layer-order fix). Volt = 112-line palette remap + hand edits to 4 of 18 copied files, and the copies have upstream class typos. Reka = 322 lines of our own components for this set (all PRIMITIVES are ours to build).
+- Size (gzip, both screens): Reka +55 kB; styled +159 kB, Volt +172 kB, both + 69 kB lazy `chart.js/auto` from `primevue/chart`. Shared baseline 85 kB.
+- Behaviour: all trap focus and close on Esc. PrimeVue Drawer drops focus to `<body>` and doesn't lock scroll by default; InputNumber's ± buttons have no accessible name. Reka restores focus, locks scroll and labels its steppers. None has swipe-to-close sheets.
+- Licence: PrimeVue 5 moved to the PrimeUI licence (yearly Community key for individuals, a badge without one). The lab pinned 4.5.5 (MIT, frozen since Apr 2026).
+Recommendation: Reka + own Tailwind (looks and behaviour match the charter; costs the most build time). Runner-up: PrimeVue 4 styled + preset (fastest to theme; licence and Aura density to manage). Not recommended: Volt.

@@ -15,7 +15,8 @@
 ## Status (2026-11-19)
 - Charter done and agreed. The owner accepted the proposed defaults: blue accent, inverted neutral primary button, darker surfaces, Dark/Light/System toggle, bottom sheets on mobile, phone-width gym logging on desktop.
 - Setup done: ESLint replaces the earlier vitest ratchet. Docs moved to `docs/design/`. `frontend/CLAUDE.md` and the `ui` skill added. The owner is installing the Playwright and impeccable plugins.
-- **Not started**: no tokens, components or pages changed yet.
+- **B1 bake-off done** (branch `proj/ui-bakeoff`, `lab/`, comparison page https://claude.ai/artifact/4buX5k9LpVSCJ36o8LEMux). Recommendation: Reka UI + own Tailwind; runner-up PrimeVue 4 styled + preset. Waiting on the owner's pick (B2).
+- No tokens, components or pages in `frontend/` changed yet.
 
 ## Current state (audited 2026-11-19; details in MIGRATION.md)
 - Tailwind v4 `@theme` in `frontend/src/style.css` has 8 camelCase colour aliases and nothing for spacing, radius, type, motion or z. `tailwind.config.js` is dead (delete in the token slice).
@@ -33,7 +34,13 @@
 6. **Enforcement + cleanup**: planned lint rules (RULES.md), remove the global element CSS, `--color-*: initial`, delete the legacy aliases.
 
 ## Next up / gotchas
-- **Next slice: B1 bake-off** (TASKS.md). Don't start the token layer before the library is picked, because token names may follow the library's convention.
+- **Next slice: B2 decision** (owner). Results and trade-offs are in DECISIONS (2026-11-19, bake-off results) and on the comparison page. Don't start F1 before the pick: token names may follow the library.
+- **PrimeVue licence:** 5.x (Jul 2026+) is under the PrimeUI licence (free Community tier with a yearly key, a licence badge without one). 4.5.5 is MIT but the last 4.x release (Apr 2026). `frontend/` is on ^4.5.4 today, for charts only.
+- **If PrimeVue styled wins:** pass `cssLayer: { name: "primevue", order: "theme, base, primevue, components, utilities" }`, or Tailwind v4's preflight silently wipes every button and input. Opt into the Drawer's `blockScroll`; it doesn't restore focus on close.
+- **Token fixes for F1, whatever the pick** (`lab/scripts/contrast.mjs`): light-theme status text on `*-soft` fails AA (success 3.4, warn 3.1, danger 4.0, accent 4.3); `text-warn` on canvas 3.5 in light; dark danger badge 4.0; the overline pattern uses `fg-subtle` (3.7:1 in light) though TOKENS.md reserves it for hints.
+- **Spec conflict for P6:** the mobile toast at `bottom-tabbar` covers the gym "Log set" button (all candidates). Stack it above the CTA on focus pages, or confirm inline.
+- **Charts (F2):** read tokens after `data-theme` is set and re-render on change. The lab caught a chart that sampled the previous theme.
+- No candidate has swipe-to-close sheets (PRINCIPLES §5); plan it in P5 (pointer handler or vaul-vue).
 - A lint failure in a file with suppressed violations lists *all* of that rule's violations in the file. Diff against `main` to find the new one. Never run `--suppress-all` to get past it.
 - The global `button`/`input`/`select` CSS in `App.vue` styles every raw element. Removing it early restyles ~170 buttons.
 - Real bugs the lint found: `bg-primary` (media pages, no background) and `md:grid-none` (not a Tailwind class). Fix them in their module slices.
@@ -41,4 +48,5 @@
 - Macro colours only exist inside `.diet-module` (`pages/diet/macro-colors.css`).
 
 ## Open questions for the owner
-- After the bake-off: which library, and is its stock look a starting point or something to restyle fully?
+- B2: which library (Reka + own Tailwind recommended, PrimeVue 4 styled + preset runner-up, Volt not recommended)? If PrimeVue: stay on MIT 4.5.5 or take a v5 Community key?
+- Keep `lab/` as the bake-off record, or delete it in B2?

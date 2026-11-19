@@ -2,7 +2,7 @@
 
 | Project | Goal | Status |
 |---|---|---|
-| [ui-overhaul](ui-overhaul/README.md) | Consistent, clean, functional UI built on tokens and shared primitives | Charter + setup done; next: library bake-off |
+| [ui-overhaul](ui-overhaul/README.md) | Consistent, clean, functional UI built on tokens and shared primitives | Bake-off (B1) done; next: owner picks the library (B2) |
 | [optimistic-ui](optimistic-ui/README.md) | Linear-style instant UI on top of TanStack Query | Not started (planning) |
 | [performance](performance/README.md) | Measured backend and frontend optimisation, open-ended | Not started (planning) |
 
