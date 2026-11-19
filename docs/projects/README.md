@@ -3,7 +3,7 @@
 | Project | Goal | Status |
 |---|---|---|
 | [ui-overhaul](ui-overhaul/README.md) | Consistent, clean, functional UI built on tokens and shared primitives | Not started (planning) |
-| [optimistic-ui](optimistic-ui/README.md) | Linear-style instant UI on top of TanStack Query | Not started (planning) |
+| [optimistic-ui](optimistic-ui/README.md) | Linear-style instant UI on top of TanStack Query | Audit + design done; foundation next |
 | [performance](performance/README.md) | Measured backend and frontend optimisation, open-ended | Not started (planning) |
 
 Repo files are the source of truth for status. Agents read them, and nothing else is needed.
