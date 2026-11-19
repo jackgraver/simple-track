@@ -1,0 +1,257 @@
+{
+  "src/App.vue": {
+    "colorLiteral": 7,
+    "styleBlock": 1
+  },
+  "src/composables/dialog/DialogContainer.vue": {
+    "colorLiteral": 12,
+    "styleBlock": 1
+  },
+  "src/composables/toast/ToastContainer.vue": {
+    "colorLiteral": 4,
+    "styleBlock": 1
+  },
+  "src/pages/auth/signin/index.vue": {
+    "colorLiteral": 7,
+    "styleBlock": 1
+  },
+  "src/pages/diet/components/DietDayView.vue": {
+    "colorLiteral": 1,
+    "paletteClass": 2,
+    "arbitraryValue": 1
+  },
+  "src/pages/diet/components/LoggedMealsDisplay.vue": {
+    "paletteClass": 1
+  },
+  "src/pages/diet/components/MacroBars.vue": {
+    "styleBlock": 1
+  },
+  "src/pages/diet/components/MealCard.vue": {
+    "colorLiteral": 6,
+    "styleBlock": 1
+  },
+  "src/pages/diet/components/MealCardMacroDetails.vue": {
+    "styleBlock": 1
+  },
+  "src/pages/diet/components/PlannedMealsDisplay.vue": {
+    "paletteClass": 4
+  },
+  "src/pages/diet/components/dialog/LogWaterDialog.vue": {
+    "paletteClass": 18
+  },
+  "src/pages/diet/components/dialog/QuickLogDialog.vue": {
+    "paletteClass": 29
+  },
+  "src/pages/diet/components/dialog/WaterLogsDialog.vue": {
+    "paletteClass": 7
+  },
+  "src/pages/diet/components/macrobar/MacroBar.vue": {
+    "paletteClass": 1,
+    "arbitraryValue": 1,
+    "styleBlock": 1
+  },
+  "src/pages/diet/components/macrobar/useMacroBarStyling.ts": {
+    "paletteClass": 2,
+    "arbitraryValue": 3
+  },
+  "src/pages/diet/edit-planned/index.vue": {
+    "paletteClass": 91,
+    "arbitraryValue": 2
+  },
+  "src/pages/diet/logmeal/components/FoodDisplay.vue": {
+    "colorLiteral": 1,
+    "styleBlock": 1
+  },
+  "src/pages/diet/logmeal/dialog/CreateFoodDialog.vue": {
+    "colorLiteral": 7,
+    "styleBlock": 1
+  },
+  "src/pages/diet/targets/components/MacroSlider.vue": {
+    "colorLiteral": 4,
+    "paletteClass": 14,
+    "arbitraryValue": 1,
+    "styleBlock": 1
+  },
+  "src/pages/diet/targets/components/MacroSlidersPanel.vue": {
+    "colorLiteral": 3,
+    "paletteClass": 10,
+    "arbitraryValue": 3
+  },
+  "src/pages/diet/targets/components/MacroToWeightRatio.vue": {
+    "paletteClass": 11
+  },
+  "src/pages/diet/targets/components/TDEECalculator.vue": {
+    "paletteClass": 21
+  },
+  "src/pages/diet/targets/index.vue": {
+    "paletteClass": 14
+  },
+  "src/pages/diet/water-presets/index.vue": {
+    "paletteClass": 63
+  },
+  "src/pages/finances/account.vue": {
+    "colorLiteral": 2,
+    "paletteClass": 3
+  },
+  "src/pages/finances/chart.ts": {
+    "colorLiteral": 5
+  },
+  "src/pages/finances/components/PresetDialog.vue": {
+    "paletteClass": 2
+  },
+  "src/pages/finances/components/RoomBreakdown.vue": {
+    "paletteClass": 4,
+    "arbitraryValue": 4
+  },
+  "src/pages/finances/components/RoomCard.vue": {
+    "paletteClass": 8
+  },
+  "src/pages/finances/format.ts": {
+    "paletteClass": 4
+  },
+  "src/pages/finances/index.vue": {
+    "paletteClass": 5,
+    "arbitraryValue": 1
+  },
+  "src/pages/finances/rules.vue": {
+    "paletteClass": 3
+  },
+  "src/pages/grocery/dialog/AddListDialog.vue": {
+    "paletteClass": 25
+  },
+  "src/pages/grocery/index.vue": {
+    "colorLiteral": 5,
+    "paletteClass": 3,
+    "styleBlock": 1
+  },
+  "src/pages/gym/WorkoutActivityGraph.vue": {
+    "paletteClass": 1
+  },
+  "src/pages/gym/index.vue": {
+    "paletteClass": 1
+  },
+  "src/pages/gym/logging/components/ExerciseListView.vue": {
+    "colorLiteral": 15,
+    "paletteClass": 2,
+    "styleBlock": 1
+  },
+  "src/pages/gym/logging/exercise/components/CardioLoggingView.vue": {
+    "colorLiteral": 7,
+    "paletteClass": 3,
+    "styleBlock": 1
+  },
+  "src/pages/gym/logging/exercise/components/ExerciseLoggingFlow.vue": {
+    "paletteClass": 6
+  },
+  "src/pages/gym/logging/exercise/components/ExerciseRepsScreen.vue": {
+    "colorLiteral": 1,
+    "paletteClass": 8,
+    "arbitraryValue": 2
+  },
+  "src/pages/gym/logging/exercise/components/ExerciseRestScreen.vue": {
+    "paletteClass": 16
+  },
+  "src/pages/gym/logging/exercise/components/ExerciseSetupScreen.vue": {
+    "paletteClass": 21
+  },
+  "src/pages/gym/logging/exercise/components/LoggedSetsList.vue": {
+    "colorLiteral": 1,
+    "paletteClass": 12,
+    "arbitraryValue": 1
+  },
+  "src/pages/gym/logging/exercise/components/LoggingHeader.vue": {
+    "paletteClass": 4
+  },
+  "src/pages/gym/logging/exercise/components/LoggingPageShell.vue": {
+    "paletteClass": 4,
+    "styleBlock": 1
+  },
+  "src/pages/gym/logging/exercise/components/MobilityLoggingView.vue": {
+    "paletteClass": 8
+  },
+  "src/pages/gym/logging/exercise/components/NumberSlider.vue": {
+    "colorLiteral": 3,
+    "paletteClass": 10,
+    "arbitraryValue": 10
+  },
+  "src/pages/gym/logging/exercise/dialog/EditCuesDialog.vue": {
+    "paletteClass": 2
+  },
+  "src/pages/gym/logging/exercise/dialog/WeightSetupDialog.vue": {
+    "colorLiteral": 22,
+    "paletteClass": 5,
+    "arbitraryValue": 22
+  },
+  "src/pages/gym/logging/index.vue": {
+    "styleBlock": 1
+  },
+  "src/pages/gym/plans/components/AddExerciseDialog.vue": {
+    "styleBlock": 1
+  },
+  "src/pages/gym/plans/components/CreateExerciseForPlanDialog.vue": {
+    "colorLiteral": 7,
+    "styleBlock": 1
+  },
+  "src/pages/gym/plans/components/EditExerciseDialog.vue": {
+    "colorLiteral": 7,
+    "styleBlock": 1
+  },
+  "src/pages/gym/plans/index.vue": {
+    "paletteClass": 3,
+    "arbitraryValue": 2
+  },
+  "src/pages/gym/progression/useProgressionCharts.ts": {
+    "colorLiteral": 10
+  },
+  "src/pages/gym/steps/index.vue": {
+    "colorLiteral": 1
+  },
+  "src/pages/gym/trackingLogChart.ts": {
+    "colorLiteral": 4
+  },
+  "src/pages/gym/weight/index.vue": {
+    "colorLiteral": 1
+  },
+  "src/pages/home/index.vue": {
+    "styleBlock": 1
+  },
+  "src/pages/media/StarRating.vue": {
+    "paletteClass": 2
+  },
+  "src/pages/media/[id].vue": {
+    "paletteClass": 2
+  },
+  "src/pages/media/index.vue": {
+    "paletteClass": 6,
+    "arbitraryValue": 2
+  },
+  "src/pages/not-found/index.vue": {
+    "paletteClass": 4
+  },
+  "src/pages/settings/profile/BodyProfileForm.vue": {
+    "paletteClass": 28
+  },
+  "src/pages/settings/profile/index.vue": {
+    "paletteClass": 9
+  },
+  "src/shared/SearchList.vue": {
+    "colorLiteral": 4,
+    "styleBlock": 1
+  },
+  "src/shared/SimpleMacros.vue": {
+    "colorLiteral": 5,
+    "styleBlock": 1
+  },
+  "src/shared/input/Dropdown.vue": {
+    "colorLiteral": 7,
+    "paletteClass": 1,
+    "arbitraryValue": 9
+  },
+  "src/shared/input/Input.vue": {
+    "colorLiteral": 7,
+    "styleBlock": 1
+  },
+  "src/shared/nav/mobile/BottomTabBar.vue": {
+    "arbitraryValue": 1
+  }
+}
