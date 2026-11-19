@@ -102,3 +102,34 @@ Bug found: the `bottom-tabbar` / `pb-tabbar` utilities were silently shadowed by
 ## 2026-11-19: PageHeader for sub-pages, ModuleTitleBar stays the module nav (P7)
 `ModuleTitleBar` is the module's sub-navigation (title, sibling links, measured overflow, day offset). `PageHeader` is a page's own title with optional meta and actions, used on sub-pages and detail pages that have no sibling links (water-presets is the first). They don't merge: a module root keeps `ModuleTitleBar`; its overflow becomes a `Menu` in M9. Below `lg` PageHeader's actions stack under the title rather than collapsing into a menu (no Menu primitive yet).
 `Button` `:to` now takes a route location object, not only a string. The water-presets page was migrated whole (header, sections, form, list with loading/empty/error) as the first real consumer of every phase 4 primitive; its saved-size rows use trailing Edit/Delete `IconButton`s at every width because the hover-actions pattern has no mobile equivalent until `Menu` exists.
+
+## 2026-11-19: Phase 5 ran as four parallel workers, merged into `proj/ui-charter`
+Gym (M1, M5), diet (M2, M3), finances + grocery (M4, M7) and media/home/settings + shared (M6, M8, M9), each in its own worktree with stacked branches per slice, reviewed and merged by a lead session. Workers did not edit these docs (four branches would conflict); the lead folded their notes in. Shared code was owned by one worker per change (gym: NumberField, Menu, ListRow `#end`, Button fix; shared worker: Combobox, SearchList, ModuleTitleBar), and the others cherry-picked those commits.
+
+## 2026-11-19: ListRow `#end` slot for per-row actions (M1)
+A clickable ListRow renders a `<button>`/`<a>`, so an IconButton in `#trailing` nests interactive elements, and `#actions` is lg-only. `#end` is a sibling of the main element at every width. `#trailing` is for passive content. Supersedes the P3 advice ("on mobile the caller puts an IconButton in `#trailing`"), which only works on non-clickable rows.
+
+## 2026-11-19: NumberField, Menu and Combobox on Reka (M1, M9)
+NumberField: labelled steppers, 44px below lg, `inputmode=decimal`, select-all on focus, `unit`, works inside Field. Menu: `<Menu :items @select>`, a popover at every width (no Sheet). Combobox: action-style (emits `select`, clears), our own filtering (`ignore-filter`) so server search works; Reka 2.11 keeps the search term on `ComboboxInput`, not on the root. Popover on mobile too: neither caller needed a Sheet. `Dropdown.vue` was kept as a wrapper during the parallel work, then deleted once its two gym callers moved to Combobox.
+
+## 2026-11-19: `box-border` on primitives that render links
+App.vue's `a { all: unset }` resets `box-sizing` to content-box on anchors, so a `w-full` Button `:to` measured 408px in a 358px column. Button, Card and ListRow carry `box-border`. The rule goes with the global reset in phase 6.
+
+## 2026-11-19: Radio patterns built on sr-only native radios
+Choice controls that have no primitive (finance account presets, media star rating, the diet planning calendar) are a `<fieldset>` of styled `<label>`s around `sr-only` `<input type=radio>`, styled with `has-checked:`/`has-focus-visible:`. Native keyboard and one tab stop, and the global input CSS never applies, so there's no `!`. Rejected: `role=button` spans (10 tab stops on the stars) and raw buttons with `!` overrides.
+Promote to a primitive if a fourth user appears.
+
+## 2026-11-19: Too many options for SegmentedControl: Select below lg (M3, M6)
+SegmentedControl is for 2–5 options that fit at 390. The media status picker (5–6 statuses) is a SegmentedControl from `lg` and a native Select below it. TDEE goals (5 long labels) are a Select. The media status filter (All + 6 + counts) is a horizontally scrolling row of ghost/secondary Buttons with `aria-pressed`.
+
+## 2026-11-19: Behaviour changes made during phase 5
+- Diet `PlannedMealsDisplay` dropped its viewport-height pagination (it hid meals on short desktop screens). All planned meals render.
+- MealCard macros per food are always visible (they were hover-only). The dot pager became a SegmentedControl.
+- MacroBar: label + percent, number, and a 6px token-coloured bar (it was white text over a fill, which can't be themed).
+- Grocery: the inline ghost-text suggestion became a short suggestion list under the input (same keys: Up/Down, Enter, Tab/→ to fill, Esc). The ghost needed a transparent input over a mirror span and never worked on mobile. Check-off keeps the row in place until the strike-through finishes; before, the refetch removed it within ~100ms.
+- Gym exercise step nav (Setup/Log/Rest) is a SegmentedControl above the tab bar. It used to sit under the tab bar on mobile, where it couldn't be reached.
+- Multi-control rows (planned cardio, assign to day) use a `Section` heading plus `aria-label` per control, since `Field` injects a single id into every control inside it.
+- Plans week grid keeps native drag and drop, on desktop only (as before).
+
+## 2026-11-19: Bugs found in phase 5
+Fixed: diet targets ignored the typed g/lb ratio on Apply; gym step nav unreachable on mobile; grocery strike-through never visible; media `bg-primary` buttons; devseed stored grams as meal-item `Amount` (it's servings, so "18000g Salmon"); the Button/Card/ListRow link overflow; grids with only `lg:grid-cols-*` overflowed at 390 (an implicit `auto` column grows to min-content, so add `grid-cols-1`). Not fixed: `useExerciseLoggingSession.ts` assigns `group.logged` on a readonly query proxy (Vue warns on every set log; fix with optimistic set logging).

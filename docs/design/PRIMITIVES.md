@@ -3,7 +3,8 @@
 > **Status: spec; library chosen (2026-11-19): Reka UI, headless, styled with our Tailwind
 > tokens.** Reka supplies behaviour only (focus, ARIA, keyboard, portals, positioning). Every
 > primitive below is our own component in `shared/ui/` with our markup and classes, and wraps a
-> Reka part only where the table in "Library-backed" says so. Not built yet (phase 3–4).
+> Reka part only where the table in "Library-backed" says so. All built (phases 3–5, 2026-11-19);
+> Storybook (`npm run storybook` in `frontend/`) is the reference for every state.
 
 The minimal shared component set. Location: **`frontend/src/shared/ui/`**, one component per
 file, PascalCase, exported from `shared/ui/index.ts`. Pages import from `shared/ui/` only, never
@@ -48,8 +49,8 @@ Shared conventions:
 | `Toggle` | Reka `Switch*` | |
 | `Checkbox` | Reka `Checkbox*` | Indeterminate support |
 | `SegmentedControl` | Reka `ToggleGroup*` (single) | |
-| Number stepper (`Input type=number` with ±) | Reka `NumberField*` | Gym set logging. Labelled steppers come for free |
-| `Combobox`, `Menu` | Reka `Combobox*`, `DropdownMenu*` | Later (phase 5, M9) |
+| `NumberField` (number with ± steppers) | Reka `NumberField*` | Gym plate counts, log-meal quantities. Labelled steppers come for free |
+| `Combobox`, `Menu` | Reka `Combobox*`, `DropdownMenu*` | Popover at every width (no Sheet presentation yet) |
 | `Select` | **native `<select>`** | The OS picker wins on mobile. Reka `Select` only if a module needs custom option rendering |
 | `Button`, `IconButton`, `Spinner`, `Field`, `Input`, `Textarea`, `Card`, `Badge`, `List`/`ListRow`, `EmptyState`, `ErrorState`, `Skeleton`, `PageHeader`, `Section` | **ours** | Plain Vue + Tailwind tokens |
 | `Chart` | **ours** | chart.js directly (PrimeVue chart is dropped) |
@@ -136,6 +137,8 @@ Replaces: `ui.card` (`finances/format.ts`); `rounded-lg border border-(--color-b
 (several); `rounded-lg border border-zinc-700 bg-zinc-900/40` (`diet/edit-planned`);
 the `MealCard.vue` scoped styles (152 lines); `RoomCard.vue`.
 Rule: no cards inside cards. Inside a card, use `List` dividers or a `Section` heading.
+`class` lands on the outer element; the content sits in an inner padded div, so layout classes
+(`flex flex-col gap-4`) go on your own wrapper inside the Card.
 
 ## ListRow (+ List)
 `<List :inset>` is a vertical group with `divide-y divide-line`, optionally inside a Card.
@@ -144,8 +147,12 @@ default (title, truncates), `#subtitle` (`text-xs text-fg-muted`), `#trailing` (
 chevron).
 - Height: `min-h-touch` on mobile, `min-h-row` at lg. Padding `px-3 py-2`/`px-4`.
 - `pending` dims the row (`opacity-60`) and adds `aria-busy`. This is the hook for optimistic-ui.
-- Desktop: `#actions` slot shown on hover/focus-within. Mobile: actions go in a Sheet (or Menu)
-  opened from the row's trailing IconButton. Never hover-only.
+- `#trailing` is inside the row's main element: passive content only (value, Badge, chevron).
+- `#end` is a sibling of the main element, visible at every width: per-row actions (an
+  `IconButton` or a `Menu` trigger). A clickable row (`to`/`@click`) must never hold a button in
+  `#trailing` (nested interactive elements).
+- `#actions` (desktop only) shows on hover/focus-within. Never hover-only: pair it with `#end` or a
+  Menu for mobile.
 - Replaces `.exercise-item` (`ExerciseListView.vue`), `SearchList.vue` item markup, grocery rows,
   finance account/transaction rows, media list rows, `WaterLogsDialog.vue`, `LoggedSetsList.vue`.
 
@@ -218,13 +225,26 @@ chart.js wrapper that registers only line/bar parts (no `chart.js/auto`). `chart
 chart re-colours when `data-theme` changes (the bake-off caught a chart that sampled the previous
 theme). Callers pass `type`, `data`, `options` and an accessible `label`.
 
-## Combobox, Menu (later)
-- `Combobox`: evolve `shared/input/Dropdown.vue` (hex colours, `z-1000`, blur-timeout close) into
-  an Input-skinned search with a `role="listbox"` popover, keyboard nav (reuse
-  `composables/useListNavigation.ts`) and a Sheet presentation on mobile. `SearchList.vue` (345
-  lines, `<style>`) should end up built from Input + List + ListRow, not a parallel design.
-- `Menu`: an overflow action menu (popover on desktop, Sheet on mobile). `ModuleTitleBar.vue`'s
-  overflow (`MoreVertical`) menu is the first user.
+## NumberField, Combobox, Menu
+- `<NumberField v-model :label :step :min :max :decimals :unit :size="md|lg">`: Reka NumberField
+  with `Decrease/Increase <label>` steppers (44px below lg), `inputmode=decimal`, tabular-nums,
+  select-all on focus. Works inside `Field` (id/invalid by injection).
+- `<Combobox>`: action-style search (Reka Combobox, our filtering via `ignore-filter`): emits
+  `select` and clears; `search` is debounced 300ms; `has-more`/`loading`/`load-more` for paging.
+  Replaced `shared/input/Dropdown.vue` (deleted). `shared/SearchList.vue` is built from Input +
+  List + ListRow.
+- `<Menu :items="[{ key, label, icon?, tone?: 'danger', disabled? }]" align @select="key">` with
+  the trigger in the default slot: an overflow action menu (Reka DropdownMenu), 44px items below
+  lg. `ModuleTitleBar` overflow uses it.
+
+## Patterns without a primitive
+- **Radio cards / ratings / day pickers:** a `<fieldset>` of styled `<label>`s around `sr-only`
+  native `<input type="radio">` (`has-checked:`, `has-focus-visible:`, `has-disabled:`). One tab
+  stop, native arrow keys, and the global input CSS never shows, so no `!` is needed. Used by
+  finances `PresetDialog`, media `StarRating`, diet `PlanCalendar`.
+- **Styled links:** App.vue's `a { all: unset }` makes anchors content-box. Primitives that render
+  a RouterLink (Button, Card, ListRow) carry `box-border`; do the same on any other styled `<a>`
+  until phase 6 removes the reset.
 
 ## Not primitives (on purpose)
 Domain components stay in their module but are **built from** primitives and tokens:

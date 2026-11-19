@@ -34,18 +34,19 @@ screenshots of the changed pages or stories at 390 and 1280, in dark and light (
 - [x] **P7** (branch `proj/ui-p7-header`, 2026-11-19; stories `UI/PageHeader and Section`; used on `diet/water-presets`, which is now fully on primitives and out of the suppressions; checked add/edit/delete(confirm)/empty/error at 390 and 1280, both themes) `PageHeader`, `Section`; decide the `ModuleTitleBar` relationship (DECISIONS). *Done:* used on one page.
 
 ## Phase 5: module migration (one per slice; pair with optimistic-ui where its slice is ready)
+Done 2026-11-19: four parallel workers (gym, diet, finances+grocery, media/home/settings/shared), each slice stacked on its own branch and merged into `proj/ui-charter`. `eslint-suppressions.json` now only lists `App.vue` (phase 6). Optimistic-ui was not ready, so no slice paired with it. Error/empty states were checked in code, not by forcing failures in the browser.
 Done-state for each: the module's files have no entries left in `eslint-suppressions.json`; every query view has
 loading/empty/error; every mutation has pending + failure toast; before/after at 390 and 1280,
 dark and light.
-- [ ] **M1 gym/logging** (mobile priority): `logging/index.vue`, `ExerciseListView`, `exercise/*` screens, `LoggedSetsList`, `NumberSlider` tokens, `WeightSetupDialog`
-- [ ] **M2 diet day + log meal**: `diet/index`, `DietDayView`, `MealCard`, `PlannedMealsDisplay`, `logmeal/*`, `QuickLogDialog`, `CreateFoodDialog`, water dialogs
-- [ ] **M3 diet planning**: `diet/edit-planned` (largest file, 51 violations), `diet/targets/*`, `diet/water-presets`
-- [ ] **M4 finances**: retire `ui` in `finances/format.ts` for primitives; `index`, `account`, `rules`, dialogs, `RoomCard`
-- [ ] **M5 gym/plans + progression + weight + steps** (desktop-heavy; `EditExerciseDialog`, `CreateExerciseForPlanDialog`)
-- [ ] **M6 media** (fixes the broken `bg-primary` buttons)
-- [ ] **M7 grocery**
-- [ ] **M8 home, settings, auth/signin**
-- [ ] **M9 shared leftovers**: `SearchList` on Input+List, `Dropdown` → `Combobox`, `ModuleTitleBar` overflow → `Menu`
+- [x] **M1 gym/logging** (branch `proj/ui-m1-gym-logging`, 2026-11-19; new primitives NumberField, Menu, ListRow `#end`; step nav no longer hidden under the tab bar) (mobile priority): `logging/index.vue`, `ExerciseListView`, `exercise/*` screens, `LoggedSetsList`, `NumberSlider` tokens, `WeightSetupDialog`
+- [x] **M2 diet day + log meal** (branch `proj/ui-m2-diet-day`, 2026-11-19; MacroBar redesigned, log-meal rows on NumberField + Menu, CreateFoodDialog failure toasts): `diet/index`, `DietDayView`, `MealCard`, `PlannedMealsDisplay`, `logmeal/*`, `QuickLogDialog`, `CreateFoodDialog`, water dialogs
+- [x] **M3 diet planning** (branch `proj/ui-m3-diet-planning`, 2026-11-19; edit-planned split into PlanCalendar/PlannedDayEditor/BulkRangePlanner; targets g/lb ratio bug fixed): `diet/edit-planned` (largest file, 51 violations), `diet/targets/*`, `diet/water-presets`
+- [x] **M4 finances** (branch `proj/ui-m4-finances`, 2026-11-19; `ui` object gone from `format.ts`): retire `ui` in `finances/format.ts` for primitives; `index`, `account`, `rules`, dialogs, `RoomCard`
+- [x] **M5 gym/plans + progression + weight + steps** (branch `proj/ui-m5-gym-plans`, 2026-11-19; desktop-heavy; `EditExerciseDialog`, `CreateExerciseForPlanDialog`)
+- [x] **M6 media** (branch `proj/ui-m6-media`, 2026-11-19; StarRating is a radio group) (fixes the broken `bg-primary` buttons)
+- [x] **M7 grocery** (branch `proj/ui-m7-grocery`, 2026-11-19; check-off strike-through now visible; ghost-text suggestion became a suggestion list)
+- [x] **M8 home, settings, auth/signin** (branch `proj/ui-m8-home-settings`, 2026-11-19; also not-found)
+- [x] **M9 shared leftovers** (branch `proj/ui-m9-shared`, 2026-11-19; Combobox primitive; `Dropdown.vue` and `shared/input/` deleted in `proj/ui-p5-gym-followups`): `SearchList` on Input+List, `Dropdown` → `Combobox`, `ModuleTitleBar` overflow → `Menu`
 
 ## Phase 6: enforcement + cleanup
 - [ ] Add the planned lint rules (`docs/design/RULES.md` "Planned rules") as their conditions are met

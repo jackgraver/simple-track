@@ -4,11 +4,6 @@ Apply these to **any** change that touches `frontend/src/**/*.vue` or UI-facing 
 project. Background: [PRINCIPLES.md](PRINCIPLES.md), [TOKENS.md](TOKENS.md),
 [PRIMITIVES.md](PRIMITIVES.md). Migration tracking lives in `docs/projects/ui-overhaul/`.
 
-> **Interim (until the token layer and primitives land):** the new tokens and `shared/ui/` don't
-> exist yet. Use the legacy token utilities (`bg-firstBg`, `bg-secondBg`, `text-textPrimary`,
-> `text-textSecondary`, `border-(--color-border)`), copy the nearest existing pattern, and keep the
-> lint clean. Don't invent new colours, and don't start a primitive outside its ui-overhaul task.
-
 ## Rules
 1. **Tokens only.** No hex/rgb/hsl literals, no Tailwind palette classes (`zinc-*`, `green-*`,
    `white`…), no arbitrary colour, type, radius, shadow or z values (`text-[10px]`,

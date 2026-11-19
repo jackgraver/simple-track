@@ -62,13 +62,13 @@ const isCrumb = (item: Item): item is Crumb =>
     <nav v-if="showBreadcrumbs" aria-label="Breadcrumb" class="min-w-0">
         <ol class="flex min-w-0 items-center gap-1 text-sm">
             <template v-for="(item, index) in visibleItems" :key="item.key">
-                <li v-if="index > 0" aria-hidden="true" class="shrink-0 text-textSecondary/70 flex items-center">
+                <li v-if="index > 0" aria-hidden="true" class="shrink-0 text-fg-subtle flex items-center">
                     <ChevronRightIcon class="size-3.5" />
                 </li>
-                <li v-if="!isCrumb(item)" class="shrink-0 text-textSecondary select-none">…</li>
+                <li v-if="!isCrumb(item)" class="shrink-0 text-fg-muted select-none">…</li>
                 <li v-else class="min-w-0">
-                    <router-link v-if="!item.isCurrent" :to="item.to" class="block max-w-[12ch] truncate text-textSecondary hover:text-textPrimary hover:underline underline-offset-4">{{ item.label }}</router-link>
-                    <span v-else aria-current="page" class="block max-w-[14ch] truncate font-medium text-textPrimary">{{ item.label }}</span>
+                    <router-link v-if="!item.isCurrent" :to="item.to" class="block max-w-[12ch] truncate text-fg-muted hover:text-fg hover:underline underline-offset-4">{{ item.label }}</router-link>
+                    <span v-else aria-current="page" class="block max-w-[14ch] truncate font-medium text-fg">{{ item.label }}</span>
                 </li>
             </template>
         </ol>
