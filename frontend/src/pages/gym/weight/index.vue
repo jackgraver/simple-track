@@ -4,6 +4,7 @@ import { computed, ref, watch } from "vue";
 import { useRoute } from "vue-router";
 import {
     latestWeightLbs,
+    useImportWeightCsv,
     useSaveWeight,
     useWeightLogs,
 } from "~/api/tracking/queries";
@@ -115,6 +116,56 @@ const handleSave = async () => {
     }
 };
 const saving = computed(() => saveMutation.isPending.value);
+
+const importMutation = useImportWeightCsv();
+const importText = ref("");
+const importing = computed(() => importMutation.isPending.value);
+const errorMessage = (err: unknown, fallback: string) => {
+    if (axios.isAxiosError(err)) {
+        const e0 = (err.response?.data as { error?: string } | undefined)?.error;
+        if (e0) return e0;
+    }
+    return err instanceof Error ? err.message : fallback;
+};
+const handleImport = async () => {
+    const csv = importText.value.trim();
+    if (!csv) {
+        toast.push("Paste your Renpho CSV first", "error");
+        return;
+    }
+    try {
+        const res = await importMutation.mutateAsync(csv);
+        importText.value = "";
+        toast.push(
+            `Imported ${res.created} new, ${res.updated} updated`,
+            "success",
+        );
+    } catch (err: unknown) {
+        toast.push(errorMessage(err, "Import failed"), "error");
+    }
+};
+const pasteFromClipboard = async () => {
+    try {
+        importText.value = await navigator.clipboard.readText();
+    } catch {
+        toast.push("Couldn't read clipboard; paste into the box instead", "error");
+    }
+};
+
+const metricsForDay = computed(() => {
+    const l = existingLogForDate.value;
+    if (!l) return [];
+    const fmt = (v: number | null | undefined, suffix = "") =>
+        v == null ? null : `${v}${suffix}`;
+    return [
+        { label: "Body fat", value: fmt(l.body_fat_pct, "%") },
+        { label: "Muscle", value: fmt(l.muscle_pct, "%") },
+        { label: "Body water", value: fmt(l.body_water_pct, "%") },
+        { label: "BMI", value: fmt(l.bmi) },
+        { label: "Visceral fat", value: fmt(l.visceral_fat) },
+        { label: "BMR", value: fmt(l.bmr_kcal, " kcal") },
+    ].filter((m): m is { label: string; value: string } => m.value != null);
+});
 </script>
 <template>
     <div class="flex w-full min-w-0 flex-col gap-6">
@@ -148,6 +199,51 @@ const saving = computed(() => saveMutation.isPending.value);
             >
                 {{ saving ? "Saving…" : "Save" }}
             </button>
+        </form>
+        <div
+            v-if="metricsForDay.length"
+            class="grid grid-cols-3 gap-3 rounded-md border border-(--color-border) bg-firstBg p-4"
+        >
+            <div v-for="m in metricsForDay" :key="m.label" class="flex flex-col">
+                <span class="text-xs text-textSecondary">{{ m.label }}</span>
+                <span class="text-sm font-semibold text-textPrimary">{{
+                    m.value
+                }}</span>
+            </div>
+        </div>
+        <form
+            class="flex flex-col gap-3 rounded-md border border-(--color-border) bg-firstBg p-4"
+            @submit.prevent="handleImport"
+        >
+            <h2 class="m-0 text-base font-semibold text-textPrimary">
+                Import from Renpho
+            </h2>
+            <p class="m-0 text-sm text-textSecondary">
+                Copy your CSV in the Renpho app, then paste it here. Existing
+                days are overwritten.
+            </p>
+            <textarea
+                v-model="importText"
+                rows="4"
+                placeholder="No.,Date,Time,Weight(lb),..."
+                class="w-full rounded-md border border-(--color-border) bg-secondBg p-2 font-mono text-xs text-textPrimary"
+            />
+            <div class="flex gap-2">
+                <button
+                    type="button"
+                    class="rounded-md bg-secondBg px-4 py-2 text-sm font-semibold text-textPrimary transition-colors hover:bg-thirdBg"
+                    @click="pasteFromClipboard"
+                >
+                    Paste
+                </button>
+                <button
+                    type="submit"
+                    class="flex-1 rounded-md bg-secondBg px-4 py-2 text-sm font-semibold text-textPrimary transition-colors hover:bg-thirdBg disabled:opacity-50"
+                    :disabled="importing || !importText.trim()"
+                >
+                    {{ importing ? "Importing…" : "Import" }}
+                </button>
+            </div>
         </form>
         <div v-if="isError" class="text-sm text-(--color-cf-red)">
             {{ error?.message ?? "Failed to load" }}

@@ -20,6 +20,7 @@ import {
     saveSteps,
     saveWater,
     saveWeight,
+    importWeightCsv,
     updateDrinkSizePreset,
 } from "~/api/tracking/api";
 import type { BodyWeightLog } from "~/api/tracking/types";
@@ -64,6 +65,16 @@ export function useSaveWeight() {
             date: string;
             weightLbs: number;
         }) => saveWeight(date, weightLbs),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: trackingKeys.weight });
+        },
+    });
+}
+
+export function useImportWeightCsv() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: (csv: string) => importWeightCsv(csv),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: trackingKeys.weight });
         },

@@ -17,6 +17,7 @@ func RegisterWeightRoutes(group *gin.RouterGroup, db *gorm.DB) {
 	h := handler{db: db}
 	group.GET("", h.getWeights)
 	group.POST("", h.postWeight)
+	group.POST("/import", h.importWeights)
 }
 
 func (h *handler) getWeights(c *gin.Context) {
@@ -51,4 +52,27 @@ func (h *handler) postWeight(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"log": row})
+}
+
+type importWeightsBody struct {
+	CSV string `json:"csv"`
+}
+
+func (h *handler) importWeights(c *gin.Context) {
+	var body importWeightsBody
+	if err := c.ShouldBindJSON(&body); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	logs, err := ParseRenphoCSV(body.CSV)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	created, updated, err := ImportBodyWeights(h.db, logs)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"created": created, "updated": updated})
 }

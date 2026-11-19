@@ -1,6 +1,7 @@
 import { apiDELETE, apiGET, apiPATCH, apiPOST, apiPUT } from '~/api/client';
 import type {
     BodyWeightLog,
+    WeightImportResult,
     DrinkSizePreset,
     GroceryItem,
     ParsedGroceryLine,
@@ -30,6 +31,10 @@ export async function fetchWeightLogs(limit?: number): Promise<BodyWeightLog[]> 
     const params = limit != null && limit > 0 ? { limit } : undefined;
     const res = await apiGET<{ logs: BodyWeightLog[] }>('/tracking/weight', { params });
     return res.logs ?? [];
+}
+
+export async function importWeightCsv(csv: string): Promise<WeightImportResult> {
+    return apiPOST<WeightImportResult>('/tracking/weight/import', { csv });
 }
 
 export async function saveWeight(date: string, weightLbs: number): Promise<BodyWeightLog> {
