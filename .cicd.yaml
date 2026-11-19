@@ -18,6 +18,9 @@ steps:
   - name: frontend-install
     run: mise exec node@22 -- npm ci --no-audit --no-fund
     dir: frontend
+  - name: frontend-lint
+    run: mise exec node@22 -- npx eslint .
+    dir: frontend
   - name: frontend-test
     run: mise exec node@22 -- npx vitest run
     dir: frontend
