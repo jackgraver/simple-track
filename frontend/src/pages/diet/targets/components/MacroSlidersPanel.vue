@@ -3,6 +3,7 @@ import { computed } from "vue";
 import type { MacroSlidersApi } from "../useMacroSliders";
 import MacroSlider from "./MacroSlider.vue";
 import MacroToWeightRatio from "./MacroToWeightRatio.vue";
+import { Field, Input } from "~/shared/ui";
 
 const props = defineProps<{
     sliders: MacroSlidersApi;
@@ -67,20 +68,24 @@ const calorieDeltaLabel = computed(() => {
 
 const calorieDeltaClass = computed(() => {
     const delta = props.sliders.calorieDelta.value;
-    if (delta === 0) return "text-emerald-400/90";
-    if (Math.abs(delta) <= 20) return "text-amber-300/90";
-    return "text-red-400/90";
+    if (delta === 0) return "text-success";
+    if (Math.abs(delta) <= 20) return "text-warn";
+    return "text-danger";
 });
 
-function onFiberInput(e: Event) {
-    props.sliders.setFiberG(Number((e.target as HTMLInputElement).value) || 0);
-}
+const fiberModel = computed<number | string>({
+    get: () => props.sliders.fiberG.value,
+    set: (v) => props.sliders.setFiberG(Number(v) || 0),
+});
 
-function applyProteinFromWeight() {
+// The ratio typed in the row is what gets applied (it used to be ignored in favour of the stored 0.8 / 0.3).
+function applyProteinFromWeight(ratio: number) {
+    props.sliders.proteinGPerLb.value = ratio;
     props.sliders.applyProteinFromBodyWeight(props.weightLbs);
 }
 
-function applyFatFromWeight() {
+function applyFatFromWeight(ratio: number) {
+    props.sliders.fatGPerLb.value = ratio;
     props.sliders.applyFatFromBodyWeight(props.weightLbs);
 }
 </script>
@@ -93,13 +98,13 @@ function applyFatFromWeight() {
             :min-grams="0"
             :max-grams="5000"
             :display-max-grams="5000"
-            track-bg-class="bg-amber-500/70"
+            track-bg-class="bg-macro-calories/70"
             hide-lock
             :stat-text="calorieDeltaLabel"
             :stat-class="calorieDeltaClass"
             @update:grams="sliders.setCalorieTarget"
         />
-        <div class="grid grid-cols-1 gap-4 md:grid-cols-[1fr_10rem]">
+        <div class="flex flex-col gap-4">
             <div class="flex flex-col gap-4">
                 <div class="flex flex-col gap-2">
                     <MacroSlider
@@ -110,7 +115,7 @@ function applyFatFromWeight() {
                         :display-max-grams="displayMaxP"
                         :pct="sliders.proteinCalPct.value"
                         :locked="sliders.lockProtein.value"
-                        track-bg-class="bg-[#60a5fa]/70"
+                        track-bg-class="bg-macro-protein/70"
                         :marker-grams="proteinMarkers"
                         @update:grams="sliders.setProteinG"
                         @toggle-lock="
@@ -134,7 +139,7 @@ function applyFatFromWeight() {
                         :display-max-grams="displayMaxF"
                         :pct="sliders.fatCalPct.value"
                         :locked="sliders.lockFat.value"
-                        track-bg-class="bg-[#a855f7]/70"
+                        track-bg-class="bg-macro-fat/70"
                         :marker-grams="fatMarkers"
                         @update:grams="sliders.setFatG"
                         @toggle-lock="
@@ -156,23 +161,22 @@ function applyFatFromWeight() {
                         :display-max-grams="displayMaxC"
                         :pct="sliders.carbsCalPct.value"
                         :locked="sliders.lockCarbs.value"
-                        track-bg-class="bg-[#ef4444]/70"
+                        track-bg-class="bg-macro-carbs/70"
                         :marker-grams="carbsMarkers"
                         @update:grams="sliders.setCarbsG"
                         @toggle-lock="
                             sliders.lockCarbs.value = !sliders.lockCarbs.value
                         "
                     />
-                    <span class="text-xs text-zinc-500">Fiber</span>
-                    <input
-                        :value="sliders.fiberG.value"
-                        type="number"
-                        min="0"
-                        :max="sliders.carbsG.value"
-                        step="1"
-                        class="max-w-24 rounded-md border border-zinc-600 bg-zinc-900 px-2 py-1 text-sm text-zinc-100 outline-none ring-amber-700/40 focus:border-amber-600 focus:ring-2"
-                        @input="onFiberInput"
-                    />
+                    <div class="max-w-32">
+                        <Field label="Fiber (g)">
+                            <Input
+                                v-model="fiberModel"
+                                type="number"
+                                inputmode="decimal"
+                            />
+                        </Field>
+                    </div>
                 </div>
             </div>
         </div>

@@ -7,45 +7,6 @@
       "count": 1
     }
   },
-  "src/pages/diet/edit-planned/index.vue": {
-    "better-tailwindcss/no-deprecated-classes": {
-      "count": 4
-    },
-    "better-tailwindcss/no-restricted-classes": {
-      "count": 93
-    }
-  },
-  "src/pages/diet/targets/components/MacroSlider.vue": {
-    "better-tailwindcss/no-deprecated-classes": {
-      "count": 1
-    },
-    "better-tailwindcss/no-restricted-classes": {
-      "count": 15
-    },
-    "vue/no-restricted-block": {
-      "count": 1
-    }
-  },
-  "src/pages/diet/targets/components/MacroSlidersPanel.vue": {
-    "better-tailwindcss/no-restricted-classes": {
-      "count": 6
-    }
-  },
-  "src/pages/diet/targets/components/MacroToWeightRatio.vue": {
-    "better-tailwindcss/no-restricted-classes": {
-      "count": 11
-    }
-  },
-  "src/pages/diet/targets/components/TDEECalculator.vue": {
-    "better-tailwindcss/no-restricted-classes": {
-      "count": 21
-    }
-  },
-  "src/pages/diet/targets/index.vue": {
-    "better-tailwindcss/no-restricted-classes": {
-      "count": 14
-    }
-  },
   "src/pages/finances/account.vue": {
     "better-tailwindcss/no-deprecated-classes": {
       "count": 3

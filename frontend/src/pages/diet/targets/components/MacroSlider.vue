@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Lock, Unlock } from "lucide-vue-next";
 import { computed } from "vue";
+import { Badge, IconButton, Input } from "~/shared/ui";
 
 const props = defineProps<{
     label: string;
@@ -11,6 +12,7 @@ const props = defineProps<{
     pct?: number;
     locked?: boolean;
     readonly?: boolean;
+    /** Full token class for the filled part, e.g. `bg-macro-protein/70`. */
     trackBgClass: string;
     markerGrams?: number[];
     hideLock?: boolean;
@@ -43,81 +45,57 @@ function onRangeInput(e: Event) {
     );
 }
 
-function onNumberInput(e: Event) {
-    if (inputDisabled.value) return;
-    emit(
-        "update:grams",
-        clampGrams(Number((e.target as HTMLInputElement).value) || 0),
-    );
-}
+const gramsModel = computed<number | string>({
+    get: () => props.grams,
+    set: (v) => {
+        if (inputDisabled.value) return;
+        emit("update:grams", clampGrams(Number(v) || 0));
+    },
+});
 
 const markerStyles = computed(() => {
     const max = displayMax.value;
-    const markers = props.markerGrams ?? [];
-    return markers
+    return (props.markerGrams ?? [])
         .filter((g) => g > 0 && g <= max)
-        .map((g) => ({
-            left: `${(g / max) * 100}%`,
-        }));
+        .map((g) => ({ left: `${(g / max) * 100}%` }));
 });
 </script>
 
 <template>
     <div class="flex flex-col gap-1">
         <div class="flex flex-wrap items-center justify-between gap-2">
-            <span class="text-sm font-medium text-zinc-300">{{ label }}</span>
+            <span class="text-sm font-medium text-fg">{{ label }}</span>
             <div class="flex items-center gap-2">
-                <span
-                    v-if="readonly"
-                    class="rounded-full border border-zinc-700 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-zinc-500"
-                >
-                    Fixed
-                </span>
+                <Badge v-if="readonly" variant="outline">Fixed</Badge>
                 <span
                     v-if="statText !== undefined"
                     class="text-xs font-medium"
                     :class="statClass"
                     >{{ statText }}</span
                 >
-                <span v-else class="text-xs tabular-nums text-zinc-500"
+                <span v-else class="text-xs text-fg-muted tabular-nums"
                     >{{ Math.round((pct ?? 0) * 10) / 10 }}% kcal</span
                 >
-                <button
+                <IconButton
                     v-if="!hideLock"
-                    type="button"
-                    class="rounded p-1 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200"
-                    :aria-pressed="locked"
+                    :label="`${locked ? 'Unlock' : 'Lock'} ${label}`"
+                    size="sm"
+                    :aria-pressed="!!locked"
                     @click="emit('toggleLock')"
                 >
                     <Lock v-if="locked" class="size-4" />
                     <Unlock v-else class="size-4" />
-                </button>
+                </IconButton>
             </div>
         </div>
-        <div class="relative h-5">
-            <div
-                class="pointer-events-none absolute inset-x-0 top-1/2 h-2 -translate-y-1/2 rounded-full bg-zinc-800"
-            />
-            <div
-                class="pointer-events-none absolute left-0 top-1/2 h-2 -translate-y-1/2 rounded-l-full"
-                :class="trackBgClass"
-                :style="{ width: `${trackFillPct}%` }"
-            />
-            <span
-                v-for="(m, i) in markerStyles"
-                :key="i"
-                class="pointer-events-none absolute top-1/2 h-4 w-0.5 -translate-x-1/2 -translate-y-1/2 bg-zinc-100/80"
-                :style="{ left: m.left }"
-            />
-            <span
-                class="pointer-events-none absolute top-1/2 z-20 size-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-zinc-600 bg-zinc-50"
-                :class="inputDisabled ? 'opacity-60' : ''"
-                :style="{ left: `${trackFillPct}%` }"
-            />
+        <!-- A real range input sits invisibly on top (touch, keyboard, ARIA); the visible track,
+             markers and thumb are drawn beneath it. -->
+        <div class="relative h-touch lg:h-6">
             <input
                 type="range"
-                class="absolute inset-x-0 top-0 z-10 h-5 w-full appearance-none bg-transparent opacity-0"
+                class="peer absolute inset-0 z-raised m-0 h-full w-full appearance-none bg-transparent opacity-0"
                 :class="inputDisabled ? 'cursor-not-allowed' : 'cursor-pointer'"
+                :aria-label="label"
                 min="0"
                 :max="displayMax"
                 step="1"
@@ -125,43 +103,34 @@ const markerStyles = computed(() => {
                 :disabled="inputDisabled"
                 @input="onRangeInput"
             />
+            <div
+                class="pointer-events-none absolute inset-x-0 top-1/2 h-2 -translate-y-1/2 rounded-full bg-surface-3"
+            ></div>
+            <div
+                class="pointer-events-none absolute top-1/2 left-0 h-2 -translate-y-1/2 rounded-l-full"
+                :class="trackBgClass"
+                :style="{ width: `${trackFillPct}%` }"
+            ></div>
+            <span
+                v-for="(m, i) in markerStyles"
+                :key="i"
+                class="pointer-events-none absolute top-1/2 h-4 w-0.5 -translate-x-1/2 -translate-y-1/2 bg-fg/80"
+                :style="{ left: m.left }"
+            ></span>
+            <span
+                class="pointer-events-none absolute top-1/2 size-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-line-strong bg-fg peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-accent"
+                :class="inputDisabled ? 'opacity-60' : ''"
+                :style="{ left: `${trackFillPct}%` }"
+            ></span>
         </div>
-        <input
-            type="number"
-            :min="minSafe"
-            :max="maxSafe"
-            step="1"
-            :value="grams"
-            :disabled="inputDisabled"
-            class="max-w-28 rounded-md border border-zinc-600 bg-zinc-900 px-2 py-1 text-sm text-zinc-100 disabled:cursor-not-allowed disabled:opacity-60"
-            @input="onNumberInput"
-        />
+        <div class="max-w-32">
+            <Input
+                v-model="gramsModel"
+                type="number"
+                inputmode="decimal"
+                :disabled="inputDisabled"
+                :aria-label="`${label} amount`"
+            />
+        </div>
     </div>
 </template>
-
-<style scoped>
-.macro-slider-input::-webkit-slider-runnable-track {
-    height: 8px;
-    background: transparent;
-}
-.macro-slider-input::-webkit-slider-thumb {
-    appearance: none;
-    height: 14px;
-    width: 14px;
-    border-radius: 9999px;
-    background: #fafafa;
-    border: 2px solid #52525b;
-}
-.macro-slider-input::-moz-range-track,
-.macro-slider-input::-moz-range-progress {
-    height: 8px;
-    background: transparent;
-}
-.macro-slider-input::-moz-range-thumb {
-    height: 14px;
-    width: 14px;
-    border-radius: 9999px;
-    background: #fafafa;
-    border: 2px solid #52525b;
-}
-</style>

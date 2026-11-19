@@ -11,6 +11,7 @@ import {
 import { toast } from "~/composables/toast/useToast";
 import { dietKeys } from "~/api/diet/keys";
 import { useDietLogsToday } from "~/api/diet/queries";
+import { Button, Card, ErrorState, PageHeader, Section, Skeleton, useDelayedFlag } from "~/shared/ui";
 import MacroSlidersPanel from "./components/MacroSlidersPanel.vue";
 import TDEECalculator from "./components/TDEECalculator.vue";
 import { useMacroSliders } from "./useMacroSliders";
@@ -22,6 +23,7 @@ const {
     data: dayData,
     isPending: dayPending,
     error: loadError,
+    refetch: refetchDay,
 } = useDietLogsToday(0);
 const { data: profile, isPending: profilePending } = useProfile();
 const { data: weightLogs, isPending: weightPending } = useWeightLogs();
@@ -95,6 +97,7 @@ const saving = computed(() => saveMutation.isPending.value);
 const isPending = computed(
     () => dayPending.value || profilePending.value || weightPending.value,
 );
+const showSkeleton = useDelayedFlag(isPending);
 const submit = () => saveMutation.mutate();
 function applyTdeeCalories(n: number) {
     sliders.setCalorieTarget(n);
@@ -102,55 +105,61 @@ function applyTdeeCalories(n: number) {
 </script>
 
 <template>
-    <div class="flex flex-col gap-5 pb-8 pt-2">
-        <div class="flex items-baseline gap-3">
-            <h1 class="m-0 text-lg font-semibold text-textPrimary">
-                Macro Targets
-            </h1>
-            <span v-if="dayData?.day.plan?.name" class="text-sm text-zinc-500">
-                {{ dayData.day.plan.name }}
-            </span>
-        </div>
-        <div v-if="isPending" class="text-zinc-500">Loading…</div>
-        <div v-else-if="loadError" class="text-red-400">
-            {{ loadError.message }}
+    <div class="mx-auto flex w-full max-w-3xl flex-col gap-6 pt-2 pb-above-tabbar lg:pb-10">
+        <PageHeader title="Macro targets">
+            <template v-if="dayData?.day.plan?.name" #meta>{{
+                dayData.day.plan.name
+            }}</template>
+        </PageHeader>
+        <ErrorState
+            v-if="loadError"
+            title="Couldn't load your targets"
+            :error="loadError"
+            @retry="refetchDay()"
+        />
+        <div v-else-if="isPending" class="flex flex-col gap-6">
+            <template v-if="showSkeleton">
+                <Skeleton shape="block" height="12rem" />
+                <Skeleton shape="block" height="20rem" />
+            </template>
         </div>
         <template v-else>
-            <section
-                class="flex flex-col gap-3 rounded-lg border border-zinc-700 bg-zinc-950/40 p-4"
-            >
-                <div
-                    class="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1"
+            <Section title="TDEE estimate">
+                <Card>
+                    <div class="flex flex-col gap-4">
+                        <p class="m-0 text-xs text-fg-muted">
+                            {{ weightLbs }} lb · {{ heightFtIn }} · {{ age }} yr ·
+                            {{ sex }}
+                        </p>
+                        <TDEECalculator
+                            :bmr="bmr"
+                            :tdee="tdee"
+                            :multiplier="multiplier"
+                            @apply-calories="applyTdeeCalories"
+                        />
+                    </div>
+                </Card>
+            </Section>
+            <Section title="Macros">
+                <Card>
+                    <MacroSlidersPanel
+                        :sliders="sliders"
+                        :weight-lbs="weightLbs"
+                    />
+                </Card>
+            </Section>
+            <div>
+                <Button
+                    variant="primary"
+                    size="lg"
+                    class="w-full lg:w-auto"
+                    :loading="saving"
+                    :disabled="planId == null || !macrosValid"
+                    @click="submit"
                 >
-                    <h2 class="m-0 text-sm font-medium text-zinc-200">
-                        TDEE estimate
-                    </h2>
-                    <span class="text-xs text-zinc-500"
-                        >{{ weightLbs }} lb · {{ heightFtIn }} · {{ age }} yr ·
-                        {{ sex }}</span
-                    >
-                </div>
-                <TDEECalculator
-                    :bmr="bmr"
-                    :tdee="tdee"
-                    :multiplier="multiplier"
-                    @apply-calories="applyTdeeCalories"
-                />
-            </section>
-            <section
-                class="flex flex-col gap-3 rounded-lg border border-zinc-700 bg-zinc-950/40 p-4"
-            >
-                <h2 class="m-0 text-sm font-medium text-zinc-200">Macros</h2>
-                <MacroSlidersPanel :sliders="sliders" :weight-lbs="weightLbs" />
-            </section>
-            <button
-                type="button"
-                class="w-full rounded-md border border-amber-700/50 bg-amber-950/40 px-4 py-2.5 text-sm font-semibold text-amber-100 transition-colors hover:bg-amber-950/70 disabled:opacity-50"
-                :disabled="saving || planId == null || !macrosValid"
-                @click="submit"
-            >
-                {{ saving ? "Saving…" : "Save targets" }}
-            </button>
+                    Save targets
+                </Button>
+            </div>
         </template>
     </div>
 </template>
