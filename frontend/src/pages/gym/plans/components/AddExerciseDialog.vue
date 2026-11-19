@@ -51,7 +51,7 @@ const createExercise = async (name: string) => {
 </script>
 
 <template>
-    <div class="add-exercise-dialog">
+    <div class="flex max-h-[60vh] min-h-72 flex-col">
         <SearchList
             route="workout/exercises/all"
             :onSelect="addExerciseToPlan"
@@ -61,12 +61,3 @@ const createExercise = async (name: string) => {
         />
     </div>
 </template>
-
-<style scoped>
-.add-exercise-dialog {
-    display: flex;
-    flex-direction: column;
-    min-height: 300px;
-    max-height: 60vh;
-}
-</style>

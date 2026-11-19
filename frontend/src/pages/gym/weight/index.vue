@@ -22,6 +22,7 @@ import {
 import axios from "axios";
 import { ClipboardList } from "lucide-vue-next";
 import { openImportWeightDialog } from "./dialog/useImportDialog";
+import { Button, Card, ErrorState, PageHeader, Section, Skeleton, useDelayedFlag } from "~/shared/ui";
 import NumberSlider from "~/pages/gym/logging/exercise/components/NumberSlider.vue";
 
 const WEIGHT_SLIDER_PADDING = 25;
@@ -33,7 +34,8 @@ const gymHomeQuery = computed(() =>
     dateOffset.value === 0 ? {} : { offset: String(dateOffset.value) },
 );
 const weightLbs = ref(0);
-const { data: logs, isPending, isError, error } = useWeightLogs();
+const { data: logs, isPending, isError, error, refetch } = useWeightLogs();
+const showSkeleton = useDelayedFlag(() => isPending.value);
 const saveMutation = useSaveWeight();
 const rows = computed(() => logs.value ?? []);
 const existingLogForDate = computed(() =>
@@ -133,82 +135,38 @@ const metricsForDay = computed(() => {
 </script>
 <template>
     <div class="flex w-full min-w-0 flex-col gap-6">
-        <div
-            class="flex items-center justify-between gap-4 border-b border-(--color-border) pb-3"
-        >
-            <h1 class="m-0 text-lg font-semibold text-textPrimary">
-                Body weight
-            </h1>
-            <button
-                type="button"
-                class="ml-auto mr-3 flex items-center gap-1.5 rounded-md bg-zinc-800 px-2.5 py-1.5 text-sm text-zinc-200 hover:bg-zinc-700"
-                @click="openImportWeightDialog"
-            >
-                <ClipboardList class="size-4" aria-hidden="true" />
-                Import
-            </button>
-            <router-link
-                :to="{ name: 'gym', query: gymHomeQuery }"
-                class="text-sm text-textSecondary transition-colors hover:text-textPrimary"
-                >Back</router-link
-            >
-        </div>
-        <form
-            class="flex flex-col gap-3 rounded-md border border-(--color-border) bg-firstBg p-4"
-            @submit.prevent="handleSave"
-        >
-            <NumberSlider
-                v-model="weightLbs"
-                :label="weightLabel"
-                :step="0.1"
-                :min="sliderMin"
-                :max="sliderMax"
-            />
-            <button
-                type="submit"
-                class="rounded-md bg-secondBg px-4 py-2 text-sm font-semibold text-textPrimary transition-colors hover:bg-thirdBg disabled:opacity-50"
-                :disabled="saving"
-            >
-                {{ saving ? "Saving…" : "Save" }}
-            </button>
-        </form>
-        <div
-            v-if="metricsForDay.length"
-            class="grid grid-cols-3 gap-3 rounded-md border border-(--color-border) bg-firstBg p-4"
-        >
-            <div v-for="m in metricsForDay" :key="m.label" class="flex flex-col">
-                <span class="text-xs text-textSecondary">{{ m.label }}</span>
-                <span class="text-sm font-semibold text-textPrimary">{{
-                    m.value
-                }}</span>
-            </div>
-        </div>
-        <div v-if="isError" class="text-sm text-(--color-cf-red)">
-            {{ error?.message ?? "Failed to load" }}
-        </div>
-        <div v-else-if="isPending" class="text-sm text-textSecondary">
-            Loading…
-        </div>
-        <template v-else>
-            <div class="flex min-w-0 flex-col gap-2">
-                <h2 class="m-0 text-base font-semibold text-textPrimary">
-                    Previous
-                </h2>
-                <div
-                    v-if="hasChartData"
-                    class="h-72 min-h-72 w-full min-w-0 lg:h-80 lg:min-h-80"
-                >
-                    <Chart
-                        type="line"
-                        :data="weightChart.data"
-                        :options="weightChart.options"
-                        class="h-full w-full"
-                    />
+        <PageHeader title="Body weight">
+            <template #actions>
+                <Button variant="secondary" @click="openImportWeightDialog">
+                    <ClipboardList class="size-4" aria-hidden="true" />
+                    Import
+                </Button>
+                <Button variant="ghost" :to="{ name: 'gym', query: gymHomeQuery }">Back</Button>
+            </template>
+        </PageHeader>
+        <Card>
+            <form class="flex flex-col gap-3" @submit.prevent="handleSave">
+                <NumberSlider v-model="weightLbs" :label="weightLabel" :step="0.1" :min="sliderMin" :max="sliderMax" />
+                <Button type="submit" variant="primary" :loading="saving">{{ saving ? "Saving…" : "Save" }}</Button>
+            </form>
+        </Card>
+        <Card v-if="metricsForDay.length">
+            <div class="grid grid-cols-3 gap-3">
+                <div v-for="m in metricsForDay" :key="m.label" class="flex flex-col">
+                    <span class="text-xs text-fg-muted">{{ m.label }}</span>
+                    <span class="text-sm font-semibold text-fg">{{ m.value }}</span>
                 </div>
-                <p v-else class="m-0 text-sm text-textSecondary">
-                    No history through this day yet.
-                </p>
             </div>
+        </Card>
+        <ErrorState v-if="isError" :error="error" title="Couldn't load your weight history" @retry="refetch()" />
+        <template v-else-if="isPending">
+            <Skeleton v-if="showSkeleton" shape="block" height="18rem" />
         </template>
+        <Section v-else title="Previous">
+            <div v-if="hasChartData" class="h-72 min-h-72 w-full min-w-0 lg:h-80 lg:min-h-80">
+                <Chart type="line" :data="weightChart.data" :options="weightChart.options" class="h-full w-full" />
+            </div>
+            <p v-else class="m-0 text-sm text-fg-muted">No history through this day yet.</p>
+        </Section>
     </div>
 </template>

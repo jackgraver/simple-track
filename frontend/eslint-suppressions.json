@@ -222,66 +222,6 @@
       "count": 1
     }
   },
-  "src/pages/gym/WorkoutActivityGraph.vue": {
-    "better-tailwindcss/no-deprecated-classes": {
-      "count": 2
-    },
-    "better-tailwindcss/no-unknown-classes": {
-      "count": 1
-    }
-  },
-  "src/pages/gym/index.vue": {
-    "better-tailwindcss/no-restricted-classes": {
-      "count": 1
-    }
-  },
-  "src/pages/gym/plans/[id].vue": {
-    "better-tailwindcss/no-deprecated-classes": {
-      "count": 4
-    }
-  },
-  "src/pages/gym/plans/components/AddExerciseDialog.vue": {
-    "better-tailwindcss/no-unknown-classes": {
-      "count": 1
-    },
-    "vue/no-restricted-block": {
-      "count": 1
-    }
-  },
-  "src/pages/gym/plans/components/CreateExerciseForPlanDialog.vue": {
-    "better-tailwindcss/no-unknown-classes": {
-      "count": 13
-    },
-    "vue/no-restricted-block": {
-      "count": 1
-    }
-  },
-  "src/pages/gym/plans/components/EditExerciseDialog.vue": {
-    "better-tailwindcss/no-unknown-classes": {
-      "count": 13
-    },
-    "vue/no-restricted-block": {
-      "count": 1
-    }
-  },
-  "src/pages/gym/plans/components/MobilityItemEditor.vue": {
-    "better-tailwindcss/no-deprecated-classes": {
-      "count": 1
-    }
-  },
-  "src/pages/gym/plans/index.vue": {
-    "better-tailwindcss/no-deprecated-classes": {
-      "count": 1
-    },
-    "better-tailwindcss/no-restricted-classes": {
-      "count": 5
-    }
-  },
-  "src/pages/gym/progression/ExerciseProgressionChartPanel.vue": {
-    "better-tailwindcss/no-deprecated-classes": {
-      "count": 2
-    }
-  },
   "src/pages/home/index.vue": {
     "vue/no-restricted-block": {
       "count": 1

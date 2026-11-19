@@ -1,21 +1,24 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import { useRoute } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 import { useWorkoutLogToday } from "~/api/workout/queries";
 import WorkoutActivityGraph from "~/pages/gym/WorkoutActivityGraph.vue";
 import SwitchWorkoutPlanDialog from "~/pages/gym/components/SwitchWorkoutPlanDialog.vue";
 import ModuleTitleBar from "~/shared/ModuleTitleBar.vue";
 import { dialogManager } from "~/composables/dialog/useDialog";
 import { Pencil } from "lucide-vue-next";
+import { Button, ErrorState, IconButton, Skeleton, useDelayedFlag } from "~/shared/ui";
 
 const route = useRoute();
+const router = useRouter();
 const isGymHome = computed(() => route.name === "gym");
 const dayOffset = computed(() => {
     const raw = route.query.offset;
     const value = typeof raw === "string" ? Number.parseInt(raw, 10) : 0;
     return Number.isNaN(value) ? 0 : value;
 });
-const { data, isError, error } = useWorkoutLogToday(dayOffset, isGymHome);
+const { data, isError, error, isPending, refetch } = useWorkoutLogToday(dayOffset, isGymHome);
+const showSkeleton = useDelayedFlag(() => isPending.value);
 
 const currentPlanId = computed(() => data.value?.workout_plan_id ?? null);
 
@@ -40,30 +43,17 @@ const loggingRoute = computed(() => ({
 <template>
     <div class="flex w-full flex-col gap-6">
         <template v-if="isGymHome">
-            <div v-if="isError" class="text-sm text-(--color-cf-red)">
-                Error: {{ error?.message ?? "Failed to load" }}
-            </div>
+            <ErrorState v-if="isError" :error="error" title="Couldn't load today's workout" @retry="refetch()" />
             <template v-else>
                 <ModuleTitleBar title="Gym" :links="[]" />
-                <section class="flex flex-col gap-2">
-                    <div class="flex items-center justify-between">
-                        <h1 class="text-lg font-semibold text-textPrimary">
-                            {{ data?.workout_plan?.name }} Day
-                        </h1>
-                        <button
-                            type="button"
-                            class="flex items-center gap-1 rounded-md border px-2 py-1 m-0! text-sm font-medium text-zinc-200 transition-colors hover:bg-secondBg"
-                            @click="openSwitchPlanDialog()"
-                        >
-                            <Pencil :size="15" />
-                        </button>
-                    </div>
+                <section class="flex items-center justify-between gap-2">
+                    <Skeleton v-if="isPending && showSkeleton" width="10rem" height="1.75rem" />
+                    <h1 v-else class="m-0 text-lg font-semibold text-fg">{{ data?.workout_plan?.name }} Day</h1>
+                    <IconButton label="Switch workout plan" variant="secondary" @click="openSwitchPlanDialog()">
+                        <Pencil />
+                    </IconButton>
                 </section>
-                <router-link
-                    :to="loggingRoute"
-                    class="flex items-center justify-center rounded-md bg-secondBg px-4 py-3 text-sm font-semibold text-textPrimary transition-colors hover:bg-thirdBg"
-                    >Log workout</router-link
-                >
+                <Button variant="primary" size="lg" block @click="router.push(loggingRoute)">Log workout</Button>
                 <WorkoutActivityGraph />
             </template>
         </template>

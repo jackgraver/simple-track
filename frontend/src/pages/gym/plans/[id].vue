@@ -7,7 +7,8 @@ import AddExerciseDialog from "~/pages/gym/plans/components/AddExerciseDialog.vu
 import CreateExerciseForPlanDialog from "~/pages/gym/plans/components/CreateExerciseForPlanDialog.vue";
 import EditExerciseDialog from "~/pages/gym/plans/components/EditExerciseDialog.vue";
 import MobilityItemEditor from "~/pages/gym/plans/components/MobilityItemEditor.vue";
-import { X, Plus, ChevronUp, ChevronDown, Pencil } from "lucide-vue-next";
+import { X, Plus, ChevronUp, ChevronDown, Pencil, Dumbbell, SearchX } from "lucide-vue-next";
+import { Badge, Button, Card, EmptyState, ErrorState, IconButton, Input, List, ListRow, NumberField, PageHeader, Section, Select, SkeletonList, useDelayedFlag } from "~/shared/ui";
 import { computed, ref, watch } from "vue";
 import { useRoute } from "vue-router";
 import { apiClient, apiPUT } from "~/api/client";
@@ -15,7 +16,11 @@ import { useWorkoutPlansAll } from "~/api/workout/queries";
 
 const route = useRoute();
 
-const { data, isPending, refetch } = useWorkoutPlansAll();
+const { data, isPending, isError, error, refetch } = useWorkoutPlansAll();
+const showSkeleton = useDelayedFlag(() => isPending.value);
+const cardioSaving = ref(false);
+const busyExerciseId = ref<number | null>(null);
+const daySelectKey = ref(0);
 
 const plans = computed(() => data.value?.plans || []);
 const refresh = () => refetch();
@@ -68,7 +73,8 @@ watch(
 
 const savePlannedCardio = async () => {
     const p = plan.value;
-    if (!p) return;
+    if (!p || cardioSaving.value) return;
+    cardioSaving.value = true;
     try {
         await apiPUT(`workout/plans/${p.ID}/planned-cardio`, {
             type: plannedCardioInput.value.trim(),
@@ -82,6 +88,8 @@ const savePlannedCardio = async () => {
     } catch (err: unknown) {
         const message = getApiErrorMessage(err, "Something went wrong");
         toast.push("Failed to save planned cardio: " + message, "error");
+    } finally {
+        cardioSaving.value = false;
     }
 };
 
@@ -124,6 +132,7 @@ const getAssignedPlanName = (
 };
 
 const removeExerciseFromPlan = async (p: WorkoutPlan, exercise: Exercise) => {
+    busyExerciseId.value = exercise.ID;
     try {
         await apiClient.delete(`workout/plans/${p.ID}/exercises/remove`, {
             data: { exercise_id: exercise.ID },
@@ -133,6 +142,8 @@ const removeExerciseFromPlan = async (p: WorkoutPlan, exercise: Exercise) => {
     } catch (err: unknown) {
         const message = getApiErrorMessage(err, "Something went wrong");
         toast.push("Failed to remove exercise: " + message, "error");
+    } finally {
+        busyExerciseId.value = null;
     }
 };
 
@@ -181,17 +192,16 @@ const openEditExerciseDialog = (exercise: Exercise) => {
         });
 };
 
-const handleDayChange = async (p: WorkoutPlan, event: Event) => {
-    const select = event.target as HTMLSelectElement;
-    const day = parseInt(select.value);
+const handleDayChange = async (p: WorkoutPlan, value: number | "") => {
+    // Re-keying the Select puts it back on "— Select day —" after every pick.
+    const reset = () => {
+        daySelectKey.value++;
+    };
+    const day = typeof value === "number" ? value : NaN;
     const currentDays = assignedDays(p);
 
-    if (isNaN(day)) {
-        select.value = "";
-        return;
-    }
-    if (currentDays.includes(day)) {
-        select.value = "";
+    if (isNaN(day) || currentDays.includes(day)) {
+        reset();
         return;
     }
 
@@ -216,14 +226,20 @@ const handleDayChange = async (p: WorkoutPlan, event: Event) => {
         });
 
         if (!confirmed) {
-            select.value = "";
+            reset();
             return;
         }
     }
 
     await assignPlanToDay(p, day);
-    select.value = "";
+    reset();
 };
+const dayOptions = computed(() =>
+    dayNames.map((dayName, index) => ({
+        label: plan.value && isDayAssigned(index, plan.value) ? `${dayName} (${getAssignedPlanName(index, plan.value)})` : dayName,
+        value: index,
+    })),
+);
 
 const assignPlanToDay = async (p: WorkoutPlan, dayOfWeek: number) => {
     try {
@@ -272,6 +288,7 @@ const moveExerciseInPlan = async (
     if (a === undefined || b === undefined) return;
     reordered[index] = b;
     reordered[next] = a;
+    busyExerciseId.value = a.ID;
     try {
         await apiPUT(`workout/plans/${p.ID}/exercises/reorder`, {
             exercise_ids: reordered.map((e) => e.ID),
@@ -281,157 +298,83 @@ const moveExerciseInPlan = async (
     } catch (err: unknown) {
         const message = getApiErrorMessage(err, "Something went wrong");
         toast.push("Failed to reorder: " + message, "error");
+    } finally {
+        busyExerciseId.value = null;
     }
 };
 </script>
 
 <template>
     <div class="flex w-full max-w-3xl flex-col gap-4 pb-8 pt-2">
-        <div class="flex flex-wrap items-center gap-3">
-            <span
-                v-if="plan"
-                class="text-xs font-medium uppercase tracking-wide text-textSecondary"
-                >Configure plan</span
-            >
-        </div>
-        <div v-if="isPending" class="text-center text-sm text-textSecondary">
-            Loading…
-        </div>
-        <div
-            v-else-if="planIdParam === null"
-            class="rounded-lg border border-(--color-border) bg-firstBg p-6 text-center text-sm text-textSecondary"
+        <ErrorState v-if="isError" :error="error" title="Couldn't load this plan" @retry="refetch()" />
+        <SkeletonList v-else-if="isPending && showSkeleton" :rows="4" :leading="false" />
+        <span v-else-if="isPending" />
+        <EmptyState
+            v-else-if="planIdParam === null || !plan"
+            :icon="SearchX"
+            :title="planIdParam === null ? 'Invalid plan link' : 'Plan not found'"
         >
-            Invalid plan link.
-            <router-link
-                :to="{ name: 'gym-plans' }"
-                class="text-textPrimary underline underline-offset-2 hover:no-underline"
-                >Back to schedule</router-link
-            >
-        </div>
-        <div
-            v-else-if="!plan"
-            class="rounded-lg border border-(--color-border) bg-firstBg p-6 text-center text-sm text-textSecondary"
-        >
-            Plan not found.
-            <router-link
-                :to="{ name: 'gym-plans' }"
-                class="text-textPrimary underline underline-offset-2 hover:no-underline"
-                >Back to schedule</router-link
-            >
-        </div>
+            <template #action>
+                <Button :to="{ name: 'gym-plans' }">Back to schedule</Button>
+            </template>
+        </EmptyState>
         <template v-else>
-            <div
-                class="flex flex-col gap-2 border-b border-(--color-border) pb-3"
-            >
-                <h1
-                    class="m-0 text-xl font-semibold tracking-tight text-textPrimary"
-                >
-                    {{ plan.name }}
-                </h1>
-                <div class="flex flex-wrap items-center gap-2">
-                    <span
-                        v-if="assignedDays(plan).length"
-                        class="rounded-md bg-secondBg px-2 py-0.5 text-xs font-medium text-textPrimary"
-                        >{{
-                            assignedDays(plan).map(getDayName).join(", ")
-                        }}</span
-                    >
-                    <span
-                        v-else
-                        class="rounded-md bg-thirdBg/60 px-2 py-0.5 text-xs font-medium text-textSecondary"
-                        >Not Assigned to a Day</span
-                    >
-                </div>
-            </div>
-            <div class="flex flex-wrap gap-2">
-                <button
-                    type="button"
-                    class="inline-flex items-center gap-1.5 rounded-md bg-secondBg px-3 py-2 text-sm font-medium text-textPrimary transition-colors hover:bg-thirdBg disabled:opacity-50"
-                    @click="openAddExerciseToPlanDialog"
-                >
-                    <Plus class="size-4 shrink-0" />
-                    Add Exercise to plan
-                </button>
-                <button
-                    type="button"
-                    class="inline-flex items-center gap-1.5 rounded-md border border-(--color-border) bg-firstBg px-3 py-2 text-sm font-medium text-textPrimary transition-colors hover:bg-secondBg disabled:opacity-50"
-                    @click="openCreateExerciseDialog"
-                >
-                    <Plus class="size-4 shrink-0" />
+            <PageHeader :title="plan.name">
+                <template #meta>
+                    <Badge v-if="assignedDays(plan).length">{{ assignedDays(plan).map(getDayName).join(", ") }}</Badge>
+                    <Badge v-else>Not assigned to a day</Badge>
+                </template>
+            </PageHeader>
+            <div class="flex flex-col gap-2 lg:flex-row">
+                <Button @click="openAddExerciseToPlanDialog">
+                    <template #icon-left><Plus class="size-4" /></template>
+                    Add exercise to plan
+                </Button>
+                <Button variant="ghost" @click="openCreateExerciseDialog">
+                    <template #icon-left><Plus class="size-4" /></template>
                     Create exercise
-                </button>
+                </Button>
             </div>
-            <section
-                class="rounded-lg border border-(--color-border) bg-firstBg p-4"
-            >
-                <label
-                    class="mb-2 block text-xs font-medium uppercase tracking-wide text-textSecondary"
-                    >Assign to day</label
-                >
-                <div class="flex flex-wrap gap-2">
-                    <select
-                        value=""
-                        class="min-w-48 flex-1 rounded-md border border-(--color-border) bg-firstBg px-3 py-2 text-sm text-textPrimary transition-colors hover:bg-secondBg focus:outline-none focus:ring-2 focus:ring-(--color-cf-red)/40"
-                        @change="handleDayChange(plan, $event)"
-                    >
-                        <option value="">— Select day —</option>
-                        <option
-                            v-for="(dayName, index) in dayNames"
-                            :key="index"
-                            :value="index"
-                        >
-                            {{ dayName
-                            }}{{
-                                isDayAssigned(index, plan)
-                                    ? ` (${getAssignedPlanName(index, plan)})`
-                                    : ""
-                            }}
-                        </option>
-                    </select>
-                    <button
-                        v-for="day in assignedDays(plan)"
-                        :key="day"
-                        type="button"
-                        class="inline-flex items-center gap-1 rounded-md border border-(--color-border) bg-secondBg px-3 py-2 text-sm font-medium text-textPrimary transition-colors hover:bg-thirdBg"
-                        @click="unassignPlanFromDay(plan, day)"
-                    >
-                        {{ getDayName(day) }}
-                        <X class="size-3.5" />
-                    </button>
-                </div>
-            </section>
-            <section
-                class="rounded-lg border border-(--color-border) bg-firstBg p-4"
-            >
-                <label
-                    class="mb-2 block text-xs font-medium uppercase tracking-wide text-textSecondary"
-                    >Planned cardio</label
-                >
-                <div class="flex flex-wrap gap-2">
-                    <input
-                        v-model="plannedCardioInput"
-                        type="text"
-                        class="min-w-0 flex-1 rounded-md border border-(--color-border) bg-firstBg px-3 py-2 text-sm text-textPrimary placeholder:text-textSecondary/60 hover:bg-secondBg focus:outline-none focus:ring-2 focus:ring-(--color-cf-red)/40"
-                        placeholder="e.g. Bike, Run"
-                    />
-                    <input
-                        v-model.number="plannedCardioMinutesInput"
-                        type="number"
-                        min="0"
-                        step="1"
-                        class="w-28 rounded-md border border-(--color-border) bg-firstBg px-3 py-2 text-sm text-textPrimary placeholder:text-textSecondary/60 hover:bg-secondBg focus:outline-none focus:ring-2 focus:ring-(--color-cf-red)/40"
-                        placeholder="Minutes"
-                        aria-label="Planned cardio minutes"
-                    />
-                    <button
-                        type="button"
-                        class="rounded-md bg-secondBg px-3 py-2 text-sm font-medium text-textPrimary transition-colors hover:bg-thirdBg"
-                        @click="savePlannedCardio"
-                    >
-                        Save
-                    </button>
-                </div>
-            </section>
+            <Card>
+                <Section title="Assign to day">
+                    <div class="flex flex-wrap gap-2">
+                        <div class="min-w-48 flex-1">
+                            <Select
+                                :key="daySelectKey"
+                                aria-label="Assign to day"
+                                model-value=""
+                                :options="dayOptions"
+                                placeholder="— Select day —"
+                                @update:model-value="handleDayChange(plan, $event)"
+                            />
+                        </div>
+                        <Button v-for="day in assignedDays(plan)" :key="day" @click="unassignPlanFromDay(plan, day)">
+                            {{ getDayName(day) }}
+                            <template #icon-right><X class="size-3.5" /></template>
+                        </Button>
+                    </div>
+                </Section>
+            </Card>
+            <Card>
+                <Section title="Planned cardio">
+                    <div class="flex flex-col gap-2 lg:flex-row">
+                        <div class="min-w-0 flex-1">
+                            <Input v-model="plannedCardioInput" aria-label="Planned cardio type" placeholder="e.g. Bike, Run" />
+                        </div>
+                        <div class="lg:w-44">
+                            <NumberField
+                                v-model="plannedCardioMinutesInput"
+                                label="planned cardio minutes"
+                                unit="min"
+                                :min="0"
+                                :step="1"
+                                :decimals="0"
+                            />
+                        </div>
+                        <Button :loading="cardioSaving" @click="savePlannedCardio">Save</Button>
+                    </div>
+                </Section>
+            </Card>
             <div class="flex flex-col gap-3">
                 <MobilityItemEditor
                     v-model="dynamicWarmupItems"
@@ -445,82 +388,59 @@ const moveExerciseInPlan = async (
                     description="Stretches to complete after the workout."
                     placeholder="Add a stretch…"
                 />
-                <button
-                    type="button"
-                    class="self-end rounded-md bg-secondBg px-4 py-2 text-sm font-medium text-textPrimary transition-colors hover:bg-thirdBg disabled:cursor-not-allowed disabled:opacity-50"
-                    :disabled="mobilitySaving"
-                    @click="savePlannedMobility"
-                >
+                <Button class="lg:self-end" :loading="mobilitySaving" @click="savePlannedMobility">
                     {{ mobilitySaving ? "Saving…" : "Save mobility" }}
-                </button>
+                </Button>
             </div>
-            <section class="flex flex-col gap-2">
-                <h2 class="m-0 text-sm font-semibold text-textPrimary">
-                    Exercises
-                </h2>
-                <div class="flex flex-col gap-2">
-                    <div
-                        v-for="(exercise, exerciseIndex) in plan.exercises"
-                        :key="exercise.ID"
-                        class="flex items-center justify-between gap-2 rounded-md border border-(--color-border) bg-secondBg px-3 py-2"
-                    >
-                        <div class="flex min-w-0 flex-1 items-center gap-2">
-                            <button
-                                type="button"
-                                class="shrink-0 rounded p-1 text-textSecondary transition-colors hover:bg-firstBg hover:text-textPrimary"
-                                title="Edit exercise"
-                                @click="openEditExerciseDialog(exercise)"
-                            >
-                                <Pencil class="size-3.5" />
-                            </button>
-                            <span
-                                class="min-w-0 truncate text-sm text-textPrimary"
-                                >{{ exercise.name }}</span
-                            >
-                        </div>
-                        <div class="flex shrink-0 items-center gap-0.5">
-                            <button
-                                type="button"
-                                class="rounded p-1 text-textSecondary transition-colors hover:bg-firstBg hover:text-textPrimary disabled:opacity-25"
-                                :disabled="exerciseIndex === 0"
-                                title="Move up"
-                                @click="
-                                    moveExerciseInPlan(plan, exerciseIndex, -1)
-                                "
-                            >
-                                <ChevronUp class="size-4" />
-                            </button>
-                            <button
-                                type="button"
-                                class="rounded p-1 text-textSecondary transition-colors hover:bg-firstBg hover:text-textPrimary disabled:opacity-25"
-                                :disabled="
-                                    exerciseIndex === plan.exercises.length - 1
-                                "
-                                title="Move down"
-                                @click="
-                                    moveExerciseInPlan(plan, exerciseIndex, 1)
-                                "
-                            >
-                                <ChevronDown class="size-4" />
-                            </button>
-                            <button
-                                type="button"
-                                class="rounded p-1 text-(--color-cf-red) transition-colors hover:bg-(--color-cf-red)/10"
-                                title="Remove"
-                                @click="removeExerciseFromPlan(plan, exercise)"
-                            >
-                                <X class="size-4" />
-                            </button>
-                        </div>
-                    </div>
-                    <div
-                        v-if="plan.exercises.length === 0"
-                        class="rounded-md border border-dashed border-(--color-border) py-6 text-center text-sm italic text-textSecondary"
-                    >
-                        No exercises in this plan
-                    </div>
-                </div>
-            </section>
+            <Section title="Exercises">
+                <Card padding="none">
+                    <List v-if="plan.exercises.length">
+                        <ListRow
+                            v-for="(exercise, exerciseIndex) in plan.exercises"
+                            :key="exercise.ID"
+                            :pending="busyExerciseId === exercise.ID"
+                        >
+                            {{ exercise.name }}
+                            <template #trailing>
+                                <IconButton
+                                    label="Edit exercise"
+                                    size="sm"
+                                    :disabled="busyExerciseId !== null"
+                                    @click="openEditExerciseDialog(exercise)"
+                                >
+                                    <Pencil />
+                                </IconButton>
+                                <IconButton
+                                    label="Move up"
+                                    size="sm"
+                                    :disabled="exerciseIndex === 0 || busyExerciseId !== null"
+                                    @click="moveExerciseInPlan(plan, exerciseIndex, -1)"
+                                >
+                                    <ChevronUp />
+                                </IconButton>
+                                <IconButton
+                                    label="Move down"
+                                    size="sm"
+                                    :disabled="exerciseIndex === plan.exercises.length - 1 || busyExerciseId !== null"
+                                    @click="moveExerciseInPlan(plan, exerciseIndex, 1)"
+                                >
+                                    <ChevronDown />
+                                </IconButton>
+                                <IconButton
+                                    label="Remove from plan"
+                                    size="sm"
+                                    variant="danger"
+                                    :disabled="busyExerciseId !== null"
+                                    @click="removeExerciseFromPlan(plan, exercise)"
+                                >
+                                    <X />
+                                </IconButton>
+                            </template>
+                        </ListRow>
+                    </List>
+                    <EmptyState v-else :icon="Dumbbell" title="No exercises in this plan" description="Add one above." />
+                </Card>
+            </Section>
         </template>
     </div>
 </template>

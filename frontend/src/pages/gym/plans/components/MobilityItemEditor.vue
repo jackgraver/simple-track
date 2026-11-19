@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
 import { Plus, X } from "lucide-vue-next";
+import { Button, Card, IconButton, Input, List, ListRow, Section } from "~/shared/ui";
 
 const props = defineProps<{
     title: string;
@@ -36,52 +37,36 @@ const removeItem = (index: number) => {
 </script>
 
 <template>
-    <section
-        class="flex flex-col gap-3 rounded-lg border border-(--color-border) bg-firstBg p-4"
-    >
-        <div class="flex flex-col gap-1">
-            <h2 class="m-0 text-sm font-semibold text-textPrimary">
-                {{ title }}
-            </h2>
-            <p class="m-0 text-xs text-textSecondary">{{ description }}</p>
-        </div>
-        <div v-if="modelValue.length" class="flex flex-col gap-1">
-            <div
-                v-for="(item, index) in modelValue"
-                :key="`${item}-${index}`"
-                class="flex items-center gap-3 rounded-md bg-secondBg px-3 py-2 text-sm"
-            >
-                <span class="min-w-0 flex-1 text-textPrimary">{{ item }}</span>
-                <button
-                    type="button"
-                    class="shrink-0 rounded p-1 text-textSecondary transition-colors hover:bg-firstBg hover:text-(--color-cf-red)"
-                    :aria-label="`Remove ${item}`"
-                    @click="removeItem(index)"
-                >
-                    <X class="size-4" />
-                </button>
+    <Card>
+        <Section :title="title">
+            <p class="m-0 -mt-2 text-xs text-fg-muted">{{ description }}</p>
+            <Card v-if="modelValue.length" padding="none" class="bg-surface-2">
+                <List>
+                    <ListRow v-for="(item, index) in modelValue" :key="`${item}-${index}`">
+                        {{ item }}
+                        <template #trailing>
+                            <IconButton :label="`Remove ${item}`" size="sm" variant="danger" @click="removeItem(index)">
+                                <X />
+                            </IconButton>
+                        </template>
+                    </ListRow>
+                </List>
+            </Card>
+            <p v-else class="m-0 text-sm text-fg-muted">No items configured.</p>
+            <div class="flex gap-2">
+                <div class="min-w-0 flex-1">
+                    <Input
+                        v-model="newItem"
+                        :aria-label="`${title}: new item`"
+                        :placeholder="placeholder"
+                        @keydown.enter.prevent="addItem"
+                    />
+                </div>
+                <Button :disabled="!trimmedItem" @click="addItem">
+                    <template #icon-left><Plus class="size-4" /></template>
+                    Add
+                </Button>
             </div>
-        </div>
-        <p v-else class="m-0 text-sm italic text-textSecondary">
-            No items configured.
-        </p>
-        <div class="flex gap-2">
-            <input
-                v-model="newItem"
-                type="text"
-                class="min-w-0 flex-1 rounded-md border border-(--color-border) bg-firstBg px-3 py-2 text-sm text-textPrimary placeholder:text-textSecondary/60 focus:outline-none focus:ring-2 focus:ring-(--color-cf-red)/40"
-                :placeholder="placeholder"
-                @keydown.enter.prevent="addItem"
-            />
-            <button
-                type="button"
-                class="inline-flex items-center gap-1.5 rounded-md bg-secondBg px-3 py-2 text-sm font-medium text-textPrimary transition-colors hover:bg-thirdBg disabled:cursor-not-allowed disabled:opacity-40"
-                :disabled="!trimmedItem"
-                @click="addItem"
-            >
-                <Plus class="size-4" />
-                Add
-            </button>
-        </div>
-    </section>
+        </Section>
+    </Card>
 </template>

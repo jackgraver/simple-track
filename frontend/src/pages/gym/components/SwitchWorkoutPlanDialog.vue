@@ -6,6 +6,7 @@ import {
     useWorkoutPrograms,
     useSwitchWorkoutPlan,
 } from "~/api/workout/queries";
+import { Field, Select } from "~/shared/ui";
 import { toast } from "~/composables/toast/useToast";
 
 const props = defineProps<{
@@ -45,8 +46,20 @@ const planSelectValue = computed(() => {
 
 const switchingPlan = computed(() => switchPlanMutation.isPending.value);
 
-const handleSwitchPlan = async (e: Event) => {
-    const v = (e.target as HTMLSelectElement).value;
+const planOptions = computed(() => {
+    const grouped = planGroups.value.length > 1;
+    return [
+        { label: "No plan", value: "" },
+        ...planGroups.value.flatMap((group) =>
+            group.plans.map((plan) => ({
+                label: grouped ? `${group.name}: ${plan.name}` : plan.name,
+                value: String(plan.ID),
+            })),
+        ),
+    ];
+});
+
+const handleSwitchPlan = async (v: string) => {
     const planId = v === "" ? null : Number(v);
     if (planId === props.currentPlanId) return;
     try {
@@ -72,41 +85,17 @@ const handleSwitchPlan = async (e: Event) => {
 </script>
 <template>
     <div class="flex flex-col gap-2">
-        <label
-            for="gym-plan-switch"
-            class="text-xs font-medium uppercase tracking-wide text-textSecondary"
-            >Today's plan</label
-        >
-        <select
-            v-if="planGroups.length"
-            id="gym-plan-switch"
-            class="w-full rounded-md border border-(--color-border) bg-firstBg px-3 py-2 text-sm text-textPrimary transition-colors hover:bg-secondBg disabled:opacity-50"
-            :value="planSelectValue"
-            :disabled="switchingPlan"
-            @change="handleSwitchPlan"
-        >
-            <option value="">No plan</option>
-            <optgroup
-                v-for="group in planGroups"
-                :key="group.id"
-                :label="group.name"
-            >
-                <option
-                    v-for="plan in group.plans"
-                    :key="plan.ID"
-                    :value="String(plan.ID)"
-                >
-                    {{ plan.name }}
-                </option>
-            </optgroup>
-        </select>
-        <p v-else class="m-0 text-sm text-textSecondary">
+        <Field v-if="planGroups.length" label="Today's plan">
+            <Select
+                :model-value="planSelectValue"
+                :options="planOptions"
+                :disabled="switchingPlan"
+                @update:model-value="handleSwitchPlan"
+            />
+        </Field>
+        <p v-else class="m-0 text-sm text-fg-muted">
             No plans yet.
-            <router-link
-                :to="{ name: 'gym-plans' }"
-                class="text-textPrimary underline underline-offset-2 hover:no-underline"
-                >Create one</router-link
-            >
+            <router-link :to="{ name: 'gym-plans' }" class="text-fg underline underline-offset-2 hover:no-underline">Create one</router-link>
         </p>
     </div>
 </template>

@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import Chart from "~/shared/chart/Chart.vue";
 import { computed, ref, toRef } from "vue";
+import { EmptyState, ErrorState, SegmentedControl, Skeleton, useDelayedFlag } from "~/shared/ui";
+import { LineChart } from "lucide-vue-next";
 import { useQuery } from "@tanstack/vue-query";
 import { apiClient } from "~/api/client";
 import {
@@ -31,16 +33,16 @@ const rangeLabel = computed(
         })[range.value],
 );
 
-const viewOptions: { id: ViewMode; label: string }[] = [
-    { id: "chart", label: "Graph" },
-    { id: "text", label: "List" },
+const viewOptions: { value: ViewMode; label: string }[] = [
+    { value: "chart", label: "Graph" },
+    { value: "text", label: "List" },
 ];
-const rangeOptions: { id: ProgressionRange; label: string }[] = [
-    { id: "1m", label: "1 mo" },
-    { id: "3m", label: "3 mo" },
-    { id: "6m", label: "6 mo" },
-    { id: "1y", label: "1 yr" },
-    { id: "all", label: "All" },
+const rangeOptions: { value: ProgressionRange; label: string }[] = [
+    { value: "1m", label: "1 mo" },
+    { value: "3m", label: "3 mo" },
+    { value: "6m", label: "6 mo" },
+    { value: "1y", label: "1 yr" },
+    { value: "all", label: "All" },
 ];
 
 const exerciseId = toRef(props, "exerciseId");
@@ -49,6 +51,7 @@ const {
     data: progressionPayload,
     isPending: loading,
     error: fetchError,
+    refetch,
 } = useQuery({
     queryKey: computed(() => [
         "workout",
@@ -68,7 +71,7 @@ const {
 
 const progression = computed(() => progressionPayload.value?.progression ?? []);
 
-const error = computed(() => fetchError.value?.message || null);
+const showSkeleton = useDelayedFlag(() => loading.value);
 
 const {
     progressionChartData,
@@ -97,104 +100,35 @@ const lastTimeDayKey = computed(() => {
 
 <template>
     <div class="flex min-w-0 flex-col gap-3">
-        <div
-            v-if="loading"
-            class="py-4 text-center text-sm text-textSecondary"
-        >
-            Loading…
-        </div>
-        <div
-            v-else-if="error"
-            class="py-4 text-center text-sm text-(--color-cf-red)"
-        >
-            {{ error }}
-        </div>
-        <template v-else-if="!hasProgressionData">
-            <p class="m-0 py-4 text-center text-sm text-textSecondary">
-                No data in the {{ rangeLabel }}.
-            </p>
+        <ErrorState v-if="fetchError" :error="fetchError" title="Couldn't load progression" @retry="refetch()" />
+        <template v-else-if="loading">
+            <Skeleton v-if="showSkeleton" shape="block" height="16rem" />
         </template>
         <template v-else>
-            <div class="flex flex-wrap items-center justify-between gap-2">
-                <div class="flex flex-wrap items-center gap-1">
-                    <span class="mr-1 text-xs text-textSecondary">Range</span>
-                    <button
-                        v-for="opt in rangeOptions"
-                        :key="opt.id"
-                        type="button"
-                        class="rounded px-2 py-0.5 text-xs transition-colors"
-                        :class="
-                            range === opt.id
-                                ? 'bg-secondBg text-textPrimary'
-                                : 'text-textSecondary hover:bg-firstBg hover:text-textPrimary'
-                        "
-                        @click="range = opt.id"
-                    >
-                        {{ opt.label }}
-                    </button>
-                </div>
-                <div class="flex flex-wrap gap-1">
-                    <button
-                        v-for="opt in viewOptions"
-                        :key="opt.id"
-                        type="button"
-                        class="rounded px-2 py-0.5 text-xs transition-colors"
-                        :class="
-                            viewMode === opt.id
-                                ? 'bg-secondBg text-textPrimary'
-                                : 'text-textSecondary hover:bg-firstBg hover:text-textPrimary'
-                        "
-                        @click="viewMode = opt.id"
-                    >
-                        {{ opt.label }}
-                    </button>
-                </div>
+            <div class="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+                <div class="lg:w-80"><SegmentedControl v-model="range" label="Range" :options="rangeOptions" /></div>
+                <div class="lg:w-40"><SegmentedControl v-model="viewMode" label="View" :options="viewOptions" /></div>
             </div>
-            <div
-                v-if="viewMode === 'chart'"
-                class="flex min-h-0 min-w-0 flex-col gap-2"
-            >
-                <div
-                    v-if="hasProgressionChartData"
-                    class="h-64 min-h-64 w-full min-w-0 lg:h-80 lg:min-h-80"
-                >
-                    <Chart
-                        type="line"
-                        :data="progressionChartData"
-                        :options="progressionChartOptions"
-                        class="h-full w-full"
-                    />
+            <EmptyState
+                v-if="!hasProgressionData"
+                :icon="LineChart"
+                :title="`No data in the ${rangeLabel}`"
+                description="Log sets for this exercise to see progress."
+            />
+            <div v-else-if="viewMode === 'chart'" class="flex min-h-0 min-w-0 flex-col gap-2">
+                <div v-if="hasProgressionChartData" class="h-64 min-h-64 w-full min-w-0 lg:h-80 lg:min-h-80">
+                    <Chart type="line" :data="progressionChartData" :options="progressionChartOptions" class="h-full w-full" />
                 </div>
-                <p v-else class="m-0 text-sm text-textSecondary">
-                    No chart data in the {{ rangeLabel }}.
-                </p>
+                <p v-else class="m-0 text-sm text-fg-muted">No chart data in the {{ rangeLabel }}.</p>
             </div>
-            <div
-                v-else
-                class="flex max-h-80 flex-col gap-3 overflow-y-auto text-sm"
-            >
-                <div
-                    v-for="day in progressionDayGroups"
-                    :key="day.dayKey"
-                    class="flex flex-col gap-1"
-                >
-                    <p class="m-0 font-medium text-textPrimary">
-                        {{ day.dateLabel }}<span
-                            v-if="day.dayKey === lastTimeDayKey"
-                            class="font-normal text-textSecondary"
-                        >
-                            (last time)</span
-                        >
+            <div v-else class="flex max-h-80 flex-col gap-3 overflow-y-auto text-sm">
+                <div v-for="day in progressionDayGroups" :key="day.dayKey" class="flex flex-col gap-1">
+                    <p class="m-0 font-medium text-fg">
+                        {{ day.dateLabel }}<span v-if="day.dayKey === lastTimeDayKey" class="font-normal text-fg-muted"> (last time)</span>
                     </p>
                     <ul class="m-0 list-none space-y-0.5 pl-0">
-                        <li
-                            v-for="(set, index) in day.sets"
-                            :key="`${day.dayKey}-${index}`"
-                            class="text-textSecondary"
-                        >
-                            - Set {{ index + 1 }}: {{ set.weight }}x{{
-                                set.reps
-                            }}
+                        <li v-for="(set, index) in day.sets" :key="`${day.dayKey}-${index}`" class="text-fg-muted tabular-nums">
+                            - Set {{ index + 1 }}: {{ set.weight }}x{{ set.reps }}
                         </li>
                     </ul>
                 </div>

@@ -4,6 +4,8 @@ import type { WorkoutPlan } from "~/types/workout";
 import { toast } from "~/composables/toast/useToast";
 import { dialogManager } from "~/composables/dialog/useDialog";
 import { computed, ref, watch } from "vue";
+import { GripVertical, CalendarDays, Plus } from "lucide-vue-next";
+import { Badge, Button, Card, EmptyState, ErrorState, PageHeader, Section, Select, Skeleton, useDelayedFlag } from "~/shared/ui";
 import { useRouter } from "vue-router";
 import { apiClient } from "~/api/client";
 import {
@@ -16,7 +18,8 @@ import {
 
 const router = useRouter();
 
-const { data, isPending, refetch } = useWorkoutPrograms();
+const { data, isPending, isError, error, refetch } = useWorkoutPrograms();
+const showSkeleton = useDelayedFlag(() => isPending.value);
 const createProgram = useCreateWorkoutProgram();
 const renameProgram = useRenameWorkoutProgram();
 const activateProgram = useActivateWorkoutProgram();
@@ -40,9 +43,25 @@ watch(
 const plans = computed(() => selectedProgram.value?.plans || []);
 const refresh = () => refetch();
 
+const failToast = (what: string, err: unknown) =>
+    toast.push(`${what}: ${getApiErrorMessage(err, "Something went wrong")}`, "error");
+
 const promptCreateProgram = async () => {
     const name = window.prompt("Workout plan name");
-    if (name?.trim()) await createProgram.mutateAsync(name.trim());
+    if (!name?.trim()) return;
+    try {
+        await createProgram.mutateAsync(name.trim());
+    } catch (err: unknown) {
+        failToast("Failed to create plan", err);
+    }
+};
+const makeActive = async () => {
+    if (!selectedProgram.value) return;
+    try {
+        await activateProgram.mutateAsync(selectedProgram.value.ID);
+    } catch (err: unknown) {
+        failToast("Failed to activate plan", err);
+    }
 };
 const promptRenameProgram = async () => {
     if (!selectedProgram.value) return;
@@ -50,12 +69,28 @@ const promptRenameProgram = async () => {
         "Rename workout plan",
         selectedProgram.value.name,
     );
-    if (name?.trim())
+    if (!name?.trim()) return;
+    try {
         await renameProgram.mutateAsync({
             id: selectedProgram.value.ID,
             name: name.trim(),
         });
+    } catch (err: unknown) {
+        failToast("Failed to rename plan", err);
+    }
 };
+const programOptions = computed(() =>
+    (data.value?.programs ?? []).map((program) => ({
+        label: `${program.name}${program.is_active ? " (Active)" : ""}`,
+        value: program.ID,
+    })),
+);
+const programModel = computed({
+    get: () => selectedProgramId.value ?? "",
+    set: (v: number | "") => {
+        selectedProgramId.value = v === "" ? null : v;
+    },
+});
 const promptCreateDay = async (dayOfWeek: number | null = null) => {
     if (!selectedProgram.value) return;
     const name = window.prompt(
@@ -262,7 +297,7 @@ const onDropPool = async () => {
 };
 
 const planCardClasses =
-    "rounded-md border border-(--color-border) bg-secondBg px-3 py-2 text-left transition-opacity hover:bg-thirdBg/40";
+    "rounded-control border border-line bg-surface-2 px-3 py-2 text-left transition-colors duration-100 hover:bg-surface-3 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent";
 const planDraggingClass = (planId: number) =>
     draggingPlanId.value === planId ? "opacity-60" : "";
 
@@ -271,255 +306,158 @@ const exerciseCountLabel = (n: number) => `${n} exercise${n === 1 ? "" : "s"}`;
 
 <template>
     <div class="flex w-full flex-col gap-6 pb-8 pt-2">
-        <div class="flex flex-col gap-1 border-b border-(--color-border) pb-3">
-            <h1
-                class="m-0 text-xl font-semibold tracking-tight text-textPrimary"
-            >
-                Workout schedule
-            </h1>
-            <p class="m-0 text-sm text-textSecondary">
-                Choose an active plan, then arrange its routines through the
-                week.
-            </p>
-        </div>
-        <div
-            v-if="data?.programs?.length"
-            class="flex flex-wrap items-center gap-2"
-        >
-            <select
-                v-model="selectedProgramId"
-                class="rounded-md border border-(--color-border) bg-firstBg px-3 py-2 text-sm text-textPrimary"
-            >
-                <option
-                    v-for="program in data.programs"
-                    :key="program.ID"
-                    :value="program.ID"
-                >
-                    {{ program.name }}{{ program.is_active ? " (Active)" : "" }}
-                </option>
-            </select>
-            <button
-                class="rounded-md border border-(--color-border) px-3 py-2 text-sm text-textPrimary"
-                :disabled="selectedProgram?.is_active"
-                @click="
-                    selectedProgram &&
-                    activateProgram.mutate(selectedProgram.ID)
-                "
-            >
-                Make active
-            </button>
-            <button
-                class="rounded-md border border-(--color-border) px-3 py-2 text-sm text-textPrimary"
-                @click="promptRenameProgram"
-            >
-                Rename
-            </button>
-            <button
-                class="rounded-md bg-(--color-cf-red) px-3 py-2 text-sm font-medium text-white"
-                @click="promptCreateProgram"
-            >
-                New workout plan
-            </button>
-        </div>
-        <button
-            v-else-if="!isPending"
-            class="self-start rounded-md bg-(--color-cf-red) px-3 py-2 text-sm font-medium text-white"
-            @click="promptCreateProgram"
-        >
-            Create your first workout plan
-        </button>
-        <div v-if="isPending" class="text-center text-sm text-textSecondary">
-            Loading…
-        </div>
-        <div
-            v-else-if="!selectedProgram"
-            class="rounded-lg border border-(--color-border) bg-firstBg p-8 text-center text-sm text-textSecondary"
-        >
-            No workout plans yet. Create one above to configure its week.
-        </div>
+        <PageHeader title="Workout schedule">
+            <template #meta>Choose an active plan, then arrange its routines through the week.</template>
+        </PageHeader>
+        <ErrorState
+            v-if="isError"
+            :error="error"
+            title="Couldn't load your workout plans"
+            @retry="refetch()"
+        />
+        <template v-else-if="isPending">
+            <div v-if="showSkeleton" class="flex flex-col gap-4" role="status" aria-busy="true">
+                <Skeleton height="2.75rem" width="24rem" />
+                <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-7">
+                    <Skeleton v-for="n in 7" :key="n" shape="block" height="8rem" />
+                </div>
+            </div>
+        </template>
         <template v-else>
-            <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-7">
-                <div
-                    v-for="slot in weekdaysSundayFirst"
-                    :key="slot.dow"
-                    class="flex min-h-32 flex-col gap-2 rounded-lg border border-(--color-border) bg-firstBg p-3 transition-shadow"
-                    :class="
-                        dropTargetKey === slot.dow
-                            ? 'ring-2 ring-(--color-cf-red)/60'
-                            : ''
-                    "
-                    @dragover="onDragOverDay($event, slot.dow)"
-                    @drop.prevent="onDropDay(slot.dow)"
+            <div v-if="data?.programs?.length" class="flex flex-col gap-2 lg:flex-row lg:flex-wrap lg:items-center">
+                <div class="lg:w-64">
+                    <Select v-model="programModel" :options="programOptions" aria-label="Workout plan" />
+                </div>
+                <Button
+                    :disabled="selectedProgram?.is_active"
+                    :loading="activateProgram.isPending.value"
+                    @click="makeActive"
                 >
-                    <div class="flex flex-wrap items-center gap-1.5">
-                        <span class="text-sm font-semibold text-textPrimary">{{
-                            slot.label
-                        }}</span>
-                        <span
-                            v-if="slot.dow === todayDow()"
-                            class="rounded bg-(--color-cf-red)/20 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-(--color-cf-red)"
-                            >Today</span
-                        >
-                    </div>
-                    <template v-if="planByDay[slot.dow]">
+                    Make active
+                </Button>
+                <Button :loading="renameProgram.isPending.value" @click="promptRenameProgram">Rename</Button>
+                <Button variant="primary" :loading="createProgram.isPending.value" @click="promptCreateProgram">
+                    New workout plan
+                </Button>
+            </div>
+            <EmptyState
+                v-if="!selectedProgram"
+                :icon="CalendarDays"
+                title="No workout plans yet"
+                description="Create one to configure its week."
+            >
+                <template #action>
+                    <Button variant="primary" :loading="createProgram.isPending.value" @click="promptCreateProgram">
+                        Create your first workout plan
+                    </Button>
+                </template>
+            </EmptyState>
+            <template v-else>
+                <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-7">
+                    <Card
+                        v-for="slot in weekdaysSundayFirst"
+                        :key="slot.dow"
+                        padding="sm"
+                        class="min-h-32 transition-shadow"
+                        :class="dropTargetKey === slot.dow ? 'ring-2 ring-accent' : ''"
+                        @dragover="onDragOverDay($event, slot.dow)"
+                        @drop.prevent="onDropDay(slot.dow)"
+                    >
+                        <div class="flex flex-col gap-2">
+                        <div class="flex flex-wrap items-center gap-1.5">
+                            <span class="text-sm font-semibold text-fg">{{ slot.label }}</span>
+                            <Badge v-if="slot.dow === todayDow()" tone="accent">Today</Badge>
+                        </div>
                         <div
+                            v-if="planByDay[slot.dow]"
                             role="button"
                             tabindex="0"
                             draggable="true"
-                            :class="[
-                                planCardClasses,
-                                planDraggingClass(planByDay[slot.dow]!.ID),
-                            ]"
-                            @dragstart="
-                                onDragStart(
-                                    $event,
-                                    planByDay[slot.dow]!,
-                                    slot.dow,
-                                )
-                            "
+                            :class="[planCardClasses, planDraggingClass(planByDay[slot.dow]!.ID)]"
+                            @dragstart="onDragStart($event, planByDay[slot.dow]!, slot.dow)"
                             @dragend="onDragEnd"
                             @click="goDetail(planByDay[slot.dow]!.ID)"
                             @keydown.enter="goDetail(planByDay[slot.dow]!.ID)"
                         >
                             <div class="flex items-start gap-2">
-                                <div
-                                    class="mt-0.5 shrink-0 cursor-grab text-textSecondary/40 hover:text-textSecondary active:cursor-grabbing"
+                                <span
+                                    class="mt-0.5 hidden shrink-0 cursor-grab text-fg-subtle hover:text-fg-muted active:cursor-grabbing lg:block"
+                                    aria-hidden="true"
                                     @mousedown="onHandleMouseDown"
                                 >
-                                    <svg
-                                        width="10"
-                                        height="14"
-                                        viewBox="0 0 10 14"
-                                        fill="currentColor"
-                                    >
-                                        <circle cx="2" cy="2" r="1.5" />
-                                        <circle cx="8" cy="2" r="1.5" />
-                                        <circle cx="2" cy="7" r="1.5" />
-                                        <circle cx="8" cy="7" r="1.5" />
-                                        <circle cx="2" cy="12" r="1.5" />
-                                        <circle cx="8" cy="12" r="1.5" />
-                                    </svg>
-                                </div>
+                                    <GripVertical class="size-4" />
+                                </span>
                                 <div class="min-w-0 flex-1">
-                                    <div
-                                        class="truncate text-sm font-medium text-textPrimary"
-                                    >
-                                        {{ planByDay[slot.dow]!.name }}
+                                    <div class="truncate text-sm font-medium text-fg">{{ planByDay[slot.dow]!.name }}</div>
+                                    <div class="mt-1 text-xs text-fg-muted">
+                                        {{ exerciseCountLabel(planByDay[slot.dow]!.exercises.length) }}
                                     </div>
                                     <div
-                                        class="mt-1 text-xs text-textSecondary"
+                                        v-if="planByDay[slot.dow]!.planned_cardio_type?.trim()"
+                                        class="mt-1 truncate text-2xs text-fg-muted"
                                     >
-                                        {{
-                                            exerciseCountLabel(
-                                                planByDay[slot.dow]!.exercises
-                                                    .length,
-                                            )
-                                        }}
-                                    </div>
-                                    <div
-                                        v-if="
-                                            planByDay[
-                                                slot.dow
-                                            ]!.planned_cardio_type?.trim()
-                                        "
-                                        class="mt-1 truncate text-[11px] text-textSecondary"
-                                    >
-                                        Cardio:
-                                        {{
-                                            planByDay[slot.dow]!
-                                                .planned_cardio_type
-                                        }}
+                                        Cardio: {{ planByDay[slot.dow]!.planned_cardio_type }}
                                     </div>
                                 </div>
                             </div>
                         </div>
+                        <Button v-else variant="secondary" block @click="promptCreateDay(slot.dow)">
+                            <template #icon-left><Plus class="size-4" /></template>
+                            Add
+                        </Button>
+                        </div>
+                    </Card>
+                </div>
+                <Section title="Plan Days">
+                    <template #actions>
+                        <Button size="sm" :loading="createPlan.isPending.value" @click="promptCreateDay()">
+                            Create day
+                        </Button>
                     </template>
-                    <div
-                        v-else
-                        class="flex flex-1 items-center justify-center rounded-md border border-dashed border-(--color-border) px-2 py-6 text-center text-xs text-textSecondary"
-                        role="button"
-                        tabindex="0"
-                        @click="promptCreateDay(slot.dow)"
-                        @keydown.enter="promptCreateDay(slot.dow)"
+                    <Card
+                        padding="sm"
+                        class="min-h-18 transition-shadow"
+                        :class="dropTargetKey === 'pool' ? 'ring-2 ring-accent' : ''"
+                        @dragover="onDragOverPool($event)"
+                        @drop.prevent="onDropPool()"
                     >
-                        Add a routine
-                    </div>
-                </div>
-            </div>
-            <section class="flex flex-col gap-2">
-                <div class="flex flex-wrap items-center justify-between gap-2">
-                    <h2 class="m-0 text-sm font-semibold text-textPrimary">
-                        Plan Days
-                    </h2>
-                    <button
-                        type="button"
-                        class="rounded-md bg-(--color-cf-red) px-3 py-1.5 text-xs font-medium text-white"
-                        @click="promptCreateDay()"
-                    >
-                        Create day
-                    </button>
-                </div>
-                <div
-                    class="flex min-h-18 flex-wrap content-start gap-2 rounded-lg border border-(--color-border) bg-firstBg p-3 transition-shadow"
-                    :class="
-                        dropTargetKey === 'pool'
-                            ? 'ring-2 ring-(--color-cf-red)/60'
-                            : ''
-                    "
-                    @dragover="onDragOverPool($event)"
-                    @drop.prevent="onDropPool()"
-                >
-                    <p
-                        v-if="planDays.length === 0"
-                        class="m-0 w-full text-center text-xs text-textSecondary"
-                    >
-                        No plan days yet — create one to add it to the week.
-                    </p>
-                    <div
-                        v-for="p in planDays"
-                        :key="p.ID"
-                        role="button"
-                        tabindex="0"
-                        draggable="true"
-                        :class="[planCardClasses, planDraggingClass(p.ID)]"
-                        @dragstart="onDragStart($event, p, null)"
-                        @dragend="onDragEnd"
-                        @click="goDetail(p.ID)"
-                        @keydown.enter="goDetail(p.ID)"
-                    >
-                        <div class="flex items-start gap-2">
-                            <div
-                                class="mt-0.5 shrink-0 cursor-grab text-textSecondary/40 hover:text-textSecondary active:cursor-grabbing"
-                                @mousedown="onHandleMouseDown"
-                            >
-                                <svg
-                                    width="10"
-                                    height="14"
-                                    viewBox="0 0 10 14"
-                                    fill="currentColor"
+                        <div class="flex flex-wrap content-start gap-2">
+                        <EmptyState
+                            v-if="planDays.length === 0"
+                            class="w-full"
+                            title="No plan days yet"
+                            description="Create one to add it to the week."
+                        />
+                        <div
+                            v-for="p in planDays"
+                            :key="p.ID"
+                            role="button"
+                            tabindex="0"
+                            draggable="true"
+                            :class="[planCardClasses, planDraggingClass(p.ID)]"
+                            @dragstart="onDragStart($event, p, null)"
+                            @dragend="onDragEnd"
+                            @click="goDetail(p.ID)"
+                            @keydown.enter="goDetail(p.ID)"
+                        >
+                            <div class="flex items-start gap-2">
+                                <span
+                                    class="mt-0.5 hidden shrink-0 cursor-grab text-fg-subtle hover:text-fg-muted active:cursor-grabbing lg:block"
+                                    aria-hidden="true"
+                                    @mousedown="onHandleMouseDown"
                                 >
-                                    <circle cx="2" cy="2" r="1.5" />
-                                    <circle cx="8" cy="2" r="1.5" />
-                                    <circle cx="2" cy="7" r="1.5" />
-                                    <circle cx="8" cy="7" r="1.5" />
-                                    <circle cx="2" cy="12" r="1.5" />
-                                    <circle cx="8" cy="12" r="1.5" />
-                                </svg>
-                            </div>
-                            <div class="min-w-0 flex-1">
-                                <div
-                                    class="truncate text-sm font-medium text-textPrimary"
-                                >
-                                    {{ p.name }}
-                                </div>
-                                <div class="mt-1 text-xs text-textSecondary">
-                                    {{ exerciseCountLabel(p.exercises.length) }}
+                                    <GripVertical class="size-4" />
+                                </span>
+                                <div class="min-w-0 flex-1">
+                                    <div class="truncate text-sm font-medium text-fg">{{ p.name }}</div>
+                                    <div class="mt-1 text-xs text-fg-muted">{{ exerciseCountLabel(p.exercises.length) }}</div>
                                 </div>
                             </div>
                         </div>
-                    </div>
-                </div>
-            </section>
+                        </div>
+                    </Card>
+                </Section>
+            </template>
         </template>
     </div>
 </template>

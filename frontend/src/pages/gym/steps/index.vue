@@ -16,6 +16,7 @@ import {
     trackingDayKey,
 } from "~/pages/gym/trackingLogChart";
 import axios from "axios";
+import { Button, Card, ErrorState, Field, Input, PageHeader, Section, Skeleton, useDelayedFlag } from "~/shared/ui";
 
 const route = useRoute();
 const dateOffset = computed(() => parseDietDayOffsetQuery(route.query.offset));
@@ -24,7 +25,8 @@ const gymHomeQuery = computed(() =>
     dateOffset.value === 0 ? {} : { offset: String(dateOffset.value) },
 );
 const stepsInput = ref("");
-const { data: logs, isPending, isError, error } = useStepLogs();
+const { data: logs, isPending, isError, error, refetch } = useStepLogs();
+const showSkeleton = useDelayedFlag(() => isPending.value);
 const saveMutation = useSaveSteps();
 const rows = computed(() => logs.value ?? []);
 const existingLogForDate = computed(() =>
@@ -80,59 +82,27 @@ const saving = computed(() => saveMutation.isPending.value);
 </script>
 <template>
     <div class="flex w-full min-w-0 flex-col gap-6">
-        <div
-            class="flex items-center justify-between gap-4 border-b border-(--color-border) pb-3"
-        >
-            <h1 class="m-0 text-lg font-semibold text-textPrimary">Steps</h1>
-            <router-link
-                :to="{ name: 'gym', query: gymHomeQuery }"
-                class="text-sm text-textSecondary transition-colors hover:text-textPrimary"
-                >Back</router-link
-            >
-        </div>
-        <form
-            class="flex flex-col gap-3 rounded-md border border-(--color-border) bg-firstBg p-4"
-            @submit.prevent="handleSave"
-        >
-            <label class="flex flex-col gap-1 text-xs text-textSecondary"
-                >Steps ({{ formatDateLong(`${dateStr}T12:00:00`) }})
-                <input
-                    v-model="stepsInput"
-                    type="text"
-                    inputmode="numeric"
-                    autocomplete="off"
-                    placeholder="e.g. 8420"
-                    class="rounded-md border border-(--color-border) bg-secondBg px-3 py-2 text-sm text-textPrimary"
-                />
-            </label>
-            <button
-                type="submit"
-                class="rounded-md bg-secondBg px-4 py-2 text-sm font-semibold text-textPrimary transition-colors hover:bg-thirdBg disabled:opacity-50"
-                :disabled="saving"
-            >
-                {{ saving ? "Saving…" : "Save" }}
-            </button>
-        </form>
-        <div v-if="isError" class="text-sm text-(--color-cf-red)">
-            {{ error?.message ?? "Failed to load" }}
-        </div>
-        <div v-else-if="isPending" class="text-sm text-textSecondary">
-            Loading…
-        </div>
-        <template v-else>
-            <div class="flex min-w-0 flex-col gap-2">
-                <h2 class="m-0 text-base font-semibold text-textPrimary">
-                    Previous
-                </h2>
-                <div class="h-72 min-h-72 w-full min-w-0 lg:h-80 lg:min-h-80">
-                    <Chart
-                        type="bar"
-                        :data="stepChart.data"
-                        :options="stepChart.options"
-                        class="h-full w-full"
-                    />
-                </div>
-            </div>
+        <PageHeader title="Steps">
+            <template #actions>
+                <Button variant="ghost" :to="{ name: 'gym', query: gymHomeQuery }">Back</Button>
+            </template>
+        </PageHeader>
+        <Card>
+            <form class="flex flex-col gap-3" @submit.prevent="handleSave">
+                <Field :label="`Steps (${formatDateLong(`${dateStr}T12:00:00`)})`">
+                    <Input v-model="stepsInput" inputmode="numeric" autocomplete="off" placeholder="e.g. 8420" />
+                </Field>
+                <Button type="submit" variant="primary" :loading="saving">{{ saving ? "Saving…" : "Save" }}</Button>
+            </form>
+        </Card>
+        <ErrorState v-if="isError" :error="error" title="Couldn't load your step history" @retry="refetch()" />
+        <template v-else-if="isPending">
+            <Skeleton v-if="showSkeleton" shape="block" height="18rem" />
         </template>
+        <Section v-else title="Previous">
+            <div class="h-72 min-h-72 w-full min-w-0 lg:h-80 lg:min-h-80">
+                <Chart type="bar" :data="stepChart.data" :options="stepChart.options" class="h-full w-full" />
+            </div>
+        </Section>
     </div>
 </template>

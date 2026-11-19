@@ -6,6 +6,7 @@ import { DEFAULT_EXERCISE_LOAD_TYPE } from "~/types/workout";
 import { toast } from "~/composables/toast/useToast";
 import { useQueryClient } from "@tanstack/vue-query";
 import { apiClient } from "~/api/client";
+import { Button, Field, Input, NumberField, Select, Textarea } from "~/shared/ui";
 import { ref } from "vue";
 
 const props = defineProps<{
@@ -14,10 +15,17 @@ const props = defineProps<{
 
 const queryClient = useQueryClient();
 const name = ref("");
-const repRollover = ref(10);
+const repRollover = ref<number | null>(10);
 const cues = ref("");
 const loadType = ref<ExerciseLoadType>(DEFAULT_EXERCISE_LOAD_TYPE);
 const submitting = ref(false);
+const loadTypeOptions: { label: string; value: ExerciseLoadType }[] = [
+    { label: "Plate loaded — count 45 lb bar", value: "plate_loaded_with_bar" },
+    { label: "Plate loaded — do not count bar", value: "plate_loaded_without_bar" },
+    { label: "Plate-loaded machine — total plates", value: "plate_loaded_total" },
+    { label: "Weight stack machine", value: "weight_stack" },
+    { label: "Free weights", value: "free_weights" },
+];
 
 const submit = async () => {
     const n = name.value.trim();
@@ -50,109 +58,23 @@ const submit = async () => {
 </script>
 
 <template>
-    <div class="create-ex-form">
-        <label class="field">
-            <span>Name</span>
-            <input
-                v-model="name"
-                type="text"
-                autocomplete="off"
-                class="input"
-            />
-        </label>
-        <label class="field">
-            <span>Rep rollover</span>
-            <input
-                v-model.number="repRollover"
-                type="number"
-                min="1"
-                class="input"
-            />
-        </label>
-        <label class="field">
-            <span>Weight type</span>
-            <select v-model="loadType" class="input">
-                <option value="plate_loaded_with_bar">
-                    Plate loaded — count 45 lb bar
-                </option>
-                <option value="plate_loaded_without_bar">
-                    Plate loaded — do not count bar
-                </option>
-                <option value="plate_loaded_total">
-                    Plate-loaded machine — total plates
-                </option>
-                <option value="weight_stack">Weight stack machine</option>
-                <option value="free_weights">Free weights</option>
-            </select>
-        </label>
-        <label class="field">
-            <span>Cues</span>
-            <textarea
-                v-model="cues"
-                class="input textarea"
-                rows="4"
-                placeholder="Optional cues (e.g. bullet points)"
-            ></textarea>
-        </label>
-        <div class="actions">
-            <button
-                type="button"
-                class="btn primary"
-                :disabled="submitting"
-                @click="submit"
-            >
+    <form class="flex flex-col gap-4" @submit.prevent="submit">
+        <Field label="Name">
+            <Input v-model="name" autocomplete="off" />
+        </Field>
+        <Field label="Rep rollover">
+            <NumberField v-model="repRollover" label="rep rollover" :min="1" :step="1" :decimals="0" />
+        </Field>
+        <Field label="Weight type">
+            <Select v-model="loadType" :options="loadTypeOptions" />
+        </Field>
+        <Field label="Cues">
+            <Textarea v-model="cues" :rows="4" placeholder="Optional cues (e.g. bullet points)" />
+        </Field>
+        <div class="flex flex-col gap-2 lg:flex-row lg:justify-end">
+            <Button type="submit" variant="primary" :loading="submitting">
                 {{ submitting ? "Saving…" : "Create exercise" }}
-            </button>
+            </Button>
         </div>
-    </div>
+    </form>
 </template>
-
-<style scoped>
-.create-ex-form {
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-    min-width: 260px;
-}
-.field {
-    display: flex;
-    flex-direction: column;
-    gap: 0.35rem;
-    font-size: 0.9rem;
-    color: #ccc;
-}
-.input {
-    padding: 0.5rem 0.65rem;
-    background: #2a2a2a;
-    border: 1px solid #444;
-    border-radius: 0.25rem;
-    color: #fff;
-    font-size: 1rem;
-}
-.input:focus {
-    outline: none;
-    border-color: #4a9eff;
-}
-.textarea {
-    resize: vertical;
-    font-family: inherit;
-}
-.actions {
-    display: flex;
-    justify-content: flex-end;
-    margin-top: 0.25rem;
-}
-.btn.primary {
-    padding: 0.5rem 1rem;
-    background: #4a9eff;
-    color: #fff;
-    border: none;
-    border-radius: 0.25rem;
-    cursor: pointer;
-    font-size: 0.9rem;
-}
-.btn.primary:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-}
-</style>
