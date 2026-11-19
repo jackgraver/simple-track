@@ -23,14 +23,6 @@
       "count": 1
     }
   },
-  "src/pages/auth/signin/index.vue": {
-    "better-tailwindcss/no-unknown-classes": {
-      "count": 9
-    },
-    "vue/no-restricted-block": {
-      "count": 1
-    }
-  },
   "src/pages/diet/components/DietDayView.vue": {
     "better-tailwindcss/no-deprecated-classes": {
       "count": 1
@@ -497,14 +489,6 @@
   "src/shared/input/Dropdown.vue": {
     "better-tailwindcss/no-restricted-classes": {
       "count": 10
-    }
-  },
-  "src/shared/input/Input.vue": {
-    "better-tailwindcss/no-unknown-classes": {
-      "count": 1
-    },
-    "vue/no-restricted-block": {
-      "count": 1
     }
   }
 }

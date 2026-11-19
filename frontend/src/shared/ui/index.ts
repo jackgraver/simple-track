@@ -4,3 +4,8 @@ export { default as SegmentedControl } from "./SegmentedControl.vue";
 export { default as Button } from "./Button.vue";
 export { default as IconButton } from "./IconButton.vue";
 export { default as Spinner } from "./Spinner.vue";
+export { default as Field } from "./Field.vue";
+export { default as Input } from "./Input.vue";
+export { default as Textarea } from "./Textarea.vue";
+export { default as Select } from "./Select.vue";
+export { default as Checkbox } from "./Checkbox.vue";

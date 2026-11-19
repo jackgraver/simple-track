@@ -77,3 +77,8 @@ Alternative: ship the toggle with the legacy aliases unchanged (light would show
 ## 2026-11-19: Solid danger button uses `text-fg-inverse`, not `on-solid` (P1)
 White on the dark `danger` fill (hsl 0 80% 66%) is under 4.5:1. `fg-inverse` flips per theme (near-black in dark, near-white in light) and gives 5.9:1 on `danger` in dark and 5.8:1 in light, so no new token is needed. `on-solid` stays for the accent Toggle thumb. Primary (`bg-fg text-fg-inverse`) is unchanged.
 Also: Button's `:to` renders a `RouterLink` only while not disabled or loading (an anchor can't be disabled); `loading` keeps the label, shows a spinner in place of the left icon, sets `aria-busy` and ignores clicks without removing focus. Sizes are 44px below `lg` for all three, then 32/40/44px (sm/md/lg) from `lg`.
+
+## 2026-11-19: Field provides the control id by injection; signin tidied (P2)
+`Field` provides `{ id, describedBy, invalid }` and `Input`/`Textarea`/`Select` inject it, so callers write `<Field label><Input v-model/></Field>` with no ids or aria wiring (PRIMITIVES showed a slot-prop form; injection is the same contract with less typing). All three also work without a Field when given `aria-label`.
+`shared/input/Input.vue` was deleted rather than kept as a shim: it had two users. The signin page got real labels (it had empty ones and an empty login button label) and lost a stray always-visible email input and ~40 lines of commented-out markup. Registration mode is still unreachable (no UI toggles it): out of scope, left as is.
+Checkbox tick uses `text-fg-inverse` on the accent fill (contrast in both themes), like danger-solid in P1.

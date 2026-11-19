@@ -4,7 +4,7 @@ import { useRoute, useRouter } from "vue-router";
 import { useAuth } from "~/composables/auth/useAuth";
 import { getApiErrorMessage } from "~/api/httpError";
 import { toast } from "~/composables/toast/useToast";
-import Input from "~/shared/input/Input.vue";
+import { Button, Field, Input } from "~/shared/ui";
 
 const router = useRouter();
 const route = useRoute();
@@ -54,150 +54,27 @@ const handleSubmit = async () => {
 </script>
 
 <template>
-    <div class="signin-container">
-        <div class="signin-card">
-            <!-- <h1>{{ isLoginMode ? "Sign In" : "Sign Up" }}</h1> -->
+    <div class="flex min-h-dvh items-center justify-center bg-canvas p-4">
+        <div class="w-full max-w-sm rounded-card border border-line bg-surface p-6">
+            <form class="flex flex-col gap-4" @submit.prevent="handleSubmit">
+                <p v-if="error" role="alert" class="m-0 text-sm text-danger">{{ error }}</p>
 
-            <form @submit.prevent="handleSubmit" class="signin-form">
-                <div v-if="error" class="error-message">{{ error }}</div>
+                <Field label="Username" required>
+                    <Input v-model="username" required autocomplete="username" />
+                </Field>
 
-                <div class="form-group">
-                    <Input
-                        label=""
-                        v-model="username"
-                        type="text"
-                        :required="true"
-                        autocomplete="username"
-                        placeholder=""
-                        :error="error && !username ? error : ''"
-                    />
-                </div>
+                <Field label="Password" required>
+                    <Input v-model="password" type="password" required autocomplete="current-password" />
+                </Field>
 
-                <div class="form-group">
-                    <Input
-                        label=""
-                        v-model="password"
-                        type="password"
-                        :required="true"
-                        autocomplete="current-password"
-                        placeholder=""
-                        :error="error && !password ? error : ''"
-                    />
-                </div>
+                <Field v-if="!isLoginMode" label="Email (optional)">
+                    <Input v-model="email" type="email" inputmode="email" autocomplete="email" />
+                </Field>
 
-                <div class="form-group">
-                    <Input
-                        label=""
-                        v-model="email"
-                        type="text"
-                        autocomplete=""
-                        placeholder=""
-                        :error="''"
-                    />
-                </div>
-
-                <!-- <div class="form-group">
-                    <Input
-                        label="Username"
-                        v-model="username"
-                        type="text"
-                        :required="true"
-                        autocomplete="username"
-                        placeholder="Enter your username"
-                        :error="error && !username ? error : ''"
-                    />
-                </div>
-
-                <div class="form-group">
-                    <Input
-                        label="Password"
-                        v-model="password"
-                        type="password"
-                        :required="true"
-                        autocomplete="current-password"
-                        placeholder="Enter your password"
-                        :error="error && !password ? error : ''"
-                    />
-                </div> -->
-
-                <div v-if="!isLoginMode" class="form-group">
-                    <Input
-                        label="Email (optional)"
-                        v-model="email"
-                        type="email"
-                        :required="false"
-                        autocomplete="email"
-                        placeholder="Enter your email"
-                        :error="error && !email && !isLoginMode ? error : ''"
-                    />
-                </div>
-
-                <button
-                    type="submit"
-                    :disabled="isLoading"
-                    class="submit-button"
-                >
-                    {{
-                        isLoading ? "Loading..." : isLoginMode ? "" : "Sign Up"
-                    }}
-                </button>
+                <Button type="submit" variant="primary" size="lg" block :loading="isLoading">
+                    {{ isLoginMode ? "Sign in" : "Sign up" }}
+                </Button>
             </form>
         </div>
     </div>
 </template>
-
-<style scoped>
-.signin-container {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    min-height: 100vh;
-    padding: 1rem;
-    background: rgb(20, 20, 20);
-}
-
-.signin-card {
-    width: 100%;
-    max-width: 400px;
-    padding: 2rem;
-    background: rgb(27, 27, 27);
-    border: 1px solid rgb(56, 56, 56);
-    border-radius: 8px;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
-}
-
-.signin-card h1 {
-    margin: 0 0 2rem 0;
-    text-align: center;
-    color: white;
-    font-size: 2rem;
-}
-
-.signin-form {
-    display: flex;
-    flex-direction: column;
-    gap: 1.5rem;
-}
-
-.submit-button {
-    padding: 0.75rem 1.5rem;
-    background: rgb(40, 80, 40);
-    border: 1px solid rgb(56, 56, 56);
-    border-radius: 4px;
-    color: white;
-    font-size: 1rem;
-    font-weight: 500;
-    cursor: pointer;
-    transition: background-color 0.2s;
-    margin-top: 0.5rem;
-}
-
-.submit-button:hover:not(:disabled) {
-    background: rgb(50, 100, 50);
-}
-
-.submit-button:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-}
-</style>

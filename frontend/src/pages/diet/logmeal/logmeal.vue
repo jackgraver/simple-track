@@ -4,7 +4,7 @@ import LogMealGroupBlock from "./LogMealGroupBlock.vue";
 import LogMealItemRow from "./LogMealItemRow.vue";
 import FoodDisplay from "~/pages/diet/logmeal/components/FoodDisplay.vue";
 import { mealItemsListGridClass } from "./mealItemsListGrid";
-import Input from "~/shared/input/Input.vue";
+import { Field, Input } from "~/shared/ui";
 import { computed, nextTick, watch } from "vue";
 import { useMeal } from "./queries/useMeal";
 import { useSavedMeal } from "./queries/useSavedMeal";
@@ -222,12 +222,9 @@ const macroBarsDayTotals = computed(() => {
                         />
                     </div>
                     <div class="flex min-w-0 flex-1 flex-col gap-2">
-                        <Input
-                            label="Meal Name"
-                            type="text"
-                            v-model="meal.name"
-                            required
-                        />
+                        <Field label="Meal Name" required>
+                            <Input v-model="meal.name" required />
+                        </Field>
                     </div>
                 </header>
                 <section

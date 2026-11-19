@@ -1,0 +1,49 @@
+<script setup lang="ts" generic="T extends string | number">
+// Native <select>: the OS picker wins on mobile (PRIMITIVES). Same skin as Input.
+import { ChevronDown } from "lucide-vue-next";
+import { useField } from "./fieldContext";
+
+const model = defineModel<T | "">({ required: true });
+const props = withDefaults(
+    defineProps<{
+        options: { label: string; value: T }[];
+        placeholder?: string;
+        size?: "md" | "sm";
+        invalid?: boolean;
+        disabled?: boolean;
+        required?: boolean;
+        ariaLabel?: string;
+    }>(),
+    { size: "md" },
+);
+const field = useField();
+</script>
+
+<template>
+    <div class="relative">
+        <select
+            :id="field?.id"
+            v-model="model"
+            :disabled="disabled"
+            :required="required"
+            :aria-label="ariaLabel"
+            :aria-invalid="props.invalid || field?.invalid() || undefined"
+            :aria-describedby="field?.describedBy()"
+            class="m-0! w-full cursor-pointer appearance-none rounded-control! border! bg-surface-2! py-0! pr-9! pl-3! text-base text-fg! outline-none! transition-colors duration-150 focus:ring-1 disabled:cursor-not-allowed disabled:opacity-50 lg:text-sm"
+            :class="[
+                props.size === 'sm' ? 'min-h-touch lg:min-h-control-sm' : 'min-h-touch lg:min-h-row',
+                props.invalid || field?.invalid()
+                    ? 'border-danger! ring-danger focus:border-danger!'
+                    : 'border-line-strong! ring-accent focus:border-accent!',
+                model === '' ? 'text-fg-subtle!' : '',
+            ]"
+        >
+            <option v-if="placeholder" value="" disabled>{{ placeholder }}</option>
+            <option v-for="o in options" :key="String(o.value)" :value="o.value">{{ o.label }}</option>
+        </select>
+        <ChevronDown
+            aria-hidden="true"
+            class="pointer-events-none absolute top-1/2 right-3 size-4 -translate-y-1/2 text-fg-muted"
+        />
+    </div>
+</template>
