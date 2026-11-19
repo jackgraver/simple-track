@@ -24,3 +24,6 @@ export { default as Toaster } from "./Toaster.vue";
 export type { ToastItem, ToastTone, ToastAction } from "./toastTypes";
 export { default as PageHeader } from "./PageHeader.vue";
 export { default as Section } from "./Section.vue";
+export { default as NumberField } from "./NumberField.vue";
+export { default as Menu } from "./Menu.vue";
+export type { MenuItem } from "./Menu.vue";
