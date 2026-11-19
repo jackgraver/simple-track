@@ -306,6 +306,7 @@ const onTickClick = (index: number) => {
                         :style="{ width: `${padPx}px` }"
                         aria-hidden="true"
                     />
+                    <!-- eslint-disable-next-line vue/no-restricted-html-elements -- slider tick, part of the drawn scale -->
                     <button
                         v-for="(tick, index) in tickValues"
                         :key="index"

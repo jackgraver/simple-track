@@ -101,6 +101,7 @@ function onNativeDateChange(ev: Event) {
                     >
                         Wednesday, December&nbsp;31st,&nbsp;2026
                     </span>
+                    <!-- eslint-disable-next-line vue/no-restricted-html-elements -- the date itself, styled as text, opens the native date picker -->
                     <button
                         type="button"
                         class="col-start-1 row-start-1 max-w-full cursor-pointer rounded-control px-1 text-base font-medium leading-tight text-fg underline-offset-2 transition-colors hover:text-fg hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
@@ -110,6 +111,7 @@ function onNativeDateChange(ev: Event) {
                         {{ dateLabel }}
                     </button>
                 </div>
+                <!-- eslint-disable-next-line vue/no-restricted-html-elements -- hidden native date input that provides the picker -->
                 <input
                     ref="nativeDateInputEl"
                     type="date"
@@ -122,6 +124,7 @@ function onNativeDateChange(ev: Event) {
                 <div
                     class="flex h-4 shrink-0 items-center justify-center leading-none"
                 >
+                    <!-- eslint-disable-next-line vue/no-restricted-html-elements -- small text link under the date -->
                     <button
                         type="button"
                         class="py-0 text-xs leading-none text-fg-muted underline-offset-2 transition-colors hover:text-fg hover:underline disabled:pointer-events-none"

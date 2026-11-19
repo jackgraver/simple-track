@@ -72,6 +72,7 @@ async function submit() {
                 :key="preset.key"
                 class="flex min-h-touch cursor-pointer flex-col justify-center rounded-control border border-line bg-surface-2 px-3 py-2 text-base text-fg transition-colors duration-100 hover:bg-surface-3 has-checked:border-accent has-checked:bg-accent-soft has-disabled:cursor-not-allowed has-disabled:opacity-50 has-focus-visible:ring-2 has-focus-visible:ring-accent lg:text-sm"
             >
+                <!-- eslint-disable-next-line vue/no-restricted-html-elements -- sr-only native radio behind a styled card label (radio-card pattern, PRIMITIVES.md) -->
                 <input
                     v-model="form.key"
                     type="radio"

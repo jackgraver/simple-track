@@ -21,9 +21,8 @@ Shared conventions:
 - Native elements first (`<button>`, `<input>`, `<select>`) where Reka doesn't add real value.
   Focus traps, popovers and comboboxes come from Reka (see "Library-backed").
 - Only `shared/ui/` imports `reka-ui` (`no-restricted-imports`). Pages never see it.
-- Until phase 5 removes the global element CSS in `App.vue` (`button { padding; margin; box-shadow }`,
-  `input, select { background: rgb(71,71,71) }`), primitives neutralise it with a base reset
-  class inside the primitive (`m-0 shadow-none`). Callers must never need `!` overrides.
+- There is no global element CSS (removed in phase 6): Tailwind's preflight is the only reset, so
+  a primitive's classes are all it gets. Never add `!` classes.
 
 ## Priority order
 
@@ -242,9 +241,7 @@ theme). Callers pass `type`, `data`, `options` and an accessible `label`.
   native `<input type="radio">` (`has-checked:`, `has-focus-visible:`, `has-disabled:`). One tab
   stop, native arrow keys, and the global input CSS never shows, so no `!` is needed. Used by
   finances `PresetDialog`, media `StarRating`, diet `PlanCalendar`.
-- **Styled links:** App.vue's `a { all: unset }` makes anchors content-box. Primitives that render
-  a RouterLink (Button, Card, ListRow) carry `box-border`; do the same on any other styled `<a>`
-  until phase 6 removes the reset.
+
 
 ## Not primitives (on purpose)
 Domain components stay in their module but are **built from** primitives and tokens:

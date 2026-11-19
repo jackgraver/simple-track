@@ -25,8 +25,9 @@ project. Background: [PRINCIPLES.md](PRINCIPLES.md), [TOKENS.md](TOKENS.md),
 7. **Both themes work.** Never use `dark:`. If light looks wrong, fix the token.
 8. **A11y floor.** Icon-only buttons have `aria-label`, inputs have labels, focus is visible,
    colour is never the only signal.
-9. **Never grow the suppressions.** Don't run `--suppress-all`/`--suppress-rule` to make new code
-   pass. When you clean a file up, prune them (command below).
+9. **No suppressions.** `eslint-suppressions.json` has been empty since phase 6. Never run
+   `--suppress-all`/`--suppress-rule`. A real exception (an `sr-only` native radio, a range input
+   under a drawn slider) gets an inline `eslint-disable-next-line <rule> -- <why>` comment.
 10. **One module per PR** for migrations: tokens, primitives, states and the optimistic-ui
     conversion together, so each page is touched once.
 
@@ -36,31 +37,20 @@ pipeline (`frontend-lint` step, before tests). It covers:
 
 | Rule | Catches |
 |---|---|
-| `better-tailwindcss/no-restricted-classes` | palette colours (`text-zinc-500`, `hover:bg-green-600`, `text-white/15`) and arbitrary colour/type/radius/shadow/z values |
+| `better-tailwindcss/no-restricted-classes` | palette colours (`text-zinc-500`, `hover:bg-green-600`, `text-white/15`), arbitrary colour/type/radius/shadow/z values, and `!` important classes |
 | `better-tailwindcss/no-unknown-classes` | classes Tailwind doesn't know: typos, undefined tokens (`bg-primary`), and the custom CSS classes that `<style>` blocks need |
 | `better-tailwindcss/no-conflicting-classes`, `no-duplicate-classes`, `no-deprecated-classes` | contradictory, repeated or v3-era classes |
 | `vue/no-restricted-block` (`style`) | `<style>` blocks |
 | `no-restricted-syntax`, `vue/no-restricted-syntax`, `vue/no-restricted-static-attribute` | hex/rgb/hsl in TS strings, template expressions and `style="…"` |
+| `vue/no-restricted-html-elements` | raw `<button>`, `<input>`, `<select>`, `<textarea>` outside `shared/ui/` |
+| `no-restricted-imports` | `reka-ui` outside `shared/ui/` |
 
-Existing violations (849 at setup, 2026-11-19) are recorded in `frontend/eslint-suppressions.json`.
-ESLint only fails when a file has **more** violations of a rule than recorded. When that
-happens it lists every violation of that rule in the file, not just the new one: diff against
-`main` to find yours.
+Palette classes also fail to compile: `style.css` sets `--color-*: initial`, so only tokens exist.
 
 ```sh
 cd frontend
-mise exec -- npm run lint                            # check
-mise exec -- npm run lint -- --prune-suppressions    # after cleanup: shrink the suppressions file
-git diff eslint-suppressions.json                    # counts may only go down or disappear
+mise exec -- npm run lint
 ```
-
-## Planned rules (add when the condition holds)
-| When | Add |
-|---|---|
-| Token layer lands | Restrict legacy tokens: `bg-(mainBg\|firstBg\|secondBg\|thirdBg)`, `text-(textPrimary\|textSecondary\|cfRed)`, `--color-border`, `--color-cf-red` |
-| Button/Input primitives land | `vue/no-restricted-html-elements` for raw `<button>`, `<input>`, `<select>`, `<textarea>` outside `shared/ui/` |
-| Global element CSS removed | Restrict `!` important classes |
-| No palette suppressions left | `--color-*: initial;` in `@theme`, so palette classes stop compiling |
 
 ## How to verify visually
 Screenshot only what you changed. The owner knows the rest of the UI.

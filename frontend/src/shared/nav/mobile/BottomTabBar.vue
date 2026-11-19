@@ -27,6 +27,7 @@ function openGroup(group: NavGroup) {
         class="fixed inset-x-0 bottom-0 z-nav border-t border-line bg-surface/95 pb-safe backdrop-blur-sm"
     >
         <div class="mx-auto flex h-tabbar max-w-md items-stretch">
+            <!-- eslint-disable-next-line vue/no-restricted-html-elements -- tab bar item (icon over label), not a button style -->
             <button
                 v-for="group in navGroups"
                 :key="group.key"

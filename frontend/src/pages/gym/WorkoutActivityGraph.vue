@@ -183,6 +183,7 @@ watch(gridCells, () => scrollToToday());
         </template>
         <div v-else ref="scrollContainer" class="w-full min-w-0 overflow-x-auto">
             <div class="grid w-max grid-flow-col grid-rows-7 gap-[3px]" role="grid" aria-label="Workout activity">
+                <!-- eslint-disable-next-line vue/no-restricted-html-elements -- heatmap cell (10px square), not a button style -->
                 <button
                     v-for="(c, i) in gridCells"
                     :key="c.key + '-' + i"

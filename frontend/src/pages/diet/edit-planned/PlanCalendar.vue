@@ -162,6 +162,7 @@ function plannedCount(index: number): number {
                                     : 'border-line bg-surface hover:bg-surface-3'
                             "
                         >
+                            <!-- eslint-disable-next-line vue/no-restricted-html-elements -- sr-only native radio behind a styled day label (radio-card pattern, PRIMITIVES.md) -->
                             <input
                                 type="radio"
                                 name="plan-day"

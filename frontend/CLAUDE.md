@@ -9,8 +9,9 @@ Read `docs/design/PRINCIPLES.md` once and `docs/design/RULES.md` before your fir
 use the `ui` skill.
 - Tokens only: no hex/rgb/hsl, no Tailwind palette classes (`zinc-*`, `white`), no arbitrary
   colour/type/radius/shadow/z values. Theme lives in `src/style.css`.
-- Shared components from `src/shared/ui/` only (once they exist). No `<style>` blocks, no `!` overrides.
+- Shared components from `src/shared/ui/` only (no raw `<button>`/`<input>`/`<select>`/`<textarea>`
+  elsewhere). No `<style>` blocks, no `!` overrides.
 - Every data view has loading, empty and error states. Every action shows pending and failure.
 - Check mobile (390px) and desktop (1280px), dark and light. Layout switches at `lg` only.
-- `npm run lint` must pass. Never grow `eslint-suppressions.json`; prune it after cleanups
-  (`npm run lint -- --prune-suppressions`).
+- `npm run lint` must pass. `eslint-suppressions.json` is empty: never add to it. A real exception
+  gets an inline `eslint-disable-next-line <rule> -- <why>`.

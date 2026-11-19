@@ -1,11 +1,7 @@
 // ESLint: UI design-system rules (see docs/design/RULES.md).
 //
-// Existing violations are recorded in eslint-suppressions.json, so only NEW
-// ones fail. After cleaning a file up, shrink the file with
-//   npm run lint -- --prune-suppressions
-// Never run --suppress-all / --suppress-rule to make new code pass.
-//
-// Rules are added as the overhaul progresses ("Planned rules" in RULES.md).
+// eslint-suppressions.json is empty and stays empty: never run --suppress-all or
+// --suppress-rule. A legitimate exception gets an inline disable with a reason.
 import pluginVue from "eslint-plugin-vue";
 import betterTailwind from "eslint-plugin-better-tailwindcss";
 import { getDefaultSelectors } from "eslint-plugin-better-tailwindcss/defaults";
@@ -73,6 +69,11 @@ export default [
                                 "Tailwind palette colour. Use a semantic token (text-fg-muted, bg-surface, border-line, text-danger...): docs/design/TOKENS.md.",
                         },
                         {
+                            pattern: "^!|!$",
+                            message:
+                                "No ! (important) classes. If something overrides a class, fix the cause or use a primitive (docs/design/RULES.md).",
+                        },
+                        {
                             pattern: `${VARIANTS}-?(?:${COLOR_UTILITIES}|rounded(?:-[a-z]+)?|z)-\\[.+\\]!?$`,
                             message:
                                 "Arbitrary value for something tokens cover (colour, type size, radius, shadow, z). Use or add a token: docs/design/TOKENS.md.",
@@ -111,9 +112,22 @@ export default [
                 { patterns: [{ group: ["reka-ui", "reka-ui/*"], message: "Import Reka UI only inside src/shared/ui/. Pages use the shared/ui primitives." }] },
             ],
             "vue/no-restricted-syntax": ["error", ...colorLiteralSelectors],
+            // Primitives only: raw form controls live in shared/ui/. A legitimate exception
+            // (an sr-only native radio, a range input under a drawn slider) gets an
+            // inline disable comment for this rule that says why.
+            "vue/no-restricted-html-elements": [
+                "error",
+                ...["button", "input", "select", "textarea"].map((element) => ({
+                    element,
+                    message: `No raw <${element}> outside src/shared/ui/. Use Button/IconButton/Input/Select/Textarea/Checkbox/NumberField (docs/design/PRIMITIVES.md).`,
+                })),
+            ],
         },
     },
 
     // The only place allowed to import the headless library.
-    { files: ["src/shared/ui/**/*.{ts,vue}"], rules: { "no-restricted-imports": "off" } },
+    {
+        files: ["src/shared/ui/**/*.{ts,vue}"],
+        rules: { "no-restricted-imports": "off", "vue/no-restricted-html-elements": "off" },
+    },
 ];

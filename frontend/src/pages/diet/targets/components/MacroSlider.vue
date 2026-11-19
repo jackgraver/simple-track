@@ -91,6 +91,7 @@ const markerStyles = computed(() => {
         <!-- A real range input sits invisibly on top (touch, keyboard, ARIA); the visible track,
              markers and thumb are drawn beneath it. -->
         <div class="relative h-touch lg:h-6">
+            <!-- eslint-disable-next-line vue/no-restricted-html-elements -- invisible native range input over the drawn track and markers -->
             <input
                 type="range"
                 class="peer absolute inset-0 z-raised m-0 h-full w-full appearance-none bg-transparent opacity-0"

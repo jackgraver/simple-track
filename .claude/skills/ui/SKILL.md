@@ -24,8 +24,7 @@ If the work is part of the ui-overhaul project, also follow `docs/projects/READM
 
 ## 3. While writing
 - Tokens only, no `<style>`, no `!` overrides, no `dark:` (RULES.md).
-- Run `mise exec -- npm run lint` in `frontend/` often. A failure in a file with suppressed
-  violations lists all of them: `git diff` to find the one you added.
+- Run `mise exec -- npm run lint` in `frontend/` often. There are no suppressions: every error is yours.
 
 ## 4. Verify (don't skip)
 1. `cd frontend && mise exec -- npm run type-check && mise exec -- npm run lint && mise exec -- npx vitest run`

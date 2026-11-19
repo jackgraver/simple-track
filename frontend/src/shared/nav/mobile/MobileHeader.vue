@@ -3,6 +3,7 @@ import { Check, ChevronDown, ChevronLeft, CircleUser } from "lucide-vue-next";
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { isDevEnvironment } from "~/composables/auth/session";
+import { IconButton } from "~/shared/ui";
 import {
     activeGroup,
     activeItem,
@@ -60,17 +61,10 @@ onUnmounted(() => {
 
 <template>
     <header class="flex min-h-touch items-center gap-1 pt-2 pb-3">
-        <button
-            v-if="showBack"
-            type="button"
-            class="-ml-2 flex size-touch shrink-0 items-center justify-center rounded-control text-fg-muted hover:bg-surface-3 hover:text-fg"
-            aria-label="Back"
-            @click="goBack"
-        >
-            <ChevronLeft class="size-6" />
-        </button>
+        <IconButton v-if="showBack" label="Back" class="-ml-2" @click="goBack"><ChevronLeft /></IconButton>
 
         <div ref="menuRoot" class="relative min-w-0 flex-1">
+            <!-- eslint-disable-next-line vue/no-restricted-html-elements -- the page title is the trigger of the module switcher; ui: replace the hand-rolled popover with <Menu> -->
             <button
                 v-if="hasMenu"
                 type="button"

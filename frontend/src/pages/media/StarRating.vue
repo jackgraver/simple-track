@@ -50,6 +50,7 @@ const stars = [1, 2, 3, 4, 5];
                 :class="i === 0 ? 'left-0' : 'right-0'"
                 @mouseenter="hover = value"
             >
+                <!-- eslint-disable-next-line vue/no-restricted-html-elements -- sr-only native radio per half star (radio-card pattern, PRIMITIVES.md) -->
                 <input
                     type="radio"
                     :name="name"
