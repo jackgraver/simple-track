@@ -85,3 +85,6 @@ Checkbox tick uses `text-fg-inverse` on the accent fill (contrast in both themes
 
 ## 2026-11-19: ListRow picks its element from its props; actions are a sibling (P3)
 `to` renders a RouterLink, an attached `@click` renders a `<button>`, otherwise a `<div>`. The desktop `#actions` slot sits beside that element inside the `<li>` (a button can't contain buttons), and the hover/selected background lives on the `<li>` so the actions area highlights with the row. Actions are `lg`-only and appear on hover or focus-within; on mobile the caller puts an `IconButton` in `#trailing` (the story hides it at `lg`). `selected` sets `aria-current`, not `aria-selected` (rows are not an ARIA listbox).
+
+## 2026-11-19: ErrorState takes `onRetry` as a prop; the logging shell gets a retry (P4)
+`ErrorState` shows Retry only when `@retry` is bound (declared as an `onRetry` prop, so the template can tell). The logging shell's error branch now keeps the back header, shows `ErrorState` and emits `retry`, which `exercise/[id].vue` wires to a new `refetch` returned by `useWorkoutStore` (a one-line addition to the store). The pending branch waits 150ms (`useDelayedFlag`) before showing skeletons, and the "Set —" placeholder is gone.

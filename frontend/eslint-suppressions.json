@@ -323,20 +323,6 @@
       "count": 4
     }
   },
-  "src/pages/gym/logging/exercise/components/LoggingPageShell.vue": {
-    "better-tailwindcss/no-deprecated-classes": {
-      "count": 1
-    },
-    "better-tailwindcss/no-restricted-classes": {
-      "count": 4
-    },
-    "better-tailwindcss/no-unknown-classes": {
-      "count": 11
-    },
-    "vue/no-restricted-block": {
-      "count": 1
-    }
-  },
   "src/pages/gym/logging/exercise/components/MobilityLoggingView.vue": {
     "better-tailwindcss/no-deprecated-classes": {
       "count": 3

@@ -231,6 +231,7 @@ export function useWorkoutStore(offset: MaybeRefOrGetter<number> = 0) {
         data,
         pending,
         error,
+        refetch: () => workoutLogsQuery.refetch(),
         logExercise,
         addExerciseToWorkout,
         removeExerciseFromLog,
