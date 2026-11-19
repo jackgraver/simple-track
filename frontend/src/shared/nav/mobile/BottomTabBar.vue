@@ -31,7 +31,7 @@ function openGroup(group: NavGroup) {
                 v-for="group in navGroups"
                 :key="group.key"
                 type="button"
-                class="m-0! flex flex-1 flex-col items-center justify-center gap-0.5 rounded-none! bg-transparent p-0! text-2xs shadow-none! transition-colors"
+                class="flex flex-1 flex-col items-center justify-center gap-0.5 bg-transparent text-2xs transition-colors"
                 :class="current?.key === group.key ? 'text-fg' : 'text-fg-muted'"
                 :aria-current="current?.key === group.key ? 'page' : undefined"
                 @click="openGroup(group)"

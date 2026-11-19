@@ -34,7 +34,7 @@ function onOpen(t: ToastItem, open: boolean) {
             <ToastAction v-if="t.action" as-child :alt-text="`${t.action.label}: ${t.message}`">
                 <button
                     type="button"
-                    class="m-0! min-h-touch shrink-0 cursor-pointer rounded-control! border-0! bg-transparent! px-3! py-0! text-sm font-medium text-accent shadow-none! hover:bg-surface-3! focus-visible:outline-2 focus-visible:outline-accent lg:min-h-control-sm"
+                    class="min-h-touch shrink-0 cursor-pointer rounded-control px-3 py-0 text-sm font-medium text-accent hover:bg-surface-3 focus-visible:outline-2 focus-visible:outline-accent lg:min-h-control-sm"
                     @click="emit('action', t.id)"
                 >
                     {{ t.action.label }}
@@ -44,7 +44,7 @@ function onOpen(t: ToastItem, open: boolean) {
                 <button
                     type="button"
                     aria-label="Dismiss"
-                    class="m-0! flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-control! border-0! bg-transparent! p-0! text-fg-subtle shadow-none! hover:bg-surface-3! hover:text-fg focus-visible:outline-2 focus-visible:outline-accent"
+                    class="flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-control text-fg-subtle hover:bg-surface-3 hover:text-fg focus-visible:outline-2 focus-visible:outline-accent"
                 >
                     <X aria-hidden="true" class="size-4" />
                 </button>

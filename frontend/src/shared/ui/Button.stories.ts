@@ -71,7 +71,7 @@ export const Matrix: Story = {
 };
 
 /**
- * A link button (`to`) with `block` at phone width. Regression: `a { all: unset }` in App.vue made the anchor
+ * A link button (`to`) with `block` at phone width. Regression (fixed in phase 6 by removing `a { all: unset }` from App.vue): it made the anchor
  * content-box, so `w-full` plus padding overflowed its column. The wrapper is 358px (390 - 2 x 16px gutter): the
  * button must fill it exactly.
  */

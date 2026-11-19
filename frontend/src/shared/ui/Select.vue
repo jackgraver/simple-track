@@ -29,13 +29,13 @@ const field = useField();
             :aria-label="ariaLabel"
             :aria-invalid="props.invalid || field?.invalid() || undefined"
             :aria-describedby="field?.describedBy()"
-            class="m-0! w-full cursor-pointer appearance-none rounded-control! border! bg-surface-2! py-0! pr-9! pl-3! text-base text-fg! outline-none! transition-colors duration-150 focus:ring-1 disabled:cursor-not-allowed disabled:opacity-50 lg:text-sm"
+            class="w-full cursor-pointer appearance-none rounded-control border bg-surface-2 py-0 pr-9 pl-3 text-base text-fg outline-none transition-colors duration-150 focus:ring-1 disabled:cursor-not-allowed disabled:opacity-50 lg:text-sm"
             :class="[
                 props.size === 'sm' ? 'min-h-touch lg:min-h-control-sm' : 'min-h-touch lg:min-h-row',
                 props.invalid || field?.invalid()
-                    ? 'border-danger! ring-danger focus:border-danger!'
-                    : 'border-line-strong! ring-accent focus:border-accent!',
-                model === '' ? 'text-fg-subtle!' : '',
+                    ? 'border-danger ring-danger focus:border-danger'
+                    : 'border-line-strong ring-accent focus:border-accent',
+                model === '' ? 'text-fg-subtle' : '',
             ]"
         >
             <option v-if="placeholder" value="" disabled>{{ placeholder }}</option>

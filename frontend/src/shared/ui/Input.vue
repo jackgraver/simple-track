@@ -26,9 +26,8 @@ function onFocus(e: FocusEvent) {
     if (isNumeric()) (e.target as HTMLInputElement).select();
 }
 
-// `!` classes on the <input> beat the global `input, select {}` rule in App.vue (phase 6 removes it).
 const control =
-    "m-0! min-w-0 flex-1 rounded-none! border-0! bg-transparent! p-0! text-base text-fg! outline-none! placeholder:text-fg-subtle read-only:text-fg-muted lg:text-sm";
+    "min-w-0 flex-1 text-base text-fg outline-none placeholder:text-fg-subtle read-only:text-fg-muted lg:text-sm";
 </script>
 
 <template>

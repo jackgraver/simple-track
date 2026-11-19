@@ -32,7 +32,7 @@ const noun = computed(() => props.label ?? "value");
 const formatOptions = computed(() => ({ maximumFractionDigits: props.decimals, useGrouping: false }));
 
 const stepper =
-    "m-0! flex size-touch shrink-0 cursor-pointer items-center justify-center rounded-control! border! border-line-strong! bg-surface-2 p-0! text-fg shadow-none! transition-colors duration-100 select-none enabled:hover:bg-surface-3 enabled:active:bg-line focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-50 lg:size-row";
+    "flex size-touch shrink-0 cursor-pointer items-center justify-center rounded-control border border-line-strong bg-surface-2 text-fg transition-colors duration-100 select-none enabled:hover:bg-surface-3 enabled:active:bg-line focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-50 lg:size-row";
 </script>
 
 <template>
@@ -65,7 +65,7 @@ const stepper =
                 :placeholder="placeholder"
                 :aria-invalid="props.invalid || field?.invalid() || undefined"
                 :aria-describedby="field?.describedBy()"
-                class="m-0! w-full min-w-0 flex-1 rounded-none! border-0! bg-transparent! p-0! text-center text-fg! tabular-nums outline-none! placeholder:text-fg-subtle"
+                class="w-full min-w-0 flex-1 text-center text-fg tabular-nums outline-none placeholder:text-fg-subtle"
                 :class="size === 'lg' ? 'text-lg font-semibold' : 'text-base lg:text-sm'"
                 @focus="($event.target as HTMLInputElement).select()"
             />

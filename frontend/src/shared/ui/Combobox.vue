@@ -70,9 +70,8 @@ watch(term, (q) => {
 });
 onBeforeUnmount(() => clearTimeout(timer));
 
-// `!` classes beat the global `input {}` rule in App.vue (phase 6 removes it), same as Input.vue.
 const control =
-    "m-0! min-w-0 flex-1 rounded-none! border-0! bg-transparent! p-0! text-base text-fg! outline-none! placeholder:text-fg-subtle lg:text-sm";
+    "min-w-0 flex-1 text-base text-fg outline-none placeholder:text-fg-subtle lg:text-sm";
 const itemClass =
     "flex min-h-touch cursor-pointer items-center rounded-control px-3 text-base text-fg outline-none select-none data-[highlighted]:bg-surface-3 lg:min-h-row lg:text-sm";
 </script>

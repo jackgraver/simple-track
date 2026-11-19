@@ -8,6 +8,7 @@ import {
     formatDateLong,
     parseDietDayOffsetQuery,
 } from "~/utils/dateUtil";
+import { IconButton } from "~/shared/ui";
 
 const route = useRoute();
 const router = useRouter();
@@ -87,14 +88,7 @@ function onNativeDateChange(ev: Event) {
 <template>
     <section class="flex flex-col gap-2">
         <div class="flex items-center justify-between gap-3">
-            <button
-                type="button"
-                aria-label="Previous day"
-                class="shrink-0 rounded-control border border-line bg-surface-2 p-2 text-fg transition-colors hover:bg-surface-3"
-                @click="goToPreviousDay"
-            >
-                <ChevronLeftIcon class="size-4" />
-            </button>
+            <IconButton label="Previous day" variant="secondary" @click="goToPreviousDay"><ChevronLeftIcon /></IconButton>
             <div
                 class="flex min-w-0 flex-1 flex-col items-center justify-center gap-0"
             >
@@ -109,7 +103,7 @@ function onNativeDateChange(ev: Event) {
                     </span>
                     <button
                         type="button"
-                        class="col-start-1 row-start-1 m-0 max-w-full cursor-pointer rounded-control border-none bg-transparent px-1 text-base font-medium leading-tight text-fg underline-offset-2 transition-colors hover:text-fg hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                        class="col-start-1 row-start-1 max-w-full cursor-pointer rounded-control px-1 text-base font-medium leading-tight text-fg underline-offset-2 transition-colors hover:text-fg hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
                         :aria-label="`Chosen day: ${dateLabel}. Open calendar`"
                         @click="openNativeDatePicker"
                     >
@@ -130,7 +124,7 @@ function onNativeDateChange(ev: Event) {
                 >
                     <button
                         type="button"
-                        class="m-0! py-0! text-xs leading-none text-fg-muted underline-offset-2 transition-colors hover:text-fg hover:underline disabled:pointer-events-none"
+                        class="py-0 text-xs leading-none text-fg-muted underline-offset-2 transition-colors hover:text-fg hover:underline disabled:pointer-events-none"
                         :class="{ invisible: isToday }"
                         :disabled="isToday"
                         :tabindex="isToday ? -1 : 0"
@@ -141,14 +135,7 @@ function onNativeDateChange(ev: Event) {
                     </button>
                 </div>
             </div>
-            <button
-                type="button"
-                aria-label="Next day"
-                class="shrink-0 rounded-control border border-line bg-surface-2 p-2 text-fg transition-colors hover:bg-surface-3"
-                @click="goToNextDay"
-            >
-                <ChevronRightIcon class="size-4" />
-            </button>
+            <IconButton label="Next day" variant="secondary" @click="goToNextDay"><ChevronRightIcon /></IconButton>
         </div>
     </section>
 </template>

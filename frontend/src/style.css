@@ -201,10 +201,26 @@
 @utility pb-above-tabbar { padding-bottom: calc(var(--spacing-tabbar) + 0.5rem + env(safe-area-inset-bottom)); }
 @utility bottom-above-tabbar { bottom: calc(var(--spacing-tabbar) + 1rem + env(safe-area-inset-bottom)); }
 
+@utility h-safe-top { height: env(safe-area-inset-top); }
+
 @layer base {
     html {
+        min-height: 100%;
+        overscroll-behavior: none;
         background: var(--color-canvas);
         color: var(--color-fg);
+    }
+
+    body {
+        padding-top: env(safe-area-inset-top);
+        padding-bottom: env(safe-area-inset-bottom);
+        overscroll-behavior: none;
+    }
+
+    /* Keyboard focus indicator wherever a component doesn't draw its own. */
+    :focus-visible {
+        outline: 2px solid var(--color-accent);
+        outline-offset: 2px;
     }
 }
 
@@ -217,19 +233,14 @@
 }
 
 /*
- * Desktop: the sidebar is fixed, so centre the page content on the whole
+ * Desktop (`lg:app-content`): the sidebar is fixed, so centre the page content on the whole
  * window rather than the space beside the sidebar. When the window is too
  * narrow to centre without overlapping, it sits just right of the sidebar.
  */
-@media (width >= 64rem) {
-    .app-content {
-        --nav-w: var(--spacing-sidenav);
-        --nav-gap: 2rem;
-        --content-w: min(var(--spacing-content), 100vw - var(--nav-w) - 2 * var(--nav-gap));
-        width: var(--content-w);
-        max-width: none;
-        padding-inline: 0;
-        margin-left: max(var(--nav-w) + var(--nav-gap), (100vw - var(--content-w)) / 2);
-        margin-right: 0;
-    }
+@utility app-content {
+    --nav-w: var(--spacing-sidenav);
+    --nav-gap: 2rem;
+    --content-w: min(var(--spacing-content), 100vw - var(--nav-w) - 2 * var(--nav-gap));
+    width: var(--content-w);
+    margin-left: max(var(--nav-w) + var(--nav-gap), (100vw - var(--content-w)) / 2);
 }

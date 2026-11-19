@@ -28,10 +28,10 @@ const interactive = computed(() => !props.disabled && (!!props.to || clickable.v
             :is="main"
             v-bind="{ ...attrs, ...(main === RouterLink ? { to } : {}), ...(main === 'button' ? { type: 'button', disabled } : {}) }"
             :aria-current="selected ? 'true' : undefined"
-            class="box-border flex min-h-touch min-w-0 flex-1 items-center gap-3 px-3 py-2 text-left text-base text-fg no-underline lg:min-h-row lg:px-4 lg:text-sm"
+            class="flex min-h-touch min-w-0 flex-1 items-center gap-3 px-3 py-2 text-left text-base text-fg no-underline lg:min-h-row lg:px-4 lg:text-sm"
             :class="[
                 interactive
-                    ? 'm-0! cursor-pointer rounded-none! bg-transparent! p-0! px-3! py-2! shadow-none! focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent lg:px-4!'
+                    ? 'cursor-pointer focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent'
                     : '',
                 disabled ? 'cursor-not-allowed' : '',
             ]"

@@ -41,11 +41,11 @@ watch(model, () => nextTick(grow));
         :aria-label="ariaLabel"
         :aria-invalid="props.invalid || field?.invalid() || undefined"
         :aria-describedby="field?.describedBy()"
-        class="m-0! block min-h-touch w-full resize-none rounded-control! border! bg-surface-2! px-3! py-2! text-base text-fg! outline-none! transition-colors duration-150 placeholder:text-fg-subtle focus:ring-1 disabled:cursor-not-allowed disabled:opacity-50 read-only:text-fg-muted lg:text-sm"
+        class="block min-h-touch w-full resize-none rounded-control border bg-surface-2 px-3 py-2 text-base text-fg outline-none transition-colors duration-150 placeholder:text-fg-subtle focus:ring-1 disabled:cursor-not-allowed disabled:opacity-50 read-only:text-fg-muted lg:text-sm"
         :class="
             props.invalid || field?.invalid()
-                ? 'border-danger! ring-danger focus:border-danger!'
-                : 'border-line-strong! ring-accent focus:border-accent!'
+                ? 'border-danger ring-danger focus:border-danger'
+                : 'border-line-strong ring-accent focus:border-accent'
         "
     ></textarea>
 </template>

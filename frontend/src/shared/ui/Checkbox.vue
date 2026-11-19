@@ -15,7 +15,7 @@ defineProps<{ label: string; disabled?: boolean }>();
         <CheckboxRoot
             v-model="model"
             :disabled="disabled"
-            class="m-0! flex size-5 shrink-0 items-center justify-center rounded-control! border! border-line-strong! bg-surface-2 p-0! shadow-none! transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent data-[state=checked]:border-accent! data-[state=checked]:bg-accent data-[state=indeterminate]:border-accent! data-[state=indeterminate]:bg-accent"
+            class="flex size-5 shrink-0 items-center justify-center rounded-control border border-line-strong bg-surface-2 transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent data-[state=checked]:border-accent data-[state=checked]:bg-accent data-[state=indeterminate]:border-accent data-[state=indeterminate]:bg-accent"
         >
             <CheckboxIndicator class="flex text-fg-inverse">
                 <Minus v-if="model === 'indeterminate'" aria-hidden="true" class="size-3.5" />

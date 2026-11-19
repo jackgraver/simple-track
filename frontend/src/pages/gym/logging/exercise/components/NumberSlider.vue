@@ -310,7 +310,7 @@ const onTickClick = (index: number) => {
                         v-for="(tick, index) in tickValues"
                         :key="index"
                         type="button"
-                        class="flex h-full shrink-0 touch-pan-x snap-center flex-col items-center justify-end gap-1 m-0! border-0! bg-transparent! p-0! text-inherit shadow-none! focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"
+                        class="flex h-full shrink-0 touch-pan-x snap-center flex-col items-center justify-end gap-1 text-inherit focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"
                         :style="{
                             width: `${TICK_WIDTH_PX}px`,
                             scrollSnapAlign: 'center',

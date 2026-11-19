@@ -63,7 +63,7 @@ onUnmounted(() => {
         <button
             v-if="showBack"
             type="button"
-            class="-ml-2 m-0! flex size-touch shrink-0 items-center justify-center rounded-control p-0! text-fg-muted shadow-none! hover:bg-surface-3 hover:text-fg"
+            class="-ml-2 flex size-touch shrink-0 items-center justify-center rounded-control text-fg-muted hover:bg-surface-3 hover:text-fg"
             aria-label="Back"
             @click="goBack"
         >
@@ -74,7 +74,7 @@ onUnmounted(() => {
             <button
                 v-if="hasMenu"
                 type="button"
-                class="m-0! flex max-w-full items-center gap-1 rounded-control bg-transparent p-0! text-left shadow-none!"
+                class="flex max-w-full items-center gap-1 rounded-control bg-transparent text-left"
                 :aria-expanded="menuOpen"
                 aria-haspopup="menu"
                 @click="menuOpen = !menuOpen"

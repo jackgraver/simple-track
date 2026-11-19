@@ -23,7 +23,7 @@ function onUpdate(v: unknown) {
             v-for="o in options"
             :key="o.value"
             :value="o.value"
-            class="m-0! min-h-10 flex-1 rounded-control! px-3 shadow-none! text-base text-fg-muted transition-colors duration-150 hover:text-fg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent data-[state=on]:bg-surface data-[state=on]:text-fg data-[state=on]:shadow-raised! lg:min-h-8 lg:text-sm"
+            class="min-h-10 flex-1 rounded-control px-3 text-base text-fg-muted transition-colors duration-150 hover:text-fg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent data-[state=on]:bg-surface data-[state=on]:text-fg data-[state=on]:shadow-raised lg:min-h-8 lg:text-sm"
         >
             {{ o.label }}
         </ToggleGroupItem>

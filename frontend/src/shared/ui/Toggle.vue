@@ -13,7 +13,7 @@ defineProps<{ label: string; disabled?: boolean }>();
         <SwitchRoot
             v-model="model"
             :disabled="disabled"
-            class="relative m-0! inline-flex h-6 w-11 shrink-0 items-center rounded-full! bg-surface-3 p-0! shadow-none! transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-50 data-[state=checked]:bg-accent"
+            class="relative inline-flex h-6 w-11 shrink-0 items-center rounded-full bg-surface-3 transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-50 data-[state=checked]:bg-accent"
         >
             <SwitchThumb
                 class="block size-5 translate-x-0.5 rounded-full bg-on-solid shadow-raised transition-transform duration-150 data-[state=checked]:translate-x-5.5"
