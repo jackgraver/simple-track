@@ -60,3 +60,12 @@ Blue accent, inverted neutral primary button, darker surfaces, Dark/Light/System
 - Behaviour: all trap focus and close on Esc. PrimeVue Drawer drops focus to `<body>` and doesn't lock scroll by default; InputNumber's ± buttons have no accessible name. Reka restores focus, locks scroll and labels its steppers. None has swipe-to-close sheets.
 - Licence: PrimeVue 5 moved to the PrimeUI licence (yearly Community key for individuals, a badge without one). The lab pinned 4.5.5 (MIT, frozen since Apr 2026).
 Recommendation: Reka + own Tailwind (looks and behaviour match the charter; costs the most build time). Runner-up: PrimeVue 4 styled + preset (fastest to theme; licence and Aura density to manage). Not recommended: Volt.
+
+## 2026-11-19: Reka UI + own Tailwind (B2); lab stays on `proj/ui-bakeoff`
+The owner picked Reka UI. It is headless: behaviour (focus, ARIA, keyboard, portals) from the library, every look from our tokens and Tailwind. Supersedes "Own primitives in `shared/ui/`, native-first" only where that said to revisit a headless lib: Reka is now the behaviour layer for Overlay, Toast, Toggle, Checkbox, SegmentedControl, the number stepper, and later Combobox/Menu. Select stays native, and Button/Input/Card/Badge/List/states stay plain Vue. Table: PRIMITIVES.md "Library-backed".
+- Why: matched the density and behaviour in the charter at the best critique score (28/40), +55 kB gzip against +159–172 kB for PrimeVue, no licence question, no stock look to fight or Aura proportions to override.
+- Cost accepted: we build and own every primitive (322 lines for the bake-off set), including sheet swipe-to-close.
+- Dropped: PrimeVue entirely. Charts move to a chart.js wrapper (F2), so `primevue`, `@primeuix/themes` and the Aura plugin go.
+- Token names are unchanged (Reka has no naming convention). The B1 contrast fixes apply to values in F1.
+- `lab/` is not merged to `main`. It stays on branch `proj/ui-bakeoff` with the comparison page https://claude.ai/artifact/4buX5k9LpVSCJ36o8LEMux as the record. `lab/scripts/contrast.mjs` is the source for the F1 contrast fixes.
+Alternatives: PrimeVue 4 styled + preset (runner-up: fastest to theme, but a 159 kB runtime, the licence track and Aura density), Volt (not recommended).

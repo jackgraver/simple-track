@@ -1,10 +1,9 @@
 # Primitives
 
-> **Status: spec, pending the library bake-off.** This is the set of components the app needs,
-> with their variants, states and the code each replaces. That part holds whatever we pick. If a
-> library wins (PrimeVue Volt is the candidate), most entries become "the library component,
-> styled to these tokens and wrapped in `shared/ui/`". Only the gaps get built from scratch.
-> Update this file when the choice is made.
+> **Status: spec; library chosen (2026-11-19): Reka UI, headless, styled with our Tailwind
+> tokens.** Reka supplies behaviour only (focus, ARIA, keyboard, portals, positioning). Every
+> primitive below is our own component in `shared/ui/` with our markup and classes, and wraps a
+> Reka part only where the table in "Library-backed" says so. Not built yet (phase 3–4).
 
 The minimal shared component set. Location: **`frontend/src/shared/ui/`**, one component per
 file, PascalCase, exported from `shared/ui/index.ts`. Pages import from `shared/ui/` only, never
@@ -18,8 +17,9 @@ Shared conventions:
 - Every interactive primitive has `disabled`, a visible `focus-visible` ring (`ring-2 ring-accent
   ring-offset-2 ring-offset-canvas`), and `hover:` only as an enhancement.
 - Tones are always `neutral | accent | success | warn | danger | info`, mapped to tokens.
-- Native elements first (`<button>`, `<input>`, `<select>`) where the library doesn't add
-  real value. Focus traps, popovers and comboboxes come from the library.
+- Native elements first (`<button>`, `<input>`, `<select>`) where Reka doesn't add real value.
+  Focus traps, popovers and comboboxes come from Reka (see "Library-backed").
+- Only `shared/ui/` imports `reka-ui` (`no-restricted-imports`). Pages never see it.
 - Until phase 5 removes the global element CSS in `App.vue` (`button { padding; margin; box-shadow }`,
   `input, select { background: rgb(71,71,71) }`), primitives neutralise it with a base reset
   class inside the primitive (`m-0 shadow-none`). Callers must never need `!` overrides.
@@ -38,6 +38,21 @@ Shared conventions:
 | 8 | Select, Toggle, Checkbox | 3b | 11 files with raw `<select>`, 10 with raw checkboxes |
 | 9 | SegmentedControl, PageHeader/Section, Chart | 3c | Smaller repetition. Chart moves chart theming onto tokens |
 | 10 | Combobox (from `Dropdown.vue`), Menu | 3c | Only a few users; do when the owning module migrates |
+
+## Library-backed (Reka UI 2.x) vs built by us
+
+| Primitive | Built on | Notes |
+|---|---|---|
+| `Overlay` (Dialog/Sheet) | Reka `Dialog*` | Focus trap and restore, Esc, scroll lock, `aria-*`. The sheet presentation, drag handle and swipe-to-close are ours (no candidate had swipe; pointer handler or vaul-vue) |
+| `Toast` | Reka `Toast*` | Provider/viewport/swipe-dismiss/Undo action. The `toast.push` API stays ours |
+| `Toggle` | Reka `Switch*` | |
+| `Checkbox` | Reka `Checkbox*` | Indeterminate support |
+| `SegmentedControl` | Reka `ToggleGroup*` (single) | |
+| Number stepper (`Input type=number` with ±) | Reka `NumberField*` | Gym set logging. Labelled steppers come for free |
+| `Combobox`, `Menu` | Reka `Combobox*`, `DropdownMenu*` | Later (phase 5, M9) |
+| `Select` | **native `<select>`** | The OS picker wins on mobile. Reka `Select` only if a module needs custom option rendering |
+| `Button`, `IconButton`, `Spinner`, `Field`, `Input`, `Textarea`, `Card`, `Badge`, `List`/`ListRow`, `EmptyState`, `ErrorState`, `Skeleton`, `PageHeader`, `Section` | **ours** | Plain Vue + Tailwind tokens |
+| `Chart` | **ours** | chart.js directly (PrimeVue chart is dropped) |
 
 ---
 
@@ -197,8 +212,10 @@ so fast loads never flash a skeleton. Replaces the 16 "Loading…" / 2 "Loading.
 ## Chart
 `shared/chart/Chart.vue` (`type`, `data`, `options`) plus `shared/chart/theme.ts`
 (`chartTheme()` reads `--color-chart-*`, `fg-muted`, `line`; re-renders on theme change).
-Replaces `primevue/chart` in the 5 chart files and the two `readChartTheme()` copies. See the
-library bake-off (PrimeVue Volt may provide the wrapper).
+Replaces `primevue/chart` in the 5 chart files and the two `readChartTheme()` copies. A thin
+chart.js wrapper (register only the controllers/scales in use, so no `chart.js/auto`). It reads
+tokens after `data-theme` is set and re-renders when it changes (the bake-off caught a chart that
+sampled the previous theme).
 
 ## Combobox, Menu (later)
 - `Combobox`: evolve `shared/input/Dropdown.vue` (hex colours, `z-1000`, blur-timeout close) into

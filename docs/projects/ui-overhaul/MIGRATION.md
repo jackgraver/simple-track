@@ -69,8 +69,8 @@ there is none. It's dead, and it's misleading too: it defines `border` and an un
 `--color-gradient` that don't exist in the real theme. `style.css` `@theme` is canonical.
 Alternative (keep it and `@config` it) rejected: two sources of truth and the v3 API.
 
-## PrimeVue (superseded 2026-11-19)
-The charter first recommended dropping PrimeVue, which is only used for `primevue/chart` in 5
-files plus the Aura plugin. The owner is now open to a component library, and **PrimeVue Volt**
-is a bake-off candidate, so the decision waits for the bake-off (DECISIONS.md). Either way the
-Aura preset and the `.dark` coupling go, and charts read tokens via `shared/chart/theme.ts`.
+## PrimeVue (removed in F2, decided 2026-11-19)
+PrimeVue is only used for `primevue/chart` in 5 files plus the Aura plugin. It was a bake-off
+candidate and lost to Reka UI (DECISIONS.md), so F2 replaces the chart with a chart.js wrapper
+(`shared/chart/`, tokens via `theme.ts`) and uninstalls `primevue`, `@primeuix/themes` and the Aura
+preset. The `.dark` coupling goes in F1.

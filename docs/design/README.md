@@ -11,8 +11,9 @@ ui-overhaul project) is tracked separately in `docs/projects/ui-overhaul/`.
 | [PRIMITIVES.md](PRIMITIVES.md) | When you need a button, input, card, row, dialog, toast or state component |
 
 Status (2026-11-19): principles and rules are in force, and the lint enforces them for new code.
-Tokens and primitives are **specified but not built yet**. They wait on the component-library
-bake-off (PrimeVue Volt vs alternatives). Until then, follow the interim note in RULES.md.
+Tokens and primitives are **specified but not built yet**. The component library is chosen
+(Reka UI, headless, styled with our tokens), so phase 3 can start. Until the primitives land,
+follow the interim note in RULES.md.
 
 Agent entry points: `frontend/CLAUDE.md` (loaded automatically when working under `frontend/`)
 and the `ui` skill (`.claude/skills/ui/`).

@@ -3,10 +3,12 @@
 Source of truth: **`frontend/src/style.css`** (Tailwind v4 `@theme`). Nothing else defines
 colours, radii, shadows or type sizes. This file is the spec.
 
-> **Status: proposed, not yet in `style.css`.** The values and roles are agreed. The exact
-> variable names may change to fit the component library picked in the ui-overhaul bake-off
-> (e.g. PrimeVue Volt's `primary`/`surface` conventions). If they do, update the names here,
-> not the roles. Until the token layer lands, existing code uses the legacy aliases
+> **Status: agreed, not yet in `style.css`.** The values, roles and names are final: the library
+> pick (Reka UI, headless) imposes no naming convention, so nothing is renamed. Known value fixes
+> to apply when the layer lands (found by `lab/scripts/contrast.mjs` on branch `proj/ui-bakeoff`):
+> light-theme status text on `*-soft` fails AA (success 3.4, warn 3.1, danger 4.0, accent 4.3),
+> `text-warn` on canvas is 3.5 in light, the dark danger badge is 4.0. Until the token layer
+> lands, existing code uses the legacy aliases
 > (`bg-firstBg`, `text-textSecondary`…); the mapping lives in
 > `docs/projects/ui-overhaul/MIGRATION.md`.
 
