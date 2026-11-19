@@ -3,7 +3,6 @@ import type {
     BodyWeightLog,
     DrinkSizePreset,
     GroceryItem,
-    MissedTracking,
     ParsedGroceryLine,
     StepLog,
     UserProfile,
@@ -92,10 +91,6 @@ export async function fetchGrocerySuggestions(query: string): Promise<string[]> 
         params: { q: query },
     });
     return res.suggestions ?? [];
-}
-
-export async function fetchMissedTracking(): Promise<MissedTracking> {
-    return apiGET<MissedTracking>('/tracking/missed');
 }
 
 export async function saveSteps(date: string, steps: number): Promise<StepLog> {

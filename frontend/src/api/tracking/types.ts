@@ -39,12 +39,6 @@ export type ParsedGroceryLine = {
     on_list: boolean;
 };
 
-export type MissedTracking = {
-    date: string;
-    weight: boolean;
-    steps: boolean;
-};
-
 export type DrinkSizePreset = {
     ID: number;
     name: string;

@@ -5,7 +5,6 @@ export const trackingKeys = {
     groceryItems: ['tracking', 'grocery', 'items'] as const,
     grocerySuggestions: (query: string) =>
         ['tracking', 'grocery', 'suggestions', query] as const,
-    missed: ['tracking', 'missed'] as const,
     water: (date: string) => ['tracking', 'water', date] as const,
     waterPresets: ['tracking', 'water', 'presets'] as const,
 };
