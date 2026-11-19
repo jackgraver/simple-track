@@ -222,24 +222,159 @@
       "count": 1
     }
   },
-  "src/pages/home/index.vue": {
+  "src/pages/gym/WorkoutActivityGraph.vue": {
+    "better-tailwindcss/no-deprecated-classes": {
+      "count": 2
+    },
+    "better-tailwindcss/no-unknown-classes": {
+      "count": 1
+    }
+  },
+  "src/pages/gym/index.vue": {
+    "better-tailwindcss/no-restricted-classes": {
+      "count": 1
+    }
+  },
+  "src/pages/gym/logging/components/ExerciseListView.vue": {
+    "better-tailwindcss/no-restricted-classes": {
+      "count": 2
+    },
+    "better-tailwindcss/no-unknown-classes": {
+      "count": 23
+    },
     "vue/no-restricted-block": {
       "count": 1
     }
   },
-  "src/pages/not-found/index.vue": {
+  "src/pages/gym/logging/exercise/components/CardioLoggingView.vue": {
+    "better-tailwindcss/no-deprecated-classes": {
+      "count": 1
+    },
+    "better-tailwindcss/no-restricted-classes": {
+      "count": 3
+    },
+    "better-tailwindcss/no-unknown-classes": {
+      "count": 5
+    },
+    "vue/no-restricted-block": {
+      "count": 1
+    }
+  },
+  "src/pages/gym/logging/exercise/components/ExerciseLoggingFlow.vue": {
+    "better-tailwindcss/no-restricted-classes": {
+      "count": 6
+    }
+  },
+  "src/pages/gym/logging/exercise/components/ExerciseRepsScreen.vue": {
+    "better-tailwindcss/no-deprecated-classes": {
+      "count": 1
+    },
+    "better-tailwindcss/no-restricted-classes": {
+      "count": 10
+    }
+  },
+  "src/pages/gym/logging/exercise/components/ExerciseRestScreen.vue": {
+    "better-tailwindcss/no-restricted-classes": {
+      "count": 16
+    }
+  },
+  "src/pages/gym/logging/exercise/components/ExerciseSetupScreen.vue": {
+    "better-tailwindcss/no-restricted-classes": {
+      "count": 21
+    }
+  },
+  "src/pages/gym/logging/exercise/components/LoggedSetsList.vue": {
+    "better-tailwindcss/no-deprecated-classes": {
+      "count": 2
+    },
+    "better-tailwindcss/no-restricted-classes": {
+      "count": 13
+    }
+  },
+  "src/pages/gym/logging/exercise/components/LoggingHeader.vue": {
+    "better-tailwindcss/no-deprecated-classes": {
+      "count": 1
+    },
     "better-tailwindcss/no-restricted-classes": {
       "count": 4
     }
   },
-  "src/pages/settings/profile/BodyProfileForm.vue": {
+  "src/pages/gym/logging/exercise/components/MobilityLoggingView.vue": {
+    "better-tailwindcss/no-deprecated-classes": {
+      "count": 3
+    },
     "better-tailwindcss/no-restricted-classes": {
-      "count": 28
+      "count": 8
     }
   },
-  "src/pages/settings/profile/index.vue": {
+  "src/pages/gym/logging/exercise/components/NumberSlider.vue": {
     "better-tailwindcss/no-restricted-classes": {
-      "count": 9
+      "count": 20
+    }
+  },
+  "src/pages/gym/logging/exercise/dialog/EditCuesDialog.vue": {
+    "better-tailwindcss/no-restricted-classes": {
+      "count": 2
+    },
+    "better-tailwindcss/no-unknown-classes": {
+      "count": 2
+    }
+  },
+  "src/pages/gym/logging/exercise/dialog/WeightSetupDialog.vue": {
+    "better-tailwindcss/no-restricted-classes": {
+      "count": 27
+    }
+  },
+  "src/pages/gym/logging/index.vue": {
+    "vue/no-restricted-block": {
+      "count": 1
+    }
+  },
+  "src/pages/gym/plans/[id].vue": {
+    "better-tailwindcss/no-deprecated-classes": {
+      "count": 4
+    }
+  },
+  "src/pages/gym/plans/components/AddExerciseDialog.vue": {
+    "better-tailwindcss/no-unknown-classes": {
+      "count": 1
+    },
+    "vue/no-restricted-block": {
+      "count": 1
+    }
+  },
+  "src/pages/gym/plans/components/CreateExerciseForPlanDialog.vue": {
+    "better-tailwindcss/no-unknown-classes": {
+      "count": 13
+    },
+    "vue/no-restricted-block": {
+      "count": 1
+    }
+  },
+  "src/pages/gym/plans/components/EditExerciseDialog.vue": {
+    "better-tailwindcss/no-unknown-classes": {
+      "count": 13
+    },
+    "vue/no-restricted-block": {
+      "count": 1
+    }
+  },
+  "src/pages/gym/plans/components/MobilityItemEditor.vue": {
+    "better-tailwindcss/no-deprecated-classes": {
+      "count": 1
+    }
+  },
+  "src/pages/gym/plans/index.vue": {
+    "better-tailwindcss/no-deprecated-classes": {
+      "count": 1
+    },
+    "better-tailwindcss/no-restricted-classes": {
+      "count": 5
+    }
+  },
+  "src/pages/gym/progression/ExerciseProgressionChartPanel.vue": {
+    "better-tailwindcss/no-deprecated-classes": {
+      "count": 2
     }
   },
   "src/shared/ModuleTitleBar.vue": {
