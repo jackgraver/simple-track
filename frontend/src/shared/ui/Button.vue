@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import { RouterLink } from "vue-router";
+import { RouterLink, type RouteLocationRaw } from "vue-router";
 import { Loader2 } from "lucide-vue-next";
 
 export type ButtonVariant = "primary" | "secondary" | "ghost" | "danger" | "danger-solid";
@@ -12,7 +12,7 @@ const props = withDefaults(
         loading?: boolean;
         disabled?: boolean;
         block?: boolean;
-        to?: string;
+        to?: RouteLocationRaw;
         type?: "button" | "submit" | "reset";
     }>(),
     { variant: "secondary", size: "md", type: "button" },

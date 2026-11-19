@@ -2,7 +2,7 @@
 
 | Project | Goal | Status |
 |---|---|---|
-| [ui-overhaul](ui-overhaul/README.md) | Consistent, clean, functional UI built on tokens and shared primitives | Reka UI picked; Phase 3 done (F1–F4), P1–P6 done; next: P7 |
+| [ui-overhaul](ui-overhaul/README.md) | Consistent, clean, functional UI built on tokens and shared primitives | Reka UI picked; Phase 3 done (F1–F4), Phase 4 (P1–P7) done; next: M1 |
 | [optimistic-ui](optimistic-ui/README.md) | Linear-style instant UI on top of TanStack Query | Not started (planning) |
 | [performance](performance/README.md) | Measured backend and frontend optimisation, open-ended | Not started (planning) |
 

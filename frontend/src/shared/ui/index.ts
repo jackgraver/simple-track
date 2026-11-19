@@ -22,3 +22,5 @@ export { default as Overlay } from "./Overlay.vue";
 export { useIsDesktop } from "./useIsDesktop";
 export { default as Toaster } from "./Toaster.vue";
 export type { ToastItem, ToastTone, ToastAction } from "./toastTypes";
+export { default as PageHeader } from "./PageHeader.vue";
+export { default as Section } from "./Section.vue";

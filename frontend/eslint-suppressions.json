@@ -156,14 +156,6 @@
       "count": 14
     }
   },
-  "src/pages/diet/water-presets/index.vue": {
-    "better-tailwindcss/no-deprecated-classes": {
-      "count": 4
-    },
-    "better-tailwindcss/no-restricted-classes": {
-      "count": 63
-    }
-  },
   "src/pages/finances/account.vue": {
     "better-tailwindcss/no-deprecated-classes": {
       "count": 3
