@@ -45,6 +45,9 @@ const interactive = computed(() => !props.disabled && (!!props.to || clickable.v
                 <slot name="trailing" />
             </span>
         </component>
+        <!-- Always visible, at every width: a sibling of the main element so a clickable row can hold a
+             44px IconButton or a Menu trigger without nesting buttons. -->
+        <div v-if="$slots.end" class="flex shrink-0 items-center gap-1 pr-1 lg:pr-2"><slot name="end" /></div>
         <!-- Desktop only; on mobile the trailing slot holds an IconButton that opens a sheet or menu. -->
         <div
             v-if="$slots.actions"

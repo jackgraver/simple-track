@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/vue3-vite";
 import { ChevronRight, Dumbbell, MoreVertical, Pencil, Trash2 } from "lucide-vue-next";
 import Badge from "./Badge.vue";
+import Menu from "./Menu.vue";
 import Card from "./Card.vue";
 import IconButton from "./IconButton.vue";
 import List from "./List.vue";
@@ -15,11 +16,11 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-const components = { List, ListRow, Card, Badge, IconButton, ChevronRight, Dumbbell, MoreVertical, Pencil, Trash2 };
+const components = { Menu, List, ListRow, Card, Badge, IconButton, ChevronRight, Dumbbell, MoreVertical, Pencil, Trash2 };
 
 /**
  * One list, every state. Rows with a click handler are buttons. Desktop (lg+): Edit/Delete show on
- * hover or focus-within. Mobile: the trailing "more" IconButton is the way in (never hover-only).
+ * hover or focus-within. Mobile: an IconButton in `#end` is the way in (never hover-only). `#end` sits beside the row's main element, so a clickable row never nests buttons.
  */
 export const Showcase: Story = {
     render: () => ({
@@ -51,7 +52,7 @@ export const Showcase: Story = {
             <ListRow @click="ping">
                 Row with actions
                 <template #subtitle>Hover or focus on desktop</template>
-                <template #trailing>
+                <template #end>
                     <IconButton label="More actions" size="sm" class="lg:hidden"><MoreVertical /></IconButton>
                 </template>
                 <template #actions>
@@ -61,6 +62,30 @@ export const Showcase: Story = {
             </ListRow>
             <ListRow>A static row with a very long title that should truncate instead of wrapping onto a second line at any width
                 <template #trailing>12:30</template>
+            </ListRow>
+        </List></Card></div>`,
+    }),
+};
+
+/** Clickable row plus an always-visible `#end` action (an IconButton, or a Menu trigger). Check at 390 and 1280. */
+export const ClickableWithEnd: Story = {
+    render: () => ({
+        components,
+        setup: () => ({ ping: () => {}, items: [{ key: "edit", label: "Edit", icon: Pencil }, { key: "delete", label: "Delete", icon: Trash2, tone: "danger" }] }),
+        template: `
+        <div class="max-w-xl"><Card padding="none"><List>
+            <ListRow @click="ping">
+                Back squat
+                <template #subtitle>Prev 225lbs</template>
+                <template #trailing><Badge tone="success">Done</Badge></template>
+                <template #end><IconButton label="Remove exercise" variant="danger"><Trash2 /></IconButton></template>
+            </ListRow>
+            <ListRow @click="ping">
+                Romanian deadlift
+                <template #subtitle>Prev 185lbs</template>
+                <template #end>
+                    <Menu :items="items"><IconButton label="More actions"><MoreVertical /></IconButton></Menu>
+                </template>
             </ListRow>
         </List></Card></div>`,
     }),
