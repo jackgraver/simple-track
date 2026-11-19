@@ -2,7 +2,6 @@
 import { useRoute } from "vue-router";
 import { useAuth } from "~/composables/auth/useAuth";
 import { isDevEnvironment } from "~/composables/auth/session";
-import TrackingNotifications from "~/shared/TrackingNotifications.vue";
 import { isItemActive, itemLocation, navGroups } from "./nav";
 
 const route = useRoute();
@@ -64,7 +63,6 @@ const { getUsername } = useAuth();
                 active-class="text-textPrimary"
                 >{{ getUsername() }}</router-link
             >
-            <TrackingNotifications placement="above" />
         </div>
     </aside>
 </template>

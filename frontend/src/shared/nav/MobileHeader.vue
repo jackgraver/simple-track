@@ -3,7 +3,6 @@ import { Check, ChevronDown, ChevronLeft, CircleUser } from "lucide-vue-next";
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { isDevEnvironment } from "~/composables/auth/session";
-import TrackingNotifications from "~/shared/TrackingNotifications.vue";
 import {
     activeGroup,
     activeItem,
@@ -123,7 +122,6 @@ onUnmounted(() => {
         <span v-if="isDevEnvironment" class="rounded bg-secondBg px-1.5 text-xs text-textSecondary"
             >dev</span
         >
-        <TrackingNotifications />
         <router-link
             :to="{ name: 'settings-profile' }"
             class="flex size-10 items-center justify-center rounded-md text-textSecondary hover:bg-secondBg hover:text-textPrimary"
