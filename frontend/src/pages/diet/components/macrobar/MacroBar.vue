@@ -30,64 +30,53 @@ const percentage = computed(() => formatPercentage(props.total, props.planned));
 const percentageClass = computed(() =>
     percentageColorClass(percentageValue.value),
 );
+const width = computed(() => calcWidth(displayTotal.value, props.planned));
 </script>
 
 <template>
-    <div class="flex min-w-0 flex-1 flex-col">
+    <div class="flex min-w-0 flex-1 flex-col gap-1">
         <div
-            class="mb-0.5 pl-0.5 text-[0.65rem] font-semibold uppercase leading-[1.15] tracking-[0.02em] text-textSecondary flex items-center gap-1"
+            class="flex items-baseline justify-between gap-2 text-xs font-semibold tracking-wide text-fg-muted uppercase"
         >
-            <span> {{ typeLabels[type] }} </span>
-            <span v-if="percentage" :class="percentageClass">
+            <span>{{ typeLabels[type] }}</span>
+            <span
+                v-if="percentage"
+                class="font-medium tabular-nums normal-case"
+                :class="percentageClass"
+            >
                 {{ percentage }}
             </span>
         </div>
-        <div class="flex-1 rounded border border-solid border-secondBg">
+        <div
+            class="text-base font-semibold whitespace-nowrap text-fg tabular-nums"
+            :class="
+                determineOverflow(
+                    Math.round(displayTotal),
+                    Math.round(props.planned),
+                    props.indicateOverflow,
+                )
+            "
+        >
+            {{
+                formatInt(displayTotal) +
+                " / " +
+                formatInt(props.planned) +
+                (valueSuffix ?? "")
+            }}
+        </div>
+        <div
+            class="h-1.5 overflow-hidden rounded-full bg-surface-3"
+            role="progressbar"
+            :aria-label="typeLabels[type]"
+            aria-valuemin="0"
+            aria-valuemax="100"
+            :aria-valuenow="Math.round(width)"
+        >
             <div
-                class="h-full rounded text-center leading-5"
+                class="h-full rounded-full"
                 :class="macroFillClass[type]"
-                :style="{
-                    width: `${calcWidth(displayTotal, props.planned)}%`,
-                }"
-            >
-                <span
-                    class="tabular-nums whitespace-nowrap px-2 font-bold text-white"
-                    :class="
-                        determineOverflow(
-                            Math.round(displayTotal),
-                            Math.round(props.planned),
-                            props.indicateOverflow,
-                        )
-                    "
-                    >{{
-                        formatInt(displayTotal) +
-                        " / " +
-                        formatInt(props.planned) +
-                        (valueSuffix ?? "")
-                    }}</span
-                >
-            </div>
+                :style="{ width: `${width}%` }"
+            ></div>
         </div>
     </div>
 </template>
-
-<style scoped>
-.calories {
-    background-color: var(--color-macro-calories);
-}
-.protein {
-    background-color: var(--color-macro-protein);
-}
-.carbs {
-    background-color: var(--color-macro-carbs);
-}
-.fat {
-    background-color: var(--color-macro-fat);
-}
-.fiber {
-    background-color: var(--color-macro-fiber);
-}
-.water {
-    background-color: var(--color-macro-water);
-}
-</style>

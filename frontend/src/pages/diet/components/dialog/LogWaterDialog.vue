@@ -5,6 +5,7 @@ import { useRouter } from "vue-router";
 import type { DrinkSizePreset } from "~/api/tracking/types";
 import { useDrinkSizePresets, useSaveWater } from "~/api/tracking/queries";
 import { useWaterPrefs } from "~/composables/water/useWaterPrefs";
+import { Button, EmptyState, Field, Input, Skeleton, ErrorState } from "~/shared/ui";
 import { toast } from "~/composables/toast/useToast";
 
 const props = defineProps<{
@@ -15,7 +16,13 @@ const props = defineProps<{
 
 const router = useRouter();
 const { displayUnit, ozFromDisplayAmount } = useWaterPrefs();
-const { data: presets, isPending: presetsPending } = useDrinkSizePresets();
+const {
+    data: presets,
+    isPending: presetsPending,
+    isError: presetsError,
+    error: presetsQueryError,
+    refetch: refetchPresets,
+} = useDrinkSizePresets();
 const saveMutation = useSaveWater();
 
 const customInput = ref("");
@@ -63,57 +70,56 @@ function manageSizes() {
 </script>
 
 <template>
-    <div class="flex flex-col gap-4 text-left text-zinc-100">
-        <p class="m-0 text-xs text-zinc-400">
+    <div class="flex flex-col gap-4 text-left">
+        <p class="m-0 text-sm text-fg-muted">
             Quick-add from a saved size or enter a custom amount.
         </p>
-        <div v-if="presetsPending" class="text-sm text-zinc-400">Loading sizes…</div>
-        <div v-else class="flex flex-wrap gap-2">
-            <button
+        <ErrorState
+            v-if="presetsError"
+            compact
+            title="Couldn't load drink sizes"
+            :error="presetsQueryError"
+            @retry="refetchPresets()"
+        />
+        <div v-else-if="presetsPending" class="flex flex-wrap gap-2">
+            <Skeleton v-for="n in 3" :key="n" shape="block" width="6rem" height="2.75rem" />
+        </div>
+        <div v-else-if="(presets ?? []).length" class="flex flex-wrap gap-2">
+            <Button
                 v-for="p in presets ?? []"
                 :key="p.ID"
-                type="button"
-                class="rounded-md border border-sky-700/50 bg-sky-950/50 px-3 py-2 text-sm font-medium text-sky-100 hover:bg-sky-950/80 disabled:opacity-50"
+                variant="secondary"
                 :disabled="savingCustom"
                 @click="logPreset(p)"
             >
                 {{ p.name }}
-            </button>
-            <p
-                v-if="!(presets ?? []).length"
-                class="m-0 w-full text-sm text-zinc-500"
-            >
-                No drink sizes yet — add some under Manage drink sizes.
-            </p>
+            </Button>
         </div>
-        <div class="flex flex-col gap-2 border-t border-zinc-700 pt-3">
-            <label class="flex flex-col gap-1 text-xs text-zinc-400">
-                Custom amount ({{ displayUnit }})
-                <input
+        <EmptyState
+            v-else
+            title="No drink sizes yet"
+            description="Add some under Manage drink sizes."
+        />
+        <form
+            class="flex flex-col gap-3 border-t border-line pt-4"
+            @submit.prevent="submitCustom"
+        >
+            <Field :label="`Custom amount (${displayUnit})`">
+                <Input
                     v-model="customInput"
-                    type="text"
                     inputmode="decimal"
                     autocomplete="off"
                     placeholder="e.g. 12"
-                    class="rounded-md border border-zinc-600 bg-zinc-900 px-3 py-2 text-sm text-zinc-100"
-                    @keyup.enter.prevent="submitCustom"
                 />
-            </label>
-            <button
-                type="button"
-                class="rounded-md bg-zinc-700 px-4 py-2 text-sm font-semibold text-zinc-100 hover:bg-zinc-600 disabled:opacity-50"
-                :disabled="savingCustom"
-                @click="submitCustom"
-            >
-                {{ savingCustom ? "Saving…" : "Log custom amount" }}
-            </button>
+            </Field>
+            <Button type="submit" variant="primary" :loading="savingCustom">
+                Log custom amount
+            </Button>
+        </form>
+        <div>
+            <Button variant="ghost" size="sm" @click="manageSizes">
+                Manage drink sizes
+            </Button>
         </div>
-        <button
-            type="button"
-            class="text-sm text-sky-400 underline-offset-2 hover:text-sky-300 hover:underline"
-            @click="manageSizes"
-        >
-            Manage drink sizes
-        </button>
     </div>
 </template>

@@ -2,6 +2,7 @@
 import { computed } from "vue";
 import type { Food } from "~/types/diet";
 import SimpleMacros from "~/shared/SimpleMacros.vue";
+import { Badge } from "~/shared/ui";
 
 const props = defineProps<{
     item: Food & { entry_kind?: string };
@@ -11,10 +12,10 @@ const isComposite = computed(() => props.item.entry_kind === "composite");
 </script>
 
 <template>
-    <div class="food-container">
-        <h3 class="name">
+    <div class="flex flex-col items-start gap-1 text-fg">
+        <h3 class="m-0 flex items-center gap-2 text-base font-semibold">
             {{ item.name }}
-            <span v-if="isComposite" class="recipe-tag">Recipe</span>
+            <Badge v-if="isComposite" tone="info">Recipe</Badge>
         </h3>
         <SimpleMacros
             :calories="item.calories"
@@ -25,28 +26,3 @@ const isComposite = computed(() => props.item.entry_kind === "composite");
         />
     </div>
 </template>
-
-<style scoped>
-.food-container {
-    display: flex;
-    flex-direction: column; /* stack vertically */
-    align-items: flex-start; /* left-align everything */
-    border-radius: 4px;
-    color: white;
-    line-height: 1.3;
-}
-
-.name {
-    font-size: 1rem;
-    margin: 0;
-    font-weight: 600;
-}
-
-.recipe-tag {
-    margin-left: 0.35rem;
-    font-size: 0.75rem;
-    font-weight: 500;
-    color: #93c5fd;
-    vertical-align: middle;
-}
-</style>

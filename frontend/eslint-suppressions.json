@@ -7,122 +7,12 @@
       "count": 1
     }
   },
-  "src/pages/diet/components/DietDayView.vue": {
-    "better-tailwindcss/no-deprecated-classes": {
-      "count": 1
-    },
-    "better-tailwindcss/no-restricted-classes": {
-      "count": 3
-    }
-  },
-  "src/pages/diet/components/LoggedMealsDisplay.vue": {
-    "better-tailwindcss/no-restricted-classes": {
-      "count": 1
-    }
-  },
-  "src/pages/diet/components/MacroBars.vue": {
-    "better-tailwindcss/no-unknown-classes": {
-      "count": 1
-    },
-    "vue/no-restricted-block": {
-      "count": 1
-    }
-  },
-  "src/pages/diet/components/MealCard.vue": {
-    "better-tailwindcss/no-unknown-classes": {
-      "count": 29
-    },
-    "vue/no-restricted-block": {
-      "count": 1
-    }
-  },
-  "src/pages/diet/components/MealCardMacroDetails.vue": {
-    "better-tailwindcss/no-unknown-classes": {
-      "count": 1
-    },
-    "vue/no-restricted-block": {
-      "count": 1
-    }
-  },
-  "src/pages/diet/components/PlannedMealsDisplay.vue": {
-    "better-tailwindcss/no-restricted-classes": {
-      "count": 4
-    }
-  },
-  "src/pages/diet/components/dialog/LogWaterDialog.vue": {
-    "better-tailwindcss/no-restricted-classes": {
-      "count": 18
-    }
-  },
-  "src/pages/diet/components/dialog/QuickLogDialog.vue": {
-    "better-tailwindcss/no-restricted-classes": {
-      "count": 29
-    }
-  },
-  "src/pages/diet/components/dialog/WaterLogsDialog.vue": {
-    "better-tailwindcss/no-deprecated-classes": {
-      "count": 1
-    },
-    "better-tailwindcss/no-restricted-classes": {
-      "count": 7
-    }
-  },
-  "src/pages/diet/components/macrobar/MacroBar.vue": {
-    "better-tailwindcss/no-deprecated-classes": {
-      "count": 2
-    },
-    "better-tailwindcss/no-restricted-classes": {
-      "count": 2
-    },
-    "vue/no-restricted-block": {
-      "count": 1
-    }
-  },
   "src/pages/diet/edit-planned/index.vue": {
     "better-tailwindcss/no-deprecated-classes": {
       "count": 4
     },
     "better-tailwindcss/no-restricted-classes": {
       "count": 93
-    }
-  },
-  "src/pages/diet/index.vue": {
-    "better-tailwindcss/no-unknown-classes": {
-      "count": 1
-    }
-  },
-  "src/pages/diet/logmeal/LogMealGroupBlock.vue": {
-    "better-tailwindcss/no-deprecated-classes": {
-      "count": 3
-    }
-  },
-  "src/pages/diet/logmeal/LogMealItemRow.vue": {
-    "better-tailwindcss/no-deprecated-classes": {
-      "count": 4
-    }
-  },
-  "src/pages/diet/logmeal/components/FoodDisplay.vue": {
-    "better-tailwindcss/no-unknown-classes": {
-      "count": 3
-    },
-    "vue/no-restricted-block": {
-      "count": 1
-    }
-  },
-  "src/pages/diet/logmeal/dialog/CreateFoodDialog.vue": {
-    "better-tailwindcss/no-unknown-classes": {
-      "count": 20
-    },
-    "vue/no-restricted-block": {
-      "count": 1
-    }
-  },
-  "src/pages/diet/logmeal/logmeal.vue": {
-    "better-tailwindcss/no-deprecated-classes": {
-      "count": 8
-    },
-    "better-tailwindcss/no-unknown-classes": {
-      "count": 1
     }
   },
   "src/pages/diet/targets/components/MacroSlider.vue": {

@@ -1,14 +1,14 @@
 <script setup lang="ts">
 import { ChevronDown, ChevronRight, MoreVertical } from "lucide-vue-next";
-import { onMounted, onUnmounted, ref } from "vue";
+import { computed } from "vue";
 import type { Food } from "~/types/diet";
 import type { MealItemDisplayBlock } from "~/utils/mealItemGroups";
 import { blockMacros } from "~/utils/mealItemGroups";
 import { toast } from "~/composables/toast/useToast";
-import { formatNum } from "./logmealItemFormat";
-import { mealItemsListGridClass } from "./mealItemsListGrid";
 import LogMealItemRow from "./LogMealItemRow.vue";
+import SimpleMacros from "~/shared/SimpleMacros.vue";
 import { useCreateCompositeFood } from "./queries/useMealMutations";
+import { IconButton, Input, List, Menu } from "~/shared/ui";
 
 const props = defineProps<{
     block: Extract<MealItemDisplayBlock, { kind: "group" }>;
@@ -21,28 +21,34 @@ const emit = defineEmits<{
     setGroupLabel: [groupId: string, label: string];
     removeGroup: [indices: number[]];
     toggleSelect: [index: number];
-    amountPlusMinus: [index: number, direction: "plus" | "minus"];
     setItemAmount: [index: number, amount: number];
     removeItem: [index: number];
     swapVariant: [index: number, variant: Food];
 }>();
 
-const menuOpen = ref(false);
-const menuRoot = ref<HTMLElement | null>(null);
 const { mutateAsync: createCompositeAsync, isPending: savingComposite } =
     useCreateCompositeFood();
 
-function onDocumentClick(ev: MouseEvent) {
-    const el = menuRoot.value;
-    if (!el || el.contains(ev.target as Node)) return;
-    menuOpen.value = false;
+const label = computed({
+    get: () => props.block.label,
+    set: (v) => emit("setGroupLabel", props.block.groupId, String(v)),
+});
+const totals = computed(() => blockMacros(props.block.rows));
+const menuItems = computed(() => [
+    {
+        key: "composite",
+        label: "Save as composite food",
+        disabled: savingComposite.value,
+    },
+    { key: "remove", label: "Remove group", tone: "danger" as const },
+]);
+
+function onMenu(key: string) {
+    if (key === "composite") void saveAsCompositeFood();
+    else removeGroup();
 }
 
-onMounted(() => document.addEventListener("click", onDocumentClick));
-onUnmounted(() => document.removeEventListener("click", onDocumentClick));
-
 function removeGroup() {
-    menuOpen.value = false;
     emit(
         "removeGroup",
         props.block.rows.map((r) => r.index),
@@ -50,7 +56,6 @@ function removeGroup() {
 }
 
 async function saveAsCompositeFood() {
-    menuOpen.value = false;
     const name = props.block.label.trim();
     if (!name) {
         toast.push(
@@ -80,87 +85,44 @@ async function saveAsCompositeFood() {
     }
 }
 </script>
+
 <template>
-    <div class="rounded-md bg-secondBg/40 py-2 px-4">
-        <div
-            :class="[
-                mealItemsListGridClass,
-                'gap-y-1',
-                expanded && 'border-b border-secondBg/60',
-            ]"
-        >
-            <div
-                class="col-span-2 flex min-w-0 w-full max-w-full items-center justify-start gap-2 self-stretch"
-            >
-                <button
-                    type="button"
-                    class="flex h-9 w-9 shrink-0 items-center justify-center rounded border border-secondBg bg-secondBg text-textPrimary transition-colors hover:border-thirdBg hover:bg-thirdBg"
+    <li class="bg-surface-2/40" :aria-busy="savingComposite || undefined">
+        <div class="flex flex-col gap-1 px-3 py-2 lg:px-4">
+            <div class="flex items-center gap-2">
+                <IconButton
+                    :label="expanded ? 'Collapse group' : 'Expand group'"
+                    variant="secondary"
+                    size="sm"
                     @click="emit('toggleCollapse', block.groupId)"
                 >
-                    <ChevronRight v-if="!expanded" :size="18" />
-                    <ChevronDown v-else :size="18" />
-                </button>
-                <input
-                    type="text"
-                    class="min-w-0 flex-1 basis-0 rounded border border-secondBg bg-secondBg px-2 py-1 text-left text-base font-medium text-textPrimary placeholder:text-textSecondary focus:border-thirdBg focus:outline-none"
-                    :value="block.label"
-                    placeholder="Name this group"
-                    @input="
-                        emit(
-                            'setGroupLabel',
-                            block.groupId,
-                            ($event.target as HTMLInputElement).value,
-                        )
-                    "
-                    @click.stop
-                />
-            </div>
-            <span class="text-center text-xs text-textSecondary">—</span>
-            <span
-                class="min-w-0 text-right text-sm tabular-nums text-textSecondary"
-            >
-                {{ formatNum(blockMacros(block.rows).calories) }}C /
-                {{ formatNum(blockMacros(block.rows).protein) }}P /
-                {{ formatNum(blockMacros(block.rows).fiber) }}F
-            </span>
-            <div ref="menuRoot" class="relative justify-self-end">
-                <button
-                    type="button"
-                    class="flex h-9 w-9 shrink-0 items-center justify-center rounded text-textSecondary transition-colors hover:bg-secondBg hover:text-textPrimary"
-                    :aria-expanded="menuOpen"
-                    aria-haspopup="true"
-                    aria-label="Group options"
-                    @click.stop="menuOpen = !menuOpen"
-                >
-                    <MoreVertical :size="20" />
-                </button>
-                <div
-                    v-if="menuOpen"
-                    class="absolute right-0 top-full z-20 mt-0.5 min-w-52 rounded-md border border-secondBg bg-firstBg py-1 shadow-lg"
-                    role="menu"
-                    @click.stop
-                >
-                    <button
-                        type="button"
-                        class="flex w-full items-center px-3 py-2 text-left text-sm text-textPrimary hover:bg-secondBg disabled:cursor-wait disabled:opacity-50"
-                        role="menuitem"
-                        :disabled="savingComposite"
-                        @click="saveAsCompositeFood"
-                    >
-                        Save as composite food
-                    </button>
-                    <button
-                        type="button"
-                        class="flex w-full items-center px-3 py-2 text-left text-sm text-cfRed hover:bg-secondBg"
-                        role="menuitem"
-                        @click="removeGroup"
-                    >
-                        Remove
-                    </button>
+                    <ChevronDown v-if="expanded" class="size-5" />
+                    <ChevronRight v-else class="size-5" />
+                </IconButton>
+                <div class="min-w-0 flex-1">
+                    <Input
+                        v-model="label"
+                        aria-label="Group name"
+                        placeholder="Name this group"
+                    />
                 </div>
+                <Menu :items="menuItems" @select="onMenu">
+                    <IconButton label="Group options" size="sm">
+                        <MoreVertical class="size-5" />
+                    </IconButton>
+                </Menu>
             </div>
+            <SimpleMacros
+                class="pl-12"
+                :calories="totals.calories"
+                :protein="totals.protein"
+                :fat="totals.fat"
+                :carbs="totals.carbs"
+                :fiber="totals.fiber"
+                decimals="none"
+            />
         </div>
-        <div v-if="expanded">
+        <List v-if="expanded" class="border-t border-line pl-4">
             <LogMealItemRow
                 v-for="{ item, index: i } in block.rows"
                 :key="`g-${i}`"
@@ -169,16 +131,12 @@ async function saveAsCompositeFood() {
                 :selected="!!selectedForGroup[i]"
                 compact-name
                 @toggle-select="emit('toggleSelect', $event)"
-                @amount-plus-minus="
-                    (rowI, direction) =>
-                        emit('amountPlusMinus', rowI, direction)
-                "
                 @set-item-amount="
                     (rowI, amt) => emit('setItemAmount', rowI, amt)
                 "
                 @swap-variant="(rowI, v) => emit('swapVariant', rowI, v)"
                 @remove="emit('removeItem', $event)"
             />
-        </div>
-    </div>
+        </List>
+    </li>
 </template>

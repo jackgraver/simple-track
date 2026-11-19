@@ -2,6 +2,8 @@
 import { computed } from "vue";
 import MealCard from "./MealCard.vue";
 import { useDietDayMealHandlers } from "./useDietDayMealHandlers";
+import { EmptyState, Section, SkeletonList, useDelayedFlag } from "~/shared/ui";
+import { useDietLogsToday } from "~/api/diet/queries";
 
 const props = defineProps<{
     dateOffset: number;
@@ -9,25 +11,21 @@ const props = defineProps<{
 
 const { data, logPlannedMeal, logMeal, deleteLoggedMeal } =
     useDietDayMealHandlers(() => props.dateOffset);
+const { isPending } = useDietLogsToday(() => props.dateOffset);
+const showSkeleton = useDelayedFlag(isPending);
 
 const loggedMeals = computed(() => data.value?.day.loggedMeals ?? []);
 </script>
 
 <template>
-    <div class="flex min-w-0 flex-1 flex-col gap-2 pt-2">
-        <div class="flex h-9 items-center justify-between gap-2">
-            <div class="flex min-w-0 flex-1 items-center gap-2">
-                <h2
-                    class="m-0 min-w-0 flex-1 text-base font-semibold leading-none"
-                >
-                    Logged ({{ loggedMeals.length }})
-                </h2>
-            </div>
-        </div>
-        <template v-if="data">
-            <span v-if="loggedMeals.length === 0" class="text-zinc-500"
-                >Nothing logged yet.</span
-            >
+    <Section :title="`Logged (${loggedMeals.length})`">
+        <SkeletonList v-if="showSkeleton" :rows="2" :leading="false" />
+        <template v-else-if="data">
+            <EmptyState
+                v-if="loggedMeals.length === 0"
+                title="Nothing logged yet"
+                description="Log a planned meal, or use Log meal or Quick log."
+            />
             <MealCard
                 v-for="log in loggedMeals"
                 :key="log.ID"
@@ -38,5 +36,5 @@ const loggedMeals = computed(() => data.value?.day.loggedMeals ?? []);
                 type="logged"
             />
         </template>
-    </div>
+    </Section>
 </template>

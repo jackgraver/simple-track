@@ -29,10 +29,9 @@ export function formatPercentage(total: number, planned: number): string {
 
 export function percentageColorClass(percent: number | null): string {
     if (percent == null) return "";
-    if (percent >= 105) return "text-(--color-cf-red)";
-    if (percent >= 95) return "text-green-600";
-    if (percent >= 85) return "text-green-400";
-    return "";
+    if (percent >= 105) return "text-danger";
+    if (percent >= 85) return "text-success";
+    return "text-fg-muted";
 }
 
 export function determineOverflow(
@@ -43,9 +42,8 @@ export function determineOverflow(
     if (planned <= 0 || !indicateOverflow) return "";
     const overflow = (total / planned) * 100 - 100;
 
-    if (overflow > 20) return "text-[red]";
-    if (overflow > 10) return "text-[orange]";
-    if (overflow > 0) return "text-[yellow]";
+    if (overflow > 20) return "text-danger";
+    if (overflow > 0) return "text-warn";
     return "";
 }
 
@@ -58,11 +56,12 @@ export const typeLabels: Record<MacroBarNutrientType, string> = {
     water: "Water",
 };
 
+// Full class strings so Tailwind can see them.
 export const macroFillClass: Record<MacroBarNutrientType, string> = {
-    calories: "calories",
-    protein: "protein",
-    fiber: "fiber",
-    carbs: "carbs",
-    fat: "fat",
-    water: "water",
+    calories: "bg-macro-calories",
+    protein: "bg-macro-protein",
+    fiber: "bg-macro-fiber",
+    carbs: "bg-macro-carbs",
+    fat: "bg-macro-fat",
+    water: "bg-macro-water",
 };

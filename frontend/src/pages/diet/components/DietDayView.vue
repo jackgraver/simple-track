@@ -10,6 +10,14 @@ import { dialogManager } from "~/composables/dialog/useDialog";
 import { useWaterPrefs } from "~/composables/water/useWaterPrefs";
 import { formatDateLong, ymdForDayOffset } from "~/utils/dateUtil";
 import { computed, ref } from "vue";
+import {
+    Button,
+    Card,
+    ErrorState,
+    SegmentedControl,
+    Skeleton,
+    useDelayedFlag,
+} from "~/shared/ui";
 
 const props = defineProps<{
     dateOffset: number;
@@ -35,13 +43,20 @@ function planNum(
     return typeof v === "number" ? v : 0;
 }
 
-const macroPane = ref(0);
+const macroPane = ref<"macros" | "water">("macros");
+const paneOptions = [
+    { label: "Macros", value: "macros" as const },
+    { label: "Water & fiber", value: "water" as const },
+];
 
 const {
     data,
     isPending: pending,
     error,
+    refetch,
 } = useDietLogsToday(() => props.dateOffset);
+
+const showSkeleton = useDelayedFlag(pending);
 
 const dateStr = computed(() => ymdForDayOffset(props.dateOffset));
 const { goalOz, displayUnit, formatVolumeFromOz } = useWaterPrefs();
@@ -50,7 +65,10 @@ const {
     isPending: waterPending,
     isError: waterError,
     error: waterQueryError,
+    refetch: refetchWater,
 } = useWaterLogs(dateStr);
+
+const showWaterSkeleton = useDelayedFlag(waterPending);
 
 const totalOz = computed(() =>
     (waterLogs.value ?? []).reduce((s, row) => s + row.amount_oz, 0),
@@ -79,115 +97,91 @@ function openWaterLogsDialog() {
 </script>
 
 <template>
-    <div class="flex w-full flex-col gap-4">
-        <div class="w-full">
-            <div
-                class="w-full overflow-hidden rounded-md pb-2"
-                role="tablist"
-                aria-label="Macros and hydration summary"
-            >
-                <div v-show="macroPane === 0" class="box-border px-0.5 pt-1">
-                    <MacroBars
-                        :totalCalories="
-                            getTotalNumber(pending, error, data?.totalCalories)
-                        "
-                        :totalProtein="
-                            getTotalNumber(pending, error, data?.totalProtein)
-                        "
-                        :totalFat="
-                            getTotalNumber(pending, error, data?.totalFat)
-                        "
-                        :totalCarbs="
-                            getTotalNumber(pending, error, data?.totalCarbs)
-                        "
-                        :plannedCalories="
-                            planNum(pending, error, data?.day.plan, 'calories')
-                        "
-                        :plannedProtein="
-                            planNum(pending, error, data?.day.plan, 'protein')
-                        "
-                        :plannedFat="
-                            planNum(pending, error, data?.day.plan, 'fat')
-                        "
-                        :plannedCarbs="
-                            planNum(pending, error, data?.day.plan, 'carbs')
-                        "
+    <div class="flex w-full flex-col gap-6 pb-above-tabbar lg:pb-10">
+        <Card>
+            <div class="flex flex-col gap-4">
+                <SegmentedControl
+                    v-model="macroPane"
+                    :options="paneOptions"
+                    label="Macros and hydration summary"
+                />
+                <ErrorState
+                    v-if="error"
+                    compact
+                    title="Couldn't load this day"
+                    :error="error"
+                    @retry="refetch()"
+                />
+                <div
+                    v-else-if="pending"
+                    class="grid grid-cols-2 gap-x-4 gap-y-3 lg:grid-cols-4"
+                >
+                    <Skeleton
+                        v-for="n in showSkeleton ? 4 : 0"
+                        :key="n"
+                        shape="block"
+                        height="3.5rem"
                     />
                 </div>
-                <div
-                    v-show="macroPane === 1"
-                    class="box-border flex flex-col gap-1.5 px-0.5 pt-1"
-                >
-                    <div v-if="waterError" class="text-xs text-red-400">
-                        {{ waterQueryError?.message ?? "Failed to load water" }}
-                    </div>
-                    <p
+                <MacroBars
+                    v-else-if="macroPane === 'macros'"
+                    :total-calories="getTotalNumber(pending, error, data?.totalCalories)"
+                    :total-protein="getTotalNumber(pending, error, data?.totalProtein)"
+                    :total-fat="getTotalNumber(pending, error, data?.totalFat)"
+                    :total-carbs="getTotalNumber(pending, error, data?.totalCarbs)"
+                    :planned-calories="planNum(pending, error, data?.day.plan, 'calories')"
+                    :planned-protein="planNum(pending, error, data?.day.plan, 'protein')"
+                    :planned-fat="planNum(pending, error, data?.day.plan, 'fat')"
+                    :planned-carbs="planNum(pending, error, data?.day.plan, 'carbs')"
+                />
+                <div v-else class="flex flex-col gap-3">
+                    <ErrorState
+                        v-if="waterError"
+                        compact
+                        title="Couldn't load water"
+                        :error="waterQueryError"
+                        @retry="refetchWater()"
+                    />
+                    <div
                         v-else-if="waterPending"
-                        class="m-0 text-xs text-textSecondary"
+                        class="grid grid-cols-2 gap-x-4"
                     >
-                        Loading water…
-                    </p>
-                    <div v-else class="flex flex-row gap-2">
-                        <button
-                            type="button"
-                            class="min-w-0 flex-1 cursor-pointer rounded text-left transition-opacity hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2 focus-visible:ring-offset-[rgb(26,26,26)] m-0! p-0!"
-                            :aria-label="'Water log for ' + waterDayLabelLong"
-                            title="View today's water entries"
-                            @click="openWaterLogsDialog"
-                        >
-                            <MacroBar
-                                type="water"
-                                class="min-w-0 flex-1"
-                                :total="waterTotalDisplay"
-                                :planned="waterPlannedDisplay"
-                                :value-suffix="waterUnitSuffix"
-                            />
-                        </button>
-                        <MacroBar
-                            type="fiber"
-                            class="min-w-0 flex-1"
-                            :total="
-                                getTotalNumber(pending, error, data?.totalFiber)
-                            "
-                            :planned="
-                                planNum(pending, error, data?.day.plan, 'fiber')
-                            "
+                        <Skeleton
+                            v-for="n in showWaterSkeleton ? 2 : 0"
+                            :key="n"
+                            shape="block"
+                            height="3.5rem"
                         />
                     </div>
-                </div>
-                <div class="mt-2 flex justify-center gap-3">
-                    <button
-                        type="button"
-                        role="tab"
-                        :aria-selected="macroPane === 0"
-                        class="rounded-full border-none p-2 transition-colors"
-                        :class="
-                            macroPane === 0
-                                ? 'bg-textSecondary opacity-90'
-                                : 'bg-secondBg opacity-55 hover:opacity-80'
-                        "
-                        aria-label="Macros overview"
-                        @click="macroPane = 0"
-                    />
-                    <button
-                        type="button"
-                        role="tab"
-                        :aria-selected="macroPane === 1"
-                        class="rounded-full border-none p-2 transition-colors"
-                        :class="
-                            macroPane === 1
-                                ? 'bg-textSecondary opacity-90'
-                                : 'bg-secondBg opacity-55 hover:opacity-80'
-                        "
-                        aria-label="Water and fiber"
-                        @click="macroPane = 1"
-                    />
+                    <div v-else class="grid grid-cols-2 gap-x-4">
+                        <MacroBar
+                            type="water"
+                            :total="waterTotalDisplay"
+                            :planned="waterPlannedDisplay"
+                            :value-suffix="waterUnitSuffix"
+                        />
+                        <MacroBar
+                            type="fiber"
+                            :total="getTotalNumber(pending, error, data?.totalFiber)"
+                            :planned="planNum(pending, error, data?.day.plan, 'fiber')"
+                        />
+                    </div>
+                    <div v-if="!waterError && !waterPending">
+                        <Button
+                            variant="secondary"
+                            size="sm"
+                            :aria-label="'Water log for ' + waterDayLabelLong"
+                            @click="openWaterLogsDialog"
+                        >
+                            View water entries
+                        </Button>
+                    </div>
                 </div>
             </div>
-            <div class="flex w-full flex-col gap-8 sm:flex-row sm:gap-6 pb-16">
-                <PlannedMealsDisplay :date-offset="dateOffset" />
-                <LoggedMealsDisplay :date-offset="dateOffset" />
-            </div>
+        </Card>
+        <div class="grid grid-cols-1 items-start gap-6 lg:grid-cols-2">
+            <PlannedMealsDisplay :date-offset="dateOffset" />
+            <LoggedMealsDisplay :date-offset="dateOffset" />
         </div>
     </div>
 </template>

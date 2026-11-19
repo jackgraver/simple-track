@@ -3,9 +3,17 @@ import SearchList from "~/shared/SearchList.vue";
 import LogMealGroupBlock from "./LogMealGroupBlock.vue";
 import LogMealItemRow from "./LogMealItemRow.vue";
 import FoodDisplay from "~/pages/diet/logmeal/components/FoodDisplay.vue";
-import { mealItemsListGridClass } from "./mealItemsListGrid";
-import { Field, Input } from "~/shared/ui";
-import { computed, nextTick, watch } from "vue";
+import {
+    Button,
+    Card,
+    ErrorState,
+    Field,
+    Input,
+    List,
+    SkeletonList,
+    useDelayedFlag,
+} from "~/shared/ui";
+import { computed, nextTick, ref, watch } from "vue";
 import { useMeal } from "./queries/useMeal";
 import { useSavedMeal } from "./queries/useSavedMeal";
 import { useDietLogsToday } from "~/api/diet/queries";
@@ -40,9 +48,28 @@ const {
     showDietDayMacroBars,
 } = useLogMealMode();
 
-const { data: mealData, error: mealError } = useMeal(mealId);
-const { data: savedMealData, error: savedMealError } =
-    useSavedMeal(savedMealEditId);
+const {
+    data: mealData,
+    error: mealError,
+    isLoading: mealLoading,
+    refetch: refetchMeal,
+} = useMeal(mealId);
+const {
+    data: savedMealData,
+    error: savedMealError,
+    isLoading: savedMealLoading,
+    refetch: refetchSavedMeal,
+} = useSavedMeal(savedMealEditId);
+
+const editLoading = computed(
+    () => mealLoading.value || savedMealLoading.value,
+);
+const showEditSkeleton = useDelayedFlag(editLoading);
+function retryLoad() {
+    void (editVariant.value === EDIT_VARIANT.saved
+        ? refetchSavedMeal()
+        : refetchMeal());
+}
 
 const mealLoadError = computed(() => {
     if (
@@ -63,7 +90,6 @@ const {
     mealItemBlocks,
     totalMacros,
     resetMeal,
-    amountPlusMinus,
     setMealItemAmount,
     isGroupExpanded,
     toggleGroupCollapse,
@@ -99,6 +125,18 @@ const {
     mealLogDayId,
     draftStorage,
 });
+
+// The submit functions toast their own failures; this only drives the pending state.
+const submitting = ref(false);
+async function submit(fn: () => Promise<void>) {
+    if (submitting.value) return;
+    submitting.value = true;
+    try {
+        await fn();
+    } finally {
+        submitting.value = false;
+    }
+}
 
 let logMealDraftHydrateGeneration = 0;
 
@@ -181,36 +219,29 @@ const macroBarsDayTotals = computed(() => {
 </script>
 
 <template>
-    <div class="diet-module flex flex-col items-center pt-4">
-        <div
-            v-if="editMissingId"
-            class="flex h-[60dvh] items-center justify-center p-8 text-cfRed"
-        >
-            <span>Missing meal id for this edit.</span>
-        </div>
-        <div
+    <div class="flex w-full flex-col gap-4 pb-above-tabbar lg:pb-10">
+        <p v-if="editMissingId" class="m-0 text-sm text-danger" role="alert">
+            Missing meal id for this edit.
+        </p>
+        <ErrorState
             v-else-if="mealLoadError && id !== 0"
-            class="flex h-[60dvh] items-center justify-center p-8 text-cfRed"
-        >
-            <span
-                >Error loading meal:
-                {{ mealLoadError?.message || "Unknown error" }}</span
-            >
-        </div>
+            title="Couldn't load this meal"
+            :error="mealLoadError"
+            @retry="retryLoad"
+        />
+        <SkeletonList
+            v-else-if="showEditSkeleton"
+            :rows="4"
+            :leading="false"
+        />
         <div
-            v-else-if="meal"
-            class="flex w-full flex-col gap-4 md:grid md:h-[calc(100dvh-7rem)] md:grid-cols-[2fr_1fr] md:grid-rows-2 pb-16 md:pb-0"
+            v-else-if="meal && !editLoading"
+            class="grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]"
         >
-            <article
-                class="flex min-h-[min(28rem,55dvh)] flex-col overflow-hidden rounded-lg bg-firstBg md:row-span-2 md:min-h-0"
-            >
-                <header
-                    class="shrink-0 border-b border-secondBg p-4 text-textPrimary"
-                >
-                    <div
-                        class="mb-4 flex flex-row items-center justify-between"
-                    >
-                        <h1 class="m-0 text-xl font-semibold">
+            <Card padding="none" as="article">
+                <header class="flex flex-col gap-4 border-b border-line p-4">
+                    <div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
+                        <h1 class="m-0 text-xl font-semibold tracking-tight">
                             {{ pageTitle }}
                         </h1>
                         <SimpleMacros
@@ -221,62 +252,29 @@ const macroBarsDayTotals = computed(() => {
                             :fiber="totalMacros.fiber"
                         />
                     </div>
-                    <div class="flex min-w-0 flex-1 flex-col gap-2">
-                        <Field label="Meal Name" required>
-                            <Input v-model="meal.name" required />
-                        </Field>
-                    </div>
+                    <Field label="Meal name" required>
+                        <Input v-model="meal.name" required />
+                    </Field>
                 </header>
-                <section
-                    class="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden text-textPrimary"
-                >
-                    <div
-                        class="flex shrink-0 items-center justify-between gap-3 px-4 py-2.5"
-                    >
-                        <h3
-                            class="m-0 min-w-0 text-base font-medium leading-tight"
-                        >
-                            Meal Items
-                        </h3>
-                        <div
-                            class="flex shrink-0 flex-wrap items-center justify-end gap-2"
-                        >
-                            <button
-                                type="button"
-                                class="rounded border border-secondBg bg-secondBg px-3 py-1.5 text-sm hover:bg-thirdBg"
-                                @click="groupSelectedRows"
-                            >
+                <section class="flex flex-col">
+                    <div class="flex items-center justify-between gap-3 px-4 py-3">
+                        <h2 class="m-0 text-base font-semibold">Meal items</h2>
+                        <div class="flex flex-wrap justify-end gap-2">
+                            <Button size="sm" @click="groupSelectedRows">
                                 Group selected
-                            </button>
-                            <button
-                                type="button"
-                                class="rounded border border-secondBg bg-secondBg px-3 py-1.5 text-sm hover:bg-thirdBg"
-                                @click="ungroupSelectedRows"
-                            >
+                            </Button>
+                            <Button size="sm" @click="ungroupSelectedRows">
                                 Ungroup
-                            </button>
+                            </Button>
                         </div>
                     </div>
-                    <div
-                        class="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto px-4 pb-1"
+                    <p
+                        v-if="!mealItemBlocks.length"
+                        class="m-0 border-t border-line px-4 py-8 text-center text-sm text-fg-muted"
                     >
-                        <div
-                            :class="[
-                                mealItemsListGridClass,
-                                'mb-1 border-b border-secondBg pb-2 text-xs font-medium text-textSecondary sm:grid',
-                            ]"
-                        >
-                            <span><span class="sr-only">Select</span></span>
-                            <span class="min-w-0">Item</span>
-                            <span class="min-w-0 text-center">Qty</span>
-                            <span class="hidden md:block min-w-0 text-right"
-                                >Macros</span
-                            >
-                            <span
-                                class="flex h-9 w-9 shrink-0 justify-self-end"
-                                aria-hidden="true"
-                            ></span>
-                        </div>
+                        No items yet. Pick a food from Add foods.
+                    </p>
+                    <List v-else class="border-t border-line">
                         <template
                             v-for="(block, bi) in mealItemBlocks"
                             :key="'b-' + bi"
@@ -289,7 +287,6 @@ const macroBarsDayTotals = computed(() => {
                                     :row-index="i"
                                     :selected="!!selectedForGroup[i]"
                                     @toggle-select="toggleSelectRow"
-                                    @amount-plus-minus="amountPlusMinus"
                                     @set-item-amount="setMealItemAmount"
                                     @swap-variant="swapVariant"
                                     @remove="removeFood"
@@ -304,110 +301,109 @@ const macroBarsDayTotals = computed(() => {
                                 @set-group-label="setGroupLabel"
                                 @remove-group="removeGroupLines"
                                 @toggle-select="toggleSelectRow"
-                                @amount-plus-minus="amountPlusMinus"
                                 @set-item-amount="setMealItemAmount"
                                 @swap-variant="swapVariant"
                                 @remove-item="removeFood"
                             />
                         </template>
-                    </div>
+                    </List>
                 </section>
-                <footer
-                    class="flex shrink-0 flex-col gap-4 border-t border-secondBg p-4"
-                >
-                    <div class="flex w-full flex-row gap-3">
-                        <button
+                <footer class="flex flex-col gap-4 border-t border-line p-4">
+                    <div class="flex w-full flex-col gap-2 lg:flex-row lg:justify-end">
+                        <Button
                             v-if="pageMode === PAGE_MODE.create"
-                            class="flex-1 cursor-pointer rounded bg-secondBg px-5 py-2.5 text-sm text-textPrimary hover:bg-thirdBg"
-                            type="button"
-                            @click="saveSavedMealTemplate"
+                            variant="primary"
+                            :loading="submitting"
+                            @click="submit(saveSavedMealTemplate)"
                         >
-                            Save Meal
-                        </button>
-                        <button
-                            v-if="pageMode === PAGE_MODE.log"
-                            class="flex-1 cursor-pointer rounded bg-secondBg px-5 py-2.5 text-sm text-textPrimary hover:bg-thirdBg"
-                            type="button"
-                            @click="logMealToDay(false)"
-                        >
-                            Log Meal
-                        </button>
-                        <button
-                            v-if="pageMode === PAGE_MODE.log"
-                            class="flex-1 cursor-pointer rounded bg-secondBg px-5 py-2.5 text-sm text-textPrimary hover:bg-thirdBg"
-                            type="button"
-                            @click="logMealToDay(true)"
-                        >
-                            Log and Save Meal
-                        </button>
-                        <button
+                            Save meal
+                        </Button>
+                        <template v-if="pageMode === PAGE_MODE.log">
+                            <Button
+                                variant="secondary"
+                                :disabled="submitting"
+                                @click="submit(() => logMealToDay(true))"
+                            >
+                                Log and save meal
+                            </Button>
+                            <Button
+                                variant="primary"
+                                :loading="submitting"
+                                @click="submit(() => logMealToDay(false))"
+                            >
+                                Log meal
+                            </Button>
+                        </template>
+                        <Button
                             v-if="
                                 pageMode === PAGE_MODE.edit &&
                                 editVariant === EDIT_VARIANT.saved
                             "
-                            class="flex-1 cursor-pointer rounded bg-secondBg px-5 py-2.5 text-sm text-textPrimary hover:bg-thirdBg"
-                            type="button"
-                            @click="saveEditedSavedMeal"
+                            variant="primary"
+                            :loading="submitting"
+                            @click="submit(saveEditedSavedMeal)"
                         >
                             Save changes
-                        </button>
-                        <button
+                        </Button>
+                        <Button
                             v-if="
                                 pageMode === PAGE_MODE.edit &&
                                 editVariant === EDIT_VARIANT.logged
                             "
-                            class="flex-1 cursor-pointer rounded bg-secondBg px-5 py-2.5 text-sm text-textPrimary hover:bg-thirdBg"
-                            type="button"
-                            @click="updateLoggedMeal"
+                            variant="primary"
+                            :loading="submitting"
+                            @click="submit(updateLoggedMeal)"
                         >
                             Update
-                        </button>
-                        <button
+                        </Button>
+                        <Button
                             v-if="
                                 pageMode === PAGE_MODE.edit &&
                                 editVariant === EDIT_VARIANT.planned
                             "
-                            class="flex-1 cursor-pointer rounded bg-secondBg px-5 py-2.5 text-sm text-textPrimary hover:bg-thirdBg"
-                            type="button"
-                            @click="logEditedMeal"
+                            variant="primary"
+                            :loading="submitting"
+                            @click="submit(logEditedMeal)"
                         >
                             Log
-                        </button>
+                        </Button>
                     </div>
                     <MacroBars
                         v-if="showDietDayMacroBars"
-                        :totalCalories="macroBarsDayTotals.totalCalories"
-                        :totalProtein="macroBarsDayTotals.totalProtein"
-                        :totalFat="macroBarsDayTotals.totalFat"
-                        :totalCarbs="macroBarsDayTotals.totalCarbs"
+                        :total-calories="macroBarsDayTotals.totalCalories"
+                        :total-protein="macroBarsDayTotals.totalProtein"
+                        :total-fat="macroBarsDayTotals.totalFat"
+                        :total-carbs="macroBarsDayTotals.totalCarbs"
                         :planned-calories="dayLogs?.day.plan.calories ?? 0"
                         :planned-protein="dayLogs?.day.plan.protein ?? 0"
                         :planned-fat="dayLogs?.day.plan.fat ?? 0"
                         :planned-carbs="dayLogs?.day.plan.carbs ?? 0"
                     />
                 </footer>
-            </article>
-            <aside
-                class="flex min-h-[min(20rem,45dvh)] flex-col overflow-hidden rounded-lg bg-firstBg p-4 text-textPrimary md:min-h-0"
-            >
-                <h2 class="mt-0 text-lg font-semibold">Add Foods</h2>
-                <SearchList
-                    :route="'diet/meals/food/all'"
-                    :onSelect="pickFoodOrComposite"
-                    :onCreate="createFood"
-                    :displayComponent="FoodDisplay"
-                />
-            </aside>
-            <aside
-                class="flex min-h-[min(20rem,45dvh)] flex-col overflow-hidden rounded-lg bg-firstBg p-4 text-textPrimary md:min-h-0"
-            >
-                <h2 class="mt-0 text-lg font-semibold">Select Saved Meal</h2>
-                <SearchList
-                    :key="meal.ID"
-                    :route="'diet/meals/saved-meal/all'"
-                    :on-select="setMeal"
-                />
-            </aside>
+            </Card>
+            <div class="flex flex-col gap-4 lg:sticky lg:top-4">
+                <Card as="aside">
+                    <div class="flex h-[26rem] flex-col gap-2">
+                        <h2 class="m-0 text-lg font-semibold">Add foods</h2>
+                        <SearchList
+                            :route="'diet/meals/food/all'"
+                            :onSelect="pickFoodOrComposite"
+                            :onCreate="createFood"
+                            :displayComponent="FoodDisplay"
+                        />
+                    </div>
+                </Card>
+                <Card as="aside">
+                    <div class="flex h-[22rem] flex-col gap-2">
+                        <h2 class="m-0 text-lg font-semibold">Saved meals</h2>
+                        <SearchList
+                            :key="meal.ID"
+                            :route="'diet/meals/saved-meal/all'"
+                            :on-select="setMeal"
+                        />
+                    </div>
+                </Card>
+            </div>
         </div>
     </div>
 </template>

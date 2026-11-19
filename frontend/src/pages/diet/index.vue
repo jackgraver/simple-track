@@ -57,7 +57,7 @@ const dietNavLinks = computed<ModuleTitleLink[]>(() => [
 </script>
 
 <template>
-    <div class="diet-module flex w-full flex-col gap-6">
+    <div class="flex w-full flex-col gap-6">
         <template v-if="isDietHome">
             <ModuleTitleBar title="Diet" :links="dietNavLinks" />
             <DietDayView :date-offset="dateOffset" />

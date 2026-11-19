@@ -2,6 +2,7 @@
 import { getApiErrorMessage } from "~/api/httpError";
 import type { Meal } from "~/types/diet";
 import { computed, ref, watch } from "vue";
+import { Button, Field, Input } from "~/shared/ui";
 import { toast } from "~/composables/toast/useToast";
 import { useQuickLog } from "~/pages/diet/logmeal/queries/useMealMutations";
 
@@ -116,81 +117,37 @@ async function submit() {
 </script>
 
 <template>
-    <div class="flex flex-col gap-4 text-left text-zinc-100">
-        <p v-if="!isEditing" class="m-0 text-xs text-zinc-400">
+    <form class="flex flex-col gap-4 text-left" @submit.prevent="submit">
+        <p v-if="!isEditing" class="m-0 text-sm text-fg-muted">
             Adds one meal row with totals you enter. Not saved as a reusable
             food.
         </p>
-        <label class="flex flex-col gap-1 text-xs text-zinc-400">
-            Name
-            <input
+        <Field label="Name" required>
+            <Input
                 v-model="label"
-                type="text"
                 autocomplete="off"
-                class="rounded-md border border-zinc-600 bg-zinc-900 px-3 py-2 text-sm text-zinc-100"
                 placeholder="e.g. Takeout burger"
-                @keyup.enter.prevent="submit"
             />
-        </label>
-        <div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
-            <label class="flex flex-col gap-1 text-xs text-zinc-400">
-                Calories
-                <input
-                    v-model.number="calories"
-                    type="number"
-                    min="0"
-                    step="any"
-                    class="rounded-md border border-zinc-600 bg-zinc-900 px-3 py-2 text-sm text-zinc-100"
-                />
-            </label>
-            <label class="flex flex-col gap-1 text-xs text-zinc-400">
-                Protein (g)
-                <input
-                    v-model.number="protein"
-                    type="number"
-                    min="0"
-                    step="any"
-                    class="rounded-md border border-zinc-600 bg-zinc-900 px-3 py-2 text-sm text-zinc-100"
-                />
-            </label>
-            <label class="flex flex-col gap-1 text-xs text-zinc-400">
-                Carbs (g)
-                <input
-                    v-model.number="carbs"
-                    type="number"
-                    min="0"
-                    step="any"
-                    class="rounded-md border border-zinc-600 bg-zinc-900 px-3 py-2 text-sm text-zinc-100"
-                />
-            </label>
-            <label class="flex flex-col gap-1 text-xs text-zinc-400">
-                Fat (g)
-                <input
-                    v-model.number="fat"
-                    type="number"
-                    min="0"
-                    step="any"
-                    class="rounded-md border border-zinc-600 bg-zinc-900 px-3 py-2 text-sm text-zinc-100"
-                />
-            </label>
-            <label class="flex flex-col gap-1 text-xs text-zinc-400">
-                Fiber (g)
-                <input
-                    v-model.number="fiber"
-                    type="number"
-                    min="0"
-                    step="any"
-                    class="rounded-md border border-zinc-600 bg-zinc-900 px-3 py-2 text-sm text-zinc-100"
-                />
-            </label>
+        </Field>
+        <div class="grid grid-cols-2 gap-4 lg:grid-cols-3">
+            <Field label="Calories">
+                <Input v-model="calories" type="number" inputmode="decimal" />
+            </Field>
+            <Field label="Protein (g)">
+                <Input v-model="protein" type="number" inputmode="decimal" />
+            </Field>
+            <Field label="Carbs (g)">
+                <Input v-model="carbs" type="number" inputmode="decimal" />
+            </Field>
+            <Field label="Fat (g)">
+                <Input v-model="fat" type="number" inputmode="decimal" />
+            </Field>
+            <Field label="Fiber (g)">
+                <Input v-model="fiber" type="number" inputmode="decimal" />
+            </Field>
         </div>
-        <button
-            type="button"
-            class="rounded-md bg-zinc-700 px-4 py-2 text-sm font-semibold text-zinc-100 hover:bg-zinc-600 disabled:opacity-50"
-            :disabled="pending"
-            @click="submit"
-        >
-            {{ pending ? "Saving…" : isEditing ? "Save changes" : "Log meal" }}
-        </button>
-    </div>
+        <Button type="submit" variant="primary" size="lg" block :loading="pending">
+            {{ isEditing ? "Save changes" : "Log meal" }}
+        </Button>
+    </form>
 </template>
