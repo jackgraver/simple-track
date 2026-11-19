@@ -14,8 +14,11 @@ import { useNavMemory } from "./shared/nav/mobile/useNavMemory";
 const route = useRoute();
 useNavMemory();
 
-const showNav = computed(
-    () => isAuthenticated.value && route.meta.focus !== true,
+const showNav = computed(() => isAuthenticated.value);
+// Focus pages (e.g. exercise logging) bring their own header, so only the
+// mobile top bar is dropped; tab bar and sidebar stay for navigation.
+const showMobileHeader = computed(
+    () => showNav.value && route.meta.focus !== true,
 );
 const showDate = computed(() => route.meta.dated === true);
 
@@ -37,7 +40,7 @@ watchEffect(() => {
                 class="mx-auto flex w-full max-w-6xl flex-col items-stretch px-4 lg:px-8"
                 :class="{ 'app-content': showNav }"
             >
-                <MobileHeader v-if="showNav" class="lg:hidden" />
+                <MobileHeader v-if="showMobileHeader" class="lg:hidden" />
                 <DateAndBreadcrumbs
                     v-if="showDate"
                     :class="showNav ? 'pb-4 lg:pt-4' : 'py-4'"

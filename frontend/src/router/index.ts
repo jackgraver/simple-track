@@ -9,7 +9,7 @@ declare module "vue-router" {
         breadcrumb?: string;
         /** Show the day picker (pages that read `?offset=`). Inherited by children. */
         dated?: boolean;
-        /** Full-screen flow: hide the app nav (sidebar, mobile header, tab bar). */
+        /** Page supplies its own header: hide the mobile top bar (tab bar and sidebar stay). */
         focus?: boolean;
     }
 }
