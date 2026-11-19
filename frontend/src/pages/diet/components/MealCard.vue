@@ -101,12 +101,12 @@ async function run(fn: () => void | Promise<void>) {
     }
 }
 
-function itemLabel(food: Meal["items"][number], plural: boolean): string {
+// "180g Salmon", "2 Bananas": a gram amount never pluralises the name.
+function itemLabel(food: Meal["items"][number]): string {
     const name = food.food?.name ?? "";
     const amount = formatNum(itemServingAmount(food));
-    const unit = food.food?.serving_type === "g" ? "g" : "";
-    const s = plural ? pluralize(food.food?.name, Number(food.amount)) : "";
-    return `${amount}${unit} ${name}${s}`;
+    if (food.food?.serving_type === "g") return `${amount}g ${name}`;
+    return `${amount} ${name}${pluralize(name, Number(food.amount))}`;
 }
 </script>
 
@@ -172,7 +172,7 @@ function itemLabel(food: Meal["items"][number], plural: boolean): string {
                             v-for="{ item: food, index: i } in block.rows"
                             :key="'u-' + i"
                         >
-                            {{ itemLabel(food, true) }}
+                            {{ itemLabel(food) }}
                             <template #subtitle>
                                 <MealCardMacroDetails
                                     :calories="food.food?.calories ?? 0"
@@ -215,8 +215,7 @@ function itemLabel(food: Meal["items"][number], plural: boolean): string {
                                 <template #leading
                                     ><span class="block w-6"></span
                                 ></template>
-                                {{ itemLabel(food, false)
-                                }}{{ Number(food.amount) > 1 ? "s" : "" }}
+                                {{ itemLabel(food) }}
                                 <template #subtitle>
                                     <MealCardMacroDetails
                                         :calories="food.food?.calories ?? 0"
