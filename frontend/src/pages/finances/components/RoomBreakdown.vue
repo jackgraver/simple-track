@@ -11,9 +11,9 @@ function dash(value: number) {
 
 <template>
     <div class="overflow-x-auto">
-        <table class="w-full min-w-[34rem] border-collapse text-right text-xs tabular-nums">
-            <thead class="text-textSecondary">
-                <tr class="border-b border-(--color-border)">
+        <table class="w-full min-w-136 border-collapse text-right text-xs tabular-nums">
+            <thead class="text-fg-muted">
+                <tr class="border-b border-line">
                     <th class="py-2 pr-2 text-left font-medium">Year</th>
                     <th class="px-2 py-2 font-medium">Carried in</th>
                     <th class="px-2 py-2 font-medium">New room</th>
@@ -28,39 +28,39 @@ function dash(value: number) {
                 <tr
                     v-for="year in room.years"
                     :key="year.year"
-                    class="border-b border-(--color-border)/50 last:border-0"
-                    :class="year.over_contributed ? 'bg-red-950/30' : ''"
+                    class="border-b border-line/50 last:border-0"
+                    :class="year.over_contributed ? 'bg-danger-soft' : ''"
                 >
-                    <td class="py-1.5 pr-2 text-left font-medium text-textPrimary">{{ year.year }}</td>
-                    <td class="px-2 py-1.5 text-textSecondary">{{ dash(year.carried_in) }}</td>
+                    <td class="py-1.5 pr-2 text-left font-medium text-fg">{{ year.year }}</td>
+                    <td class="px-2 py-1.5 text-fg-muted">{{ dash(year.carried_in) }}</td>
                     <td class="px-2 py-1.5">
                         <span v-if="year.is_opening" title="Opening room">{{ formatMoney(year.new_room) }}*</span>
-                        <span v-else :class="year.limit_year !== null && year.limit_year !== year.year ? 'text-textSecondary' : ''" :title="year.limit_year !== null && year.limit_year !== year.year ? `Limit from ${year.limit_year}` : ''">
+                        <span v-else :class="year.limit_year !== null && year.limit_year !== year.year ? 'text-fg-muted' : ''" :title="year.limit_year !== null && year.limit_year !== year.year ? `Limit from ${year.limit_year}` : ''">
                             {{ dash(year.new_room) }}
                         </span>
                     </td>
-                    <td class="px-2 py-1.5 text-textSecondary">{{ dash(year.restored) }}</td>
+                    <td class="px-2 py-1.5 text-fg-muted">{{ dash(year.restored) }}</td>
                     <td class="px-2 py-1.5">
                         {{ formatMoney(year.available) }}
-                        <span v-if="year.lifetime_capped > 0" class="block text-[0.65rem] text-amber-300">lifetime cap −{{ formatMoney(year.lifetime_capped) }}</span>
+                        <span v-if="year.lifetime_capped > 0" class="block text-xs text-warn">lifetime cap −{{ formatMoney(year.lifetime_capped) }}</span>
                     </td>
-                    <td class="px-2 py-1.5" :class="yearAllowance(year)?.over ? 'text-amber-300' : ''">
+                    <td class="px-2 py-1.5" :class="yearAllowance(year)?.over ? 'text-warn' : ''">
                         {{ dash(year.contributed) }}
-                        <span v-if="yearAllowance(year)?.over" class="block text-[0.65rem]">
+                        <span v-if="yearAllowance(year)?.over" class="block text-xs">
                             over {{ year.year }} limit by {{ formatMoney(year.contributed - yearAllowance(year)!.allowance) }}
                         </span>
                     </td>
-                    <td class="px-2 py-1.5 text-textSecondary">{{ dash(year.withdrawn) }}</td>
-                    <td class="py-1.5 pl-2 font-medium" :class="year.remaining < 0 ? 'text-red-400' : 'text-textPrimary'">
+                    <td class="px-2 py-1.5 text-fg-muted">{{ dash(year.withdrawn) }}</td>
+                    <td class="py-1.5 pl-2 font-medium" :class="year.remaining < 0 ? 'text-danger' : 'text-fg'">
                         {{ formatMoney(year.remaining) }}
-                        <span v-if="year.carried_out !== year.remaining" class="block text-[0.65rem] font-normal text-textSecondary">
+                        <span v-if="year.carried_out !== year.remaining" class="block text-xs font-normal text-fg-muted">
                             {{ formatMoney(year.carried_out) }} carries over
                         </span>
                     </td>
                 </tr>
             </tbody>
         </table>
-        <p class="mb-0 mt-2 text-[0.7rem] text-textSecondary">
+        <p class="mb-0 mt-2 text-xs text-fg-muted">
             Greyed new room is inherited from an earlier year's limit. Amber contributions went past that year's
             limit (plus restored withdrawals) and used room carried forward from earlier years.
             <template v-if="room.years.some((y) => y.is_opening)"> * Opening room you entered.</template>

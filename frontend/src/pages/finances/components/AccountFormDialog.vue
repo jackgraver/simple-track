@@ -11,8 +11,8 @@ import {
     isLiabilityKind,
     parseAmount,
     todayKey,
-    ui,
 } from "../format";
+import { Button, Checkbox, Field, Input, Select, Textarea } from "~/shared/ui";
 
 const props = defineProps<{
     account?: Account;
@@ -33,6 +33,19 @@ const form = reactive({
     archived: !!props.account?.archived_at,
     openingBalance: "",
     balanceDate: todayKey(),
+});
+
+const kindOptions = accountKindOrder.map((kind) => ({ label: accountKindLabels[kind], value: kind }));
+// Select works on strings/numbers, so "None" is 0 rather than null.
+const typeOptions = computed(() => [
+    { label: "None", value: 0 },
+    ...props.contributionTypes.map((t) => ({ label: t.name, value: t.ID })),
+]);
+const typeId = computed<number | "">({
+    get: () => form.contributionTypeId ?? 0,
+    set: (v) => {
+        form.contributionTypeId = v === "" || v === 0 ? null : v;
+    },
 });
 
 const isLiability = computed(() => isLiabilityKind(form.kind));
@@ -74,65 +87,46 @@ async function submit() {
 </script>
 
 <template>
-    <form class="flex w-full min-w-72 flex-col gap-4 sm:min-w-96" @submit.prevent="submit">
-        <label :class="ui.label">
-            Name
-            <input v-model="form.name" required placeholder="e.g. Tangerine chequing" :class="ui.input" />
-        </label>
-        <div class="grid gap-3 sm:grid-cols-2">
-            <label :class="ui.label">
-                Type
-                <select v-model="form.kind" :class="ui.input">
-                    <option v-for="kind in accountKindOrder" :key="kind" :value="kind">
-                        {{ accountKindLabels[kind] }}
-                    </option>
-                </select>
-            </label>
-            <label :class="ui.label">
-                Institution
-                <input v-model="form.institution" placeholder="Optional" :class="ui.input" />
-            </label>
+    <form class="flex w-full flex-col gap-4" @submit.prevent="submit">
+        <Field label="Name" required>
+            <Input v-model="form.name" required placeholder="e.g. Tangerine chequing" />
+        </Field>
+        <div class="grid grid-cols-1 gap-3 lg:grid-cols-2">
+            <Field label="Type">
+                <Select v-model="form.kind" :options="kindOptions" />
+            </Field>
+            <Field label="Institution">
+                <Input v-model="form.institution" placeholder="Optional" />
+            </Field>
         </div>
-        <label v-if="!isLiability" :class="ui.label">
-            Registered account (shares contribution room)
-            <select v-model="form.contributionTypeId" :class="ui.input">
-                <option :value="null">None</option>
-                <option v-for="type in contributionTypes" :key="type.ID" :value="type.ID">
-                    {{ type.name }}
-                </option>
-            </select>
-            <span v-if="contributionTypes.length === 0" class="font-normal">
-                Set up TFSA / RRSP / FHSA under Contribution room to link accounts.
-            </span>
-        </label>
-        <div v-if="!isEdit" class="grid gap-3 sm:grid-cols-2">
-            <label :class="ui.label">
-                {{ balanceLabel }}
-                <input
-                    v-model="form.openingBalance"
-                    inputmode="decimal"
-                    placeholder="0.00"
-                    :class="ui.input"
-                />
-            </label>
-            <label :class="ui.label">
-                As of
-                <input v-model="form.balanceDate" type="date" required :class="ui.input" />
-            </label>
+        <Field
+            v-if="!isLiability"
+            label="Registered account (shares contribution room)"
+            :hint="contributionTypes.length === 0 ? 'Set up TFSA / RRSP / FHSA under Contribution room to link accounts.' : undefined"
+        >
+            <Select v-model="typeId" :options="typeOptions" />
+        </Field>
+        <div v-if="!isEdit" class="grid grid-cols-1 gap-3 lg:grid-cols-2">
+            <Field :label="balanceLabel">
+                <Input v-model="form.openingBalance" inputmode="decimal" placeholder="0.00" />
+            </Field>
+            <Field label="As of" required>
+                <Input v-model="form.balanceDate" type="date" required />
+            </Field>
         </div>
-        <label :class="ui.label">
-            Notes
-            <textarea v-model="form.notes" rows="2" placeholder="Optional" :class="ui.input" />
-        </label>
-        <label v-if="isEdit" class="flex items-center gap-2 text-sm text-textSecondary">
-            <input v-model="form.archived" type="checkbox" />
-            Archived (closed account — hidden and excluded from net worth)
-        </label>
-        <div class="flex justify-end gap-2">
-            <button type="button" :class="ui.btnSecondary" @click="props.onCancel?.()">Cancel</button>
-            <button type="submit" :class="ui.btnPrimary" :disabled="mutation.isPending.value">
+        <Field label="Notes">
+            <Textarea v-model="form.notes" :rows="2" placeholder="Optional" />
+        </Field>
+        <Checkbox
+            v-if="isEdit"
+            v-model="form.archived"
+            label="Archived (closed account: hidden and excluded from net worth)"
+        />
+        <div class="flex flex-col-reverse gap-2 lg:flex-row lg:justify-end">
+            <Button variant="ghost" @click="props.onCancel?.()">Cancel</Button>
+            <Button type="submit" variant="primary" :loading="mutation.isPending.value">
                 {{ isEdit ? "Save" : "Add account" }}
-            </button>
+            </Button>
         </div>
     </form>
 </template>

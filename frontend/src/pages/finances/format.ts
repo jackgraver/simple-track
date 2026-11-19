@@ -104,19 +104,10 @@ export function isLiabilityKind(kind: AccountKind) {
 /** Balances older than this are flagged as stale. */
 export const STALE_BALANCE_DAYS = 35;
 
-export const ui = {
-    card: "rounded-lg border border-(--color-border) bg-firstBg p-4",
-    input: "w-full rounded-md border border-(--color-border) bg-secondBg px-3 py-2 text-sm text-textPrimary outline-none focus:border-textSecondary",
-    label: "flex flex-col gap-1 text-xs font-medium text-textSecondary",
-    btnPrimary:
-        "rounded-md bg-green-700 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-green-600 disabled:cursor-not-allowed disabled:opacity-50",
-    btnSecondary:
-        "rounded-md border border-(--color-border) bg-secondBg px-3 py-2 text-sm text-textPrimary transition-colors hover:bg-thirdBg disabled:cursor-not-allowed disabled:opacity-50",
-    btnDanger:
-        "rounded-md px-3 py-2 text-sm text-(--color-cf-red) transition-colors hover:bg-secondBg disabled:opacity-50",
-    positive: "text-emerald-400",
-    negative: "text-(--color-cf-red)",
-};
+/** Text colour for a money change: good news green, bad news red (never the only signal: the sign is shown too). */
+export function changeClass(good: boolean) {
+    return good ? "text-success" : "text-danger";
+}
 
 export type YearAllowance = {
     /** The annual limit for the year. */
