@@ -12,7 +12,8 @@ ui-overhaul project) is tracked separately in `docs/projects/ui-overhaul/`.
 
 Status (2026-11-19): principles and rules are in force, and the lint enforces them for new code.
 Tokens and the `shared/ui/` primitives (Reka UI, headless, styled with our tokens) are built,
-and every page uses them. Only the global element CSS in `App.vue` is left (phase 6).
+and every page uses them. There is no global element CSS; the lint enforces the rules with no
+suppressions.
 
 Agent entry points: `frontend/CLAUDE.md` (loaded automatically when working under `frontend/`)
 and the `ui` skill (`.claude/skills/ui/`).

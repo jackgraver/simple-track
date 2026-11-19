@@ -2,7 +2,7 @@
 
 | Project | Goal | Status |
 |---|---|---|
-| [ui-overhaul](ui-overhaul/README.md) | Consistent, clean, functional UI built on tokens and shared primitives | Phases 3–5 done on `proj/ui-charter` (not merged); next: phase 6 cleanup |
+| [ui-overhaul](ui-overhaul/README.md) | Consistent, clean, functional UI built on tokens and shared primitives | Done (phases 1–6) on `proj/ui-charter`, not merged to `main` |
 | [optimistic-ui](optimistic-ui/README.md) | Linear-style instant UI on top of TanStack Query | Not started (planning) |
 | [performance](performance/README.md) | Measured backend and frontend optimisation, open-ended | Not started (planning) |
 

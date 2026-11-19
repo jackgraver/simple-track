@@ -48,8 +48,8 @@ dark and light.
 - [x] **M8 home, settings, auth/signin** (branch `proj/ui-m8-home-settings`, 2026-11-19; also not-found)
 - [x] **M9 shared leftovers** (branch `proj/ui-m9-shared`, 2026-11-19; Combobox primitive; `Dropdown.vue` and `shared/input/` deleted in `proj/ui-p5-gym-followups`): `SearchList` on Input+List, `Dropdown` → `Combobox`, `ModuleTitleBar` overflow → `Menu`
 
-## Phase 6: enforcement + cleanup
-- [ ] Add the planned lint rules (`docs/design/RULES.md` "Planned rules") as their conditions are met
-- [ ] Remove the global `button`/`input`/`select`/`.delete-button`/`.confirm-button` CSS from `App.vue`
-- [ ] `--color-*: initial;` in `@theme`; delete the legacy aliases and `:root` kebab vars
-- [ ] Final pass: no UI suppressions left, delete MIGRATION.md, retro, update README
+## Phase 6: enforcement + cleanup (done 2026-11-19, stacked branches `proj/ui-p6-element-css` → `proj/ui-p6-tokens` → `proj/ui-p6-lint` → `proj/ui-p6-final`)
+- [x] Add the planned lint rules: `vue/no-restricted-html-elements` (raw form controls outside `shared/ui/`, legitimate cases carry an inline disable with the reason) and `!` classes in `no-restricted-classes`. The legacy-token rule was dropped: those classes no longer compile.
+- [x] Remove the global `button`/`input`/`select`/`a`/`.delete-button`/`.confirm-button` CSS from `App.vue` (no `<style>` block left; base rules moved to `style.css`) and the `!`/`box-border` workarounds it forced. Checked: every route at 390/1280 in both themes, pixel-diffed before/after.
+- [x] `--color-*: initial;` in `@theme`; legacy aliases, the light bridge and the `:root` kebab vars deleted
+- [x] Final pass: `eslint-suppressions.json` is `{}`, MIGRATION.md deleted, retro in the README, README closed out

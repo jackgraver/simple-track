@@ -37,6 +37,7 @@ import {
     SegmentedControl,
     Select,
     Skeleton,
+    Spinner,
     Textarea,
     useDelayedFlag,
 } from "~/shared/ui";
@@ -361,7 +362,7 @@ onMounted(() => void load());
                             </template>
                             {{ r.title }}
                             <template #subtitle>{{ [r.release_year, r.creator].filter(Boolean).join(" · ") || "\u00a0" }}</template>
-                            <template v-if="applyingId === r.external_id" #trailing>Loading…</template>
+                            <template v-if="applyingId === r.external_id" #trailing><Spinner size="sm" label="Applying" /></template>
                         </ListRow>
                     </List>
                 </Card>
