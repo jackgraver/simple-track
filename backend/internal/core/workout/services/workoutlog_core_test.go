@@ -30,7 +30,11 @@ func TestGetOrCreateToday_createsLogWithPlanForDay(t *testing.T) {
 	db := testutil.SetupTestDB(t)
 	today := utils.ZerodTime(0)
 	dow := int(today.Weekday())
-	plan := models.WorkoutPlan{Name: "Push", DayOfWeek: &dow}
+	var program models.WorkoutProgram
+	if err := db.Where("is_active = ?", true).First(&program).Error; err != nil {
+		t.Fatal(err)
+	}
+	plan := models.WorkoutPlan{Name: "Push", DayOfWeek: &dow, WorkoutProgramID: &program.ID}
 	if err := db.Create(&plan).Error; err != nil {
 		t.Fatal(err)
 	}

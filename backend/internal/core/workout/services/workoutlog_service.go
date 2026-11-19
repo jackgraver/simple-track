@@ -621,22 +621,9 @@ func GetPlanByDay(dayOfWeek int) (*models.WorkoutPlan, error) {
 	plan, err := workoutrepo.FindWorkoutPlanByProgramAndDay(program.ID, dayOfWeek)
 	if err != nil {
 		if err == gorm.ErrRecordNotFound {
-			legacy, legacyErr := workoutrepo.FindWorkoutPlanByDayOfWeek(dayOfWeek)
-			if legacyErr == gorm.ErrRecordNotFound {
-				return nil, nil
-			}
-			if legacyErr != nil {
-				return nil, legacyErr
-			}
-			if legacy.WorkoutProgramID == nil {
-				if err := workoutrepo.AssignWorkoutPlanToProgram(legacy.ID, program.ID); err != nil {
-					return nil, err
-				}
-			}
-			plan = legacy
-		} else {
-			return nil, err
+			return nil, nil
 		}
+		return nil, err
 	}
 	return workoutrepo.LoadPlanWithOrderedExercises(plan.ID)
 }
