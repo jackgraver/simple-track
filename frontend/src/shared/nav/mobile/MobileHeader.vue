@@ -59,11 +59,11 @@ onUnmounted(() => {
 </script>
 
 <template>
-    <header class="flex min-h-10 items-center gap-1 pt-2 pb-3">
+    <header class="flex min-h-touch items-center gap-1 pt-2 pb-3">
         <button
             v-if="showBack"
             type="button"
-            class="-ml-2 m-0! flex size-10 shrink-0 items-center justify-center rounded-md p-0! text-textSecondary shadow-none! hover:bg-secondBg hover:text-textPrimary"
+            class="-ml-2 m-0! flex size-touch shrink-0 items-center justify-center rounded-control p-0! text-fg-muted shadow-none! hover:bg-surface-3 hover:text-fg"
             aria-label="Back"
             @click="goBack"
         >
@@ -74,20 +74,20 @@ onUnmounted(() => {
             <button
                 v-if="hasMenu"
                 type="button"
-                class="m-0! flex max-w-full items-center gap-1 rounded-md bg-transparent p-0! text-left shadow-none!"
+                class="m-0! flex max-w-full items-center gap-1 rounded-control bg-transparent p-0! text-left shadow-none!"
                 :aria-expanded="menuOpen"
                 aria-haspopup="menu"
                 @click="menuOpen = !menuOpen"
             >
-                <h1 class="m-0 truncate text-lg font-semibold tracking-tight text-textPrimary">
+                <h1 class="m-0 truncate text-lg font-semibold tracking-tight text-fg">
                     {{ title }}
                 </h1>
                 <ChevronDown
-                    class="size-4 shrink-0 text-textSecondary transition-transform"
+                    class="size-4 shrink-0 text-fg-muted transition-transform"
                     :class="{ 'rotate-180': menuOpen }"
                 />
             </button>
-            <h1 v-else class="m-0 truncate text-lg font-semibold tracking-tight text-textPrimary">
+            <h1 v-else class="m-0 truncate text-lg font-semibold tracking-tight text-fg">
                 {{ title }}
             </h1>
 
@@ -95,9 +95,9 @@ onUnmounted(() => {
                 v-if="menuOpen && group"
                 role="menu"
                 :aria-label="`${group.label} pages`"
-                class="absolute top-full left-0 z-40 mt-1 min-w-52 rounded-lg border border-(--color-border) bg-firstBg py-1 shadow-lg"
+                class="absolute top-full left-0 z-popover mt-1 min-w-52 rounded-card border border-line bg-surface py-1 shadow-raised"
             >
-                <p class="m-0 px-3 pt-1.5 pb-1 text-xs font-semibold tracking-wide text-textSecondary uppercase">
+                <p class="m-0 px-3 pt-1.5 pb-1 text-xs font-semibold tracking-wide text-fg-muted uppercase">
                     {{ group.label }}
                 </p>
                 <router-link
@@ -108,8 +108,8 @@ onUnmounted(() => {
                     class="flex items-center justify-between gap-4 px-3 py-2.5 text-sm"
                     :class="
                         isItemActive(item, route)
-                            ? 'font-medium text-textPrimary'
-                            : 'text-textSecondary hover:bg-secondBg hover:text-textPrimary'
+                            ? 'font-medium text-fg'
+                            : 'text-fg-muted hover:bg-surface-3 hover:text-fg'
                     "
                     :aria-current="isItemActive(item, route) ? 'page' : undefined"
                 >
@@ -119,12 +119,12 @@ onUnmounted(() => {
             </div>
         </div>
 
-        <span v-if="isDevEnvironment" class="rounded bg-secondBg px-1.5 text-xs text-textSecondary"
+        <span v-if="isDevEnvironment" class="rounded-control bg-surface-3 px-1.5 text-xs text-fg-muted"
             >dev</span
         >
         <router-link
             :to="{ name: 'settings-profile' }"
-            class="flex size-10 items-center justify-center rounded-md text-textSecondary hover:bg-secondBg hover:text-textPrimary"
+            class="flex size-touch items-center justify-center rounded-control text-fg-muted hover:bg-surface-3 hover:text-fg"
             aria-label="Profile"
         >
             <CircleUser class="size-6" />

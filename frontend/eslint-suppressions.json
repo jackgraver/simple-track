@@ -498,11 +498,6 @@
       "count": 9
     }
   },
-  "src/shared/DateAndBreadcrumbs.vue": {
-    "better-tailwindcss/no-deprecated-classes": {
-      "count": 1
-    }
-  },
   "src/shared/ModuleTitleBar.vue": {
     "better-tailwindcss/no-deprecated-classes": {
       "count": 1
@@ -537,24 +532,6 @@
       "count": 1
     },
     "vue/no-restricted-block": {
-      "count": 1
-    }
-  },
-  "src/shared/nav/SideNav.vue": {
-    "better-tailwindcss/no-deprecated-classes": {
-      "count": 1
-    }
-  },
-  "src/shared/nav/mobile/BottomTabBar.vue": {
-    "better-tailwindcss/no-deprecated-classes": {
-      "count": 1
-    },
-    "better-tailwindcss/no-restricted-classes": {
-      "count": 1
-    }
-  },
-  "src/shared/nav/mobile/MobileHeader.vue": {
-    "better-tailwindcss/no-deprecated-classes": {
       "count": 1
     }
   }

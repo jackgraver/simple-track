@@ -96,6 +96,16 @@
 
 :root[data-theme="light"] {
     color-scheme: light;
+    /* Bridge: unmigrated modules still use the legacy aliases. Point them at the light
+       tokens so they stay readable until phase 6 deletes them. */
+    --color-main-bg: var(--color-canvas);
+    --color-main-bg-transparent: hsl(0 0% 100% / 0.6);
+    --color-first-bg: var(--color-surface);
+    --color-second-bg: var(--color-surface-2);
+    --color-third-bg: var(--color-surface-3);
+    --color-text-primary: var(--color-fg);
+    --color-text-secondary: var(--color-fg-muted);
+    --color-border: var(--color-line);
     --color-canvas: hsl(0 0% 97%);
     --color-surface: hsl(0 0% 100%);
     --color-surface-2: hsl(0 0% 95%);

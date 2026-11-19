@@ -146,7 +146,7 @@ input:focus {
 
 /* Keyboard focus indicator for links/buttons (the base reset above strips it). */
 :focus-visible {
-    outline: 2px solid var(--color-text-secondary);
+    outline: 2px solid var(--color-accent);
     outline-offset: 2px;
 }
 </style>

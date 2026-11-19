@@ -3,6 +3,7 @@ import axios from 'axios';
 import { computed, ref, watch } from 'vue';
 import { useProfile, useSaveProfile } from '~/api/tracking/queries';
 import { toast } from '~/composables/toast/useToast';
+import AppearanceSection from '../AppearanceSection.vue';
 import BodyProfileForm from './BodyProfileForm.vue';
 
 const { data: profileRow, isPending, isError, error } = useProfile();
@@ -43,6 +44,7 @@ async function save() {
 
 <template>
     <div class="flex flex-col gap-5 pb-8 pt-2">
+        <AppearanceSection />
         <h1 class="m-0 text-lg font-semibold text-textPrimary">Body profile</h1>
         <p class="m-0 text-sm text-zinc-500">
             Used for TDEE estimates on macro targets. Weight comes from your latest weight log.

@@ -69,3 +69,7 @@ The owner picked Reka UI. It is headless: behaviour (focus, ARIA, keyboard, port
 - Token names are unchanged (Reka has no naming convention). The B1 contrast fixes apply to values in F1.
 - `lab/` is not merged to `main`. It stays on branch `proj/ui-bakeoff` with the comparison page https://claude.ai/artifact/4buX5k9LpVSCJ36o8LEMux as the record. `lab/scripts/contrast.mjs` is the source for the F1 contrast fixes.
 Alternatives: PrimeVue 4 styled + preset (runner-up: fastest to theme, but a 159 kB runtime, the licence track and Aura density), Volt (not recommended).
+
+## 2026-11-19: Light theme bridges the legacy aliases until phase 6
+`:root[data-theme="light"]` repoints `mainBg/firstBg/secondBg/thirdBg/textPrimary/textSecondary/--color-border` at the light tokens, so unmigrated pages stay readable when the toggle is switched. Dark keeps the original legacy values (nothing shifts). Hard-coded palette classes (`zinc-*`, `amber-*`) in unmigrated files still render their dark colours in light; each module slice fixes its own. The bridge is deleted with the aliases in phase 6.
+Alternative: ship the toggle with the legacy aliases unchanged (light would show white-on-white text in every unmigrated page).

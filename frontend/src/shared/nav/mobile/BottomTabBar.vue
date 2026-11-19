@@ -24,15 +24,15 @@ function openGroup(group: NavGroup) {
 <template>
     <nav
         aria-label="Main"
-        class="fixed inset-x-0 bottom-0 z-40 border-t border-(--color-border) bg-mainBg/95 pb-[env(safe-area-inset-bottom)] backdrop-blur"
+        class="fixed inset-x-0 bottom-0 z-nav border-t border-line bg-surface/95 pb-safe backdrop-blur-sm"
     >
-        <div class="mx-auto flex h-16 max-w-md items-stretch">
+        <div class="mx-auto flex h-tabbar max-w-md items-stretch">
             <button
                 v-for="group in navGroups"
                 :key="group.key"
                 type="button"
-                class="m-0! flex flex-1 flex-col items-center justify-center gap-0.5 rounded-none! bg-transparent p-0! text-[11px] shadow-none! transition-colors"
-                :class="current?.key === group.key ? 'text-textPrimary' : 'text-textSecondary'"
+                class="m-0! flex flex-1 flex-col items-center justify-center gap-0.5 rounded-none! bg-transparent p-0! text-2xs shadow-none! transition-colors"
+                :class="current?.key === group.key ? 'text-fg' : 'text-fg-muted'"
                 :aria-current="current?.key === group.key ? 'page' : undefined"
                 @click="openGroup(group)"
             >

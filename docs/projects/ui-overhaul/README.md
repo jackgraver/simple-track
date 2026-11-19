@@ -35,8 +35,8 @@
 6. **Enforcement + cleanup**: planned lint rules (RULES.md), remove the global element CSS, `--color-*: initial`, delete the legacy aliases.
 
 ## Next up / gotchas
-- **Next slice: F2 charts and F3 theme toggle** (different files, can run in parallel), then Phase 4. F1 is on `proj/ui-tokens`, F4 on `proj/ui-storybook` (branched from it). Storybook: `npm run storybook` in `frontend/`; `reka-ui` is installed and lint-restricted to `shared/ui/`.
-- **Light theme is only half-visible until F3:** the canvas and text flip, but the shell and pages still use the legacy aliases, which don't. Don't ship `st:theme=light` UI before F3.
+- **Next slice: F2 charts, then Phase 4.** F3 is on `proj/ui-theme`. F1 is on `proj/ui-tokens`, F4 on `proj/ui-storybook` (branched from it). Storybook: `npm run storybook` in `frontend/`; `reka-ui` is installed and lint-restricted to `shared/ui/`.
+- **Light theme:** the shell and the Settings control are on tokens. Unmigrated pages stay readable through the legacy-alias bridge (DECISIONS), but their hard-coded `zinc-*`/`amber-*` classes still render dark colours. Each module slice fixes its own.
 - **Solid fills:** `on-solid` (white) on `danger`/`success`/`warn` fills is under 4.5:1 in dark. Decide the solid-button tokens in P1.
 - **Spec conflict for P6:** the mobile toast at `bottom-tabbar` covers the gym "Log set" button (all candidates). Stack it above the CTA on focus pages, or confirm inline.
 - **Charts (F2):** read tokens after `data-theme` is set and re-render on change. The lab caught a chart that sampled the previous theme.

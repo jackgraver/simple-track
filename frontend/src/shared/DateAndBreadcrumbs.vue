@@ -90,7 +90,7 @@ function onNativeDateChange(ev: Event) {
             <button
                 type="button"
                 aria-label="Previous day"
-                class="shrink-0 rounded-md border border-(--color-border) bg-firstBg p-2 text-textPrimary transition-colors hover:bg-secondBg"
+                class="shrink-0 rounded-control border border-line bg-surface-2 p-2 text-fg transition-colors hover:bg-surface-3"
                 @click="goToPreviousDay"
             >
                 <ChevronLeftIcon class="size-4" />
@@ -102,14 +102,14 @@ function onNativeDateChange(ev: Event) {
                     class="grid w-full max-w-[min(100%,22rem)] place-items-center text-center text-pretty"
                 >
                     <span
-                        class="invisible col-start-1 row-start-1 m-0 max-w-full px-1 text-base font-medium leading-tight text-textPrimary"
+                        class="invisible col-start-1 row-start-1 m-0 max-w-full px-1 text-base font-medium leading-tight text-fg"
                         aria-hidden="true"
                     >
                         Wednesday, December&nbsp;31st,&nbsp;2026
                     </span>
                     <button
                         type="button"
-                        class="col-start-1 row-start-1 m-0 max-w-full cursor-pointer rounded border-none bg-transparent px-1 text-base font-medium leading-tight text-textPrimary underline-offset-2 transition-colors hover:text-textPrimary hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-(--color-border)"
+                        class="col-start-1 row-start-1 m-0 max-w-full cursor-pointer rounded-control border-none bg-transparent px-1 text-base font-medium leading-tight text-fg underline-offset-2 transition-colors hover:text-fg hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
                         :aria-label="`Chosen day: ${dateLabel}. Open calendar`"
                         @click="openNativeDatePicker"
                     >
@@ -130,7 +130,7 @@ function onNativeDateChange(ev: Event) {
                 >
                     <button
                         type="button"
-                        class="m-0! py-0! text-xs leading-none text-textSecondary underline-offset-2 transition-colors hover:text-textPrimary hover:underline disabled:pointer-events-none"
+                        class="m-0! py-0! text-xs leading-none text-fg-muted underline-offset-2 transition-colors hover:text-fg hover:underline disabled:pointer-events-none"
                         :class="{ invisible: isToday }"
                         :disabled="isToday"
                         :tabindex="isToday ? -1 : 0"
@@ -144,7 +144,7 @@ function onNativeDateChange(ev: Event) {
             <button
                 type="button"
                 aria-label="Next day"
-                class="shrink-0 rounded-md border border-(--color-border) bg-firstBg p-2 text-textPrimary transition-colors hover:bg-secondBg"
+                class="shrink-0 rounded-control border border-line bg-surface-2 p-2 text-fg transition-colors hover:bg-surface-3"
                 @click="goToNextDay"
             >
                 <ChevronRightIcon class="size-4" />
