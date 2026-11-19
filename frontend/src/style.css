@@ -7,6 +7,9 @@
  * JS (chart theme) and component <style> blocks can read them.
  */
 @theme static {
+    /* No Tailwind palette: only the tokens below compile (zinc-*, white... are not classes). */
+    --color-*: initial;
+
     --font-sans:
         "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif,
         "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol",
@@ -106,42 +109,10 @@
         to { opacity: 0; transform: scale(0.98); }
     }
 
-    /* Legacy aliases: unchanged values, removed in phase 6 as modules migrate. */
-    --color-mainBg: var(--color-main-bg);
-    --color-mainBgTransparent: var(--color-main-bg-transparent);
-    --color-firstBg: var(--color-first-bg);
-    --color-secondBg: var(--color-second-bg);
-    --color-thirdBg: var(--color-third-bg);
-    --color-textPrimary: var(--color-text-primary);
-    --color-textSecondary: var(--color-text-secondary);
-    --color-cfRed: var(--color-cf-red);
-}
-
-:root {
-    --color-cf-red: hsl(0, 100%, 49%);
-    --color-cf-red-dark: hsl(0, 100%, 42%);
-    --color-main-bg: hsl(0, 0%, 5%);
-    --color-main-bg-transparent: hsla(0, 0%, 0%, 0.6);
-    --color-first-bg: hsl(0, 0%, 15%);
-    --color-second-bg: hsl(0, 0%, 25%);
-    --color-third-bg: hsl(0, 0%, 35%);
-    --color-text-primary: hsl(0, 0%, 95%);
-    --color-text-secondary: hsl(0, 0%, 70%);
-    --color-border: hsl(0, 0%, 30%);
 }
 
 :root[data-theme="light"] {
     color-scheme: light;
-    /* Bridge: unmigrated modules still use the legacy aliases. Point them at the light
-       tokens so they stay readable until phase 6 deletes them. */
-    --color-main-bg: var(--color-canvas);
-    --color-main-bg-transparent: hsl(0 0% 100% / 0.6);
-    --color-first-bg: var(--color-surface);
-    --color-second-bg: var(--color-surface-2);
-    --color-third-bg: var(--color-surface-3);
-    --color-text-primary: var(--color-fg);
-    --color-text-secondary: var(--color-fg-muted);
-    --color-border: var(--color-line);
     --color-canvas: hsl(0 0% 97%);
     --color-surface: hsl(0 0% 100%);
     --color-surface-2: hsl(0 0% 95%);
@@ -184,7 +155,6 @@
     --duration-base: 150ms;
     --duration-slow: 250ms;
 }
-:root[data-theme="light"] { color-scheme: light; }
 
 @utility z-raised { z-index: 10; }
 @utility z-nav { z-index: 40; }

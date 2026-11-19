@@ -3,9 +3,9 @@
 Source of truth: **`frontend/src/style.css`** (Tailwind v4 `@theme`). Nothing else defines
 colours, radii, shadows or type sizes. This file is the spec.
 
-> **Status: landed in `frontend/src/style.css` (F1).** Legacy aliases (`bg-firstBg`,
-> `text-textSecondary`…) still exist with unchanged values until each module migrates; the mapping
-> is in `docs/projects/ui-overhaul/MIGRATION.md`. Values below include the AA fixes from B1:
+> **Status: landed in `frontend/src/style.css` (F1); the only colours since phase 6.** The legacy
+> aliases (`bg-firstBg`, `text-textSecondary`…) are deleted and `--color-*: initial` removes
+> Tailwind's palette, so `zinc-*`/`white` classes don't compile. Values below include the AA fixes from B1:
 > status colours are darker in light and `danger` is lighter in dark so text on `*-soft` reaches
 > 4.5:1 (checked by computation against `canvas`, `surface-2` and the soft tint).
 
@@ -125,15 +125,14 @@ A popover inside a dialog stacks inside the dialog's context, so 50 < 60 isn't a
 
 ## `style.css` shape
 The block below is the spec; the file differs in two ways: `@theme static` (so every variable is
-emitted even when no utility uses it, which JS and component `<style>` need), and the legacy
-aliases sit beside it. Values in the table above win over the ones in this block.
+emitted even when no utility uses it, which JS such as the chart theme reads). Values in the table above win over the ones in this block.
 
 ```css
 @import "tailwindcss";
 
 /* Tokens only. Values flip per theme under [data-theme="light"]. */
 @theme {
-    /* Phase 5 adds `--color-*: initial;` here to delete Tailwind's palette. */
+    --color-*: initial; /* no Tailwind palette */
     --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif,
         "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
 
