@@ -35,9 +35,10 @@
 6. **Enforcement + cleanup**: planned lint rules (RULES.md), remove the global element CSS, `--color-*: initial`, delete the legacy aliases.
 
 ## Next up / gotchas
-- **Phase 3 (foundations) is done:** F1 `proj/ui-tokens`, F4 `proj/ui-storybook` (from F1), F3 `proj/ui-theme` and F2 `proj/ui-charts` (both from F4, different files). **Next: Phase 4 starting with P1** (Button, IconButton, Spinner).
+- **Phase 3 (foundations) is done:** F1 `proj/ui-tokens`, F4 `proj/ui-storybook` (from F1), F3 `proj/ui-theme` and F2 `proj/ui-charts` (both from F4, different files). **P1 done** (`proj/ui-p1-buttons`: Button, IconButton, Spinner). **Next: P2** (Field, Input, Textarea, Select, Toggle, Checkbox). Storybook: `npm run storybook` in `frontend/`; `reka-ui` is installed and lint-restricted to `shared/ui/`.
 - **Light theme:** the shell and the Settings control are on tokens. Unmigrated pages stay readable through the legacy-alias bridge (DECISIONS), but their hard-coded `zinc-*`/`amber-*` classes still render dark colours. Each module slice fixes its own.
-- **Solid fills:** `on-solid` (white) on `danger`/`success`/`warn` fills is under 4.5:1 in dark. Decide the solid-button tokens in P1.
+- **Solid fills:** decided in P1 (DECISIONS): `danger-solid` uses `text-fg-inverse`. Any other solid `success`/`warn` fill must do the same, never `on-solid`.
+- **Primitives and the global `button {}` rule:** Button/IconButton carry `m-0! shadow-none! rounded-control! border!` (and `px-*!`) to beat the unlayered `App.vue` rule. They go when that rule is removed in phase 6. Storybook doesn't load that rule, so check a primitive in the real app too.
 - **Spec conflict for P6:** the mobile toast at `bottom-tabbar` covers the gym "Log set" button (all candidates). Stack it above the CTA on focus pages, or confirm inline.
 - **Charts (F2):** read tokens after `data-theme` is set and re-render on change. The lab caught a chart that sampled the previous theme.
 - Reka has no swipe-to-close sheets (PRINCIPLES §5); build it in P5 (pointer handler or vaul-vue).

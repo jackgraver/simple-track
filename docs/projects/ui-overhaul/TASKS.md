@@ -25,7 +25,7 @@ screenshots of the changed pages or stories at 390 and 1280, in dark and light (
 - [x] **F4 Storybook in `frontend/`** (branch `proj/ui-storybook`, 2026-11-19; sample = `shared/ui/Toggle` on Reka Switch) (`@storybook/vue3-vite`, a11y addon, MCP addon, theme switcher, 390/1280 viewports) + `reka-ui` installed (pin 2.x; the lab used 2.11.0) and wrapped in `shared/ui/`. *Done:* `npm run storybook` works; one sample story; `no-restricted-imports` blocks `reka-ui` outside `shared/ui/`.
 
 ## Phase 4: shared components (`frontend/src/shared/ui/`, each with stories for all states, both themes)
-- [ ] **P1** `Button`, `IconButton`, `Spinner`. *Done:* every variant × size × state (hover/focus/disabled/loading) visible; keyboard focus ring visible; 44px at 390px.
+- [x] **P1** (branch `proj/ui-p1-buttons`, 2026-11-19; stories `shared/ui/{Button,IconButton,Spinner}.stories.ts`, `Matrix` shows variant × size × state) `Button`, `IconButton`, `Spinner`. *Done:* every variant × size × state (hover/focus/disabled/loading) visible; keyboard focus ring visible; 44px at 390px.
 - [ ] **P2** `Field`, `Input`, `Textarea`, `Select`, `Toggle`, `Checkbox` (evolve `shared/input/Input.vue`, keep its import path working or update its 4 users). *Done:* showcase with invalid/disabled states; no iOS zoom (16px) below lg; signin page uses Field+Input.
 - [ ] **P3** `Card`, `Badge`, `List`/`ListRow`, `SegmentedControl`. *Done:* showcase includes `ListRow pending` and the desktop hover actions / mobile trailing button.
 - [ ] **P4** `EmptyState`, `ErrorState`, `Skeleton`/`SkeletonList`, `useDelayedFlag`. *Done:* `LoggingPageShell.vue` uses them (first real consumer).

@@ -73,3 +73,7 @@ Alternatives: PrimeVue 4 styled + preset (runner-up: fastest to theme, but a 159
 ## 2026-11-19: Light theme bridges the legacy aliases until phase 6
 `:root[data-theme="light"]` repoints `mainBg/firstBg/secondBg/thirdBg/textPrimary/textSecondary/--color-border` at the light tokens, so unmigrated pages stay readable when the toggle is switched. Dark keeps the original legacy values (nothing shifts). Hard-coded palette classes (`zinc-*`, `amber-*`) in unmigrated files still render their dark colours in light; each module slice fixes its own. The bridge is deleted with the aliases in phase 6.
 Alternative: ship the toggle with the legacy aliases unchanged (light would show white-on-white text in every unmigrated page).
+
+## 2026-11-19: Solid danger button uses `text-fg-inverse`, not `on-solid` (P1)
+White on the dark `danger` fill (hsl 0 80% 66%) is under 4.5:1. `fg-inverse` flips per theme (near-black in dark, near-white in light) and gives 5.9:1 on `danger` in dark and 5.8:1 in light, so no new token is needed. `on-solid` stays for the accent Toggle thumb. Primary (`bg-fg text-fg-inverse`) is unchanged.
+Also: Button's `:to` renders a `RouterLink` only while not disabled or loading (an anchor can't be disabled); `loading` keeps the label, shows a spinner in place of the left icon, sets `aria-busy` and ignores clicks without removing focus. Sizes are 44px below `lg` for all three, then 32/40/44px (sm/md/lg) from `lg`.
