@@ -124,6 +124,7 @@ const deleteBalanceMutation = useMoneyMutation((balanceId: number) =>
 async function removeBalance(balanceId: number, date: string) {
     const confirmed = await dialogManager.confirm({
         title: "Delete balance?",
+        tone: "danger",
         message: `The balance recorded on ${formatDay(date)} will be removed from the history.`,
         confirmText: "Delete",
     });
@@ -189,6 +190,7 @@ const deleteTxMutation = useMoneyMutation((transactionId: number) =>
 async function removeTransaction(transactionId: number) {
     const confirmed = await dialogManager.confirm({
         title: "Delete transaction?",
+        tone: "danger",
         message: "This only removes the record; the account balance is not changed.",
         confirmText: "Delete",
     });
@@ -248,6 +250,7 @@ async function removeAccount() {
     if (!a) return;
     const confirmed = await dialogManager.confirm({
         title: `Delete ${a.name}?`,
+        tone: "danger",
         message: "All balances and transactions are permanently deleted and removed from net worth history. Archive instead to keep them.",
         confirmText: "Delete forever",
     });

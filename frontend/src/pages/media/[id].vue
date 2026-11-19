@@ -238,6 +238,7 @@ async function quickStatus(status: MediaStatus) {
 async function remove() {
     const ok = await confirm({
         title: "Delete this item?",
+        tone: "danger",
         message: `"${form.title}" and your review will be removed.`,
         confirmText: "Delete",
     });

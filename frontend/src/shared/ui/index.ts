@@ -18,3 +18,5 @@ export { default as ErrorState } from "./ErrorState.vue";
 export { default as Skeleton } from "./Skeleton.vue";
 export { default as SkeletonList } from "./SkeletonList.vue";
 export { useDelayedFlag } from "./useDelayedFlag";
+export { default as Overlay } from "./Overlay.vue";
+export { useIsDesktop } from "./useIsDesktop";

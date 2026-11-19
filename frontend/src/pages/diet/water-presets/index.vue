@@ -119,6 +119,7 @@ async function saveEdit() {
 async function removePreset(id: number) {
     const ok = await dialogManager.confirm({
         title: "Delete drink size?",
+        tone: "danger",
         message: "Quick-add buttons will no longer include this size.",
         confirmText: "Delete",
         cancelText: "Cancel",

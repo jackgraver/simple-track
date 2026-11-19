@@ -316,12 +316,14 @@ async function deleteSavedMealTemplate(sm: SavedMeal) {
         preview.reference_count > 0
             ? await dialogManager.confirm({
                   title: "Saved meal is on your plan",
+                  tone: "danger",
                   message: `This meal is referenced ${preview.reference_count} times in your plan. Deleting removes those planned meals. Delete “${sm.name}”?`,
                   confirmText: "Delete",
                   cancelText: "Cancel",
               })
             : await dialogManager.confirm({
                   title: "Delete saved meal",
+                  tone: "danger",
                   message: `Delete “${sm.name}”?`,
                   confirmText: "Delete",
                   cancelText: "Cancel",

@@ -73,6 +73,7 @@ export function useDietDayMealHandlers(getOffset: () => number) {
         const quick = mealHasQuickEntryFood(meal);
         const confirmed = await dialogManager.confirm({
             title: quick ? "Remove quick log" : "Delete Logged Meal",
+            tone: "danger",
             message: quick
                 ? `Remove “${name}” from today's log? This one-off entry will be discarded.`
                 : `Are you sure you want to delete “${name}”?`,

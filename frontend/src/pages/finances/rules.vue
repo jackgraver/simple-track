@@ -98,6 +98,7 @@ async function saveLimit(type: ContributionType) {
 async function removeLimit(type: ContributionType, year: number) {
     const confirmed = await dialogManager.confirm({
         title: "Remove annual limit?",
+        tone: "danger",
         message: `The ${type.name} limit starting ${year} will be removed; earlier limits extend to cover those years.`,
         confirmText: "Remove",
     });
@@ -112,6 +113,7 @@ async function removeLimit(type: ContributionType, year: number) {
 async function removeType(type: ContributionType) {
     const confirmed = await dialogManager.confirm({
         title: `Delete ${type.name}?`,
+        tone: "danger",
         message: type.accounts.length
             ? `Unlink ${type.accounts.map((a) => a.name).join(", ")} first.`
             : "Its rules and limits will be deleted. Accounts and deposits are not affected.",

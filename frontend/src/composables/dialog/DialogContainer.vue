@@ -1,233 +1,50 @@
 <script setup lang="ts">
-import {
-    dialogManager,
-    type DialogOptions,
-} from "~/composables/dialog/useDialog";
-import { X } from "lucide-vue-next";
-import { onMounted, onUnmounted } from "vue";
+import { computed, shallowRef, watch } from "vue";
+import { dialogManager } from "~/composables/dialog/useDialog";
+import { Button, Overlay } from "~/shared/ui";
 
-const handleKeydown = (event: KeyboardEvent) => {
-    if (event.key === "Escape" && dialogManager.dialog.value) {
-        event.preventDefault();
-        dialogManager.cancel();
-    }
-};
+// Renders the one dialog `dialogManager` holds. The API is unchanged; this is only the presentation.
+// `shown` keeps the last dialog mounted while Overlay plays its exit animation.
+const shown = shallowRef(dialogManager.dialog.value);
+watch(
+    () => dialogManager.dialog.value,
+    (d) => {
+        if (d) shown.value = d;
+    },
+);
 
-onMounted(() => window.addEventListener("keydown", handleKeydown));
-onUnmounted(() => window.removeEventListener("keydown", handleKeydown));
-
-function isConfirmDialog(
-    d: typeof dialogManager.dialog.value,
-): d is { type: "confirm"; options: DialogOptions } {
-    return d?.type === "confirm";
-}
+const open = computed({
+    get: () => !!dialogManager.dialog.value,
+    set: (v) => {
+        if (!v) dialogManager.cancel();
+    },
+});
 </script>
 
 <template>
-    <div
-        v-if="dialogManager.dialog.value"
-        class="dialog-backdrop"
-        :class="{
-            'top-dialog': isConfirmDialog(dialogManager.dialog.value),
-        }"
+    <Overlay
+        v-if="shown"
+        v-model:open="open"
+        :title="shown.options.title || ''"
+        :description="shown.type === 'confirm' ? shown.options.message : undefined"
+        :size="shown.type === 'custom' && shown.options.wide ? 'lg' : 'md'"
     >
-        <div
-            class="dialog-container"
-            :class="{
-                'dialog-container--wide':
-                    !isConfirmDialog(dialogManager.dialog.value) &&
-                    dialogManager.dialog.value.options.wide,
+        <component
+            :is="shown.options.component"
+            v-if="shown.type === 'custom'"
+            v-bind="{
+                ...(shown.options.componentProps ?? {}),
+                onResolve: dialogManager.resolve,
+                onCancel: dialogManager.cancel,
             }"
-        >
-            <header class="dialog-header">
-                <h2>
-                    {{
-                        isConfirmDialog(dialogManager.dialog.value)
-                            ? dialogManager.dialog.value.options.title
-                            : dialogManager.dialog.value.options.title || ""
-                    }}
-                </h2>
-                <button
-                    class="close-btn"
-                    @click="dialogManager.cancel()"
-                    v-if="!isConfirmDialog(dialogManager.dialog.value)"
-                >
-                    <X />
-                </button>
-            </header>
-            <template v-if="isConfirmDialog(dialogManager.dialog.value)">
-                <div class="confirm-template">
-                    <h3>{{ dialogManager.dialog.value.options.message }}</h3>
-                    <div class="confirm-buttons">
-                        <button
-                            @click="dialogManager.resolve(true)"
-                            class="confirm-btn"
-                        >
-                            {{
-                                dialogManager.dialog.value.options
-                                    .confirmText || "Confirm"
-                            }}
-                        </button>
-                        <button
-                            @click="dialogManager.resolve(false)"
-                            class="cancel-btn"
-                        >
-                            {{
-                                dialogManager.dialog.value.options.cancelText ||
-                                "Cancel"
-                            }}
-                        </button>
-                    </div>
-                </div>
-            </template>
-            <template v-else>
-                <div class="template">
-                    <component
-                        :is="dialogManager.dialog.value.options.component"
-                        v-bind="{
-                            ...(dialogManager.dialog.value.options
-                                .componentProps ?? {}),
-                            onResolve: dialogManager.resolve,
-                            onCancel: dialogManager.cancel,
-                        }"
-                    />
-                </div>
-            </template>
-        </div>
-    </div>
+        />
+        <template v-if="shown.type === 'confirm'" #footer>
+            <Button variant="secondary" @click="dialogManager.resolve(false)">
+                {{ shown.options.cancelText || "Cancel" }}
+            </Button>
+            <Button :variant="shown.options.tone === 'danger' ? 'danger-solid' : 'primary'" @click="dialogManager.resolve(true)">
+                {{ shown.options.confirmText || "Confirm" }}
+            </Button>
+        </template>
+    </Overlay>
 </template>
-
-<style scoped>
-.dialog-backdrop {
-    position: fixed;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.5);
-    display: flex;
-    justify-content: center;
-    align-items: flex-start;
-    padding-top: 10vh;
-    z-index: 998;
-}
-
-.top-dialog {
-    align-items: flex-start;
-    padding-top: 10vh;
-}
-
-.dialog-container {
-    position: relative;
-    display: flex;
-    flex-direction: column;
-    min-width: 30%;
-    max-width: 90vw;
-    box-sizing: border-box;
-    background: rgb(26, 26, 26);
-    border: 1px solid #3d3d3d;
-    border-radius: 10px;
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
-    padding: 0;
-    max-height: 85vh;
-    overflow: hidden;
-}
-
-.dialog-container--wide {
-    width: min(90vw, 42rem);
-    min-width: 0;
-}
-
-.dialog-container > * {
-    width: auto;
-}
-
-.dialog-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 1rem 1.25rem;
-    border-bottom: 1px solid #3d3d3d;
-    flex-shrink: 0;
-}
-
-.dialog-header h2 {
-    margin: 0;
-    font-size: 1.25rem;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    flex: 1;
-}
-
-.close-btn {
-    background: transparent;
-    border: none;
-    color: #ccc;
-    cursor: pointer;
-    padding: 0.25rem;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 4px;
-    transition: background 0.2s;
-}
-
-.close-btn:hover {
-    background: rgba(255, 255, 255, 0.1);
-}
-
-.template {
-    flex: 1;
-    min-width: 0;
-    padding: 1.25rem;
-    overflow-y: auto;
-    text-align: left;
-}
-
-.confirm-template {
-    display: flex;
-    flex-direction: column;
-    gap: 1.25rem;
-    padding: 1.25rem;
-}
-
-.confirm-template h3 {
-    margin: 0;
-    font-size: 1rem;
-    font-weight: normal;
-    color: #ccc;
-}
-
-.confirm-buttons {
-    display: flex;
-    flex-direction: row;
-    gap: 0.75rem;
-    justify-content: flex-end;
-}
-
-button {
-    padding: 0.625rem 1.25rem;
-    border: none;
-    border-radius: 6px;
-    cursor: pointer;
-    font-size: 0.9rem;
-    font-weight: 500;
-    transition: all 0.2s;
-}
-
-.confirm-btn {
-    background: rgb(34, 139, 34);
-    color: white;
-}
-
-.confirm-btn:hover {
-    background: rgb(40, 160, 40);
-}
-
-.cancel-btn {
-    background: rgb(60, 60, 60);
-    color: white;
-}
-
-.cancel-btn:hover {
-    background: rgb(80, 80, 80);
-}
-</style>

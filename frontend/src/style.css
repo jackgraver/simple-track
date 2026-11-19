@@ -70,6 +70,34 @@
     --shadow-raised: 0 4px 12px hsl(0 0% 0% / 0.45);
     --shadow-overlay: 0 12px 32px hsl(0 0% 0% / 0.6);
 
+    /* Overlay motion (docs/design/TOKENS.md). Enter 250ms ease-out, exit 150ms ease-in. Reka waits
+       for the exit animation to end before unmounting. `--sheet-drag` is the live swipe offset. */
+    --animate-overlay-in: overlay-in 250ms ease-out;
+    --animate-overlay-out: overlay-out 150ms ease-in;
+    --animate-sheet-in: sheet-in 250ms ease-out;
+    --animate-sheet-out: sheet-out 150ms ease-in;
+    --animate-dialog-in: dialog-in 250ms ease-out;
+    --animate-dialog-out: dialog-out 150ms ease-in;
+    @keyframes overlay-in {
+        from { opacity: 0; }
+    }
+    @keyframes overlay-out {
+        to { opacity: 0; }
+    }
+    @keyframes sheet-in {
+        from { transform: translateY(100%); }
+    }
+    @keyframes sheet-out {
+        from { transform: translateY(var(--sheet-drag, 0px)); }
+        to { transform: translateY(100%); }
+    }
+    @keyframes dialog-in {
+        from { opacity: 0; transform: scale(0.98); }
+    }
+    @keyframes dialog-out {
+        to { opacity: 0; transform: scale(0.98); }
+    }
+
     /* Legacy aliases: unchanged values, removed in phase 6 as modules migrate. */
     --color-mainBg: var(--color-main-bg);
     --color-mainBgTransparent: var(--color-main-bg-transparent);
