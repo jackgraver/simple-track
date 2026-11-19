@@ -7,8 +7,8 @@ import { isAuthenticated } from "./composables/auth/session";
 import DateAndBreadcrumbs from "./shared/DateAndBreadcrumbs.vue";
 // Breadcrumbs (./shared/Breadcrumbs.vue) are kept but not displayed for now.
 import SideNav from "./shared/nav/SideNav.vue";
-import MobileHeader from "./shared/nav/MobileHeader.vue";
-import BottomTabBar from "./shared/nav/BottomTabBar.vue";
+import MobileHeader from "./shared/nav/mobile/MobileHeader.vue";
+import BottomTabBar from "./shared/nav/mobile/BottomTabBar.vue";
 import { useNavMemory } from "./shared/nav/useNavMemory";
 
 const route = useRoute();

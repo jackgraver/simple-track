@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import { activeGroup, itemLocation, navGroups, type NavGroup } from "./nav";
-import { useNavMemory } from "./useNavMemory";
+import { activeGroup, itemLocation, navGroups, type NavGroup } from "../nav";
+import { useNavMemory } from "../useNavMemory";
 
 const route = useRoute();
 const router = useRouter();
