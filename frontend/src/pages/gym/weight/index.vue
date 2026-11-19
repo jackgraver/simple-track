@@ -4,7 +4,6 @@ import { computed, ref, watch } from "vue";
 import { useRoute } from "vue-router";
 import {
     latestWeightLbs,
-    useImportWeightCsv,
     useSaveWeight,
     useWeightLogs,
 } from "~/api/tracking/queries";
@@ -21,6 +20,8 @@ import {
     trackingDayKey,
 } from "~/pages/gym/trackingLogChart";
 import axios from "axios";
+import { ClipboardList } from "lucide-vue-next";
+import { openImportWeightDialog } from "./dialog/useImportDialog";
 import NumberSlider from "~/pages/gym/logging/exercise/components/NumberSlider.vue";
 
 const WEIGHT_SLIDER_PADDING = 25;
@@ -117,41 +118,6 @@ const handleSave = async () => {
 };
 const saving = computed(() => saveMutation.isPending.value);
 
-const importMutation = useImportWeightCsv();
-const importText = ref("");
-const importing = computed(() => importMutation.isPending.value);
-const errorMessage = (err: unknown, fallback: string) => {
-    if (axios.isAxiosError(err)) {
-        const e0 = (err.response?.data as { error?: string } | undefined)?.error;
-        if (e0) return e0;
-    }
-    return err instanceof Error ? err.message : fallback;
-};
-const handleImport = async () => {
-    const csv = importText.value.trim();
-    if (!csv) {
-        toast.push("Paste your Renpho CSV first", "error");
-        return;
-    }
-    try {
-        const res = await importMutation.mutateAsync(csv);
-        importText.value = "";
-        toast.push(
-            `Imported ${res.created} new, ${res.updated} updated`,
-            "success",
-        );
-    } catch (err: unknown) {
-        toast.push(errorMessage(err, "Import failed"), "error");
-    }
-};
-const pasteFromClipboard = async () => {
-    try {
-        importText.value = await navigator.clipboard.readText();
-    } catch {
-        toast.push("Couldn't read clipboard; paste into the box instead", "error");
-    }
-};
-
 const metricsForDay = computed(() => {
     const l = existingLogForDate.value;
     if (!l) return [];
@@ -175,6 +141,14 @@ const metricsForDay = computed(() => {
             <h1 class="m-0 text-lg font-semibold text-textPrimary">
                 Body weight
             </h1>
+            <button
+                type="button"
+                class="ml-auto mr-3 flex items-center gap-1.5 rounded-md bg-zinc-800 px-2.5 py-1.5 text-sm text-zinc-200 hover:bg-zinc-700"
+                @click="openImportWeightDialog"
+            >
+                <ClipboardList class="size-4" aria-hidden="true" />
+                Import
+            </button>
             <router-link
                 :to="{ name: 'gym', query: gymHomeQuery }"
                 class="text-sm text-textSecondary transition-colors hover:text-textPrimary"
@@ -211,40 +185,6 @@ const metricsForDay = computed(() => {
                 }}</span>
             </div>
         </div>
-        <form
-            class="flex flex-col gap-3 rounded-md border border-(--color-border) bg-firstBg p-4"
-            @submit.prevent="handleImport"
-        >
-            <h2 class="m-0 text-base font-semibold text-textPrimary">
-                Import from Renpho
-            </h2>
-            <p class="m-0 text-sm text-textSecondary">
-                Copy your CSV in the Renpho app, then paste it here. Existing
-                days are overwritten.
-            </p>
-            <textarea
-                v-model="importText"
-                rows="4"
-                placeholder="No.,Date,Time,Weight(lb),..."
-                class="w-full rounded-md border border-(--color-border) bg-secondBg p-2 font-mono text-xs text-textPrimary"
-            />
-            <div class="flex gap-2">
-                <button
-                    type="button"
-                    class="rounded-md bg-secondBg px-4 py-2 text-sm font-semibold text-textPrimary transition-colors hover:bg-thirdBg"
-                    @click="pasteFromClipboard"
-                >
-                    Paste
-                </button>
-                <button
-                    type="submit"
-                    class="flex-1 rounded-md bg-secondBg px-4 py-2 text-sm font-semibold text-textPrimary transition-colors hover:bg-thirdBg disabled:opacity-50"
-                    :disabled="importing || !importText.trim()"
-                >
-                    {{ importing ? "Importing…" : "Import" }}
-                </button>
-            </div>
-        </form>
         <div v-if="isError" class="text-sm text-(--color-cf-red)">
             {{ error?.message ?? "Failed to load" }}
         </div>
