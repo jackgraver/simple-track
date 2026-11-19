@@ -65,26 +65,25 @@ async function submit() {
         <div v-if="isPending" class="grid grid-cols-1 gap-2 lg:grid-cols-3" aria-busy="true">
             <Skeleton v-for="n in 3" :key="n" height="3.5rem" />
         </div>
-        <div v-else role="radiogroup" aria-label="Account type" class="grid grid-cols-1 gap-2 lg:grid-cols-3">
-            <button
+        <fieldset v-else class="m-0 grid min-w-0 grid-cols-1 gap-2 border-0 p-0 lg:grid-cols-3">
+            <legend class="sr-only">Account type</legend>
+            <label
                 v-for="preset in available"
                 :key="preset.key"
-                type="button"
-                role="radio"
-                :aria-checked="form.key === preset.key"
-                class="m-0! min-h-touch cursor-pointer rounded-control! border! px-3! py-2! text-left text-base shadow-none! transition-colors duration-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-40 lg:text-sm"
-                :class="
-                    form.key === preset.key
-                        ? 'border-accent! bg-accent-soft! text-fg'
-                        : 'border-line! bg-surface-2! text-fg hover:bg-surface-3!'
-                "
-                :disabled="preset.taken"
-                @click="form.key = preset.key"
+                class="flex min-h-touch cursor-pointer flex-col justify-center rounded-control border border-line bg-surface-2 px-3 py-2 text-base text-fg transition-colors duration-100 hover:bg-surface-3 has-checked:border-accent has-checked:bg-accent-soft has-disabled:cursor-not-allowed has-disabled:opacity-50 has-focus-visible:ring-2 has-focus-visible:ring-accent lg:text-sm"
             >
+                <input
+                    v-model="form.key"
+                    type="radio"
+                    name="preset"
+                    class="sr-only"
+                    :value="preset.key"
+                    :disabled="preset.taken"
+                />
                 <span class="block font-semibold">{{ preset.name }}</span>
                 <span class="block text-xs text-fg-muted">{{ preset.taken ? "Already added" : "Canada" }}</span>
-            </button>
-        </div>
+            </label>
+        </fieldset>
 
         <p v-if="!isPending && available.length && available.every((p) => p.taken)" class="m-0 text-sm text-fg-muted">
             All presets are already set up. Use <strong>Custom type</strong> for anything else, or edit an existing type's rules.
