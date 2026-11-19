@@ -190,6 +190,7 @@ func seedDiet(tx *gorm.DB) error {
 		{"Salmon", "g", 100, 208, 20, 0, 0, 13},
 		{"Whey Protein", "scoop", 1, 120, 24, 0, 3, 1.5},
 	}
+	// Item Amount below is a number of servings (ServingAmount units each), not grams.
 	foods := make([]dietm.Food, len(defs))
 	for i, d := range defs {
 		foods[i] = dietm.Food{Name: d.name, ServingType: d.serving, ServingAmount: d.amt, Calories: d.cal, Protein: d.p, Fiber: d.f, Carbs: d.c, Fat: d.fat}
@@ -206,7 +207,7 @@ func seedDiet(tx *gorm.DB) error {
 	}
 
 	saved := []dietm.SavedMeal{
-		{Name: "Chicken & Rice", Items: []dietm.SavedMealItem{{FoodID: foods[0].ID, Amount: 200}, {FoodID: foods[1].ID, Amount: 250}, {FoodID: foods[6].ID, Amount: 100}}},
+		{Name: "Chicken & Rice", Items: []dietm.SavedMealItem{{FoodID: foods[0].ID, Amount: 2}, {FoodID: foods[1].ID, Amount: 2.5}, {FoodID: foods[6].ID, Amount: 1}}},
 		{Name: "Breakfast", Items: []dietm.SavedMealItem{{FoodID: foods[2].ID, Amount: 3}, {FoodID: foods[4].ID, Amount: 1}}},
 	}
 	if err := tx.Create(&saved).Error; err != nil {
@@ -228,7 +229,7 @@ func seedDiet(tx *gorm.DB) error {
 		}
 		if i <= 0 {
 			meal := dietm.Meal{Name: "Lunch", Items: []dietm.MealItem{
-				{FoodID: foods[0].ID, Amount: 200}, {FoodID: foods[1].ID, Amount: 250}, {FoodID: foods[7].ID, Amount: 1},
+				{FoodID: foods[0].ID, Amount: 2}, {FoodID: foods[1].ID, Amount: 2.5}, {FoodID: foods[7].ID, Amount: 1},
 			}}
 			if err := tx.Create(&meal).Error; err != nil {
 				return err
@@ -238,7 +239,7 @@ func seedDiet(tx *gorm.DB) error {
 			}
 		}
 		if i >= 0 {
-			meal := dietm.Meal{Name: "Dinner", Items: []dietm.MealItem{{FoodID: foods[8].ID, Amount: 180}, {FoodID: foods[6].ID, Amount: 150}}}
+			meal := dietm.Meal{Name: "Dinner", Items: []dietm.MealItem{{FoodID: foods[8].ID, Amount: 1.8}, {FoodID: foods[6].ID, Amount: 1.5}}}
 			if err := tx.Create(&meal).Error; err != nil {
 				return err
 			}
