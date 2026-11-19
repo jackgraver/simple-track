@@ -41,7 +41,9 @@ Never run bare `./bin/dev` (it opens an interactive TUI). Use the background com
 - `dev api` uses the `DEV_AUTH_TOKEN` cookie bypass from `backend/.env` (`ALLOW_BYPASS` is
   forced on by `dev/env.sh`; the backend rejects both in production).
 - A fresh worktree starts with an empty DB: the one-shot `migrate` service applies every
-  migration before the backend starts, and there's no sample data. `dev db:drop-worktree` removes a worktree's DB.
+  migration before the backend starts, then the one-shot `devseed` step (`cmd/devseed`) adds
+  sample gym/diet/tracking/media/money data. It does one check (any exercises?) and skips if
+  data exists, so it runs on every start; `dev db:seed` runs it by hand. `dev db:drop-worktree` removes a worktree's DB.
 
 ### Layout (plug-and-play)
 

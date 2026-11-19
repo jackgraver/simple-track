@@ -1,0 +1,9 @@
+# One-shot: seed sample data into an empty dev DB (no-op if exercises already exist).
+version: "0.5"
+processes:
+  devseed:
+    working_dir: backend
+    command: go run ./cmd/devseed
+    depends_on:
+      migrate:
+        condition: process_completed_successfully
