@@ -5,6 +5,20 @@
     <link rel="icon" type="image/x-icon" href="/favicon.ico">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <meta name="theme-color" content="#0d0d0d">
+    <script>
+      // Set the theme before first paint. st:theme = dark (default) | light | system.
+      (function () {
+        var t = 'dark';
+        try { t = localStorage.getItem('st:theme') || 'dark'; } catch (e) {}
+        if (t === 'system') {
+          t = matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+        }
+        if (t !== 'light') t = 'dark';
+        document.documentElement.setAttribute('data-theme', t);
+        document.querySelector('meta[name="theme-color"]')
+          .setAttribute('content', t === 'light' ? '#f7f7f7' : '#0d0d0d');
+      })();
+    </script>
 
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">

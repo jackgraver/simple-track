@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import "~/pages/diet/macro-colors.css";
 import SearchList from "~/shared/SearchList.vue";
 import LogMealGroupBlock from "./LogMealGroupBlock.vue";
 import LogMealItemRow from "./LogMealItemRow.vue";

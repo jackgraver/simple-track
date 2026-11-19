@@ -35,8 +35,9 @@
 6. **Enforcement + cleanup**: planned lint rules (RULES.md), remove the global element CSS, `--color-*: initial`, delete the legacy aliases.
 
 ## Next up / gotchas
-- **Next slice: F1 token layer** (TASKS.md). Names are unchanged by the library pick. Then F2/F3/F4 in parallel where files don't overlap.
-- **Token fixes for F1** (`lab/scripts/contrast.mjs`): light-theme status text on `*-soft` fails AA (success 3.4, warn 3.1, danger 4.0, accent 4.3); `text-warn` on canvas 3.5 in light; dark danger badge 4.0; the overline pattern uses `fg-subtle` (3.7:1 in light) though TOKENS.md reserves it for hints.
+- **Next slice: F2 charts, F3 theme toggle, F4 Storybook + `reka-ui`**; they touch different files, so they can run in parallel. F1 (token layer) is on `proj/ui-tokens`.
+- **Light theme is only half-visible until F3:** the canvas and text flip, but the shell and pages still use the legacy aliases, which don't. Don't ship `st:theme=light` UI before F3.
+- **Solid fills:** `on-solid` (white) on `danger`/`success`/`warn` fills is under 4.5:1 in dark. Decide the solid-button tokens in P1.
 - **Spec conflict for P6:** the mobile toast at `bottom-tabbar` covers the gym "Log set" button (all candidates). Stack it above the CTA on focus pages, or confirm inline.
 - **Charts (F2):** read tokens after `data-theme` is set and re-render on change. The lab caught a chart that sampled the previous theme.
 - Reka has no swipe-to-close sheets (PRINCIPLES §5); build it in P5 (pointer handler or vaul-vue).

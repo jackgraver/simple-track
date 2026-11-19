@@ -1,10 +1,76 @@
 @import "tailwindcss";
 
-@theme {
+/*
+ * Design tokens. Spec: docs/design/TOKENS.md. Dark is the default; the light
+ * values live under :root[data-theme="light"] (set by the script in index.html).
+ * `static` keeps every variable in the output even when no utility uses it, so
+ * JS (chart theme) and component <style> blocks can read them.
+ */
+@theme static {
     --font-sans:
         "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif,
         "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol",
         "Noto Color Emoji";
+
+    --color-canvas: hsl(0 0% 5%);
+    --color-surface: hsl(0 0% 9%);
+    --color-surface-2: hsl(0 0% 13%);
+    --color-surface-3: hsl(0 0% 18%);
+    --color-overlay: hsl(0 0% 0% / 0.6);
+    --color-line: hsl(0 0% 20%);
+    --color-line-strong: hsl(0 0% 28%);
+    --color-fg: hsl(0 0% 95%);
+    --color-fg-muted: hsl(0 0% 68%);
+    --color-fg-subtle: hsl(0 0% 50%);
+    --color-fg-inverse: hsl(0 0% 7%);
+    --color-on-solid: hsl(0 0% 100%);
+
+    --color-accent: hsl(212 92% 62%);
+    --color-accent-soft: color-mix(in oklab, var(--color-accent) 16%, transparent);
+    --color-success: hsl(142 65% 48%);
+    --color-success-soft: color-mix(in oklab, var(--color-success) 16%, transparent);
+    --color-warn: hsl(38 92% 55%);
+    --color-warn-soft: color-mix(in oklab, var(--color-warn) 16%, transparent);
+    --color-danger: hsl(0 80% 66%);
+    --color-danger-soft: color-mix(in oklab, var(--color-danger) 16%, transparent);
+    --color-info: hsl(199 89% 60%);
+    --color-info-soft: color-mix(in oklab, var(--color-info) 16%, transparent);
+
+    --color-macro-calories: #fb923c;
+    --color-macro-protein: #60a5fa;
+    --color-macro-carbs: #f87171;
+    --color-macro-fat: #c084fc;
+    --color-macro-fiber: #34d399;
+    --color-macro-water: #38bdf8;
+
+    --color-chart-1: hsl(212 92% 62%);
+    --color-chart-2: hsl(142 65% 48%);
+    --color-chart-3: hsl(27 96% 61%);
+    --color-chart-4: hsl(270 85% 72%);
+    --color-chart-5: hsl(330 80% 66%);
+    --color-chart-grid: var(--color-line);
+    --color-chart-text: var(--color-fg-muted);
+
+    --text-2xs: 0.6875rem;
+    --text-2xs--line-height: 0.875rem;
+    --text-display: 2rem;
+    --text-display--line-height: 2.25rem;
+
+    --spacing-touch: 2.75rem;
+    --spacing-row: 2.5rem;
+    --spacing-control-sm: 2rem;
+    --spacing-tabbar: 4rem;
+    --spacing-sidenav: 14rem;
+    --spacing-content: 56rem;
+
+    --radius-control: 0.375rem;
+    --radius-card: 0.5rem;
+    --radius-dialog: 0.75rem;
+
+    --shadow-raised: 0 4px 12px hsl(0 0% 0% / 0.45);
+    --shadow-overlay: 0 12px 32px hsl(0 0% 0% / 0.6);
+
+    /* Legacy aliases: unchanged values, removed in phase 6 as modules migrate. */
     --color-mainBg: var(--color-main-bg);
     --color-mainBgTransparent: var(--color-main-bg-transparent);
     --color-firstBg: var(--color-first-bg);
@@ -28,17 +94,80 @@
     --color-border: hsl(0, 0%, 30%);
 }
 
-.light {
-    --color-cf-red: hsl(0, 100%, 49%);
-    --color-cf-red-dark: hsl(0, 100%, 42%);
-    --color-main-bg: hsl(0, 0%, 95%);
-    --color-first-bg: hsl(0, 0%, 90%);
-    --color-main-bg-transparent: hsla(0, 0%, 100%, 0.6);
-    --color-second-bg: hsl(0, 0%, 85%);
-    --color-third-bg: hsl(0, 0%, 75%);
-    --color-text-primary: hsl(0, 0%, 0%);
-    --color-text-secondary: hsl(0, 0%, 50%);
-    --color-border: hsl(0, 0%, 80%);
+:root[data-theme="light"] {
+    color-scheme: light;
+    --color-canvas: hsl(0 0% 97%);
+    --color-surface: hsl(0 0% 100%);
+    --color-surface-2: hsl(0 0% 95%);
+    --color-surface-3: hsl(0 0% 91%);
+    --color-overlay: hsl(0 0% 0% / 0.3);
+    --color-line: hsl(0 0% 87%);
+    --color-line-strong: hsl(0 0% 78%);
+    --color-fg: hsl(0 0% 9%);
+    --color-fg-muted: hsl(0 0% 38%);
+    --color-fg-subtle: hsl(0 0% 50%);
+    --color-fg-inverse: hsl(0 0% 98%);
+    --color-accent: hsl(217 85% 46%);
+    --color-accent-soft: color-mix(in oklab, var(--color-accent) 12%, transparent);
+    --color-success: hsl(142 70% 27%);
+    --color-success-soft: color-mix(in oklab, var(--color-success) 12%, transparent);
+    --color-warn: hsl(32 95% 31%);
+    --color-warn-soft: color-mix(in oklab, var(--color-warn) 12%, transparent);
+    --color-danger: hsl(0 72% 44%);
+    --color-danger-soft: color-mix(in oklab, var(--color-danger) 12%, transparent);
+    --color-info: hsl(200 90% 32%);
+    --color-info-soft: color-mix(in oklab, var(--color-info) 12%, transparent);
+    --color-macro-calories: #ea580c;
+    --color-macro-protein: #2563eb;
+    --color-macro-carbs: #dc2626;
+    --color-macro-fat: #9333ea;
+    --color-macro-fiber: #059669;
+    --color-macro-water: #0284c7;
+    --color-chart-1: hsl(217 85% 50%);
+    --color-chart-2: hsl(142 70% 33%);
+    --color-chart-3: hsl(24 90% 48%);
+    --color-chart-4: hsl(270 70% 55%);
+    --color-chart-5: hsl(330 70% 50%);
+    --shadow-raised: 0 2px 8px hsl(0 0% 0% / 0.08);
+    --shadow-overlay: 0 12px 32px hsl(0 0% 0% / 0.16);
+}
+
+:root {
+    color-scheme: dark;
+    --duration-fast: 100ms;
+    --duration-base: 150ms;
+    --duration-slow: 250ms;
+}
+:root[data-theme="light"] { color-scheme: light; }
+
+@utility z-raised { z-index: 10; }
+@utility z-nav { z-index: 40; }
+@utility z-popover { z-index: 50; }
+@utility z-overlay { z-index: 60; }
+@utility z-toast { z-index: 70; }
+
+@utility pt-safe { padding-top: env(safe-area-inset-top); }
+@utility pb-safe { padding-bottom: env(safe-area-inset-bottom); }
+@utility px-safe {
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+}
+@utility pb-tabbar { padding-bottom: calc(var(--spacing-tabbar) + 0.5rem + env(safe-area-inset-bottom)); }
+@utility bottom-tabbar { bottom: calc(var(--spacing-tabbar) + 1rem + env(safe-area-inset-bottom)); }
+
+@layer base {
+    html {
+        background: var(--color-canvas);
+        color: var(--color-fg);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        transition-duration: 1ms !important;
+        animation-duration: 1ms !important;
+        animation-iteration-count: 1 !important;
+    }
 }
 
 /* Keep toasts clear of the mobile bottom tab bar (see App.vue). */
@@ -55,9 +184,9 @@
  */
 @media (width >= 64rem) {
     .app-content {
-        --nav-w: 14rem;
+        --nav-w: var(--spacing-sidenav);
         --nav-gap: 2rem;
-        --content-w: min(56rem, 100vw - var(--nav-w) - 2 * var(--nav-gap));
+        --content-w: min(var(--spacing-content), 100vw - var(--nav-w) - 2 * var(--nav-gap));
         width: var(--content-w);
         max-width: none;
         padding-inline: 0;

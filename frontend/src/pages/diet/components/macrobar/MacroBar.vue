@@ -73,21 +73,21 @@ const percentageClass = computed(() =>
 
 <style scoped>
 .calories {
-    background-color: var(--macro-calories);
+    background-color: var(--color-macro-calories);
 }
 .protein {
-    background-color: var(--macro-protein);
+    background-color: var(--color-macro-protein);
 }
 .carbs {
-    background-color: var(--macro-carbs);
+    background-color: var(--color-macro-carbs);
 }
 .fat {
-    background-color: var(--macro-fat);
+    background-color: var(--color-macro-fat);
 }
 .fiber {
-    background-color: var(--macro-fiber);
+    background-color: var(--color-macro-fiber);
 }
 .water {
-    background-color: var(--macro-water);
+    background-color: var(--color-macro-water);
 }
 </style>

@@ -30,7 +30,7 @@ watchEffect(() => {
 
 <template>
     <div class="status-bar-cover" aria-hidden="true"></div>
-    <div class="dark min-h-dvh w-full">
+    <div class="min-h-dvh w-full">
         <SideNav v-if="showNav" class="hidden! lg:flex!" />
         <main
             class="scrollbar-gutter-both box-border w-full overflow-x-clip"
@@ -56,8 +56,6 @@ watchEffect(() => {
 
 <style>
 html {
-    color: rgb(218, 218, 218);
-    background-color: var(--color-main-bg);
     margin: 0;
     min-height: 100%;
     overscroll-behavior: none;
@@ -78,7 +76,7 @@ body {
     left: 0;
     right: 0;
     height: env(safe-area-inset-top);
-    background-color: var(--color-main-bg);
+    background-color: var(--color-canvas);
     z-index: 40;
     pointer-events: none;
 }

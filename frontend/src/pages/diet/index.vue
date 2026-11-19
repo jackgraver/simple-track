@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import "./macro-colors.css";
 import { computed } from "vue";
 import { useRoute } from "vue-router";
 import DietDayView from "./components/DietDayView.vue";

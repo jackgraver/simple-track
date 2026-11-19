@@ -54,18 +54,18 @@ function fmt(n: number) {
 }
 
 .calories {
-    color: var(--macro-calories, #fb923c);
+    color: var(--color-macro-calories);
 }
 .protein {
-    color: var(--macro-protein, #60a5fa);
+    color: var(--color-macro-protein);
 }
 .carbs {
-    color: var(--macro-carbs, #f87171);
+    color: var(--color-macro-carbs);
 }
 .fat {
-    color: var(--macro-fat, #c084fc);
+    color: var(--color-macro-fat);
 }
 .fiber {
-    color: var(--macro-fiber, #34d399);
+    color: var(--color-macro-fiber);
 }
 </style>

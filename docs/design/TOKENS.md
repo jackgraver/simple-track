@@ -3,14 +3,11 @@
 Source of truth: **`frontend/src/style.css`** (Tailwind v4 `@theme`). Nothing else defines
 colours, radii, shadows or type sizes. This file is the spec.
 
-> **Status: agreed, not yet in `style.css`.** The values, roles and names are final: the library
-> pick (Reka UI, headless) imposes no naming convention, so nothing is renamed. Known value fixes
-> to apply when the layer lands (found by `lab/scripts/contrast.mjs` on branch `proj/ui-bakeoff`):
-> light-theme status text on `*-soft` fails AA (success 3.4, warn 3.1, danger 4.0, accent 4.3),
-> `text-warn` on canvas is 3.5 in light, the dark danger badge is 4.0. Until the token layer
-> lands, existing code uses the legacy aliases
-> (`bg-firstBg`, `text-textSecondary`…); the mapping lives in
-> `docs/projects/ui-overhaul/MIGRATION.md`.
+> **Status: landed in `frontend/src/style.css` (F1).** Legacy aliases (`bg-firstBg`,
+> `text-textSecondary`…) still exist with unchanged values until each module migrates; the mapping
+> is in `docs/projects/ui-overhaul/MIGRATION.md`. Values below include the AA fixes from B1:
+> status colours are darker in light and `danger` is lighter in dark so text on `*-soft` reaches
+> 4.5:1 (checked by computation against `canvas`, `surface-2` and the soft tint).
 
 ## Naming
 kebab-case and semantic (role, not value). `bg-canvas`, `text-fg-muted`, `border-line`. No
@@ -34,12 +31,12 @@ never class names. Don't use Tailwind's `dark:` variant: the tokens flip on thei
 | `fg-subtle` | placeholder, hint, disabled, overline | `hsl(0 0% 50%)` | `hsl(0 0% 50%)` | `text-zinc-500/600`, `rgb(120,120,120)` |
 | `fg-inverse` | text on `fg`-filled (primary) button | `hsl(0 0% 7%)` | `hsl(0 0% 98%)` | (new) |
 | `on-solid` | text on solid semantic/accent fill | `hsl(0 0% 100%)` | `hsl(0 0% 100%)` | `text-white` on coloured buttons |
-| `accent` | focus ring, selection, active, links, progress | `hsl(212 92% 62%)` | `hsl(217 85% 50%)` | `focus-visible:ring-sky-500`, `--color-cf-red` as highlight |
-| `accent-soft` | selected bg, accent chip | accent @ 16% | accent @ 12% | (new) |
-| `success` / `success-soft` | done, +progress, positive money | `hsl(142 65% 48%)` | `hsl(142 70% 33%)` | `green-*`, `emerald-400`, `#28a745`, `#55db2c`, `rgb(34,139,34)` |
-| `warn` / `warn-soft` | stale, over target, caution | `hsl(38 92% 55%)` | `hsl(32 95% 40%)` | `amber-*`, `orange-400` |
-| `danger` / `danger-soft` | destructive, error, negative money | `hsl(0 80% 60%)` | `hsl(0 72% 48%)` | `cfRed`, `red-*`, `#ff2b2b`, `#dc3545`, `rgb(60,20,20)` |
-| `info` / `info-soft` | neutral notice | `hsl(199 89% 60%)` | `hsl(200 90% 38%)` | `sky-*`, `#007bff` |
+| `accent` | focus ring, selection, active, links, progress | `hsl(212 92% 62%)` | `hsl(217 85% 46%)` | `focus-visible:ring-sky-500`, `--color-cf-red` as highlight |
+| `accent-soft` | selected bg, accent chip | accent @ 16% | accent @ 12% (all `*-soft` use the same alphas) | (new) |
+| `success` / `success-soft` | done, +progress, positive money | `hsl(142 65% 48%)` | `hsl(142 70% 27%)` | `green-*`, `emerald-400`, `#28a745`, `#55db2c`, `rgb(34,139,34)` |
+| `warn` / `warn-soft` | stale, over target, caution | `hsl(38 92% 55%)` | `hsl(32 95% 31%)` | `amber-*`, `orange-400` |
+| `danger` / `danger-soft` | destructive, error, negative money | `hsl(0 80% 66%)` | `hsl(0 72% 44%)` | `cfRed`, `red-*`, `#ff2b2b`, `#dc3545`, `rgb(60,20,20)` |
+| `info` / `info-soft` | neutral notice | `hsl(199 89% 60%)` | `hsl(200 90% 32%)` | `sky-*`, `#007bff` |
 | `macro-calories` | | `#fb923c` | `#ea580c` | `orange`, `--macro-calories` |
 | `macro-protein` | | `#60a5fa` | `#2563eb` | `#60a5fa` |
 | `macro-carbs` | | `#f87171` | `#dc2626` | `red`, `#f87171` |
@@ -53,9 +50,10 @@ never class names. Don't use Tailwind's `dark:` variant: the tokens flip on thei
 badges, banners and the gym "+2.5" chip. Text on a soft background uses the solid token
 (`bg-success-soft text-success`).
 
-Contrast check: `fg-muted` on `surface` is above 4.5:1 in both themes. `fg-subtle` is for
-hints and placeholders only (about 3.5:1 in dark), never for content you have to read. Check
-again with a contrast tool in the token slice and adjust lightness, not hue.
+Contrast: `fg-muted` on `surface` is 8.0 (dark) / 6.2 (light). `fg-subtle` is 4.5 (dark) / 4.0
+(light) on `surface`: hints and placeholders only, never content you have to read (so overlines
+use `fg-muted`). Known gap: `on-solid` (white) on a solid `danger`/`success`/`warn` fill is below
+4.5:1 in dark; P1 decides the solid-button treatment.
 
 ### Type
 Font: Plus Jakarta Sans (already loaded in `index.html`). Weights: **400, 500, 600** only.
@@ -69,7 +67,7 @@ Font: Plus Jakarta Sans (already loaded in `index.html`). Weights: **400, 500, 6
 | `text-xl` | 20/28 | page title (`font-semibold tracking-tight`) |
 | `text-display` (new) | 32/36 | big logging numbers (replaces `text-[2rem]`, `text-3xl`) |
 
-Patterns: overline = `text-xs font-semibold uppercase tracking-wide text-fg-subtle` (used in
+Patterns: overline = `text-xs font-semibold uppercase tracking-wide text-fg-muted` (used in
 gym logging today, keep it). Numbers = `tabular-nums`.
 
 ### Spacing and sizing
@@ -124,7 +122,10 @@ A popover inside a dialog stacks inside the dialog's context, so 50 < 60 isn't a
 - Layout breakpoint is `lg` (64rem) only. Replace the `@media (max-width: 767px)` blocks
   (`LoggingPageShell`, `PlannedMealsDisplay` matchMedia) with `lg` when touched.
 
-## Exact `style.css` shape (target)
+## `style.css` shape
+The block below is the spec; the file differs in two ways: `@theme static` (so every variable is
+emitted even when no utility uses it, which JS and component `<style>` need), and the legacy
+aliases sit beside it. Values in the table above win over the ones in this block.
 
 ```css
 @import "tailwindcss";
