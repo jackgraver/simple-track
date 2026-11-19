@@ -16,7 +16,7 @@ const pad = { none: "", sm: "p-3", md: "p-4 lg:p-5" } as const;
     <component
         :is="tag"
         :to="to"
-        class="block w-full rounded-card border border-line bg-surface text-left text-fg"
+        class="box-border block w-full rounded-card border border-line bg-surface text-left text-fg"
         :class="[
             interactive || to
                 ? 'm-0! cursor-pointer rounded-card! border-line! shadow-none! transition-colors duration-100 hover:bg-surface-3 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent'
