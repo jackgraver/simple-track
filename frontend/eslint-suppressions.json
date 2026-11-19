@@ -156,25 +156,6 @@
       "count": 14
     }
   },
-  "src/pages/grocery/dialog/AddListDialog.vue": {
-    "better-tailwindcss/no-deprecated-classes": {
-      "count": 1
-    },
-    "better-tailwindcss/no-restricted-classes": {
-      "count": 25
-    }
-  },
-  "src/pages/grocery/index.vue": {
-    "better-tailwindcss/no-restricted-classes": {
-      "count": 3
-    },
-    "better-tailwindcss/no-unknown-classes": {
-      "count": 7
-    },
-    "vue/no-restricted-block": {
-      "count": 1
-    }
-  },
   "src/pages/gym/WorkoutActivityGraph.vue": {
     "better-tailwindcss/no-deprecated-classes": {
       "count": 2

@@ -7,29 +7,61 @@ import {
     useGrocerySuggestions,
 } from "~/api/tracking/queries";
 import { toast } from "~/composables/toast/useToast";
-import { ClipboardList } from "lucide-vue-next";
+import { ClipboardList, ShoppingBasket } from "lucide-vue-next";
+import {
+    Button,
+    Card,
+    Checkbox,
+    EmptyState,
+    ErrorState,
+    Input,
+    List,
+    ListRow,
+    PageHeader,
+    SkeletonList,
+    Spinner,
+    useDelayedFlag,
+} from "~/shared/ui";
 import { openAddListDialog } from "./dialog/useListDialog";
 
 const COMPLETE_DELAY_MS = 1200;
-const COLLAPSE_MS = 500;
 
 const newItem = ref("");
 const completingIds = ref<Set<number>>(new Set());
-const removingIds = ref<Set<number>>(new Set());
 const hiddenIds = ref<Set<number>>(new Set());
 const inputFocused = ref(false);
 const activeSuggestionIndex = ref(0);
-const newItemInput = useTemplateRef<HTMLInputElement>("newItemInput");
+const addWrap = useTemplateRef<HTMLElement>("addWrap");
+const newItemInput = computed(() => addWrap.value?.querySelector("input") ?? null);
 
-const { data, isError, isPending, error } = useGroceryItems();
+const { data, isError, isPending, error, refetch } = useGroceryItems();
+const showSkeleton = useDelayedFlag(isPending);
 const suggestionsQuery = useGrocerySuggestions(newItem);
 const createMutation = useCreateGroceryItem();
 const completeMutation = useCompleteGroceryItem();
 
 const items = computed(() => data.value ?? []);
-const displayItems = computed(() =>
-    items.value.filter((item) => !hiddenIds.value.has(item.ID)),
+// The list refetches as soon as the check is saved, which would drop the row before the strike-through
+// has been seen. Remember where each row was and keep completing rows in place until they're hidden.
+const lastSeen = ref(new Map<number, { item: (typeof items.value)[number]; index: number }>());
+watch(
+    items,
+    (list) => {
+        const next = new Map(lastSeen.value);
+        list.forEach((item, index) => next.set(item.ID, { item, index }));
+        lastSeen.value = next;
+    },
+    { immediate: true },
 );
+const displayItems = computed(() => {
+    const list = items.value.filter((item) => !hiddenIds.value.has(item.ID));
+    const present = new Set(list.map((item) => item.ID));
+    for (const id of completingIds.value) {
+        const seen = lastSeen.value.get(id);
+        if (!present.has(id) && seen) list.splice(Math.min(seen.index, list.length), 0, seen.item);
+    }
+    return list;
+});
 
 watch(items, (list) => {
     const present = new Set(list.map((item) => item.ID));
@@ -52,14 +84,8 @@ const prefixedSuggestions = computed(() => {
     return suggestions.value.filter((s) => s.toLowerCase().startsWith(lower));
 });
 
-const ghostSuggestion = computed(() => {
-    if (
-        !inputFocused.value ||
-        trimmedItem.value.length === 0 ||
-        prefixedSuggestions.value.length === 0
-    ) {
-        return null;
-    }
+const activeSuggestion = computed(() => {
+    if (!inputFocused.value || prefixedSuggestions.value.length === 0) return null;
     const index = Math.min(
         Math.max(activeSuggestionIndex.value, 0),
         prefixedSuggestions.value.length - 1,
@@ -67,31 +93,21 @@ const ghostSuggestion = computed(() => {
     return prefixedSuggestions.value[index] ?? null;
 });
 
-const ghostSuffix = computed(() => {
-    const suggestion = ghostSuggestion.value;
-    if (!suggestion) return "";
-    return suggestion.slice(newItem.value.length);
-});
-
-const showGhost = computed(
-    () => inputFocused.value && ghostSuffix.value.length > 0,
+// Suggestions that add nothing beyond what's typed aren't worth a row.
+const visibleSuggestions = computed(() =>
+    inputFocused.value
+        ? prefixedSuggestions.value
+              .filter((s) => s.toLowerCase() !== trimmedItem.value.toLowerCase())
+              .slice(0, 5)
+        : [],
 );
 
 function isCompleting(id: number) {
     return completingIds.value.has(id);
 }
 
-function isRemoving(id: number) {
-    return removingIds.value.has(id);
-}
-
-function updateIdSet(
-    target: "completing" | "removing",
-    id: number,
-    value: boolean,
-) {
-    const source =
-        target === "completing" ? completingIds : removingIds;
+function updateIdSet(id: number, value: boolean) {
+    const source = completingIds;
     const next = new Set(source.value);
     if (value) {
         next.add(id);
@@ -120,9 +136,8 @@ async function addItem(name?: string) {
     }
 }
 
-function onItemCheck(id: number, event: Event) {
-    const checked = (event.target as HTMLInputElement).checked;
-    if (checked) {
+function onItemCheck(id: number, checked: boolean | "indeterminate") {
+    if (checked === true) {
         void completeItem(id);
     }
 }
@@ -138,14 +153,13 @@ function unhideItem(id: number) {
 }
 
 function clearItemState(id: number) {
-    updateIdSet("completing", id, false);
-    updateIdSet("removing", id, false);
+    updateIdSet(id, false);
     unhideItem(id);
 }
 
 async function completeItem(id: number) {
-    if (isCompleting(id) || isRemoving(id)) return;
-    updateIdSet("completing", id, true);
+    if (isCompleting(id)) return;
+    updateIdSet(id, true);
     const persistPromise = completeMutation.mutateAsync(id);
     await new Promise((resolve) => setTimeout(resolve, COMPLETE_DELAY_MS));
     try {
@@ -157,44 +171,42 @@ async function completeItem(id: number) {
         toast.push(message, "error");
         return;
     }
-    updateIdSet("removing", id, true);
-    await new Promise((resolve) => setTimeout(resolve, COLLAPSE_MS));
     hideItem(id);
-    updateIdSet("completing", id, false);
-    updateIdSet("removing", id, false);
+    updateIdSet(id, false);
 }
 
-function acceptGhost() {
-    if (!ghostSuggestion.value) return;
-    newItem.value = ghostSuggestion.value;
+function acceptSuggestion() {
+    if (!activeSuggestion.value) return;
+    newItem.value = activeSuggestion.value;
+}
+
+function onInputFocus() {
+    inputFocused.value = true;
 }
 
 function onInputBlur() {
+    // Delay so a tap on a suggestion lands before the list goes away.
     window.setTimeout(() => {
         inputFocused.value = false;
         activeSuggestionIndex.value = 0;
     }, 120);
 }
 
-function onInputInput() {
-    activeSuggestionIndex.value = 0;
-}
-
 function onInputKeydown(event: KeyboardEvent) {
     const hasInput = trimmedItem.value.length > 0;
     const count = prefixedSuggestions.value.length;
-    const hasGhost = hasInput && showGhost.value && ghostSuggestion.value;
+    const hasSuggestion = hasInput && activeSuggestion.value;
 
-    if (event.key === "Tab" && hasGhost) {
+    if (event.key === "Tab" && hasSuggestion) {
         event.preventDefault();
-        acceptGhost();
+        acceptSuggestion();
         return;
     }
-    if (event.key === "ArrowRight" && hasGhost && event.target === newItemInput.value) {
+    if (event.key === "ArrowRight" && hasSuggestion && event.target === newItemInput.value) {
         const input = newItemInput.value;
         if (input && input.selectionStart === input.value.length && input.selectionEnd === input.value.length) {
             event.preventDefault();
-            acceptGhost();
+            acceptSuggestion();
             return;
         }
     }
@@ -215,7 +227,7 @@ function onInputKeydown(event: KeyboardEvent) {
     }
     if (event.key === "Enter") {
         event.preventDefault();
-        void addItem(ghostSuggestion.value ?? undefined);
+        void addItem(activeSuggestion.value ?? undefined);
         return;
     }
     if (event.key === "Escape") {
@@ -228,145 +240,79 @@ function onInputKeydown(event: KeyboardEvent) {
 </script>
 
 <template>
-    <div class="flex w-full min-w-0 flex-col gap-4">
-        <div class="flex items-center gap-2">
-            <h1 class="m-0 flex-1 text-lg font-semibold text-textPrimary">
-                Grocery List
-            </h1>
-            <button
-                type="button"
-                class="flex items-center gap-1.5 rounded-md bg-zinc-800 px-2.5 py-1.5 text-sm text-zinc-200 hover:bg-zinc-700"
-                @click="openAddListDialog"
-            >
-                <ClipboardList class="size-4" aria-hidden="true" />
-                Paste list
-            </button>
-        </div>
-        <div v-if="isError" class="text-sm text-(--color-cf-red)">
-            {{ error?.message ?? "Failed to load grocery list" }}
-        </div>
-        <div v-else-if="isPending" class="text-sm text-textSecondary">
-            Loading…
-        </div>
-        <section v-else class="flex flex-col">
-            <div class="flex flex-col">
-                <div
-                    v-for="item in displayItems"
-                    :key="item.ID"
-                    class="grocery-row-collapse grid transition-[grid-template-rows] duration-500 ease-in-out"
-                    :class="
-                        isRemoving(item.ID)
-                            ? 'grid-rows-[0fr]'
-                            : 'grid-rows-[1fr]'
-                    "
-                >
-                    <div class="min-h-0 overflow-hidden">
-                        <div
-                            class="grocery-row flex items-center gap-3 py-1.5 text-sm transition-opacity duration-500 ease-out"
-                            :class="{
-                                'grocery-row--completing': isCompleting(item.ID),
-                                'opacity-0': isRemoving(item.ID),
-                            }"
-                        >
-                            <input
-                                type="checkbox"
-                                class="m-0 size-4 shrink-0 cursor-pointer"
-                                :aria-label="`Complete ${item.name}`"
-                                :checked="isCompleting(item.ID)"
-                                @change="onItemCheck(item.ID, $event)"
-                            />
-                            <span
-                                class="grocery-row__label min-w-0 flex-1 truncate"
-                                >{{ item.name }}</span
-                            >
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="flex items-center gap-3 py-1.5">
-                <input
-                    type="checkbox"
-                    class="m-0 size-4 shrink-0 pointer-events-none opacity-30"
-                    disabled
-                    aria-hidden="true"
+    <div class="mx-auto flex w-full max-w-3xl min-w-0 flex-col gap-4">
+        <PageHeader title="Grocery list">
+            <template #actions>
+                <Button @click="openAddListDialog">
+                    <template #icon-left><ClipboardList aria-hidden="true" class="size-4" /></template>
+                    Paste list
+                </Button>
+            </template>
+        </PageHeader>
+
+        <Card padding="none">
+            <ErrorState
+                v-if="isError"
+                :error="error"
+                title="Couldn't load the grocery list"
+                @retry="refetch()"
+            />
+            <SkeletonList v-else-if="showSkeleton" :rows="5" :leading="false" />
+            <template v-else-if="!isPending">
+                <EmptyState
+                    v-if="displayItems.length === 0"
+                    :icon="ShoppingBasket"
+                    title="Nothing on the list"
+                    description="Add what you need below, or paste a whole list."
                 />
-                <div class="grocery-input-wrap relative min-w-0 flex-1">
-                    <div
-                        aria-hidden="true"
-                        class="grocery-input-mirror pointer-events-none absolute inset-0 overflow-hidden whitespace-pre"
+                <List v-else>
+                    <ListRow
+                        v-for="item in displayItems"
+                        :key="item.ID"
+                        :pending="isCompleting(item.ID)"
                     >
-                        <span class="text-textPrimary">{{ newItem }}</span
-                        ><span v-if="showGhost" class="text-textSecondary/45">{{
-                            ghostSuffix
-                        }}</span>
-                    </div>
-                    <input
-                        ref="newItemInput"
-                        v-model="newItem"
-                        type="text"
-                        autocomplete="off"
-                        aria-label="Add grocery item"
-                        placeholder="Add item…"
-                        class="grocery-input relative w-full min-w-0 outline-none"
-                        @focus="inputFocused = true"
-                        @blur="onInputBlur"
-                        @input="onInputInput"
+                        <Checkbox
+                            :model-value="isCompleting(item.ID)"
+                            :label="`Complete ${item.name}`"
+                            @update:model-value="onItemCheck(item.ID, $event)"
+                        >
+                            <span
+                                class="transition-colors duration-700"
+                                :class="isCompleting(item.ID) ? 'text-fg-subtle line-through' : ''"
+                            >{{ item.name }}</span>
+                        </Checkbox>
+                    </ListRow>
+                </List>
+                <div class="flex flex-col gap-2 border-t border-line p-3 lg:p-4" :class="displayItems.length === 0 ? 'border-t-0 pt-0' : ''">
+                    <div
+                        ref="addWrap"
                         @keydown="onInputKeydown"
-                    />
+                        @focusin="onInputFocus"
+                        @focusout="onInputBlur"
+                    >
+                        <Input
+                            v-model="newItem"
+                            autocomplete="off"
+                            aria-label="Add grocery item"
+                            placeholder="Add item…"
+                            @input="activeSuggestionIndex = 0"
+                        >
+                            <template v-if="createMutation.isPending.value" #suffix><Spinner size="sm" /></template>
+                        </Input>
+                    </div>
+                    <List v-if="visibleSuggestions.length" class="rounded-control border border-line">
+                        <ListRow
+                            v-for="(suggestion, i) in visibleSuggestions"
+                            :key="suggestion"
+                            :selected="suggestion === activeSuggestion"
+                            @click="addItem(suggestion)"
+                            @mouseenter="activeSuggestionIndex = i"
+                        >
+                            {{ suggestion }}
+                        </ListRow>
+                    </List>
                 </div>
-            </div>
-        </section>
+            </template>
+        </Card>
     </div>
 </template>
-
-<style scoped>
-.grocery-input-wrap {
-    min-height: 1.25rem;
-}
-
-.grocery-input-mirror,
-.grocery-input {
-    font: inherit;
-    font-size: 0.875rem;
-    line-height: 1.25rem;
-    padding: 0;
-    margin: 0;
-    border: none;
-}
-
-.grocery-input {
-    background: transparent !important;
-    color: transparent !important;
-    caret-color: rgb(218, 218, 218);
-}
-
-.grocery-input::placeholder {
-    color: rgb(140, 140, 140);
-}
-
-.grocery-row {
-    color: var(--color-text-primary, rgb(218, 218, 218));
-    opacity: 1;
-    transition:
-        color 0.7s ease,
-        opacity 0.7s ease;
-}
-
-.grocery-row__label {
-    transition:
-        color 0.7s ease,
-        opacity 0.7s ease,
-        text-decoration-color 0.7s ease;
-    text-decoration: line-through transparent;
-    text-decoration-thickness: 1px;
-}
-
-.grocery-row--completing {
-    color: rgb(140, 140, 140);
-    opacity: 0.55;
-}
-
-.grocery-row--completing .grocery-row__label {
-    text-decoration-color: rgb(140, 140, 140);
-}
-</style>
