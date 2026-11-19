@@ -35,7 +35,7 @@
 6. **Enforcement + cleanup**: planned lint rules (RULES.md), remove the global element CSS, `--color-*: initial`, delete the legacy aliases.
 
 ## Next up / gotchas
-- **Next slice: F2 charts, F3 theme toggle, F4 Storybook + `reka-ui`**; they touch different files, so they can run in parallel. F1 (token layer) is on `proj/ui-tokens`.
+- **Next slice: F2 charts and F3 theme toggle** (different files, can run in parallel), then Phase 4. F1 is on `proj/ui-tokens`, F4 on `proj/ui-storybook` (branched from it). Storybook: `npm run storybook` in `frontend/`; `reka-ui` is installed and lint-restricted to `shared/ui/`.
 - **Light theme is only half-visible until F3:** the canvas and text flip, but the shell and pages still use the legacy aliases, which don't. Don't ship `st:theme=light` UI before F3.
 - **Solid fills:** `on-solid` (white) on `danger`/`success`/`warn` fills is under 4.5:1 in dark. Decide the solid-button tokens in P1.
 - **Spec conflict for P6:** the mobile toast at `bottom-tabbar` covers the gym "Log set" button (all candidates). Stack it above the CTA on focus pages, or confirm inline.

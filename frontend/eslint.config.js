@@ -105,7 +105,15 @@ export default [
                 },
             ],
             "no-restricted-syntax": ["error", ...colorLiteralSelectors],
+            // Reka UI is an implementation detail of shared/ui/ (docs/design/PRIMITIVES.md).
+            "no-restricted-imports": [
+                "error",
+                { patterns: [{ group: ["reka-ui", "reka-ui/*"], message: "Import Reka UI only inside src/shared/ui/. Pages use the shared/ui primitives." }] },
+            ],
             "vue/no-restricted-syntax": ["error", ...colorLiteralSelectors],
         },
     },
+
+    // The only place allowed to import the headless library.
+    { files: ["src/shared/ui/**/*.{ts,vue}"], rules: { "no-restricted-imports": "off" } },
 ];

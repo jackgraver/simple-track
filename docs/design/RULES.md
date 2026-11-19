@@ -66,11 +66,10 @@ git diff eslint-suppressions.json                    # counts may only go down o
 | Button/Input primitives land | `vue/no-restricted-html-elements` for raw `<button>`, `<input>`, `<select>`, `<textarea>` outside `shared/ui/` |
 | Global element CSS removed | Restrict `!` important classes |
 | No palette suppressions left | `--color-*: initial;` in `@theme`, so palette classes stop compiling |
-| `reka-ui` installed (F4) | Restrict `reka-ui` imports outside `shared/ui/` (`no-restricted-imports`) |
 
 ## How to verify visually
 Screenshot only what you changed. The owner knows the rest of the UI.
-1. **Components:** check them in Storybook (once set up): every state, both themes, 390 and 1280
+1. **Components:** check them in Storybook (`npm run storybook`, port `$STORYBOOK_PORT` or 6006; its MCP endpoint is `/mcp`): every state, both themes, 390 and 1280
    viewports. The story URL needs no backend or login.
 2. **Pages:** `./bin/dev start` (never bare `./bin/dev`), then `./bin/dev env` for the frontend URL.
    Never hardcode ports. Log in with `dev`/`dev`. devseed provides data for every module.

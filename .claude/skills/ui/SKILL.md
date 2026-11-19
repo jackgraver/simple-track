@@ -16,7 +16,7 @@ If the work is part of the ui-overhaul project, also follow `docs/projects/READM
 (session protocol) and read `docs/projects/ui-overhaul/{README,TASKS,DECISIONS}.md`.
 
 ## 2. Before writing markup
-- Look in `frontend/src/shared/ui/` (and Storybook, once it exists) for a component that already
+- Look in `frontend/src/shared/ui/` (and Storybook: `npm run storybook` in `frontend/`) for a component that already
   does the job. Use it. Don't copy its markup.
 - Decide which states the view needs: loading, empty, error, pending, offline.
 - Decide the mobile (< lg) and desktop (≥ lg) behaviour (PRINCIPLES.md §5): sheet or dialog,

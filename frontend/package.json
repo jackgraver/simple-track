@@ -10,7 +10,9 @@
     "type-check": "vue-tsc --noEmit",
     "test": "vitest",
     "test:run": "vitest run",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "storybook": "storybook dev -p ${STORYBOOK_PORT:-6006} --no-open",
+    "build-storybook": "storybook build -o storybook-static"
   },
   "dependencies": {
     "@primeuix/themes": "^2.0.2",
@@ -19,10 +21,15 @@
     "chart.js": "^4.5.1",
     "lucide-vue-next": "^0.546.0",
     "primevue": "^4.5.4",
+    "reka-ui": "2.11.0",
     "vue": "^3.5.21",
     "vue-router": "^4.5.1"
   },
   "devDependencies": {
+    "@storybook/addon-a11y": "10.6.7",
+    "@storybook/addon-mcp": "10.6.7",
+    "@storybook/addon-themes": "10.6.7",
+    "@storybook/vue3-vite": "10.6.7",
     "@tailwindcss/vite": "^4.2.2",
     "@types/node": "^25.7.0",
     "@vitejs/plugin-vue": "^6.0.0",
@@ -31,6 +38,7 @@
     "eslint-plugin-better-tailwindcss": "^4.11.0",
     "eslint-plugin-vue": "^10.12.1",
     "prettier": "^3.6.2",
+    "storybook": "10.6.7",
     "tailwindcss": "^4.2.2",
     "typescript": "^5.0.0",
     "typescript-eslint": "^8.73.0",
