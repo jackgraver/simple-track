@@ -27,3 +27,5 @@ export { default as Section } from "./Section.vue";
 export { default as NumberField } from "./NumberField.vue";
 export { default as Menu } from "./Menu.vue";
 export type { MenuItem } from "./Menu.vue";
+export { default as Combobox } from "./Combobox.vue";
+export type { ComboboxOption } from "./Combobox.vue";

@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { MoreVertical } from "lucide-vue-next";
+import { Button, IconButton, Menu } from "~/shared/ui";
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
-import type { RouteLocationRaw } from "vue-router";
+import { useRouter, type RouteLocationRaw } from "vue-router";
 
 export type ModuleTitleLink = {
     name: string;
@@ -17,19 +18,17 @@ const props = defineProps<{
     links: ModuleTitleLink[];
 }>();
 
-const NAV_GAP = 12;
+const router = useRouter();
+const NAV_GAP = 4; // gap-1 between the ghost buttons
 const ROOT_GAP = 16;
 const TITLE_LINK_MIN_GAP = 32;
 const OVERFLOW_GAP = 8;
-const OVERFLOW_BTN_WIDTH = 36;
+const OVERFLOW_BTN_WIDTH = 44; // IconButton: size-touch below lg (the larger of its two sizes)
 
 const rootRef = ref<HTMLElement | null>(null);
 const measureRef = ref<HTMLElement | null>(null);
-const menuRoot = ref<HTMLElement | null>(null);
-const menuOpen = ref(false);
 const visibleCount = ref(props.links.length);
 const linkWidths = ref<number[]>([]);
-const separatorWidth = ref(0);
 
 const linkTo = (link: ModuleTitleLink): RouteLocationRaw | undefined => {
     if (!link.to) return undefined;
@@ -52,8 +51,7 @@ const navWidthFor = (visible: number): number => {
     for (let i = 0; i < visible; i++) {
         width += linkWidths.value[i] ?? 0;
     }
-    width += separatorWidth.value * (visible - 1);
-    width += NAV_GAP * Math.max(0, visible * 2 - 2);
+    width += NAV_GAP * (visible - 1);
     return width;
 };
 
@@ -75,8 +73,6 @@ const measureLinks = () => {
     linkWidths.value = Array.from(linkNodes).map(
         (node) => node.getBoundingClientRect().width,
     );
-    const separator = measureRef.value.querySelector("[data-measure-sep]");
-    separatorWidth.value = separator?.getBoundingClientRect().width ?? 0;
 };
 
 const updateVisibleCount = () => {
@@ -101,16 +97,14 @@ const updateVisibleCount = () => {
     visibleCount.value = nextVisible;
 };
 
-const onOverflowLinkClick = (link: ModuleTitleLink) => {
-    menuOpen.value = false;
-    link.onClick?.();
-};
-
-function onDocumentClick(ev: MouseEvent) {
-    const el = menuRoot.value;
-    if (!el || el.contains(ev.target as Node)) return;
-    menuOpen.value = false;
+function onOverflowSelect(key: string) {
+    const link = overflowLinks.value[Number(key)];
+    if (!link) return;
+    if (link.to) void router.push(linkTo(link)!);
+    else link.onClick?.();
 }
+
+const menuItems = computed(() => overflowLinks.value.map((l, i) => ({ key: String(i), label: l.name })));
 
 let resizeObserver: ResizeObserver | null = null;
 
@@ -122,12 +116,7 @@ watch(
     { deep: true },
 );
 
-watch(overflowLinks, (links) => {
-    if (links.length === 0) menuOpen.value = false;
-});
-
 onMounted(() => {
-    document.addEventListener("click", onDocumentClick);
     resizeObserver = new ResizeObserver(() => {
         updateVisibleCount();
     });
@@ -136,120 +125,39 @@ onMounted(() => {
 });
 
 onUnmounted(() => {
-    document.removeEventListener("click", onDocumentClick);
     resizeObserver?.disconnect();
 });
 </script>
 <template>
     <div
         ref="rootRef"
-        class="flex min-w-0 items-center gap-4 border-b border-(--color-border) pb-3"
-        :class="{ 'hidden! lg:flex!': links.length === 0 }"
+        class="flex min-w-0 items-center gap-4 border-b border-line pb-3"
+        :class="links.length === 0 ? 'hidden lg:flex' : ''"
     >
         <!-- On mobile the app header already shows the page title. -->
-        <h1 class="m-0 hidden shrink-0 text-md font-semibold text-textSecondary lg:block">
+        <h1 class="m-0 hidden shrink-0 text-xl font-semibold tracking-tight text-fg lg:block">
             {{ title }}
         </h1>
-        <div
-            v-if="links.length"
-            class="min-w-8 flex-1 shrink"
-            aria-hidden="true"
-        ></div>
-        <div
-            v-if="links.length"
-            class="flex shrink-0 items-center gap-2 text-sm text-textSecondary"
-        >
+        <div v-if="links.length" class="min-w-8 flex-1 shrink" aria-hidden="true"></div>
+        <div v-if="links.length" class="flex shrink-0 items-center gap-2">
             <div
                 ref="measureRef"
-                class="pointer-events-none fixed top-0 -left-[9999px] flex items-center gap-3 text-sm"
+                class="pointer-events-none fixed top-0 -left-[9999px] flex items-center gap-1"
                 aria-hidden="true"
             >
-                <template v-for="(link, index) in links" :key="link.name">
-                    <span
-                        data-measure-link
-                        class="whitespace-nowrap transition-colors"
-                        >{{ link.name }}</span
-                    >
-                    <span
-                        v-if="index === 0"
-                        data-measure-sep
-                        class="text-textSecondary/50"
-                        >·</span
-                    >
-                </template>
+                <Button v-for="link in links" :key="link.name" data-measure-link variant="ghost" size="sm" tabindex="-1">{{
+                    link.name
+                }}</Button>
             </div>
-            <nav
-                v-if="visibleLinks.length"
-                class="flex min-w-0 items-center gap-3"
-            >
-                <template
-                    v-for="(link, index) in visibleLinks"
-                    :key="link.name"
-                >
-                    <router-link
-                        v-if="link.to"
-                        :to="linkTo(link)!"
-                        class="shrink-0 whitespace-nowrap transition-colors hover:text-textPrimary"
-                        >{{ link.name }}</router-link
-                    >
-                    <button
-                        v-else
-                        type="button"
-                        class="shrink-0 whitespace-nowrap p-0! transition-colors hover:text-textPrimary"
-                        @click="link.onClick?.()"
-                    >
-                        {{ link.name }}
-                    </button>
-                    <span
-                        v-if="index < visibleLinks.length - 1"
-                        aria-hidden="true"
-                        class="shrink-0 text-textSecondary/50"
-                        >·</span
-                    >
+            <nav v-if="visibleLinks.length" aria-label="Page actions" class="flex min-w-0 items-center gap-1">
+                <template v-for="link in visibleLinks" :key="link.name">
+                    <Button v-if="link.to" variant="ghost" size="sm" :to="linkTo(link)!">{{ link.name }}</Button>
+                    <Button v-else variant="ghost" size="sm" @click="link.onClick?.()">{{ link.name }}</Button>
                 </template>
             </nav>
-            <div
-                v-if="overflowLinks.length"
-                ref="menuRoot"
-                class="relative shrink-0"
-            >
-                <button
-                    type="button"
-                    class="flex h-9 w-9 shrink-0 items-center justify-center rounded text-textSecondary transition-colors hover:bg-secondBg hover:text-textPrimary"
-                    :aria-expanded="menuOpen"
-                    aria-haspopup="true"
-                    aria-label="More options"
-                    @click.stop="menuOpen = !menuOpen"
-                >
-                    <MoreVertical :size="20" />
-                </button>
-                <div
-                    v-if="menuOpen"
-                    class="absolute right-0 top-full z-20 mt-0.5 min-w-52 rounded-md border border-secondBg bg-firstBg py-1 shadow-lg"
-                    role="menu"
-                    @click.stop
-                >
-                    <template v-for="link in overflowLinks" :key="link.name">
-                        <router-link
-                            v-if="link.to"
-                            :to="linkTo(link)!"
-                            class="flex w-full items-center whitespace-nowrap px-3 py-2 text-left text-sm text-textPrimary transition-colors hover:bg-secondBg"
-                            role="menuitem"
-                            @click="menuOpen = false"
-                            >{{ link.name }}</router-link
-                        >
-                        <button
-                            v-else
-                            type="button"
-                            class="flex w-full items-center whitespace-nowrap px-3 py-2 text-left text-sm text-textPrimary transition-colors hover:bg-secondBg"
-                            role="menuitem"
-                            @click="onOverflowLinkClick(link)"
-                        >
-                            {{ link.name }}
-                        </button>
-                    </template>
-                </div>
-            </div>
+            <Menu v-if="overflowLinks.length" :items="menuItems" @select="onOverflowSelect">
+                <IconButton label="More options" size="sm"><MoreVertical /></IconButton>
+            </Menu>
         </div>
     </div>
 </template>
