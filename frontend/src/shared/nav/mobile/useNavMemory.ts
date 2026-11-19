@@ -1,6 +1,6 @@
 import { ref, watch } from "vue";
 import { useRoute } from "vue-router";
-import { activeGroup } from "./nav";
+import { activeGroup } from "../nav";
 
 const STORAGE_KEY = "st:nav-last-path";
 
