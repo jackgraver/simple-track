@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { useGlobalRestTimer } from "~/composables/useGlobalRestTimer";
 import type { ExerciseLoggingSessionViewModel } from "../composables/useExerciseLoggingSession";
+import { Button } from "~/shared/ui";
 import LoggingHeader from "./LoggingHeader.vue";
 import LoggedSetsList from "./LoggedSetsList.vue";
 
@@ -9,6 +10,7 @@ defineProps<{
     setNumber: number;
     currentWeight: number;
     session: ExerciseLoggingSessionViewModel;
+    finishing?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -37,74 +39,35 @@ const back = () => {
 
 <template>
     <div class="flex w-full flex-col gap-6">
-        <LoggingHeader
-            :title="exerciseName"
-            :subtitle="`Set ${setNumber}`"
-            @back="back"
-        >
+        <LoggingHeader :title="exerciseName" :subtitle="`Set ${setNumber}`" @back="back">
             <template #right>
-                <span class="font-medium tabular-nums text-zinc-200">
-                    {{ isActive ? displayText : "0:00" }}
-                </span>
+                <span class="font-medium tabular-nums text-fg">{{ isActive ? displayText : "0:00" }}</span>
             </template>
         </LoggingHeader>
-        <div
-            class="flex flex-col items-center gap-3 border-b border-zinc-700 pb-6 text-center"
-        >
-            <p
-                class="m-0 text-sm font-semibold uppercase tracking-wide text-zinc-500"
-            >
-                Rest
-            </p>
-            <p class="m-0 text-6xl font-semibold tabular-nums">
-                {{ isActive ? displayText : "0:00" }}
-            </p>
-            <p class="m-0 text-zinc-400">Time since your last set.</p>
+        <div class="flex flex-col items-center gap-3 border-b border-line pb-6 text-center">
+            <p class="m-0 text-sm font-semibold tracking-wide text-fg-muted uppercase">Rest</p>
+            <p class="m-0 text-display font-semibold text-fg tabular-nums">{{ isActive ? displayText : "0:00" }}</p>
+            <p class="m-0 text-fg-muted">Time since your last set.</p>
         </div>
-        <button
-            type="button"
-            class="flex w-full items-center justify-between gap-3 rounded-md border border-zinc-700 bg-zinc-900 px-3 py-3 text-left transition-colors hover:border-zinc-500 hover:bg-zinc-800"
-            @click="emit('edit-setup')"
-        >
-            <span>
-                <span
-                    class="mr-2 text-xs font-semibold uppercase tracking-wide text-zinc-500"
-                    >Weight</span
-                >
-                <span class="tabular-nums text-zinc-200"
-                    >{{ currentWeight }} lbs</span
-                >
+        <Button variant="secondary" block @click="emit('edit-setup')">
+            <span class="flex w-full items-baseline justify-between gap-2">
+                <span class="flex items-baseline gap-2">
+                    <span class="text-xs font-semibold tracking-wide text-fg-muted uppercase">Weight</span>
+                    <span class="tabular-nums">{{ currentWeight }} lbs</span>
+                </span>
+                <span class="text-sm font-normal text-fg-muted">Change</span>
             </span>
-            <span class="text-sm text-zinc-400">Change</span>
-        </button>
+        </Button>
         <LoggedSetsList
             :logged-sets="session.loggedSets"
             @retry="session.retrySet"
             @delete="session.deleteSet"
             @edit="(index) => emit('edit', index)"
         />
-        <div class="flex flex-col gap-3 sm:flex-row">
-            <button
-                class="flex-1 rounded-md bg-secondBg px-4 py-3 text-sm font-semibold text-textPrimary transition-colors hover:bg-thirdBg"
-                type="button"
-                @click="nextSet"
-            >
-                Next set
-            </button>
-            <button
-                class="flex-1 rounded-md bg-green-700 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-green-600"
-                type="button"
-                @click="finish"
-            >
-                Finish exercise
-            </button>
+        <div class="flex flex-col gap-3">
+            <Button variant="primary" size="lg" block @click="nextSet">Next set</Button>
+            <Button variant="secondary" block :loading="finishing" @click="finish">Finish exercise</Button>
+            <Button variant="ghost" block @click="emit('progression')">View progression</Button>
         </div>
-        <button
-            class="w-full rounded-md border border-zinc-700 px-4 py-3 text-sm font-semibold text-textSecondary transition-colors hover:border-zinc-500 hover:bg-firstBg hover:text-textPrimary"
-            type="button"
-            @click="emit('progression')"
-        >
-            View progression
-        </button>
     </div>
 </template>

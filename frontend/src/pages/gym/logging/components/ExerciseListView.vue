@@ -9,7 +9,8 @@ import type {
 import type { DropdownOption } from "~/shared/input/Dropdown.vue";
 import Dropdown from "~/shared/input/Dropdown.vue";
 import { ref, computed } from "vue";
-import { Trash2 } from "lucide-vue-next";
+import { ChevronRight, Dumbbell, Trash2 } from "lucide-vue-next";
+import { Badge, Button, Card, EmptyState, IconButton, List, ListRow } from "~/shared/ui";
 import { useRouter } from "vue-router";
 import { useExercisesPaginated } from "~/api/workout/queries";
 
@@ -26,6 +27,7 @@ const props = defineProps<{
     loggedCardio?: Cardio | null;
     loggedPreMobility?: MobilityLogged | null;
     loggedPostMobility?: MobilityLogged | null;
+    removingId?: number | null;
 }>();
 
 const workoutName = computed(() => props.workoutName);
@@ -110,6 +112,21 @@ const removeExercise = (index: number, event: Event) => {
     emit("remove-exercise", index);
 };
 
+const isRemoving = (g: ExerciseGroup) =>
+    props.removingId != null &&
+    (g.logged?.exercise_id ?? g.planned?.ID) === props.removingId;
+
+const setSummary = (g: ExerciseGroup) =>
+    (g.logged?.sets ?? []).map((set) => `${set.weight}lbs × ${set.reps}`).join(" • ");
+
+const isEmptyList = computed(
+    () =>
+        props.exercises.length === 0 &&
+        !showPreMobilityRow.value &&
+        !showPostMobilityRow.value &&
+        !showCardioRow.value,
+);
+
 // Get maximum weight from previous exercise
 const getMaxWeight = (exerciseGroup: ExerciseGroup): number | null => {
     if (
@@ -120,28 +137,6 @@ const getMaxWeight = (exerciseGroup: ExerciseGroup): number | null => {
         return null;
     }
     return Math.max(...exerciseGroup.previous.sets.map((set) => set.weight));
-};
-
-// Get last set from logged exercise
-const getLastSet = (
-    exerciseGroup: ExerciseGroup,
-): { weight: number; reps: number } | null => {
-    if (
-        !exerciseGroup.logged ||
-        !exerciseGroup.logged.sets ||
-        exerciseGroup.logged.sets.length === 0
-    ) {
-        return null;
-    }
-    const lastSet =
-        exerciseGroup.logged.sets[exerciseGroup.logged.sets.length - 1];
-    if (!lastSet) {
-        return null;
-    }
-    return {
-        weight: lastSet.weight,
-        reps: lastSet.reps,
-    };
 };
 
 // Check if exercise is logged
@@ -155,246 +150,96 @@ const isLogged = (exerciseGroup: ExerciseGroup): boolean => {
 </script>
 
 <template>
-    <div class="list-view">
-        <header>
-            <h1 v-if="workoutName">{{ workoutName }} Day</h1>
-        </header>
-        <div class="mb-2">
-            <Dropdown
-                :options="exerciseOptions"
-                :on-select="handleExerciseSelect"
-                :has-more="hasNextPage ?? false"
-                :loading="isFetching"
-                placeholder="Add exercise..."
-                @load-more="handleLoadMore"
-                @search="handleExerciseSearch"
-            />
-        </div>
-        <ul class="exercise-list">
-            <li
-                v-if="showPreMobilityRow"
-                key="pre-mobility"
-                @click="emit('select-pre-mobility')"
-                :class="['exercise-item', { logged: preMobilityComplete }]"
-            >
-                <div class="exercise-content">
-                    <div class="exercise-title-section">
-                        <span class="exercise-name">{{
-                            loggedPreMobility?.title ?? "Dynamic warmup"
-                        }}</span>
-                    </div>
-                </div>
-            </li>
-            <li
-                v-for="(exerciseGroup, index) in exercises"
-                :key="
-                    exerciseGroup.planned?.ID ??
-                    exerciseGroup.logged?.exercise_id ??
-                    exerciseGroup.logged?.ID ??
-                    index
-                "
-                @click="emit('select-exercise', index)"
-                :class="['exercise-item', { logged: isLogged(exerciseGroup) }]"
-            >
-                <div class="exercise-content">
-                    <div class="exercise-title-section">
-                        <span class="exercise-name">{{
-                            exerciseGroup.planned?.name ||
-                            exerciseGroup.logged?.exercise?.name
-                        }}</span>
-                        <span
-                            v-if="
-                                isLogged(exerciseGroup) &&
-                                getLastSet(exerciseGroup)
-                            "
-                            class="exercise-subtitle"
-                        >
-                            <p v-for="set in exerciseGroup.logged?.sets">
-                                {{ set.weight }}lbs × {{ set.reps }}
-                            </p>
-                        </span>
-                        <span
-                            v-else-if="
-                                !isLogged(exerciseGroup) &&
-                                getMaxWeight(exerciseGroup) !== null
-                            "
-                            class="exercise-subtitle"
-                        >
-                            Prev {{ getMaxWeight(exerciseGroup) }}lbs
-                        </span>
-                    </div>
-                </div>
-                <button
-                    @click="removeExercise(index, $event)"
-                    class="remove-button"
-                    type="button"
+    <div class="flex w-full flex-col gap-4">
+        <h1 v-if="workoutName" class="m-0 text-xl font-semibold tracking-tight text-fg">
+            {{ workoutName }} Day
+        </h1>
+        <Dropdown
+            :options="exerciseOptions"
+            :on-select="handleExerciseSelect"
+            :has-more="hasNextPage ?? false"
+            :loading="isFetching"
+            placeholder="Add exercise..."
+            @load-more="handleLoadMore"
+            @search="handleExerciseSearch"
+        />
+        <Card padding="none">
+            <List>
+                <ListRow
+                    v-if="showPreMobilityRow"
+                    @click="emit('select-pre-mobility')"
                 >
-                    <Trash2 :size="18" />
-                </button>
-            </li>
-            <li
-                v-if="showCardioRow"
-                key="cardio"
-                @click="emit('select-cardio')"
-                :class="['exercise-item', { logged: cardioIsLogged }]"
-            >
-                <div class="exercise-content">
-                    <div class="exercise-title-section">
-                        <span class="exercise-name">{{ cardioName }}</span>
-                        <span v-if="cardioIsLogged" class="exercise-subtitle">
-                            {{ loggedCardio?.minutes }} min
-                        </span>
-                    </div>
-                </div>
-            </li>
-            <li
-                v-if="showPostMobilityRow"
-                key="post-mobility"
-                @click="emit('select-post-mobility')"
-                :class="['exercise-item', { logged: postMobilityComplete }]"
-            >
-                <div class="exercise-content">
-                    <div class="exercise-title-section">
-                        <span class="exercise-name">{{
-                            loggedPostMobility?.title ?? "Static stretching"
-                        }}</span>
-                    </div>
-                </div>
-            </li>
-        </ul>
-        <button
-            @click="router.push('/')"
-            type="button"
-            class="finish-button bg-green-600 hover:bg-green-500"
-        >
-            <span>Finish Workout</span>
-        </button>
+                    {{ loggedPreMobility?.title ?? "Dynamic warmup" }}
+                    <template #trailing>
+                        <Badge v-if="preMobilityComplete" tone="success">Done</Badge>
+                        <ChevronRight v-else aria-hidden="true" class="size-4" />
+                    </template>
+                </ListRow>
+                <ListRow
+                    v-for="(exerciseGroup, index) in exercises"
+                    :key="
+                        exerciseGroup.planned?.ID ??
+                        exerciseGroup.logged?.exercise_id ??
+                        exerciseGroup.logged?.ID ??
+                        index
+                    "
+                    :pending="isRemoving(exerciseGroup)"
+                    @click="emit('select-exercise', index)"
+                >
+                    {{
+                        exerciseGroup.planned?.name ||
+                        exerciseGroup.logged?.exercise?.name
+                    }}
+                    <template #subtitle>
+                        <template v-if="isLogged(exerciseGroup)">
+                            {{ setSummary(exerciseGroup) }}
+                        </template>
+                        <template v-else-if="getMaxWeight(exerciseGroup) !== null">
+                            Prev {{ getMaxWeight(exerciseGroup) }}lbs
+                        </template>
+                    </template>
+                    <template #trailing>
+                        <Badge v-if="isLogged(exerciseGroup)" tone="success">Done</Badge>
+                    </template>
+                    <template #end>
+                        <IconButton
+                            label="Remove exercise"
+                            variant="danger"
+                            :disabled="isRemoving(exerciseGroup)"
+                            @click="removeExercise(index, $event)"
+                        >
+                            <Trash2 />
+                        </IconButton>
+                    </template>
+                </ListRow>
+                <ListRow v-if="showCardioRow" @click="emit('select-cardio')">
+                    {{ cardioName }}
+                    <template v-if="cardioIsLogged" #subtitle>{{ loggedCardio?.minutes }} min</template>
+                    <template #trailing>
+                        <Badge v-if="cardioIsLogged" tone="success">Done</Badge>
+                        <ChevronRight v-else aria-hidden="true" class="size-4" />
+                    </template>
+                </ListRow>
+                <ListRow
+                    v-if="showPostMobilityRow"
+                    @click="emit('select-post-mobility')"
+                >
+                    {{ loggedPostMobility?.title ?? "Static stretching" }}
+                    <template #trailing>
+                        <Badge v-if="postMobilityComplete" tone="success">Done</Badge>
+                        <ChevronRight v-else aria-hidden="true" class="size-4" />
+                    </template>
+                </ListRow>
+            </List>
+            <EmptyState
+                v-if="isEmptyList"
+                :icon="Dumbbell"
+                title="Nothing planned for today"
+                description="Add an exercise above to start logging."
+            />
+        </Card>
+        <Button variant="primary" size="lg" block @click="router.push('/')">
+            Finish workout
+        </Button>
     </div>
 </template>
-
-<style scoped>
-.list-view {
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-    width: 100%;
-    max-width: 100%;
-}
-
-.exercise-list {
-    list-style: none;
-    padding: 0;
-    margin: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-    width: 100%;
-}
-
-.exercise-item {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 1rem;
-    border: 1px solid rgb(56, 56, 56);
-    border-radius: 5px;
-    background: rgb(27, 27, 27);
-    cursor: pointer;
-    transition:
-        background-color 0.2s,
-        opacity 0.2s;
-    width: 100%;
-    box-sizing: border-box;
-    gap: 1rem;
-}
-
-.exercise-item:hover {
-    background: rgb(40, 40, 40);
-}
-
-.exercise-item.logged {
-    opacity: 0.6;
-    background: rgb(20, 20, 20);
-    border: 1px solid rgb(19, 128, 42);
-}
-
-.exercise-item.logged:hover {
-    background: rgb(30, 30, 30);
-    opacity: 0.8;
-}
-
-.exercise-content {
-    flex: 1;
-    display: flex;
-    align-items: center;
-    min-width: 0;
-}
-
-.exercise-title-section {
-    display: flex;
-    flex-direction: column;
-    gap: 0.25rem;
-    min-width: 0;
-}
-
-.exercise-name {
-    font-weight: 500;
-    font-size: 1.1rem;
-}
-
-.exercise-subtitle {
-    color: rgb(150, 150, 150);
-    font-size: 0.9rem;
-    display: flex;
-    flex-direction: row;
-}
-
-.exercise-subtitle p {
-    margin: 0;
-}
-
-.exercise-subtitle p:not(:last-child)::after {
-    content: "•";
-    margin: 0 0.5rem;
-    color: rgb(150, 150, 150);
-}
-
-.exercise-item.logged .exercise-subtitle {
-    color: rgb(200, 200, 200);
-    font-weight: 500;
-}
-
-.remove-button {
-    width: 2rem;
-    height: 2rem;
-    border: 1px solid rgb(80, 40, 40);
-    border-radius: 3px;
-    background: rgb(40, 20, 20);
-    color: rgb(200, 100, 100);
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition:
-        background-color 0.2s,
-        border-color 0.2s;
-    padding: 0;
-    flex-shrink: 0;
-}
-
-.remove-button:hover {
-    background: rgb(60, 30, 30);
-    border-color: rgb(120, 60, 60);
-}
-
-.finish-button {
-    margin-top: 1rem;
-    padding: 0.75rem 1.5rem;
-    border: 1px solid rgb(56, 56, 56);
-    border-radius: 5px;
-    color: inherit;
-    font-size: 1rem;
-    cursor: pointer;
-    transition: background-color 0.2s;
-}
-</style>

@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { getApiErrorMessage } from "~/api/httpError";
 import type { MobilityLogged } from "~/types/workout";
+import { ListChecks } from "lucide-vue-next";
+import { Button, Card, Checkbox, EmptyState, List } from "~/shared/ui";
 import LoggingHeader from "./LoggingHeader.vue";
 import { ref, watch, computed } from "vue";
 import { useLoggingRouteContext } from "../../composables/useLoggingRouteContext";
@@ -77,37 +79,24 @@ const isChecked = (name: string) => localChecked.value.has(name);
 </script>
 
 <template>
-    <div class="flex w-full max-w-full flex-col gap-6 px-1 pb-2 box-border">
+    <div class="flex w-full flex-col gap-6">
         <LoggingHeader :title="title" @back="goBackToLogging">
             <template #right>
-                <span
-                    v-if="headerProgress"
-                    class="text-sm font-medium text-zinc-300 tabular-nums"
-                    >{{ headerProgress }}</span
-                >
+                <span v-if="headerProgress" class="text-sm font-medium text-fg-muted tabular-nums">{{ headerProgress }}</span>
             </template>
         </LoggingHeader>
-        <ul class="m-0 flex list-none flex-col gap-2 p-0">
-            <li v-for="item in items" :key="item">
-                <label
-                    class="flex cursor-pointer items-start gap-3 rounded border border-zinc-600 bg-zinc-900 px-4 py-3 hover:bg-zinc-800"
-                >
-                    <input
-                        class="mt-1 h-4 w-4 shrink-0 rounded border-zinc-500"
-                        type="checkbox"
-                        :checked="isChecked(item)"
-                        @change="toggle(item)"
+        <EmptyState v-if="items.length === 0" :icon="ListChecks" title="No items in this routine" />
+        <Card v-else padding="none">
+            <List>
+                <li v-for="item in items" :key="item" class="px-3 lg:px-4">
+                    <Checkbox
+                        :model-value="isChecked(item)"
+                        :label="item"
+                        @update:model-value="toggle(item)"
                     />
-                    <span class="text-base leading-snug">{{ item }}</span>
-                </label>
-            </li>
-        </ul>
-        <button
-            class="w-full rounded bg-green-600 py-3 text-base font-medium text-white hover:bg-green-500"
-            type="button"
-            @click="goBackToLogging"
-        >
-            Done
-        </button>
+                </li>
+            </List>
+        </Card>
+        <Button variant="primary" size="lg" block @click="goBackToLogging">Done</Button>
     </div>
 </template>

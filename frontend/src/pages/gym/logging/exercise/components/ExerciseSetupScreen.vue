@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useGlobalRestTimer } from "~/composables/useGlobalRestTimer";
+import { Badge, Button } from "~/shared/ui";
 import LoggingHeader from "./LoggingHeader.vue";
 import NumberSlider from "./NumberSlider.vue";
 
@@ -30,42 +31,26 @@ const { displayText, isActive } = useGlobalRestTimer();
 
 <template>
     <div class="flex w-full flex-col gap-6">
-        <LoggingHeader
-            :title="exerciseName"
-            :subtitle="`Set ${setNumber}`"
-            @back="emit('back')"
-        >
+        <LoggingHeader :title="exerciseName" :subtitle="`Set ${setNumber}`" @back="emit('back')">
             <template #right>
-                <span class="font-medium tabular-nums text-zinc-200">
-                    {{ isActive ? displayText : "0:00" }}
-                </span>
+                <span class="font-medium tabular-nums text-fg">{{ isActive ? displayText : "0:00" }}</span>
             </template>
         </LoggingHeader>
         <div class="flex flex-col gap-5">
-            <section class="flex flex-col gap-1 border-b border-zinc-700 pb-5">
+            <section class="flex flex-col gap-1 border-b border-line pb-5">
                 <div class="flex items-center justify-between gap-2">
-                    <p
-                        class="m-0 text-xs font-semibold uppercase tracking-wide text-zinc-500"
-                    >
-                        Set the machine to
-                    </p>
-                    <button
+                    <p class="m-0 text-xs font-semibold tracking-wide text-fg-muted uppercase">Set the machine to</p>
+                    <Button
                         v-if="weightIncrease != null"
-                        type="button"
-                        class="group min-w-12 rounded-full bg-green-950 px-2 py-1 text-xs font-semibold tabular-nums text-green-400 transition-colors hover:bg-green-900 focus-visible:bg-green-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-500"
+                        variant="ghost"
+                        size="sm"
                         aria-label="Undo automatic weight increase"
-                        title="Rep target met last session. Click to undo."
+                        title="Rep target met last session. Tap to undo."
                         @click="emit('undo-weight-increase')"
                     >
-                        <span
-                            class="group-hover:hidden group-focus-visible:hidden"
-                            >+{{ weightIncrease }}</span
-                        >
-                        <span
-                            class="hidden group-hover:inline group-focus-visible:inline"
-                            >Undo</span
-                        >
-                    </button>
+                        <Badge tone="success">+{{ weightIncrease }}</Badge>
+                        Undo
+                    </Button>
                 </div>
                 <NumberSlider
                     label=""
@@ -74,65 +59,34 @@ const { displayText, isActive } = useGlobalRestTimer();
                     :max="500"
                     @update:model-value="emit('update:weight', $event)"
                 />
-                <button
-                    v-if="tracksWeightSetup"
-                    type="button"
-                    class="mt-2 w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-left text-zinc-300 transition-colors hover:border-zinc-500 hover:bg-zinc-800"
-                    @click="emit('edit-weight-setup')"
-                >
-                    <span
-                        class="mr-2 text-xs font-semibold uppercase tracking-wide text-zinc-500"
-                    >
-                        Weight setup
+                <Button v-if="tracksWeightSetup" variant="secondary" block class="mt-2" @click="emit('edit-weight-setup')">
+                    <span class="flex w-full min-w-0 items-baseline gap-2">
+                        <span class="text-xs font-semibold tracking-wide text-fg-muted uppercase">Weight setup</span>
+                        <span class="truncate font-normal">{{ weightSetupSummary }}</span>
                     </span>
-                    {{ weightSetupSummary }}
-                </button>
+                </Button>
             </section>
-            <section class="flex flex-col gap-1 border-b border-zinc-700 pb-5">
-                <p
-                    class="m-0 text-xs font-semibold uppercase tracking-wide text-zinc-500"
-                >
-                    Previous session
-                </p>
-                <p class="m-0 mt-2 text-lg text-zinc-200">
+            <section class="flex flex-col gap-1 border-b border-line pb-5">
+                <p class="m-0 text-xs font-semibold tracking-wide text-fg-muted uppercase">Previous session</p>
+                <p class="m-0 mt-2 text-lg text-fg tabular-nums">
                     {{
                         previousSets.length
-                            ? previousSets
-                                  .map((set) => `${set.weight} × ${set.reps}`)
-                                  .join(", ")
+                            ? previousSets.map((set) => `${set.weight} × ${set.reps}`).join(", ")
                             : "No previous sets recorded"
                     }}
                 </p>
             </section>
-            <section class="flex flex-col gap-4">
+            <section v-if="notes || cues" class="flex flex-col gap-4">
                 <div v-if="notes">
-                    <p
-                        class="m-0 text-xs font-semibold uppercase tracking-wide text-zinc-500"
-                    >
-                        Notes
-                    </p>
-                    <p class="m-0 mt-2 whitespace-pre-wrap text-zinc-300">
-                        {{ notes }}
-                    </p>
+                    <p class="m-0 text-xs font-semibold tracking-wide text-fg-muted uppercase">Notes</p>
+                    <p class="m-0 mt-2 whitespace-pre-wrap text-fg-muted">{{ notes }}</p>
                 </div>
                 <div v-if="cues">
-                    <p
-                        class="m-0 text-xs font-semibold uppercase tracking-wide text-zinc-500"
-                    >
-                        Cues
-                    </p>
-                    <p class="m-0 mt-2 whitespace-pre-wrap text-zinc-300">
-                        {{ cues }}
-                    </p>
+                    <p class="m-0 text-xs font-semibold tracking-wide text-fg-muted uppercase">Cues</p>
+                    <p class="m-0 mt-2 whitespace-pre-wrap text-fg-muted">{{ cues }}</p>
                 </div>
             </section>
         </div>
-        <button
-            class="w-full rounded-md bg-secondBg px-4 py-3 text-sm font-semibold text-textPrimary transition-colors hover:bg-thirdBg"
-            type="button"
-            @click="emit('continue')"
-        >
-            {{ continueLabel }}
-        </button>
+        <Button variant="primary" size="lg" block @click="emit('continue')">{{ continueLabel }}</Button>
     </div>
 </template>

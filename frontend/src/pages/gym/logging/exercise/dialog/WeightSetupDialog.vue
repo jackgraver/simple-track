@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
+import { Button, Field, Input, NumberField } from "~/shared/ui";
 import type { ExerciseLoadType } from "~/types/workout";
 import {
     computeExerciseLoadLbs,
@@ -50,8 +51,8 @@ function plateCount(plate: number): number {
     return counts.value[plate] ?? 0;
 }
 
-function changePlate(plate: number, delta: number) {
-    const next = Math.max(0, plateCount(plate) + delta);
+function setPlate(plate: number, value: number | null | undefined) {
+    const next = Math.max(0, Math.round(value ?? 0));
     if (next === 0) {
         const { [plate]: _, ...rest } = counts.value;
         counts.value = rest;
@@ -89,123 +90,62 @@ function save(syncWeight: boolean) {
 
 <template>
     <div class="flex w-full min-w-0 flex-col gap-4">
-        <div class="flex flex-col gap-2">
-            <label
-                for="weight-setup-text"
-                class="text-sm font-medium text-[rgb(150,150,150)]"
-                >Setup text</label
-            >
-            <input
-                id="weight-setup-text"
+        <Field label="Setup text">
+            <Input
                 v-model="setupText"
-                type="text"
                 placeholder="e.g. belt, 2×45 + 10, or notes"
-                class="w-full min-w-0 rounded-md border border-[rgb(56,56,56)] bg-[rgb(27,27,27)] px-3 py-2 text-sm outline-none focus:border-[rgb(100,100,100)]"
-                @input="syncFromTextInput"
+                @update:model-value="syncFromTextInput"
             />
-            <p
-                v-if="parseFailed"
-                class="m-0 text-xs text-amber-300"
-            >
-                Free text — use the plate picker below to build plate notation.
-            </p>
-        </div>
-        <div class="flex flex-col gap-2">
-            <span class="text-sm font-medium text-[rgb(150,150,150)]">{{
-                props.loadType === "plate_loaded_with_bar"
-                    ? "Plates per side (45 lb bar included)"
-                    : props.loadType === "plate_loaded_total"
-                      ? "Total plates (machine load)"
-                    : "Plates per side (bar not counted)"
-            }}</span>
-            <ul class="m-0 flex w-full min-w-0 list-none flex-col gap-1.5 p-0">
-                <li
-                    v-for="plate in STANDARD_PLATE_LBS"
-                    :key="plate"
-                    class="flex items-center justify-between gap-2 rounded-md border border-[rgb(56,56,56)] bg-[rgb(27,27,27)] px-2 py-1.5"
-                >
-                    <span class="min-w-12 text-sm">{{ plate }} lb</span>
-                    <div class="flex items-center gap-2">
-                        <button
-                            type="button"
-                            class="flex h-8 w-8 items-center justify-center rounded-md border border-[rgb(56,56,56)] bg-[rgb(35,35,35)] text-lg leading-none hover:bg-[rgb(50,50,50)] disabled:opacity-40"
-                            :disabled="plateCount(plate) === 0"
-                            aria-label="Remove plate"
-                            @click="changePlate(plate, -1)"
-                        >
-                            −
-                        </button>
-                        <span
-                            class="w-6 text-center text-sm tabular-nums"
-                            >{{ plateCount(plate) }}</span
-                        >
-                        <button
-                            type="button"
-                            class="flex h-8 w-8 items-center justify-center rounded-md border border-[rgb(56,56,56)] bg-[rgb(35,35,35)] text-lg leading-none hover:bg-[rgb(50,50,50)]"
-                            aria-label="Add plate"
-                            @click="changePlate(plate, 1)"
-                        >
-                            +
-                        </button>
+        </Field>
+        <p v-if="parseFailed" class="m-0 -mt-2 text-xs text-warn">
+            Free text — use the plate picker below to build plate notation.
+        </p>
+        <section class="flex flex-col gap-2">
+            <h3 class="m-0 text-xs font-medium text-fg-muted">
+                {{
+                    props.loadType === "plate_loaded_with_bar"
+                        ? "Plates per side (45 lb bar included)"
+                        : props.loadType === "plate_loaded_total"
+                          ? "Total plates (machine load)"
+                          : "Plates per side (bar not counted)"
+                }}
+            </h3>
+            <ul class="m-0 flex w-full min-w-0 list-none flex-col gap-2 p-0">
+                <li v-for="plate in STANDARD_PLATE_LBS" :key="plate" class="flex items-center justify-between gap-3">
+                    <span class="min-w-14 text-base text-fg tabular-nums lg:text-sm">{{ plate }} lb</span>
+                    <div class="w-44">
+                        <NumberField
+                            :model-value="plateCount(plate)"
+                            :label="`${plate} lb plates`"
+                            :min="0"
+                            :step="1"
+                            :decimals="0"
+                            @update:model-value="setPlate(plate, $event)"
+                        />
                     </div>
                 </li>
             </ul>
-        </div>
-        <div
-            class="flex flex-col gap-1 rounded-md border border-[rgb(56,56,56)] bg-[rgb(24,24,24)] px-3 py-2.5"
-        >
-            <div
-                v-if="!parseFailed"
-                class="flex flex-wrap items-baseline justify-between gap-2"
-            >
-                <span class="text-sm text-[rgb(150,150,150)]">Total load</span>
-                <span class="text-lg font-medium tabular-nums"
-                    >{{ totalLbs }} lbs</span
-                >
+        </section>
+        <div class="flex flex-col gap-1 rounded-card border border-line bg-surface-2 px-3 py-2.5">
+            <div v-if="!parseFailed" class="flex flex-wrap items-baseline justify-between gap-2">
+                <span class="text-sm text-fg-muted">Total load</span>
+                <span class="text-lg font-medium text-fg tabular-nums">{{ totalLbs }} lbs</span>
             </div>
-            <p
-                v-else-if="setupText.trim()"
-                class="m-0 text-sm text-[rgb(180,180,180)]"
-            >
-                {{ setupText.trim() }}
-            </p>
-            <p
-                v-else-if="!hasPlates && props.loadType === 'plate_loaded_with_bar'"
-                class="m-0 text-sm text-[rgb(120,120,120)]"
-            >
+            <p v-else-if="setupText.trim()" class="m-0 text-sm text-fg-muted">{{ setupText.trim() }}</p>
+            <p v-else-if="!hasPlates && props.loadType === 'plate_loaded_with_bar'" class="m-0 text-sm text-fg-subtle">
                 Bar only (45 lbs)
             </p>
-            <p
-                v-else-if="!hasPlates"
-                class="m-0 text-sm text-[rgb(120,120,120)]"
-            >
-                No plates
-            </p>
-            <p
-                v-if="targetWeightLbs > 0 && mismatchDelta != null"
-                class="m-0 text-sm text-amber-300"
-            >
-                Logged weight is {{ targetWeightLbs }} lbs ({{
-                    mismatchDelta > 0 ? "+" : ""
-                }}{{ mismatchDelta }} lbs vs plates)
+            <p v-else-if="!hasPlates" class="m-0 text-sm text-fg-subtle">No plates</p>
+            <p v-if="targetWeightLbs > 0 && mismatchDelta != null" class="m-0 text-sm text-warn">
+                Logged weight is {{ targetWeightLbs }} lbs ({{ mismatchDelta > 0 ? "+" : "" }}{{ mismatchDelta }} lbs vs
+                plates)
             </p>
         </div>
-        <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
-            <button
-                type="button"
-                class="flex-1 rounded-md border border-[rgb(56,56,56)] bg-[rgb(35,35,35)] px-4 py-2 text-sm hover:bg-[rgb(50,50,50)]"
-                @click="save(false)"
-            >
-                Save setup
-            </button>
-            <button
-                type="button"
-                class="rounded-md bg-green-600 px-4 py-2 text-sm text-white hover:bg-green-500 disabled:cursor-not-allowed disabled:opacity-40"
-                :disabled="parseFailed || totalLbs <= 0"
-                @click="save(true)"
-            >
+        <div class="flex flex-col gap-2 lg:flex-row lg:justify-end">
+            <Button variant="secondary" @click="save(false)">Save setup</Button>
+            <Button variant="primary" :disabled="parseFailed || totalLbs <= 0" @click="save(true)">
                 Save & set weight to {{ totalLbs }} lbs
-            </button>
+            </Button>
         </div>
     </div>
 </template>

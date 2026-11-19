@@ -2,7 +2,8 @@
 import { useWorkoutStore } from "./store/useWorkoutStore";
 import ExerciseListView from "./components/ExerciseListView.vue";
 import { useRoute, useRouter } from "vue-router";
-import { computed } from "vue";
+import { computed, ref } from "vue";
+import { ErrorState, SkeletonList, useDelayedFlag } from "~/shared/ui";
 import { getApiErrorMessage } from "~/api/httpError";
 import { toast } from "~/composables/toast/useToast";
 import { useLoggingRouteContext } from "./composables/useLoggingRouteContext";
@@ -21,7 +22,12 @@ const {
     data,
     addExerciseToWorkout,
     removeExerciseFromLog,
+    refetch,
 } = useWorkoutStore(offset);
+
+// Fast loads show nothing instead of flashing a skeleton.
+const showSkeleton = useDelayedFlag(() => pending.value);
+const removingId = ref<number | null>(null);
 
 const workoutName = computed(() => data.value?.day?.workout_plan?.name || "");
 
@@ -84,31 +90,37 @@ const handleRemoveExercise = async (index: number) => {
         return;
     }
 
+    removingId.value = exerciseId;
     try {
         await removeExerciseFromLog(exerciseId);
         toast.push("Exercise removed", "success");
     } catch (err: unknown) {
         console.error(err);
         toast.push(getApiErrorMessage(err, "Failed to remove exercise"), "error");
+    } finally {
+        removingId.value = null;
     }
 };
 </script>
 
 <template>
-    <div v-if="pending" class="container">
-        <div>Loading...</div>
-    </div>
-    <div v-else-if="error" class="container">
-        <div>Error: {{ error.message }}</div>
-    </div>
-    <div v-else class="container">
+    <div class="mx-auto flex w-full max-w-md flex-col gap-4 py-2 lg:py-0">
+        <ErrorState
+            v-if="error"
+            :error="error"
+            title="Couldn't load today's workout"
+            @retry="refetch()"
+        />
+        <SkeletonList v-else-if="pending && showSkeleton" :rows="5" :leading="false" />
         <ExerciseListView
+            v-else-if="!pending"
             :exercises="log"
             :planned-cardio="plannedCardio"
             :logged-cardio="loggedCardio"
             :logged-pre-mobility="loggedPreMobility"
             :logged-post-mobility="loggedPostMobility"
             :workoutName="workoutName"
+            :removing-id="removingId"
             @select-exercise="selectExercise"
             @add-exercise="handleAddExercise"
             @remove-exercise="handleRemoveExercise"
@@ -118,19 +130,3 @@ const handleRemoveExercise = async (index: number) => {
         />
     </div>
 </template>
-
-<style scoped>
-.container {
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-    width: 100%;
-    align-self: stretch;
-}
-
-@media (max-width: 767px) {
-    .container {
-        padding: 0.5rem 0;
-    }
-}
-</style>

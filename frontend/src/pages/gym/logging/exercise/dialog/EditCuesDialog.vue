@@ -3,6 +3,7 @@ import { getApiErrorMessage } from "~/api/httpError";
 import { ref } from "vue";
 import { Exercise } from "~/types/workout";
 import { apiPUT } from "~/api/client";
+import { Button, Field, Textarea } from "~/shared/ui";
 import { toast } from "~/composables/toast/useToast";
 
 const props = defineProps<{
@@ -37,20 +38,14 @@ const saveCues = async () => {
 </script>
 
 <template>
-    <div class="flex flex-col gap-2">
-        <textarea
-            v-model="cues"
-            class="input textarea border border-secondBg rounded-md p-2"
-            rows="4"
-            placeholder="Optional cues (e.g. bullet points)"
-        ></textarea>
-        <button
-            type="button"
-            class="bg-green-500 text-white px-4 py-2 rounded-md disabled:opacity-60"
-            :disabled="submitting"
-            @click="saveCues"
-        >
-            {{ submitting ? "Saving…" : "Save" }}
-        </button>
+    <div class="flex flex-col gap-3">
+        <Field label="Cues">
+            <Textarea v-model="cues" :rows="4" placeholder="Optional cues (e.g. bullet points)" />
+        </Field>
+        <div class="flex flex-col gap-2 lg:flex-row lg:justify-end">
+            <Button variant="primary" :loading="submitting" @click="saveCues">
+                {{ submitting ? "Saving…" : "Save" }}
+            </Button>
+        </div>
     </div>
 </template>

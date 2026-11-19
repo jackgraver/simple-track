@@ -228,11 +228,11 @@ const onTickClick = (index: number) => {
     <div class="flex flex-col gap-3">
         <label
             v-if="label.trim()"
-            class="text-[0.9rem] font-medium text-[rgb(150,150,150)]"
+            class="text-sm font-medium text-fg-muted"
             >{{ label }}</label
         >
         <p
-            class="m-0 flex h-8 items-center justify-center text-[2rem] font-medium leading-none tabular-nums"
+            class="m-0 flex h-8 items-center justify-center text-display font-medium leading-none text-fg tabular-nums"
         >
             <span class="inline-block min-w-[5ch] text-center">{{
                 displayValue
@@ -246,13 +246,13 @@ const onTickClick = (index: number) => {
         >
             <div class="relative h-13">
                 <div
-                    class="pointer-events-none absolute inset-y-0 left-1/2 z-10 w-0.5 -translate-x-1/2 rounded-full bg-amber-400/90"
+                    class="pointer-events-none absolute inset-y-0 left-1/2 z-raised w-0.5 -translate-x-1/2 rounded-full bg-accent"
                     aria-hidden="true"
                 />
                 <div
                     v-for="marker in visibleMarkers"
                     :key="`${marker.index}-${marker.label}-${marker.labelPosition}`"
-                    class="pointer-events-none absolute bottom-0 z-5 flex -translate-x-1/2 flex-col items-center justify-end gap-1"
+                    class="pointer-events-none absolute bottom-0 z-raised flex -translate-x-1/2 flex-col items-center justify-end gap-1"
                     :style="{
                         left: `${marker.leftPx - scrollLeft}px`,
                         width: `${TICK_WIDTH_PX}px`,
@@ -263,11 +263,11 @@ const onTickClick = (index: number) => {
                         v-if="
                             marker.label && marker.labelPosition === 'top'
                         "
-                        class="text-[0.6rem] font-medium leading-none whitespace-nowrap"
+                        class="text-2xs font-medium leading-none whitespace-nowrap"
                         :class="
                             marker.color === 'orange'
-                                ? 'text-orange-400/90'
-                                : 'text-green-400/90'
+                                ? 'text-warn'
+                                : 'text-success'
                         "
                     >
                         {{ marker.label }}
@@ -276,20 +276,20 @@ const onTickClick = (index: number) => {
                         class="block h-8 w-px rounded-full"
                         :class="
                             marker.color === 'orange'
-                                ? 'bg-orange-400/90'
-                                : 'bg-green-400/90'
+                                ? 'bg-warn'
+                                : 'bg-success'
                         "
                     />
-                    <span class="h-[0.85rem]" aria-hidden="true">&nbsp;</span>
+                    <span class="h-3.5" aria-hidden="true">&nbsp;</span>
                     <span
                         v-if="
                             marker.label && marker.labelPosition === 'bottom'
                         "
-                        class="absolute top-full mt-1 text-[0.6rem] font-medium leading-none whitespace-nowrap"
+                        class="absolute top-full mt-1 text-2xs font-medium leading-none whitespace-nowrap"
                         :class="
                             marker.color === 'orange'
-                                ? 'text-orange-400/90'
-                                : 'text-green-400/90'
+                                ? 'text-warn'
+                                : 'text-success'
                         "
                     >
                         {{ marker.label }}
@@ -310,7 +310,7 @@ const onTickClick = (index: number) => {
                         v-for="(tick, index) in tickValues"
                         :key="index"
                         type="button"
-                        class="flex h-full shrink-0 touch-pan-x snap-center flex-col items-center justify-end gap-1 border-0 bg-transparent! shadow-none! p-0 text-inherit"
+                        class="flex h-full shrink-0 touch-pan-x snap-center flex-col items-center justify-end gap-1 m-0! border-0! bg-transparent! p-0! text-inherit shadow-none! focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"
                         :style="{
                             width: `${TICK_WIDTH_PX}px`,
                             scrollSnapAlign: 'center',
@@ -328,10 +328,10 @@ const onTickClick = (index: number) => {
                             aria-hidden="true"
                         >
                             <span
-                                class="block w-px rounded-full bg-[rgb(80,80,80)]"
+                                class="block w-px rounded-full bg-line-strong"
                                 :class="
                                     index === valueToIndex(model || 0)
-                                        ? 'h-8 bg-amber-400/90'
+                                        ? 'h-8 bg-accent'
                                         : isMajorTick(tick, index)
                                           ? 'h-5'
                                           : 'h-3'
@@ -339,7 +339,7 @@ const onTickClick = (index: number) => {
                             />
                         </span>
                         <span
-                            class="h-[0.85rem] text-[0.65rem] leading-none text-[rgb(120,120,120)] tabular-nums"
+                            class="h-3.5 text-2xs leading-none text-fg-subtle tabular-nums"
                             >{{ tickLabel(tick, index) || "\u00a0" }}</span
                         >
                     </button>
@@ -353,7 +353,7 @@ const onTickClick = (index: number) => {
         </div>
         <p
             v-if="hasHintSlot"
-            class="m-0 -mt-1 min-h-5 text-[0.8rem] leading-tight text-amber-200/90"
+            class="m-0 -mt-1 min-h-5 text-xs leading-tight text-warn"
             :class="{ invisible: !hintVisible }"
             :aria-hidden="!hintVisible"
         >
@@ -361,7 +361,7 @@ const onTickClick = (index: number) => {
         </p>
         <p
             v-if="displayError"
-            class="m-0 text-[0.85rem] leading-snug text-red-400"
+            class="m-0 text-sm leading-snug text-danger"
         >
             {{ displayError }}
         </p>

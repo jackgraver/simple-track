@@ -26,6 +26,7 @@ import {
     type WeightSetupDialogResult,
 } from "../domain/weightSetup";
 import { useExerciseLoggingSession } from "../composables/useExerciseLoggingSession";
+import { SegmentedControl } from "~/shared/ui";
 import WeightSetupDialog from "../dialog/WeightSetupDialog.vue";
 import ExerciseProgressionChartPanel from "~/pages/gym/progression/ExerciseProgressionChartPanel.vue";
 import ExerciseSetupScreen from "./ExerciseSetupScreen.vue";
@@ -164,9 +165,16 @@ const selectStep = (nextStep: ExerciseLoggingFlowStep) => {
     step.value = nextStep;
 };
 
+const finishing = ref(false);
 const finish = async () => {
-    if (await session.finishLogging()) {
-        clearFlowState();
+    if (finishing.value) return;
+    finishing.value = true;
+    try {
+        if (await session.finishLogging()) {
+            clearFlowState();
+        }
+    } finally {
+        finishing.value = false;
     }
 };
 
@@ -232,7 +240,7 @@ watch([step, restSetNumber], ([currentStep, setNumber]) => {
 </script>
 
 <template>
-    <div class="pb-[calc(5.5rem_+_env(safe-area-inset-bottom))]">
+    <div class="pb-above-tabbar lg:pb-20">
         <ExerciseSetupScreen
             v-if="step === 'setup'"
             :exercise-name="exerciseName"
@@ -267,6 +275,7 @@ watch([step, restSetNumber], ([currentStep, setNumber]) => {
             :set-number="displayedSetNumber"
             :current-weight="session.currentWeight"
             :session="session"
+            :finishing="finishing"
             @back="goBackToList"
             @next="transition('nextSet')"
             @finish="finish"
@@ -277,26 +286,15 @@ watch([step, restSetNumber], ([currentStep, setNumber]) => {
     </div>
     <nav
         aria-label="Exercise logging steps"
-        class="fixed inset-x-0 bottom-0 z-auto border-t border-zinc-800 bg-mainBg pb-[env(safe-area-inset-bottom)]"
+        class="pointer-events-none fixed inset-x-0 bottom-above-tabbar z-nav px-4 lg:bottom-4"
     >
-        <div class="flex w-full border-x border-zinc-800 md:mx-auto md:max-w-md">
-            <button
-                v-for="navigationStep in navigationSteps"
-                :key="navigationStep.id"
-                type="button"
-                class="m-0 flex-1 border-b-2 border-r border-zinc-800 border-b-transparent px-3 py-3 text-xs font-medium transition-colors last:border-r-0"
-                :class="
-                    navigationStep.id === step
-                        ? 'border-b-zinc-100 text-zinc-100'
-                        : 'text-zinc-500 hover:text-zinc-300'
-                "
-                :aria-current="
-                    navigationStep.id === step ? 'step' : undefined
-                "
-                @click="selectStep(navigationStep.id)"
-            >
-                {{ navigationStep.label }}
-            </button>
+        <div class="pointer-events-auto mx-auto w-full max-w-md rounded-control bg-canvas shadow-raised">
+            <SegmentedControl
+                label="Logging step"
+                :model-value="step"
+                :options="navigationSteps.map((s) => ({ label: s.label, value: s.id }))"
+                @update:model-value="selectStep"
+            />
         </div>
     </nav>
 </template>

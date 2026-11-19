@@ -95,7 +95,7 @@ const isEmpty = computed(() => {
         @back="goBackToLogging"
         @retry="refetch()"
     >
-        <div class="flex w-full flex-col gap-4 self-stretch md:px-2">
+        <div class="flex w-full flex-col gap-4 self-stretch">
             <CardioLoggingView
                 v-if="loggingKind === 'cardio'"
                 :planned-cardio="plannedCardio"

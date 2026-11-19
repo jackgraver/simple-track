@@ -2,6 +2,7 @@
 import { computed } from "vue";
 import { useGlobalRestTimer } from "~/composables/useGlobalRestTimer";
 import type { ExerciseLoggingSessionViewModel } from "../composables/useExerciseLoggingSession";
+import { Button, Field, Textarea } from "~/shared/ui";
 import LoggingHeader from "./LoggingHeader.vue";
 import NumberSlider from "./NumberSlider.vue";
 
@@ -49,15 +50,9 @@ const logSet = async () => {
 
 <template>
     <div class="flex w-full flex-col gap-6">
-        <LoggingHeader
-            :title="exerciseName"
-            :subtitle="`Set ${session.currentSetNumber}`"
-            @back="emit('back')"
-        >
+        <LoggingHeader :title="exerciseName" :subtitle="`Set ${session.currentSetNumber}`" @back="emit('back')">
             <template #right>
-                <span class="font-medium tabular-nums text-zinc-200">
-                    {{ isActive ? displayText : "0:00" }}
-                </span>
+                <span class="font-medium tabular-nums text-fg">{{ isActive ? displayText : "0:00" }}</span>
             </template>
         </LoggingHeader>
         <div class="flex flex-col gap-5">
@@ -69,33 +64,15 @@ const logSet = async () => {
                 :max="50"
                 @update:model-value="session.commitRepsFromInput"
             />
-            <div class="flex flex-col gap-3">
-                <label
-                    class="text-[0.9rem] font-medium text-[rgb(150,150,150)]"
-                    for="exercise-notes"
-                >
-                    Notes
-                </label>
-                <textarea
-                    id="exercise-notes"
-                    class="min-h-24 resize-y rounded border border-zinc-700 bg-zinc-900 px-3 py-3 text-inherit outline-none transition-colors placeholder:text-zinc-600 focus:border-zinc-500"
-                    :value="session.notes"
+            <Field label="Notes">
+                <Textarea
+                    :model-value="session.notes"
                     placeholder="Add any notes about this exercise..."
-                    rows="3"
-                    @input="
-                        session.updateNotes(
-                            ($event.target as HTMLTextAreaElement).value,
-                        )
-                    "
+                    :rows="3"
+                    @update:model-value="session.updateNotes"
                 />
-            </div>
+            </Field>
         </div>
-        <button
-            class="w-full rounded-md bg-green-700 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-green-600"
-            type="button"
-            @click="logSet"
-        >
-            Log set
-        </button>
+        <Button variant="primary" size="lg" block @click="logSet">Log set</Button>
     </div>
 </template>

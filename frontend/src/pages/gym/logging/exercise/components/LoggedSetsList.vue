@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { LoggedSetWithStatus } from "../../store/useWorkoutStore";
-import { Loader, X, RotateCcw } from "lucide-vue-next";
+import { RotateCcw, X } from "lucide-vue-next";
+import { IconButton, List, ListRow, Section, Spinner } from "~/shared/ui";
 
 defineProps<{
     loggedSets: LoggedSetWithStatus[];
@@ -14,75 +15,29 @@ const emit = defineEmits<{
 </script>
 
 <template>
-    <div v-if="loggedSets.length > 0" class="flex flex-col gap-2">
-        <h3
-            class="m-0 text-xs font-semibold uppercase tracking-wide text-zinc-500"
-        >
-            Logged today
-        </h3>
-        <ul class="m-0 flex list-none flex-col gap-1.5 p-0">
-            <li
+    <Section v-if="loggedSets.length > 0" title="Logged today">
+        <List class="rounded-card border border-line bg-surface">
+            <ListRow
                 v-for="(set, index) in loggedSets"
                 :key="set.tempId || index"
-                :class="[
-                    'flex items-center justify-between gap-2 rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 transition-colors',
-                    {
-                        'cursor-pointer hover:border-zinc-500 hover:bg-zinc-800':
-                            set.status === 'success',
-                        'border-red-800 bg-red-950/40': set.status === 'error',
-                    },
-                ]"
-                @click="set.status === 'success' && emit('edit', index)"
+                :pending="set.status === 'pending'"
+                v-bind="set.status === 'success' ? { onClick: () => emit('edit', index) } : {}"
             >
-                <div
-                    class="flex min-w-0 flex-1 items-center justify-between gap-2"
-                >
-                    <div class="min-w-0 flex flex-col gap-0.5">
-                        <span class="whitespace-nowrap">
-                            Set {{ index + 1 }}: {{ set.weight }}lbs ×
-                            {{ set.reps }}
-                        </span>
-                        <span
-                            v-if="set.weight_setup?.trim()"
-                            class="truncate text-xs text-[rgb(130,130,130)]"
-                            >{{ set.weight_setup }}</span
-                        >
-                    </div>
-                    <div class="flex shrink-0 items-center gap-2">
-                        <div
-                            v-if="set.status === 'pending'"
-                            class="flex items-center justify-center"
-                        >
-                            <Loader
-                                class="animate-spin text-zinc-400"
-                                :size="16"
-                            />
-                        </div>
-                        <div
-                            v-else-if="set.status === 'error'"
-                            class="flex items-center justify-center"
-                        >
-                            <button
-                                class="flex items-center justify-center rounded p-1 text-red-300 hover:bg-red-950"
-                                type="button"
-                                title="Retry"
-                                @click.stop="emit('retry', index)"
-                            >
-                                <RotateCcw :size="16" />
-                            </button>
-                        </div>
-                        <button
-                            v-if="set.status === 'success'"
-                            class="flex items-center justify-center rounded p-1 text-red-300 hover:bg-red-950"
-                            type="button"
-                            title="Delete set"
-                            @click.stop="emit('delete', index)"
-                        >
-                            <X :size="16" />
-                        </button>
-                    </div>
-                </div>
-            </li>
-        </ul>
-    </div>
+                Set {{ index + 1 }}: {{ set.weight }}lbs × {{ set.reps }}
+                <template v-if="set.weight_setup?.trim()" #subtitle>{{ set.weight_setup }}</template>
+                <template v-if="set.status === 'error'" #trailing>
+                    <span class="text-xs text-danger">Failed to save</span>
+                </template>
+                <template v-else-if="set.status === 'pending'" #trailing><Spinner size="sm" /></template>
+                <template v-if="set.status === 'error'" #end>
+                    <IconButton label="Retry saving set" variant="danger" @click="emit('retry', index)">
+                        <RotateCcw />
+                    </IconButton>
+                </template>
+                <template v-else-if="set.status === 'success'" #end>
+                    <IconButton label="Delete set" variant="danger" @click="emit('delete', index)"><X /></IconButton>
+                </template>
+            </ListRow>
+        </List>
+    </Section>
 </template>
