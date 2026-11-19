@@ -35,7 +35,7 @@
 6. **Enforcement + cleanup**: planned lint rules (RULES.md), remove the global element CSS, `--color-*: initial`, delete the legacy aliases.
 
 ## Next up / gotchas
-- **Phase 3 (foundations) is done:** F1 `proj/ui-tokens`, F4 `proj/ui-storybook` (from F1), F3 `proj/ui-theme` and F2 `proj/ui-charts` (both from F4, different files). **P1 and P2 done** (`proj/ui-p1-buttons`, `proj/ui-p2-fields`, stacked: P2 branches from P1). **Next: P3** (Card, Badge, List/ListRow, SegmentedControl). Storybook: `npm run storybook` in `frontend/`; `reka-ui` is installed and lint-restricted to `shared/ui/`.
+- **Phase 3 (foundations) is done:** F1 `proj/ui-tokens`, F4 `proj/ui-storybook` (from F1), F3 `proj/ui-theme` and F2 `proj/ui-charts` (both from F4, different files). **P1–P3 done** (`proj/ui-p1-buttons`, `proj/ui-p2-fields`, `proj/ui-p3-lists`, stacked: each branches from the previous). **Next: P4** (EmptyState, ErrorState, Skeleton, useDelayedFlag). Storybook: `npm run storybook` in `frontend/`; `reka-ui` is installed and lint-restricted to `shared/ui/`.
 - **Light theme:** the shell and the Settings control are on tokens. Unmigrated pages stay readable through the legacy-alias bridge (DECISIONS), but their hard-coded `zinc-*`/`amber-*` classes still render dark colours. Each module slice fixes its own.
 - **Solid fills:** decided in P1 (DECISIONS): `danger-solid` uses `text-fg-inverse`. Any other solid `success`/`warn` fill must do the same, never `on-solid`.
 - **Primitives and the global `button {}` rule:** Button/IconButton carry `m-0! shadow-none! rounded-control! border!` (and `px-*!`) to beat the unlayered `App.vue` rule. They go when that rule is removed in phase 6. Storybook doesn't load that rule, so check a primitive in the real app too.
