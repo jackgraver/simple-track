@@ -9,7 +9,7 @@ import {
     isItemActive,
     isNavRoot,
     itemLocation,
-} from "./nav";
+} from "../nav";
 
 const route = useRoute();
 const router = useRouter();
