@@ -60,6 +60,12 @@ Never run bare `./bin/dev` (it opens an interactive TUI). Use the background com
 process-compose always runs with `-U` (unix socket). Its default TCP API port is 8080, the
 same as the backend.
 
+## Long-running projects
+
+UI overhaul, optimistic UI and performance work are tracked in `docs/projects/`. Before working on any
+of them, read `docs/projects/README.md` (session protocol) and that project's README/TASKS. Update
+TASKS/DECISIONS in the same PR as the code.
+
 ## Notes
 
 - Backend config: `backend/.env` (created by `dev` from `.env.example` with random secrets).
