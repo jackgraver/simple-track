@@ -5,7 +5,7 @@ import ToastContainer from "./composables/toast/ToastContainer.vue";
 import DialogContainer from "./composables/dialog/DialogContainer.vue";
 import { isAuthenticated } from "./composables/auth/session";
 import DateAndBreadcrumbs from "./shared/DateAndBreadcrumbs.vue";
-import Breadcrumbs from "./shared/Breadcrumbs.vue";
+// Breadcrumbs (./shared/Breadcrumbs.vue) are kept but not displayed for now.
 import SideNav from "./shared/nav/SideNav.vue";
 import MobileHeader from "./shared/nav/MobileHeader.vue";
 import BottomTabBar from "./shared/nav/BottomTabBar.vue";
@@ -37,10 +37,7 @@ watchEffect(() => {
                 class="mx-auto flex w-full max-w-6xl flex-col items-stretch px-4 lg:px-8"
                 :class="{ 'app-content': showNav }"
             >
-                <template v-if="showNav">
-                    <MobileHeader class="lg:hidden" />
-                    <Breadcrumbs class="hidden pt-4 pb-1 lg:flex" />
-                </template>
+                <MobileHeader v-if="showNav" class="lg:hidden" />
                 <DateAndBreadcrumbs
                     v-if="showDate"
                     :class="showNav ? 'pb-4 lg:pt-4' : 'py-4'"
