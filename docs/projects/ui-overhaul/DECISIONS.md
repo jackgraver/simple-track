@@ -33,3 +33,21 @@ Alternative: ESLint + vue/tailwind plugins. There's no ESLint in the repo today,
 
 ## 2026-11-19: One layout breakpoint (`lg`)
 Mobile/desktop switch at 64rem, matching the nav. `sm`/`md` only for in-component tweaks. The `max-width: 767px` media queries get replaced when their files are touched.
+
+## 2026-11-19: ESLint with bulk suppressions replaces the vitest ratchet
+`eslint-plugin-vue` + `eslint-plugin-better-tailwindcss`: restricted palette/arbitrary classes, unknown/conflicting/deprecated classes, no `<style>`, no colour literals. The 849 existing violations live in `eslint-suppressions.json`. Lint runs in `dev check` and j-cicd (`frontend-lint`). Rules get added as phases land (RULES.md "Planned rules").
+Alternatives: oxlint (only lints `<script>` in `.vue`, no template support; the `oxlint-vue` wrapper is v0.3), or keep `ui-guard.test.ts` (a custom regex, not extensible, can't ban elements).
+
+## 2026-11-19: Permanent design docs in `docs/design/`, discoverable without the project
+PRINCIPLES/TOKENS/PRIMITIVES/RULES moved out of the project folder, which closes when the migration ends. Entry points: `frontend/CLAUDE.md` (auto-loaded under `frontend/`), the `ui` skill, a root CLAUDE.md pointer. Migration-only content moved to `MIGRATION.md`. PRINCIPLES gained §0 (what the app is, usage contexts, feel).
+Alternative: keep everything in the project folder. Rejected: agents outside the project never read it.
+
+## 2026-11-19: Storybook instead of a `/dev/ui` route
+Stories are isolated per state, screenshot-able without the backend or login, come with the a11y addon, and have an MCP addon so agents can look components up.
+Alternatives: a `/dev/ui` route (no tooling, but no isolation or addons), Histoire (Vue-native, smaller ecosystem).
+
+## 2026-11-19: Component library allowed; bake-off before tokens
+Supersedes the earlier "drop PrimeVue" call. Candidates: PrimeVue Volt (Tailwind v4, copy-in, on unstyled PrimeVue), PrimeVue styled mode with a custom preset, and Reka UI + own Tailwind. Ruled out: Nuxt UI and shadcn-vue (Vercel-owned/affiliated, the owner's preference; shadcn also looks generic), daisyUI (no behaviour), Vuetify/Quasar (Material, fights Tailwind), Naive UI/Element Plus (own theming, admin look). The token layer waits for the pick because names may follow the library.
+
+## 2026-11-19: Owner accepted the charter defaults
+Blue accent, inverted neutral primary button, darker surfaces, Dark/Light/System toggle (default dark), bottom sheets below `lg`, phone-width gym logging on desktop.

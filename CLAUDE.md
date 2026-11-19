@@ -66,6 +66,12 @@ UI overhaul, optimistic UI and performance work are tracked in `docs/projects/`.
 of them, read `docs/projects/README.md` (session protocol) and that project's README/TASKS. Update
 TASKS/DECISIONS in the same PR as the code.
 
+## UI / design system
+
+Any frontend UI change follows `docs/design/` (start with `docs/design/README.md`; the `ui` skill and
+`frontend/CLAUDE.md` summarise the rules). `npm run lint` in `frontend/` enforces them for new code
+and runs in `dev check` and the j-cicd pipeline.
+
 ## Notes
 
 - Backend config: `backend/.env` (created by `dev` from `.env.example` with random secrets).

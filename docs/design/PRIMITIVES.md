@@ -1,9 +1,15 @@
 # Primitives
 
+> **Status: spec, pending the library bake-off.** This is the set of components the app needs,
+> with their variants, states and the code each replaces. That part holds whatever we pick. If a
+> library wins (PrimeVue Volt is the candidate), most entries become "the library component,
+> styled to these tokens and wrapped in `shared/ui/`". Only the gaps get built from scratch.
+> Update this file when the choice is made.
+
 The minimal shared component set. Location: **`frontend/src/shared/ui/`**, one component per
-file, PascalCase, exported from `shared/ui/index.ts`. They use tokens only (TOKENS.md), have no
-`<style>` blocks (Tailwind classes plus `<Transition>` classes), and appear in `/dev/ui` in both
-themes with every state.
+file, PascalCase, exported from `shared/ui/index.ts`. Pages import from `shared/ui/` only, never
+from the library directly. They use tokens only (TOKENS.md), have no `<style>` blocks, and each
+has **Storybook stories** for every state in both themes.
 
 Shared conventions:
 - `size` is `sm | md | lg`, default `md`. **`md` is touch-sized below `lg` and compact at `lg`
@@ -12,8 +18,8 @@ Shared conventions:
 - Every interactive primitive has `disabled`, a visible `focus-visible` ring (`ring-2 ring-accent
   ring-offset-2 ring-offset-canvas`), and `hover:` only as an enhancement.
 - Tones are always `neutral | accent | success | warn | danger | info`, mapped to tokens.
-- Native elements first (`<button>`, `<input>`, `<select>`, `<dialog>`-like semantics). No
-  headless-UI dependency unless a primitive needs it (decide in DECISIONS).
+- Native elements first (`<button>`, `<input>`, `<select>`) where the library doesn't add
+  real value. Focus traps, popovers and comboboxes come from the library.
 - Until phase 5 removes the global element CSS in `App.vue` (`button { padding; margin; box-shadow }`,
   `input, select { background: rgb(71,71,71) }`), primitives neutralise it with a base reset
   class inside the primitive (`m-0 shadow-none`). Callers must never need `!` overrides.
@@ -30,7 +36,7 @@ Shared conventions:
 | 6 | Toast (re-skin `ToastContainer`) | 3b | 162 calls, Bootstrap hexes, optimistic-ui needs an Undo action |
 | 7 | ListRow (+ List) | 3b | Every module's main view is a list |
 | 8 | Select, Toggle, Checkbox | 3b | 11 files with raw `<select>`, 10 with raw checkboxes |
-| 9 | SegmentedControl, PageHeader/Section, Chart | 3c | Smaller repetition. Chart unblocks the PrimeVue removal |
+| 9 | SegmentedControl, PageHeader/Section, Chart | 3c | Smaller repetition. Chart moves chart theming onto tokens |
 | 10 | Combobox (from `Dropdown.vue`), Menu | 3c | Only a few users; do when the owning module migrates |
 
 ---
@@ -192,7 +198,7 @@ so fast loads never flash a skeleton. Replaces the 16 "Loading…" / 2 "Loading.
 `shared/chart/Chart.vue` (`type`, `data`, `options`) plus `shared/chart/theme.ts`
 (`chartTheme()` reads `--color-chart-*`, `fg-muted`, `line`; re-renders on theme change).
 Replaces `primevue/chart` in the 5 chart files and the two `readChartTheme()` copies. See the
-PrimeVue decision in TOKENS.md.
+library bake-off (PrimeVue Volt may provide the wrapper).
 
 ## Combobox, Menu (later)
 - `Combobox`: evolve `shared/input/Dropdown.vue` (hex colours, `z-1000`, blur-timeout close) into

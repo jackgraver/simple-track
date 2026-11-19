@@ -1,86 +1,82 @@
 # UI rules for agents
 
 Apply these to **any** change that touches `frontend/src/**/*.vue` or UI-facing `.ts`, in any
-project, not only ui-overhaul. Background: [PRINCIPLES.md](PRINCIPLES.md),
-[TOKENS.md](TOKENS.md), [PRIMITIVES.md](PRIMITIVES.md).
+project. Background: [PRINCIPLES.md](PRINCIPLES.md), [TOKENS.md](TOKENS.md),
+[PRIMITIVES.md](PRIMITIVES.md). Migration tracking lives in `docs/projects/ui-overhaul/`.
+
+> **Interim (until the token layer and primitives land):** the new tokens and `shared/ui/` don't
+> exist yet. Use the legacy token utilities (`bg-firstBg`, `bg-secondBg`, `text-textPrimary`,
+> `text-textSecondary`, `border-(--color-border)`), copy the nearest existing pattern, and keep the
+> lint clean. Don't invent new colours, and don't start a primitive outside its ui-overhaul task.
 
 ## Rules
 1. **Tokens only.** No hex/rgb/hsl literals, no Tailwind palette classes (`zinc-*`, `green-*`,
-   `white`…), no arbitrary colour, size, radius or z values (`text-[10px]`, `bg-[#1b1b1b]`,
-   `z-1000`) outside `src/style.css`. Use the TOKENS.md utilities. If a token is missing,
-   add it to `style.css` and TOKENS.md in the same PR and log it in DECISIONS.md. Don't inline it.
-2. **Primitives only.** Use `shared/ui/*` for buttons, inputs, selects, toggles, cards, rows,
-   badges, overlays, toasts and states. If a primitive doesn't exist yet, either build it
-   (to PRIMITIVES.md spec, in `/dev/ui`) or write the markup with tokens and leave a
-   `<!-- ui: replace with <X> -->` comment. Don't add another local copy of an existing primitive.
-3. **No new `<style>` blocks** and no new global CSS. Tailwind classes only. Animations go
-   through `<Transition>` classes or tokens in `style.css`.
-4. **No `!` overrides** (`m-0!`, `shadow-none!`) in new code. If you need one, the global
-   `App.vue` element CSS is in the way, so use a primitive.
-5. **States required.** Every query-backed view renders loading (`Skeleton`), empty
-   (`EmptyState`), error (`ErrorState` + retry) and success. Every mutation trigger shows pending
-   (`Button :loading` or row `pending`) and reports failure with a toast.
-6. **Mobile and desktop both work.** Check below and above `lg`. Mobile: nothing overflows
-   horizontally at 360px, controls ≥ 44px, primary action reachable, safe areas respected, inputs
-   ≥ 16px. Desktop: content uses the column, keyboard works (Tab, Enter, Esc).
-7. **Both themes work.** Never use `dark:`. If something looks wrong in light, the fix is a
-   token, not a per-component override.
-8. **A11y floor.** Icon-only buttons have `label`/`aria-label`, inputs have labels, focus is
-   visible, colour is never the only signal.
-9. **Lower the ratchet.** If your change removes violations, lower
-   `frontend/src/ui-guard.baseline.json` (command below). Never raise it.
-10. **One module per PR** for migrations. Touch a page once: tokens, primitives, states and the
-    optimistic-ui conversion together where that project is ready.
+   `white`…), no arbitrary colour, type, radius, shadow or z values (`text-[10px]`,
+   `bg-[#1b1b1b]`, `z-[1000]`) outside `src/style.css`. If a token is missing, add it to
+   `style.css` and TOKENS.md in the same PR and log it in the project DECISIONS.md.
+2. **Primitives only.** Buttons, inputs, selects, toggles, cards, rows, badges, overlays, toasts
+   and states come from `shared/ui/`. Don't add a local copy of something that exists there. If
+   it's missing, build it to the PRIMITIVES.md spec with a Storybook story, or use tokens and
+   leave `<!-- ui: replace with <X> -->`.
+3. **No `<style>` blocks**, no new global CSS. Tailwind classes only.
+4. **No `!` overrides** (`m-0!`, `shadow-none!`) in new code. Needing one means the global
+   `App.vue` element CSS is in the way: use a primitive.
+5. **States required.** Every query-backed view renders loading (Skeleton), empty (EmptyState),
+   error (ErrorState + retry) and success. Every mutation trigger shows pending and reports
+   failure with a toast.
+6. **Mobile and desktop both work.** Layout switches at `lg` only. Mobile: no horizontal
+   overflow at 360px, controls ≥ 44px, primary action in thumb reach, safe areas respected,
+   inputs ≥ 16px. Desktop: uses the column, keyboard works (Tab, Enter, Esc).
+7. **Both themes work.** Never use `dark:`. If light looks wrong, fix the token.
+8. **A11y floor.** Icon-only buttons have `aria-label`, inputs have labels, focus is visible,
+   colour is never the only signal.
+9. **Never grow the suppressions.** Don't run `--suppress-all`/`--suppress-rule` to make new code
+   pass. When you clean a file up, prune them (command below).
+10. **One module per PR** for migrations: tokens, primitives, states and the optimistic-ui
+    conversion together, so each page is touched once.
 
-## Mechanical enforcement (in place)
-`frontend/src/ui-guard.test.ts` runs in `vitest run`, so it runs locally, in `dev test` and in
-the j-cicd deploy pipeline (`frontend-test` step). For every `.vue`/`.ts` file in `src/`
-(except tests), it counts:
+## Lint (enforced)
+ESLint (`frontend/eslint.config.js`) runs in `npm run lint`, `./bin/dev check` and the j-cicd
+pipeline (`frontend-lint` step, before tests). It covers:
 
-| Metric | Matches |
+| Rule | Catches |
 |---|---|
-| `colorLiteral` | `#abc`, `#1b1b1b`, `rgb(`, `rgba(`, `hsl(`, `hsla(` |
-| `paletteClass` | `bg-/text-/border-/ring-/…` + Tailwind palette hue (`zinc-500`, `white`, `amber-700/50`) |
-| `arbitraryValue` | `text-[…]`, `bg-[…]`, `border-[…]`, `rounded-[…]`, `shadow-[…]`, `z-[…]`, … |
-| `styleBlock` | `<style` |
+| `better-tailwindcss/no-restricted-classes` | palette colours (`text-zinc-500`, `hover:bg-green-600`, `text-white/15`) and arbitrary colour/type/radius/shadow/z values |
+| `better-tailwindcss/no-unknown-classes` | classes Tailwind doesn't know: typos, undefined tokens (`bg-primary`), and the custom CSS classes that `<style>` blocks need |
+| `better-tailwindcss/no-conflicting-classes`, `no-duplicate-classes`, `no-deprecated-classes` | contradictory, repeated or v3-era classes |
+| `vue/no-restricted-block` (`style`) | `<style>` blocks |
+| `no-restricted-syntax`, `vue/no-restricted-syntax`, `vue/no-restricted-static-attribute` | hex/rgb/hsl in TS strings, template expressions and `style="…"` |
 
-It **fails only if a file's count goes above its entry in `ui-guard.baseline.json`**. New files
-start at 0, so it can't fail on current code. Baseline at creation (2026-11-19): 70 files, 166
-colour literals, 503 palette classes, 65 arbitrary values, 23 style blocks.
+Existing violations (849 at setup, 2026-11-19) are recorded in `frontend/eslint-suppressions.json`.
+ESLint only fails when a file has **more** violations of a rule than recorded. When that
+happens it lists every violation of that rule in the file, not just the new one: diff against
+`main` to find yours.
 
 ```sh
 cd frontend
-mise exec -- npx vitest run src/ui-guard.test.ts                    # check
-UI_GUARD_UPDATE=1 mise exec -- npx vitest run src/ui-guard.test.ts  # rewrite baseline after cleanup
-git diff src/ui-guard.baseline.json                                 # must only go DOWN
+mise exec -- npm run lint                            # check
+mise exec -- npm run lint -- --prune-suppressions    # after cleanup: shrink the suppressions file
+git diff eslint-suppressions.json                    # counts may only go down or disappear
 ```
 
-Reviewers reject a baseline diff with any increase. Known false positives (a hex in a comment, a
-`rgb(` in a chart helper) get fixed by moving the value into a token, not by raising the count.
-
-## Planned enforcement (specified, not yet added: add when the condition holds)
-- **Legacy token metric**: once the token layer lands, add `legacyToken`
-  (`\b(?:bg|text|border)-(?:mainBg|firstBg|secondBg|thirdBg|textPrimary|textSecondary|cfRed)\b`,
-  `--color-border`, `--color-cf-red`) to the guard with a fresh baseline.
-- **`!important` metric**: add once primitives replace the global `button` CSS (`\b[\w:-]+!(?=[\s"'])`).
-- **Palette removal**: when `paletteClass` is 0 everywhere, add `--color-*: initial;` to `@theme`
-  in `style.css`. Raw palette classes then stop compiling, which makes the rule a build fact.
-- **ESLint** (`eslint-plugin-vue` + `vue/no-restricted-class`, `vue/no-restricted-syntax` for
-  `<style>`, or `eslint-plugin-tailwindcss`): not added. The repo has no ESLint today, and the
-  ratchet test covers the same ground without a new toolchain. Revisit if editor-time feedback is wanted.
+## Planned rules (add when the condition holds)
+| When | Add |
+|---|---|
+| Token layer lands | Restrict legacy tokens: `bg-(mainBg\|firstBg\|secondBg\|thirdBg)`, `text-(textPrimary\|textSecondary\|cfRed)`, `--color-border`, `--color-cf-red` |
+| Button/Input primitives land | `vue/no-restricted-html-elements` for raw `<button>`, `<input>`, `<select>`, `<textarea>` outside `shared/ui/` |
+| Global element CSS removed | Restrict `!` important classes |
+| No palette suppressions left | `--color-*: initial;` in `@theme`, so palette classes stop compiling |
+| Library chosen | Restrict direct imports of the library outside `shared/ui/` (`no-restricted-imports`) |
 
 ## How to verify visually
-The owner knows the UI. Screenshot only what you changed, not every page.
-1. `./bin/dev start` (never bare `./bin/dev`), then `./bin/dev env` for the frontend URL. Never
-   hardcode ports. Log in with `dev`/`dev` (or `POST <frontend>/api/auth/login`). The devseed
-   data covers gym, diet, tracking, media and money.
-2. For each page you changed, check **390×844** (mobile) and **1280×800** (desktop), in **dark and
-   light** (`localStorage["st:theme"]="light"` once the token layer lands). Use whatever browser
-   tooling the session has (Claude in Chrome, the built-in browser, or an ad-hoc
-   `mise exec -- npx playwright screenshot`; don't add it as a dependency).
-3. Check the states: empty (a fresh worktree DB or filter to nothing), error (block `/api/*` in DevTools
-   request blocking, or `./bin/dev stop` with the page open), pending (DevTools network throttling). For new
-   primitives, `/dev/ui` is the place to check all states and both themes.
-4. `mise exec -- npx vue-tsc --noEmit` and `mise exec -- npx vitest run` in `frontend/` must pass.
-5. Put screenshots in the PR description or `docs/projects/ui-overhaul/audit/<slice>/` (only for
-   before/after of a migrated module). `./bin/dev stop` if you started the stack.
+Screenshot only what you changed. The owner knows the rest of the UI.
+1. **Components:** check them in Storybook (once set up): every state, both themes, 390 and 1280
+   viewports. The story URL needs no backend or login.
+2. **Pages:** `./bin/dev start` (never bare `./bin/dev`), then `./bin/dev env` for the frontend URL.
+   Never hardcode ports. Log in with `dev`/`dev`. devseed provides data for every module.
+3. Use the Playwright plugin (or Claude in Chrome) to open the page at **390×844** and
+   **1280×800**, in dark and light, and check the console for errors.
+4. States: empty (filter to nothing or use a fresh worktree DB), error (block `/api/*` in
+   DevTools, or `./bin/dev stop` with the page open), pending (network throttling).
+5. `mise exec -- npm run type-check`, `npm run lint` and `npx vitest run` in `frontend/` must pass.
+6. Put before/after screenshots in the PR description. `./bin/dev stop` if you started the stack.

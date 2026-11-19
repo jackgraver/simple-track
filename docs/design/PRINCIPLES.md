@@ -1,8 +1,21 @@
 # UI principles
 
 One page. If a design question isn't answered here, pick the plainest option and log it in
-DECISIONS.md. Tokens: [TOKENS.md](TOKENS.md). Components: [PRIMITIVES.md](PRIMITIVES.md).
-Rules and checks: [RULES.md](RULES.md).
+the project's DECISIONS.md. Tokens: [TOKENS.md](TOKENS.md). Components:
+[PRIMITIVES.md](PRIMITIVES.md). Rules and checks: [RULES.md](RULES.md).
+
+## 0. What this app is, and how it's used
+simple-track is a personal tracker for gym, diet, body tracking, money, media and groceries. It
+gets used every day in two very different situations:
+- **On a phone, mid-task**: logging a set between lifts, a meal, water, weight. One hand, short
+  attention, often in a gym. Speed and big targets matter more than information density.
+- **At a desk, planning and reviewing**: planning meals, editing workout plans, checking finances
+  and progression charts. Width, overview and keyboard flow matter more than big targets.
+
+The feel: a calm, dark, precise tool, more instrument than dashboard. It should feel fast and
+trustworthy, with no decoration for its own sake, and a bit of craft in the details (type,
+spacing, a quick transition). The **gym logging flow** (`pages/gym/logging/exercise/`) is the
+closest existing screen to the target on mobile. No desktop screen is there yet.
 
 ## 1. What we're aiming for
 - **Clean and functional first.** Every element earns its place by helping someone log, read
