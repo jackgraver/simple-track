@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import { useRoute, useRouter } from "vue-router";
+import { useRoute } from "vue-router";
 import { useWorkoutLogToday } from "~/api/workout/queries";
 import WorkoutActivityGraph from "~/pages/gym/WorkoutActivityGraph.vue";
 import SwitchWorkoutPlanDialog from "~/pages/gym/components/SwitchWorkoutPlanDialog.vue";
@@ -10,7 +10,6 @@ import { Pencil } from "lucide-vue-next";
 import { Button, ErrorState, IconButton, Skeleton, useDelayedFlag } from "~/shared/ui";
 
 const route = useRoute();
-const router = useRouter();
 const isGymHome = computed(() => route.name === "gym");
 const dayOffset = computed(() => {
     const raw = route.query.offset;
@@ -53,7 +52,7 @@ const loggingRoute = computed(() => ({
                         <Pencil />
                     </IconButton>
                 </section>
-                <Button variant="primary" size="lg" block @click="router.push(loggingRoute)">Log workout</Button>
+                <Button variant="primary" size="lg" block :to="loggingRoute">Log workout</Button>
                 <WorkoutActivityGraph />
             </template>
         </template>

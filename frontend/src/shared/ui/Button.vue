@@ -20,8 +20,10 @@ const props = withDefaults(
 
 // `!` classes neutralise the global `button {}` rule in App.vue until phase 6 removes it, so
 // callers never need overrides. Delete them with that rule.
+// `box-border` because App.vue's `a { all: unset }` resets box-sizing to content-box on the RouterLink
+// variant, which made `block` (w-full) plus padding overflow its column.
 const base =
-    "m-0! inline-flex shrink-0 cursor-pointer items-center justify-center gap-2 rounded-control! border! font-medium whitespace-nowrap shadow-none! transition-colors duration-100 select-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent";
+    "m-0! box-border inline-flex shrink-0 cursor-pointer items-center justify-center gap-2 rounded-control! border! font-medium whitespace-nowrap shadow-none! transition-colors duration-100 select-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent";
 
 const variants: Record<ButtonVariant, [rest: string, interactive: string]> = {
     primary: ["border-transparent! bg-fg text-fg-inverse", "hover:opacity-90 active:opacity-80"],

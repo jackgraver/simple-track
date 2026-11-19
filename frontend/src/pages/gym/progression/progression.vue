@@ -1,11 +1,10 @@
 <script setup lang="ts">
 import type { Exercise } from "~/types/workout";
-import Dropdown from "~/shared/input/Dropdown.vue";
-import type { DropdownOption } from "~/shared/input/Dropdown.vue";
 import ExerciseProgressionChartPanel from "~/pages/gym/progression/ExerciseProgressionChartPanel.vue";
 import { computed, ref, watch } from "vue";
 import { Dumbbell } from "lucide-vue-next";
-import { EmptyState, ErrorState, PageHeader } from "~/shared/ui";
+import type { ComboboxOption } from "~/shared/ui";
+import { Combobox, EmptyState, ErrorState, PageHeader } from "~/shared/ui";
 import {
     normalizeExercisesListPayload,
     useWorkoutExercisesAllQuery,
@@ -25,7 +24,7 @@ const exercises = computed(() =>
     normalizeExercisesListPayload(exercisesPayload.value),
 );
 
-const exerciseOptions = computed<DropdownOption[]>(() =>
+const exerciseOptions = computed<ComboboxOption[]>(() =>
     [...exercises.value]
         .sort((a, b) =>
             a.name.localeCompare(b.name, undefined, { sensitivity: "base" }),
@@ -33,7 +32,7 @@ const exerciseOptions = computed<DropdownOption[]>(() =>
         .map((e: Exercise) => ({ label: e.name, value: e.ID })),
 );
 
-const onExerciseSelect = (option: DropdownOption) => {
+const onExerciseSelect = (option: ComboboxOption) => {
     exerciseId.value = option.value as number;
 };
 
@@ -78,11 +77,11 @@ watch(
             <div class="flex min-w-0 max-w-2xl flex-col gap-2">
                 <span class="text-xs font-medium text-fg-muted">Exercise</span>
                 <p v-if="selectedExercise" class="m-0 text-base font-medium text-fg">{{ selectedExercise.name }}</p>
-                <Dropdown
+                <Combobox
                     :options="exerciseOptions"
                     placeholder="Search exercises…"
                     :loading="exercisesLoading && exerciseOptions.length === 0"
-                    :on-select="onExerciseSelect"
+                    @select="onExerciseSelect"
                 />
             </div>
             <ExerciseProgressionChartPanel v-if="exerciseId != null" :exercise-id="exerciseId" />

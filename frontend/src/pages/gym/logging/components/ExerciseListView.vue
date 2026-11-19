@@ -6,11 +6,10 @@ import type {
     PlannedCardio,
     MobilityLogged,
 } from "~/types/workout";
-import type { DropdownOption } from "~/shared/input/Dropdown.vue";
-import Dropdown from "~/shared/input/Dropdown.vue";
+import type { ComboboxOption } from "~/shared/ui";
 import { ref, computed } from "vue";
 import { ChevronRight, Dumbbell, Trash2 } from "lucide-vue-next";
-import { Badge, Button, Card, EmptyState, IconButton, List, ListRow } from "~/shared/ui";
+import { Badge, Button, Combobox, Card, EmptyState, IconButton, List, ListRow } from "~/shared/ui";
 import { useRouter } from "vue-router";
 import { useExercisesPaginated } from "~/api/workout/queries";
 
@@ -82,7 +81,7 @@ const {
     isFetching,
 } = useExercisesPaginated(exerciseSearch);
 
-const exerciseOptions = computed<DropdownOption[]>(() => {
+const exerciseOptions = computed<ComboboxOption[]>(() => {
     const all = exercisesPages.value?.pages.flatMap((p) => p.exercises) ?? [];
     const existingIds = new Set(
         props.exercises
@@ -94,7 +93,7 @@ const exerciseOptions = computed<DropdownOption[]>(() => {
         .map((ex) => ({ label: ex.name, value: ex.ID }));
 });
 
-const handleExerciseSelect = (option: DropdownOption) => {
+const handleExerciseSelect = (option: ComboboxOption) => {
     emit("add-exercise", option.value as number);
 };
 
@@ -154,12 +153,12 @@ const isLogged = (exerciseGroup: ExerciseGroup): boolean => {
         <h1 v-if="workoutName" class="m-0 text-xl font-semibold tracking-tight text-fg">
             {{ workoutName }} Day
         </h1>
-        <Dropdown
+        <Combobox
             :options="exerciseOptions"
-            :on-select="handleExerciseSelect"
             :has-more="hasNextPage ?? false"
             :loading="isFetching"
             placeholder="Add exercise..."
+            @select="handleExerciseSelect"
             @load-more="handleLoadMore"
             @search="handleExerciseSearch"
         />

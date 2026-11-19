@@ -1,3 +1,5 @@
+import { createRouter, createMemoryHistory, routerKey, routeLocationKey, routerViewLocationKey } from "vue-router";
+import { provide } from "vue";
 import type { Meta, StoryObj } from "@storybook/vue3-vite";
 import { Plus } from "lucide-vue-next";
 import Button from "./Button.vue";
@@ -65,5 +67,24 @@ export const Matrix: Story = {
                 </div>
             </section>
         </div>`,
+    }),
+};
+
+/**
+ * A link button (`to`) with `block` at phone width. Regression: `a { all: unset }` in App.vue made the anchor
+ * content-box, so `w-full` plus padding overflowed its column. The wrapper is 358px (390 - 2 x 16px gutter): the
+ * button must fill it exactly.
+ */
+export const LinkBlock: Story = {
+    parameters: { layout: "padded", viewport: { defaultViewport: "phone" } },
+    render: () => ({
+        components: { Button },
+        setup() {
+            const router = createRouter({ history: createMemoryHistory(), routes: [{ path: "/:p(.*)*", component: { template: "<div />" } }] });
+            provide(routerKey, router);
+            provide(routeLocationKey, router.currentRoute.value);
+            provide(routerViewLocationKey, router.currentRoute);
+        },
+        template: `<div class="w-[358px] outline outline-1 outline-line"><Button variant="primary" size="lg" block to="/gym/logging">Log workout</Button></div>`,
     }),
 };
