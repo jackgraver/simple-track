@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import Chart from "primevue/chart";
+import Chart from "~/shared/chart/Chart.vue";
 import { computed, ref, watch } from "vue";
 import { useRoute } from "vue-router";
 import {
@@ -71,14 +71,12 @@ const weightSeries = computed(() =>
     ),
 );
 const hasChartData = computed(() => weightSeries.value.values.length > 0);
-const weightLineColor = "hsl(215, 85%, 55%)";
 const weightChart = computed(() => {
     const s = weightSeries.value;
     return buildTrackingLineChart(
         s.labels,
         s.values,
         "Weight (lbs)",
-        weightLineColor,
     );
 });
 const handleSave = async () => {

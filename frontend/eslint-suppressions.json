@@ -194,14 +194,6 @@
     },
     "better-tailwindcss/no-restricted-classes": {
       "count": 3
-    },
-    "no-restricted-syntax": {
-      "count": 2
-    }
-  },
-  "src/pages/finances/chart.ts": {
-    "no-restricted-syntax": {
-      "count": 5
     }
   },
   "src/pages/finances/components/PresetDialog.vue": {
@@ -429,26 +421,6 @@
   "src/pages/gym/progression/ExerciseProgressionChartPanel.vue": {
     "better-tailwindcss/no-deprecated-classes": {
       "count": 2
-    }
-  },
-  "src/pages/gym/progression/useProgressionCharts.ts": {
-    "no-restricted-syntax": {
-      "count": 10
-    }
-  },
-  "src/pages/gym/steps/index.vue": {
-    "no-restricted-syntax": {
-      "count": 1
-    }
-  },
-  "src/pages/gym/trackingLogChart.ts": {
-    "no-restricted-syntax": {
-      "count": 4
-    }
-  },
-  "src/pages/gym/weight/index.vue": {
-    "no-restricted-syntax": {
-      "count": 1
     }
   },
   "src/pages/home/index.vue": {

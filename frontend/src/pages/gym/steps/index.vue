@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import Chart from "primevue/chart";
+import Chart from "~/shared/chart/Chart.vue";
 import { computed, ref } from "vue";
 import { useRoute } from "vue-router";
 import { useStepLogs, useSaveSteps } from "~/api/tracking/queries";
@@ -36,10 +36,9 @@ const stepSeries = computed(() =>
         dateStr.value,
     ),
 );
-const stepsBarColor = "hsl(142, 71%, 45%)";
 const stepChart = computed(() => {
     const s = stepSeries.value;
-    return buildTrackingBarChart(s.labels, s.values, "Steps", stepsBarColor);
+    return buildTrackingBarChart(s.labels, s.values, "Steps");
 });
 const handleSave = async () => {
     const n = Number.parseInt(stepsInput.value.replace(/\s/g, ""), 10);

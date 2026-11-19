@@ -1,24 +1,5 @@
 import type { ChartData, ChartOptions } from "chart.js";
-
-function readChartTheme(): {
-    textMuted: string;
-    grid: string;
-} {
-    if (typeof document === "undefined") {
-        return {
-            textMuted: "hsl(0, 0%, 45%)",
-            grid: "hsl(0, 0%, 80%)",
-        };
-    }
-    const root = document.documentElement;
-    const textMuted =
-        getComputedStyle(root).getPropertyValue("--color-text-secondary").trim() ||
-        "hsl(0, 0%, 45%)";
-    const grid =
-        getComputedStyle(root).getPropertyValue("--color-border").trim() ||
-        "hsl(0, 0%, 80%)";
-    return { textMuted, grid };
-}
+import { chartTheme, type ChartTheme } from "~/shared/chart/theme";
 
 export function trackingDayKey(dateStr: string): string {
     const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(dateStr);
@@ -90,7 +71,7 @@ const Y_AXIS_PADDING = 5;
 
 function buildTrackingScaleOptions(
     datasetLabel: string,
-    t: ReturnType<typeof readChartTheme>,
+    t: ChartTheme,
     values: number[],
     yMinFixed?: number,
 ) {
@@ -104,18 +85,18 @@ function buildTrackingScaleOptions(
     }
     return {
         x: {
-            ticks: { color: t.textMuted, maxRotation: 45 },
+            ticks: { color: t.muted, maxRotation: 45 },
             grid: { color: t.grid },
         },
         y: {
-            ticks: { color: t.textMuted },
+            ticks: { color: t.muted },
             grid: { color: t.grid },
             ...(yMin != null ? { min: yMin } : {}),
             ...(yMax != null ? { max: yMax } : {}),
             title: {
                 display: true,
                 text: datasetLabel,
-                color: t.textMuted,
+                color: t.muted,
             },
         },
     };
@@ -125,17 +106,18 @@ export function buildTrackingLineChart(
     labels: string[],
     values: number[],
     datasetLabel: string,
-    lineColor: string,
+    lineColor?: string,
 ): { data: ChartData<"line">; options: ChartOptions<"line"> } {
-    const t = readChartTheme();
+    const t = chartTheme();
+    const lineColor_ = lineColor ?? t.series[0];
     const data: ChartData<"line"> = {
         labels,
         datasets: [
             {
                 label: datasetLabel,
                 data: values,
-                borderColor: lineColor,
-                backgroundColor: lineColor,
+                borderColor: lineColor_,
+                backgroundColor: lineColor_,
                 tension: 0.2,
                 fill: false,
                 pointRadius: 3,
@@ -149,7 +131,7 @@ export function buildTrackingLineChart(
         maintainAspectRatio: false,
         interaction: { mode: "index", intersect: false },
         plugins: {
-            legend: { labels: { color: t.textMuted } },
+            legend: { labels: { color: t.muted } },
         },
         scales: buildTrackingScaleOptions(datasetLabel, t, values),
     };
@@ -160,17 +142,18 @@ export function buildTrackingBarChart(
     labels: string[],
     values: number[],
     datasetLabel: string,
-    barColor: string,
+    barColor?: string,
 ): { data: ChartData<"bar">; options: ChartOptions<"bar"> } {
-    const t = readChartTheme();
+    const t = chartTheme();
+    const barColor_ = barColor ?? t.series[1];
     const data: ChartData<"bar"> = {
         labels,
         datasets: [
             {
                 label: datasetLabel,
                 data: values,
-                backgroundColor: barColor,
-                borderColor: barColor,
+                backgroundColor: barColor_,
+                borderColor: barColor_,
                 borderWidth: 0,
                 borderRadius: 4,
             },
@@ -181,7 +164,7 @@ export function buildTrackingBarChart(
         maintainAspectRatio: false,
         interaction: { mode: "index", intersect: false },
         plugins: {
-            legend: { labels: { color: t.textMuted } },
+            legend: { labels: { color: t.muted } },
         },
         scales: buildTrackingScaleOptions(datasetLabel, t, values, 0),
     };

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
-import Chart from "primevue/chart";
+import Chart from "~/shared/chart/Chart.vue";
 import { AlertTriangle, ChevronRight, Plus, RefreshCw } from "lucide-vue-next";
 import {
     useAccounts,

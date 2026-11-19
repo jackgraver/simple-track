@@ -212,10 +212,11 @@ so fast loads never flash a skeleton. Replaces the 16 "Loading…" / 2 "Loading.
 ## Chart
 `shared/chart/Chart.vue` (`type`, `data`, `options`) plus `shared/chart/theme.ts`
 (`chartTheme()` reads `--color-chart-*`, `fg-muted`, `line`; re-renders on theme change).
-Replaces `primevue/chart` in the 5 chart files and the two `readChartTheme()` copies. A thin
-chart.js wrapper (register only the controllers/scales in use, so no `chart.js/auto`). It reads
-tokens after `data-theme` is set and re-renders when it changes (the bake-off caught a chart that
-sampled the previous theme).
+Replaces `primevue/chart` in the 5 chart files and the two `readChartTheme()` copies. `shared/chart/Chart.vue` is a thin
+chart.js wrapper that registers only line/bar parts (no `chart.js/auto`). `chartTheme()` in
+`theme.ts` resolves the tokens to `rgb()` and is reactive: call it inside a `computed` and the
+chart re-colours when `data-theme` changes (the bake-off caught a chart that sampled the previous
+theme). Callers pass `type`, `data`, `options` and an accessible `label`.
 
 ## Combobox, Menu (later)
 - `Combobox`: evolve `shared/input/Dropdown.vue` (hex colours, `z-1000`, blur-timeout close) into

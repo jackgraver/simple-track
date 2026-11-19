@@ -1,4 +1,5 @@
 import { computed, type Ref } from "vue";
+import { chartTheme } from "~/shared/chart/theme";
 import type { ChartData, ChartOptions } from "chart.js";
 
 export type ProgressionEntry = {
@@ -99,41 +100,6 @@ function groupByDay(rows: NormalizedSet[]): Map<string, NormalizedSet[]> {
     return m;
 }
 
-function readChartTheme(): {
-    text: string;
-    textMuted: string;
-    grid: string;
-    lineWeight: string;
-    lineVolume: string;
-} {
-    if (typeof document === "undefined") {
-        return {
-            text: "hsl(0, 0%, 20%)",
-            textMuted: "hsl(0, 0%, 45%)",
-            grid: "hsl(0, 0%, 80%)",
-            lineWeight: "hsl(142, 71%, 45%)",
-            lineVolume: "hsl(215, 85%, 55%)",
-        };
-    }
-    const root = document.documentElement;
-    const text =
-        getComputedStyle(root).getPropertyValue("--color-text-primary").trim() ||
-        "hsl(0, 0%, 20%)";
-    const textMuted =
-        getComputedStyle(root).getPropertyValue("--color-text-secondary").trim() ||
-        "hsl(0, 0%, 45%)";
-    const grid =
-        getComputedStyle(root).getPropertyValue("--color-border").trim() ||
-        "hsl(0, 0%, 80%)";
-    return {
-        text,
-        textMuted,
-        grid,
-        lineWeight: "hsl(142, 71%, 45%)",
-        lineVolume: "hsl(215, 85%, 55%)",
-    };
-}
-
 export function useProgressionCharts(
     entries: Ref<ProgressionEntry[]>,
     range: Ref<ProgressionRange>,
@@ -173,7 +139,7 @@ export function useProgressionCharts(
     );
 
     const progressionChartData = computed<ChartData<"line">>(() => {
-        const t = readChartTheme();
+        const t = chartTheme();
         const s = combinedSeries.value;
         const pointRadius = s.weights.length > 20 ? 0 : 3;
         return {
@@ -183,8 +149,8 @@ export function useProgressionCharts(
                     label: "Top set weight (lbs)",
                     data: s.weights,
                     yAxisID: "y",
-                    borderColor: t.lineWeight,
-                    backgroundColor: t.lineWeight,
+                    borderColor: t.series[1],
+                    backgroundColor: t.series[1],
                     tension: 0.15,
                     fill: false,
                     pointRadius,
@@ -195,8 +161,8 @@ export function useProgressionCharts(
                     label: "Top set reps",
                     data: s.topReps,
                     yAxisID: "y1",
-                    borderColor: t.lineVolume,
-                    backgroundColor: t.lineVolume,
+                    borderColor: t.series[0],
+                    backgroundColor: t.series[0],
                     tension: 0.15,
                     fill: false,
                     pointRadius,
@@ -208,7 +174,7 @@ export function useProgressionCharts(
     });
 
     const progressionChartOptions = computed<ChartOptions<"line">>(() => {
-        const t = readChartTheme();
+        const t = chartTheme();
         const s = combinedSeries.value;
         return {
             responsive: true,
@@ -216,7 +182,7 @@ export function useProgressionCharts(
             interaction: { mode: "index", intersect: false },
             plugins: {
                 legend: {
-                    labels: { color: t.textMuted },
+                    labels: { color: t.muted },
                 },
                 tooltip: {
                     callbacks: {
@@ -237,7 +203,7 @@ export function useProgressionCharts(
             scales: {
                 x: {
                     ticks: {
-                        color: t.textMuted,
+                        color: t.muted,
                         autoSkip: true,
                         maxTicksLimit: 6,
                         maxRotation: 0,
@@ -247,22 +213,22 @@ export function useProgressionCharts(
                 },
                 y: {
                     position: "left",
-                    ticks: { color: t.lineWeight },
+                    ticks: { color: t.series[1] },
                     grid: { color: t.grid },
                     title: {
                         display: true,
                         text: "Top set (lbs)",
-                        color: t.textMuted,
+                        color: t.muted,
                     },
                 },
                 y1: {
                     position: "right",
-                    ticks: { color: t.lineVolume },
+                    ticks: { color: t.series[0] },
                     grid: { drawOnChartArea: false },
                     title: {
                         display: true,
                         text: "Top set (reps)",
-                        color: t.textMuted,
+                        color: t.muted,
                     },
                 },
             },

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import Chart from "primevue/chart";
+import Chart from "~/shared/chart/Chart.vue";
 import { computed, ref, toRef } from "vue";
 import { useQuery } from "@tanstack/vue-query";
 import { apiClient } from "~/api/client";

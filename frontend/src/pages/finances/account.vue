@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import Chart from "primevue/chart";
+import Chart from "~/shared/chart/Chart.vue";
+import { chartTheme } from "~/shared/chart/theme";
 import { ArrowDownLeft, ArrowUpRight, Trash2 } from "lucide-vue-next";
 import {
     createTransaction,
@@ -86,7 +87,7 @@ const balanceChart = computed(() =>
     buildMoneyLineChart(
         [...balances.value].reverse().map((b) => ({ date: b.date, value: b.balance })),
         account.value?.is_liability ? "Owed" : "Balance",
-        account.value?.is_liability ? "rgb(248, 113, 113)" : "rgb(52, 211, 153)",
+        account.value?.is_liability ? chartTheme().danger : chartTheme().success,
     ),
 );
 

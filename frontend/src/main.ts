@@ -3,8 +3,6 @@ import { VueQueryPlugin, QueryClient } from '@tanstack/vue-query'
 import { router } from './router'
 import App from './App.vue'
 import './style.css'
-import PrimeVue from 'primevue/config'
-import Aura from '@primeuix/themes/aura'
 import { setUnauthorizedRedirect } from './composables/auth/session'
 import { resolveAuthSession } from './composables/auth/useAuth'
 import { initTheme } from './composables/useTheme'
@@ -52,15 +50,6 @@ const app = createApp(App)
 
 app.use(router)
 app.use(VueQueryPlugin, { queryClient })
-app.use(PrimeVue, {
-  theme: {
-    preset: Aura,
-    options: {
-      darkModeSelector: '[data-theme="dark"]',
-      cssLayer: false,
-    },
-  },
-})
 
 void resolveAuthSession().then(() => {
   app.mount('#app')
