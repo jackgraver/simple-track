@@ -26,7 +26,7 @@ const { getUsername } = useAuth();
                 <!-- The header links to the group's home (its first item). -->
                 <router-link
                     :to="itemLocation(group.items[0]!, route)"
-                    class="flex items-center gap-2 rounded-md px-2 py-1.5 text-xs font-semibold tracking-wide uppercase transition-colors"
+                    class="flex items-center gap-2 rounded-md px-2 py-1.5 text-xs font-semibold tracking-wide uppercase"
                     :class="
                         isItemActive(group.items[0]!, route)
                             ? 'bg-firstBg text-textPrimary'
@@ -41,7 +41,7 @@ const { getUsername } = useAuth();
                     <li v-for="item in group.items.slice(1)" :key="item.to">
                         <router-link
                             :to="itemLocation(item, route)"
-                            class="block rounded-md px-2 py-1.5 pl-7.5 text-sm transition-colors"
+                            class="block rounded-md px-2 py-1.5 pl-7.5 text-sm"
                             :class="
                                 isItemActive(item, route)
                                     ? 'bg-firstBg font-medium text-textPrimary'
