@@ -21,7 +21,7 @@
 
 ## Current state (audited 2026-11-19; details in MIGRATION.md)
 - Tailwind v4 `@theme` in `frontend/src/style.css` has 8 camelCase colour aliases and nothing for spacing, radius, type, motion or z. `tailwind.config.js` is dead (delete in the token slice).
-- PrimeVue: only `primevue/chart` (5 files) + the Aura plugin. Being removed (F2).
+- PrimeVue: removed in F2 (charts use `shared/chart/`).
 - Lint baseline: 849 suppressed violations in 80 files: 552 restricted classes (mostly `zinc-*`), 185 unknown classes (mostly custom CSS classes for `<style>` blocks), 66 deprecated v3-era classes, 23 `<style>` blocks, 23 colour literals in TS.
 - 173 raw `<button>`s and 93 raw `<input>`s, styled by global element CSS in `App.vue`.
 - States: ~16 bare "Loading…" strings, error UIs in only 8 files.
@@ -35,7 +35,7 @@
 6. **Enforcement + cleanup**: planned lint rules (RULES.md), remove the global element CSS, `--color-*: initial`, delete the legacy aliases.
 
 ## Next up / gotchas
-- **Next slice: F2 charts, then Phase 4.** F3 is on `proj/ui-theme`. F1 is on `proj/ui-tokens`, F4 on `proj/ui-storybook` (branched from it). Storybook: `npm run storybook` in `frontend/`; `reka-ui` is installed and lint-restricted to `shared/ui/`.
+- **Phase 3 (foundations) is done:** F1 `proj/ui-tokens`, F4 `proj/ui-storybook` (from F1), F3 `proj/ui-theme` and F2 `proj/ui-charts` (both from F4, different files). **Next: Phase 4 starting with P1** (Button, IconButton, Spinner).
 - **Light theme:** the shell and the Settings control are on tokens. Unmigrated pages stay readable through the legacy-alias bridge (DECISIONS), but their hard-coded `zinc-*`/`amber-*` classes still render dark colours. Each module slice fixes its own.
 - **Solid fills:** `on-solid` (white) on `danger`/`success`/`warn` fills is under 4.5:1 in dark. Decide the solid-button tokens in P1.
 - **Spec conflict for P6:** the mobile toast at `bottom-tabbar` covers the gym "Log set" button (all candidates). Stack it above the CTA on focus pages, or confirm inline.
