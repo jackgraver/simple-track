@@ -35,11 +35,11 @@
 6. **Enforcement + cleanup**: planned lint rules (RULES.md), remove the global element CSS, `--color-*: initial`, delete the legacy aliases.
 
 ## Next up / gotchas
-- **Phase 3 (foundations) is done:** F1 `proj/ui-tokens`, F4 `proj/ui-storybook` (from F1), F3 `proj/ui-theme` and F2 `proj/ui-charts` (both from F4, different files). **P1–P5 done** (`proj/ui-p1-buttons` … `proj/ui-p5-overlay`, stacked: each branches from the previous). **Next: P6** (Toast). Storybook: `npm run storybook` in `frontend/`; `reka-ui` is installed and lint-restricted to `shared/ui/`.
+- **Phase 3 (foundations) is done:** F1 `proj/ui-tokens`, F4 `proj/ui-storybook` (from F1), F3 `proj/ui-theme` and F2 `proj/ui-charts` (both from F4, different files). **P1–P6 done** (`proj/ui-p1-buttons` … `proj/ui-p6-toast`, stacked: each branches from the previous). **Next: P7** (PageHeader, Section). Storybook: `npm run storybook` in `frontend/`; `reka-ui` is installed and lint-restricted to `shared/ui/`.
 - **Light theme:** the shell and the Settings control are on tokens. Unmigrated pages stay readable through the legacy-alias bridge (DECISIONS), but their hard-coded `zinc-*`/`amber-*` classes still render dark colours. Each module slice fixes its own.
 - **Solid fills:** decided in P1 (DECISIONS): `danger-solid` uses `text-fg-inverse`. Any other solid `success`/`warn` fill must do the same, never `on-solid`.
 - **Primitives and the global `button {}` rule:** Button/IconButton carry `m-0! shadow-none! rounded-control! border!` (and `px-*!`) to beat the unlayered `App.vue` rule. They go when that rule is removed in phase 6. Storybook doesn't load that rule, so check a primitive in the real app too.
-- **Spec conflict for P6:** the mobile toast at `bottom-tabbar` covers the gym "Log set" button (all candidates). Stack it above the CTA on focus pages, or confirm inline.
+- **Toasts (P6):** resolved by placing them at the top on mobile focus pages (DECISIONS). `toast.push({ message, tone, action })` is available for optimistic Undo.
 - **Charts (F2):** read tokens after `data-theme` is set and re-render on change. The lab caught a chart that sampled the previous theme.
 - Overlay swipe-to-close is done (P5, pointer handler on the handle/header only, so the scrolling body is never hijacked). Reka focuses the ✕ first when a dialog opens; focus the first field in a custom dialog when its module migrates.
 - A lint failure in a file with suppressed violations lists *all* of that rule's violations in the file. Diff against `main` to find the new one. Never run `--suppress-all` to get past it.

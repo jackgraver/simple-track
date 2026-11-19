@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, watchEffect } from "vue";
+import { computed } from "vue";
 import { useRoute } from "vue-router";
 import ToastContainer from "./composables/toast/ToastContainer.vue";
 import DialogContainer from "./composables/dialog/DialogContainer.vue";
@@ -22,10 +22,6 @@ const showMobileHeader = computed(
 );
 const showDate = computed(() => route.meta.dated === true);
 
-// Lets fixed elements (toasts) sit above the mobile tab bar.
-watchEffect(() => {
-    document.documentElement.classList.toggle("has-tab-bar", showNav.value);
-});
 </script>
 
 <template>
@@ -50,7 +46,7 @@ watchEffect(() => {
         </main>
         <BottomTabBar v-if="showNav" class="lg:hidden" />
     </div>
-    <ToastContainer />
+    <ToastContainer :tab-bar="showNav" :top="route.meta.focus === true" />
     <DialogContainer />
 </template>
 

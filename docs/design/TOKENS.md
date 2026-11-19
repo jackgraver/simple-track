@@ -117,9 +117,9 @@ Overlay animations are tokens in `style.css` (`animate-overlay-in/out`, `animate
 A popover inside a dialog stacks inside the dialog's context, so 50 < 60 isn't a problem.
 
 ### Safe areas and breakpoint
-- `pt-safe`, `pb-safe`, `px-safe`: `env(safe-area-inset-*)`. `pb-tabbar`: bottom padding that
+- `pt-safe`, `pb-safe`, `px-safe`: `env(safe-area-inset-*)`. `pb-above-tabbar`: bottom padding that
   clears the tab bar + inset (replaces `pb-[4.5rem]`, `pb-[calc(5.5rem_+_env(...))]`).
-- `bottom-tabbar`: `bottom` offset for fixed things above the tab bar (toasts, sticky actions).
+- `bottom-above-tabbar`: `bottom` offset (not `bottom-tabbar`: Tailwind resolves that to the plain spacing token, 4rem, and ignores the utility) for fixed things above the tab bar (toasts, sticky actions).
 - Layout breakpoint is `lg` (64rem) only. Replace the `@media (max-width: 767px)` blocks
   (`LoggingPageShell`, `PlannedMealsDisplay` matchMedia) with `lg` when touched.
 
@@ -249,8 +249,8 @@ aliases sit beside it. Values in the table above win over the ones in this block
     padding-left: env(safe-area-inset-left);
     padding-right: env(safe-area-inset-right);
 }
-@utility pb-tabbar { padding-bottom: calc(var(--spacing-tabbar) + 0.5rem + env(safe-area-inset-bottom)); }
-@utility bottom-tabbar { bottom: calc(var(--spacing-tabbar) + 1rem + env(safe-area-inset-bottom)); }
+@utility pb-above-tabbar { padding-bottom: calc(var(--spacing-tabbar) + 0.5rem + env(safe-area-inset-bottom)); }
+@utility bottom-above-tabbar { bottom: calc(var(--spacing-tabbar) + 1rem + env(safe-area-inset-bottom)); }
 
 @layer base {
     html { background: var(--color-canvas); color: var(--color-fg); }

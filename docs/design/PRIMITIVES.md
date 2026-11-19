@@ -178,8 +178,8 @@ Keep `toast.push(message, type)` (162 call sites) and add an options form
 `toast.push({ message, tone, action?: { label, onClick }, duration? })`, which optimistic-ui needs
 for Undo. Look: `bg-surface border border-line shadow-overlay rounded-card`, tone icon on the
 left (check / alert / info), `text-sm text-fg`. Position bottom-right on desktop, bottom-centre
-full-width above the tab bar on mobile (`bottom-tabbar`, replacing the `.has-tab-bar
-.toast-container` rule in `style.css`). Container `aria-live="polite"`, errors `role="alert"`.
+full-width above the tab bar on mobile (`bottom-above-tabbar`, replacing the `.has-tab-bar
+.toast-container` rule in `style.css`). On focus pages (`route.meta.focus`, e.g. gym logging) mobile toasts go to the **top** so the bottom primary button stays clear. Container `aria-live="polite"`, errors `role="alert"`.
 Enter 250ms slide+fade, at most 3 visible. Replaces `ToastContainer.vue` (`#28a745`, `#dc3545`,
 `#007bff`, `gray`, z 9999).
 
