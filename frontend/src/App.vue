@@ -9,7 +9,7 @@ import DateAndBreadcrumbs from "./shared/DateAndBreadcrumbs.vue";
 import SideNav from "./shared/nav/SideNav.vue";
 import MobileHeader from "./shared/nav/mobile/MobileHeader.vue";
 import BottomTabBar from "./shared/nav/mobile/BottomTabBar.vue";
-import { useNavMemory } from "./shared/nav/useNavMemory";
+import { useNavMemory } from "./shared/nav/mobile/useNavMemory";
 
 const route = useRoute();
 useNavMemory();
