@@ -1,89 +1,67 @@
 <script setup lang="ts">
+import { computed, ref, watch } from "vue";
+import { useRouter } from "vue-router";
+import { CalendarDays, ChevronRight, Ellipsis, Pencil, Plus } from "lucide-vue-next";
 import { getApiErrorMessage } from "~/api/httpError";
 import type { WorkoutPlan } from "~/types/workout";
 import { toast } from "~/composables/toast/useToast";
-import { dialogManager } from "~/composables/dialog/useDialog";
-import { computed, ref, watch } from "vue";
-import { GripVertical, CalendarDays, Plus } from "lucide-vue-next";
-import { Badge, Button, Card, EmptyState, ErrorState, PageHeader, Section, Select, Skeleton, useDelayedFlag } from "~/shared/ui";
-import { useRouter } from "vue-router";
-import { apiClient } from "~/api/client";
+import {
+    Badge,
+    Button,
+    Card,
+    EmptyState,
+    ErrorState,
+    IconButton,
+    List,
+    ListRow,
+    Menu,
+    PageHeader,
+    Section,
+    Select,
+    Skeleton,
+    SkeletonList,
+    useDelayedFlag,
+} from "~/shared/ui";
+import type { MenuItem } from "~/shared/ui";
 import {
     useActivateWorkoutProgram,
+    useAssignPlanDay,
     useCreateWorkoutPlan,
     useCreateWorkoutProgram,
     useRenameWorkoutProgram,
+    useUnassignPlanDay,
     useWorkoutPrograms,
 } from "~/api/workout/queries";
+import DayPicker from "./components/DayPicker.vue";
+import NameDialog from "./components/NameDialog.vue";
+import {
+    type DaySlot,
+    DAY_NAMES,
+    buildWeek,
+    formatWeekSummary,
+    pickDefaultProgram,
+    daysLabel,
+    planMeta,
+    weekSummary,
+} from "./domain/week";
 
 const router = useRouter();
 
+// --- data -------------------------------------------------------------------------------------
 const { data, isPending, isError, error, refetch } = useWorkoutPrograms();
 const showSkeleton = useDelayedFlag(() => isPending.value);
-const createProgram = useCreateWorkoutProgram();
-const renameProgram = useRenameWorkoutProgram();
-const activateProgram = useActivateWorkoutProgram();
-const createPlan = useCreateWorkoutPlan();
+const programs = computed(() => data.value?.programs ?? []);
+
 const selectedProgramId = ref<number | null>(null);
-const selectedProgram = computed(
-    () =>
-        data.value?.programs.find(
-            (program) => program.ID === selectedProgramId.value,
-        ) ??
-        data.value?.programs.find((program) => program.is_active) ??
-        data.value?.programs[0],
+const program = computed(
+    () => programs.value.find((p) => p.ID === selectedProgramId.value) ?? pickDefaultProgram(programs.value),
 );
 watch(
-    () => selectedProgram.value?.ID,
+    () => program.value?.ID,
     (id) => {
-        if (id) selectedProgramId.value = id;
+        if (id !== undefined) selectedProgramId.value = id;
     },
     { immediate: true },
-);
-const plans = computed(() => selectedProgram.value?.plans || []);
-const refresh = () => refetch();
-
-const failToast = (what: string, err: unknown) =>
-    toast.push(`${what}: ${getApiErrorMessage(err, "Something went wrong")}`, "error");
-
-const promptCreateProgram = async () => {
-    const name = window.prompt("Workout plan name");
-    if (!name?.trim()) return;
-    try {
-        await createProgram.mutateAsync(name.trim());
-    } catch (err: unknown) {
-        failToast("Failed to create plan", err);
-    }
-};
-const makeActive = async () => {
-    if (!selectedProgram.value) return;
-    try {
-        await activateProgram.mutateAsync(selectedProgram.value.ID);
-    } catch (err: unknown) {
-        failToast("Failed to activate plan", err);
-    }
-};
-const promptRenameProgram = async () => {
-    if (!selectedProgram.value) return;
-    const name = window.prompt(
-        "Rename workout plan",
-        selectedProgram.value.name,
-    );
-    if (!name?.trim()) return;
-    try {
-        await renameProgram.mutateAsync({
-            id: selectedProgram.value.ID,
-            name: name.trim(),
-        });
-    } catch (err: unknown) {
-        failToast("Failed to rename plan", err);
-    }
-};
-const programOptions = computed(() =>
-    (data.value?.programs ?? []).map((program) => ({
-        label: `${program.name}${program.is_active ? " (Active)" : ""}`,
-        value: program.ID,
-    })),
 );
 const programModel = computed({
     get: () => selectedProgramId.value ?? "",
@@ -91,373 +69,371 @@ const programModel = computed({
         selectedProgramId.value = v === "" ? null : v;
     },
 });
-const promptCreateDay = async (dayOfWeek: number | null = null) => {
-    if (!selectedProgram.value) return;
-    const name = window.prompt(
-        dayOfWeek === null
-            ? "Routine name"
-            : `Routine name for ${dayNames[dayOfWeek]}`,
-    );
-    if (!name?.trim()) return;
-    try {
-        await createPlan.mutateAsync({
-            programId: selectedProgram.value.ID,
-            name: name.trim(),
-            dayOfWeek,
-        });
-        await refresh();
-        toast.push(`Created ${name.trim()}`, "success");
-    } catch (err: unknown) {
-        const message = getApiErrorMessage(err, "Something went wrong");
-        toast.push("Failed to create day: " + message, "error");
-    }
-};
+const programOptions = computed(() =>
+    programs.value.map((p) => ({
+        // The badge beside the select says "Active" for the shown program; the suffix helps inside the open list.
+        label: p.is_active && p.ID !== program.value?.ID ? `${p.name} (active)` : p.name,
+        value: p.ID,
+    })),
+);
 
-const dayNames = [
-    "Sunday",
-    "Monday",
-    "Tuesday",
-    "Wednesday",
-    "Thursday",
-    "Friday",
-    "Saturday",
-];
+const plans = computed(() => program.value?.plans ?? []);
+const week = computed(() => buildWeek(plans.value, new Date().getDay()));
+const summary = computed(() => formatWeekSummary(weekSummary(week.value)));
 
-const weekdaysSundayFirst = [
-    { dow: 0, label: "Sunday" },
-    { dow: 1, label: "Monday" },
-    { dow: 2, label: "Tuesday" },
-    { dow: 3, label: "Wednesday" },
-    { dow: 4, label: "Thursday" },
-    { dow: 5, label: "Friday" },
-    { dow: 6, label: "Saturday" },
-];
+const failToast = (what: string, err: unknown) =>
+    toast.push(`${what}: ${getApiErrorMessage(err, "Something went wrong")}`, "error");
 
-const getDayName = (dayOfWeek: number | null): string | undefined => {
-    if (dayOfWeek === null) return undefined;
-    return dayNames[dayOfWeek];
-};
-
-const assignedDays = (plan: WorkoutPlan) =>
-    plan.assigned_days ?? (plan.day_of_week === null ? [] : [plan.day_of_week]);
-
-const planByDay = computed(() => {
-    const m: Partial<Record<number, WorkoutPlan>> = {};
-    for (const p of plans.value) {
-        const days =
-            p.assigned_days ?? (p.day_of_week === null ? [] : [p.day_of_week]);
-        for (const day of days) {
-            m[day] = p;
-        }
-    }
-    return m;
+const detailRoute = (plan: WorkoutPlan) => ({
+    name: "gym-program-day-detail",
+    params: { programId: String(program.value?.ID ?? plan.workout_program_id ?? 0), id: String(plan.ID) },
 });
 
-const planDays = computed(() => plans.value);
+// --- program actions ---------------------------------------------------------------------------
+const createProgram = useCreateWorkoutProgram();
+const renameProgram = useRenameWorkoutProgram();
+const activateProgram = useActivateWorkoutProgram();
+const createPlan = useCreateWorkoutPlan();
 
-const draggingPlanId = ref<number | null>(null);
-const draggingSourceDay = ref<number | null>(null);
-const dropTargetKey = ref<number | "pool" | null>(null);
-const dragHandleActive = ref(false);
-
-const onHandleMouseDown = () => {
-    dragHandleActive.value = true;
-    const onUp = () => {
-        dragHandleActive.value = false;
-        window.removeEventListener("mouseup", onUp);
-    };
-    window.addEventListener("mouseup", onUp);
-};
-
-const todayDow = () => new Date().getDay();
-
-const goDetail = (id: number) => {
-    if (selectedProgram.value) {
-        router.push({
-            name: "gym-program-day-detail",
-            params: {
-                programId: String(selectedProgram.value.ID),
-                id: String(id),
-            },
-        });
-        return;
-    }
-    router.push({ name: "gym-plan-detail", params: { id: String(id) } });
-};
-
-const onDragStart = (
-    e: DragEvent,
-    plan: WorkoutPlan,
-    sourceDay: number | null,
-) => {
-    if (!dragHandleActive.value) {
-        e.preventDefault();
-        return;
-    }
-    draggingPlanId.value = plan.ID;
-    draggingSourceDay.value = sourceDay;
-    e.dataTransfer?.setData("text/plain", String(plan.ID));
-    if (e.dataTransfer) {
-        e.dataTransfer.effectAllowed = "move";
-    }
-};
-
-const onDragEnd = () => {
-    draggingPlanId.value = null;
-    draggingSourceDay.value = null;
-    dropTargetKey.value = null;
-};
-
-const onDragOverDay = (e: DragEvent, dow: number) => {
-    e.preventDefault();
-    dropTargetKey.value = dow;
-};
-
-const onDragOverPool = (e: DragEvent) => {
-    e.preventDefault();
-    dropTargetKey.value = "pool";
-};
-
-const assignPlanToDay = async (plan: WorkoutPlan, dayOfWeek: number) => {
+const makeActive = async () => {
+    if (!program.value) return;
     try {
-        await apiClient.post<{ plan: WorkoutPlan }>(
-            `workout/plans/${plan.ID}/assign-day`,
-            {
-                day_of_week: dayOfWeek,
-            },
-        );
-        toast.push(
-            `Assigned ${plan.name} to ${dayNames[dayOfWeek]}`,
-            "success",
-        );
-        await refresh();
-    } catch (err: unknown) {
-        const message = getApiErrorMessage(err, "Something went wrong");
-        toast.push("Failed to assign day: " + message, "error");
+        await activateProgram.mutateAsync(program.value.ID);
+    } catch (err) {
+        failToast("Couldn't make the program active", err);
     }
 };
 
-const unassignPlanFromDay = async (plan: WorkoutPlan, dayOfWeek: number) => {
+type NameDialogMode = "new-program" | "rename-program" | "new-routine";
+const nameDialog = ref<{ mode: NameDialogMode; dow: number | null } | null>(null);
+const nameDialogOpen = computed({
+    get: () => nameDialog.value !== null,
+    set: (v: boolean) => {
+        if (!v) nameDialog.value = null;
+    },
+});
+const nameDialogCopy = computed(() => {
+    const d = nameDialog.value;
+    if (d?.mode === "rename-program")
+        return { title: "Rename program", label: "Program name", initial: program.value?.name ?? "", confirm: "Rename", placeholder: "" };
+    if (d?.mode === "new-routine")
+        return {
+            title: d.dow === null ? "New routine" : `New routine for ${DAY_NAMES[d.dow]}`,
+            label: "Routine name",
+            initial: "",
+            confirm: "Create",
+            placeholder: "e.g. Push, Upper A",
+        };
+    return { title: "New program", label: "Program name", initial: "", confirm: "Create", placeholder: "e.g. Push Pull Legs" };
+});
+const nameDialogLoading = computed(
+    () => createProgram.isPending.value || renameProgram.isPending.value || createPlan.isPending.value,
+);
+
+const onNameSubmit = async (name: string) => {
+    const d = nameDialog.value;
+    if (!d) return;
     try {
-        await apiClient.delete<{ plan: WorkoutPlan }>(
-            `workout/plans/${plan.ID}/assign-day`,
-            { params: { day_of_week: dayOfWeek } },
-        );
-        toast.push(
-            `Unassigned ${plan.name} from ${getDayName(dayOfWeek) ?? "day"}`,
-            "success",
-        );
-        await refresh();
-    } catch (err: unknown) {
-        const message = getApiErrorMessage(err, "Something went wrong");
-        toast.push("Failed to unassign day: " + message, "error");
+        if (d.mode === "new-program") {
+            const res = await createProgram.mutateAsync(name);
+            selectedProgramId.value = res.program.ID;
+        } else if (d.mode === "rename-program" && program.value) {
+            await renameProgram.mutateAsync({ id: program.value.ID, name });
+        } else if (d.mode === "new-routine" && program.value) {
+            await createPlan.mutateAsync({ programId: program.value.ID, name, dayOfWeek: d.dow });
+        }
+        nameDialog.value = null;
+    } catch (err) {
+        failToast(d.mode === "rename-program" ? "Couldn't rename the program" : `Couldn't create ${name}`, err);
     }
 };
 
-const onDropDay = async (dow: number) => {
-    const rawId = draggingPlanId.value;
-    dropTargetKey.value = null;
-    draggingPlanId.value = null;
-    if (rawId === null) return;
-    const draggedPlan = plans.value.find((p) => p.ID === rawId);
-    if (!draggedPlan || assignedDays(draggedPlan).includes(dow)) return;
-    const occupant = plans.value.find(
-        (p) => assignedDays(p).includes(dow) && p.ID !== draggedPlan.ID,
+const programMenu: MenuItem[] = [
+    { key: "rename", label: "Rename program", icon: Pencil },
+    { key: "new", label: "New program", icon: Plus },
+];
+const onProgramMenu = (key: string) => {
+    nameDialog.value = { mode: key === "rename" ? "rename-program" : "new-program", dow: null };
+};
+
+// --- scheduling ---------------------------------------------------------------------------------
+const assign = useAssignPlanDay();
+const unassign = useUnassignPlanDay();
+/** Days with a request in flight: their rows dim until the refetch lands. */
+const pendingDays = ref(new Set<number>());
+
+const withPending = async (days: number[], what: string, run: () => Promise<unknown>) => {
+    days.forEach((d) => pendingDays.value.add(d));
+    try {
+        await run();
+    } catch (err) {
+        failToast(what, err);
+    } finally {
+        days.forEach((d) => pendingDays.value.delete(d));
+    }
+};
+
+const putOnDay = (plan: WorkoutPlan, dow: number) =>
+    withPending([dow], `Couldn't put ${plan.name} on ${DAY_NAMES[dow]}`, () =>
+        assign.mutateAsync({ planId: plan.ID, dayOfWeek: dow }),
     );
-    if (occupant) {
-        const confirmed = await dialogManager.confirm({
-            title: "Day Already Assigned",
-            message:
-                dayNames[dow] +
-                ' is currently assigned to "' +
-                occupant.name +
-                '". Assigning "' +
-                draggedPlan.name +
-                '" will unassign "' +
-                occupant.name +
-                '". Continue?',
-            confirmText: "Yes, Reassign",
-            cancelText: "Cancel",
-        });
-        if (!confirmed) return;
-    }
-    await assignPlanToDay(draggedPlan, dow);
+const makeRest = (plan: WorkoutPlan, dow: number) =>
+    withPending([dow], `Couldn't make ${DAY_NAMES[dow]} a rest day`, () =>
+        unassign.mutateAsync({ planId: plan.ID, dayOfWeek: dow }),
+    );
+/** Drag from one day to another moves the routine (assign the new day, then clear the old one). */
+const moveDay = (plan: WorkoutPlan, from: number, to: number) =>
+    withPending([from, to], `Couldn't move ${plan.name} to ${DAY_NAMES[to]}`, async () => {
+        await assign.mutateAsync({ planId: plan.ID, dayOfWeek: to });
+        await unassign.mutateAsync({ planId: plan.ID, dayOfWeek: from });
+    });
+
+// Day picker (tap on mobile, click or Enter on desktop).
+const pickerSlot = ref<DaySlot | null>(null);
+const pickerOpen = computed({
+    get: () => pickerSlot.value !== null,
+    set: (v: boolean) => {
+        if (!v) pickerSlot.value = null;
+    },
+});
+const onPick = (plan: WorkoutPlan) => {
+    const slot = pickerSlot.value;
+    pickerSlot.value = null;
+    if (!slot || slot.plan?.ID === plan.ID) return;
+    void putOnDay(plan, slot.dow);
+};
+const onPickRest = () => {
+    const slot = pickerSlot.value;
+    pickerSlot.value = null;
+    if (slot?.plan) void makeRest(slot.plan, slot.dow);
+};
+const onPickCreate = () => {
+    const dow = pickerSlot.value?.dow ?? null;
+    pickerSlot.value = null;
+    nameDialog.value = { mode: "new-routine", dow };
 };
 
-const onDropPool = async () => {
-    const rawId = draggingPlanId.value;
-    const sourceDay = draggingSourceDay.value;
-    dropTargetKey.value = null;
-    draggingPlanId.value = null;
-    draggingSourceDay.value = null;
-    if (rawId === null || sourceDay === null) return;
-    const draggedPlan = plans.value.find((p) => p.ID === rawId);
-    if (!draggedPlan || !assignedDays(draggedPlan).includes(sourceDay)) return;
-    await unassignPlanFromDay(draggedPlan, sourceDay);
+// Drag and drop (desktop only: the columns only render at lg).
+const dragging = ref<{ plan: WorkoutPlan; from: number | null } | null>(null);
+const dropTarget = ref<number | "pool" | null>(null);
+
+const onDragStart = (e: DragEvent, plan: WorkoutPlan, from: number | null) => {
+    dragging.value = { plan, from };
+    e.dataTransfer?.setData("text/plain", String(plan.ID));
+    if (e.dataTransfer) e.dataTransfer.effectAllowed = "move";
+};
+const onDragEnd = () => {
+    dragging.value = null;
+    dropTarget.value = null;
+};
+const onDragOver = (e: DragEvent, target: number | "pool") => {
+    if (!dragging.value) return;
+    e.preventDefault();
+    dropTarget.value = target;
+};
+const onDropDay = (dow: number) => {
+    const d = dragging.value;
+    onDragEnd();
+    if (!d || d.from === dow) return;
+    if (week.value[dow]?.plan?.ID === d.plan.ID) return;
+    void (d.from === null ? putOnDay(d.plan, dow) : moveDay(d.plan, d.from, dow));
+};
+const onDropPool = () => {
+    const d = dragging.value;
+    onDragEnd();
+    if (d && d.from !== null) void makeRest(d.plan, d.from);
 };
 
-const planCardClasses =
-    "rounded-control border border-line bg-surface-2 px-3 py-2 text-left transition-colors duration-100 hover:bg-surface-3 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent";
-const planDraggingClass = (planId: number) =>
-    draggingPlanId.value === planId ? "opacity-60" : "";
-
-const exerciseCountLabel = (n: number) => `${n} exercise${n === 1 ? "" : "s"}`;
+const goDetail = (plan: WorkoutPlan) => router.push(detailRoute(plan));
+const assignedCount = (plan: WorkoutPlan) => week.value.filter((s) => s.plan?.ID === plan.ID).length;
 </script>
 
 <template>
     <div class="flex w-full flex-col gap-6 pb-8 pt-2">
-        <PageHeader title="Workout schedule">
-            <template #meta>Choose an active plan, then arrange its routines through the week.</template>
+        <PageHeader title="Schedule">
+            <template v-if="program" #meta>{{ summary }}</template>
+            <template v-if="program" #actions>
+                <Button variant="primary" class="max-lg:hidden" @click="nameDialog = { mode: 'new-routine', dow: null }">
+                    <template #icon-left><Plus class="size-4" /></template>
+                    New routine
+                </Button>
+            </template>
         </PageHeader>
-        <ErrorState
-            v-if="isError"
-            :error="error"
-            title="Couldn't load your workout plans"
-            @retry="refetch()"
-        />
+
+        <ErrorState v-if="isError" :error="error" title="Couldn't load your programs" @retry="refetch()" />
+
         <template v-else-if="isPending">
-            <div v-if="showSkeleton" class="flex flex-col gap-4" role="status" aria-busy="true">
-                <Skeleton height="2.75rem" width="24rem" />
-                <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-7">
-                    <Skeleton v-for="n in 7" :key="n" shape="block" height="8rem" />
+            <div v-if="showSkeleton" class="flex flex-col gap-6" role="status" aria-busy="true">
+                <Skeleton height="2.75rem" width="20rem" />
+                <SkeletonList :rows="7" class="lg:hidden" />
+                <div class="hidden grid-cols-7 gap-3 lg:grid">
+                    <Skeleton v-for="n in 7" :key="n" shape="block" height="9rem" />
                 </div>
             </div>
         </template>
+
+        <EmptyState
+            v-else-if="!program"
+            :icon="CalendarDays"
+            title="No programs yet"
+            description="A program is a set of routines laid out over the week, like Push Pull Legs."
+        >
+            <template #action>
+                <Button variant="primary" @click="nameDialog = { mode: 'new-program', dow: null }">Create a program</Button>
+            </template>
+        </EmptyState>
+
         <template v-else>
-            <div v-if="data?.programs?.length" class="flex flex-col gap-2 lg:flex-row lg:flex-wrap lg:items-center">
-                <div class="lg:w-64">
-                    <Select v-model="programModel" :options="programOptions" aria-label="Workout plan" />
+            <!-- Program bar -->
+            <div class="flex items-center gap-2">
+                <div class="min-w-0 flex-1 lg:max-w-xs">
+                    <Select v-model="programModel" :options="programOptions" aria-label="Program" />
                 </div>
-                <Button
-                    :disabled="selectedProgram?.is_active"
-                    :loading="activateProgram.isPending.value"
-                    @click="makeActive"
-                >
-                    Make active
-                </Button>
-                <Button :loading="renameProgram.isPending.value" @click="promptRenameProgram">Rename</Button>
-                <Button variant="primary" :loading="createProgram.isPending.value" @click="promptCreateProgram">
-                    New workout plan
-                </Button>
+                <Badge v-if="program.is_active" tone="success" size="md">Active</Badge>
+                <Button v-else :loading="activateProgram.isPending.value" @click="makeActive">Make active</Button>
+                <Menu :items="programMenu" align="end" @select="onProgramMenu">
+                    <IconButton label="Program actions"><Ellipsis /></IconButton>
+                </Menu>
             </div>
-            <EmptyState
-                v-if="!selectedProgram"
-                :icon="CalendarDays"
-                title="No workout plans yet"
-                description="Create one to configure its week."
-            >
-                <template #action>
-                    <Button variant="primary" :loading="createProgram.isPending.value" @click="promptCreateProgram">
-                        Create your first workout plan
-                    </Button>
-                </template>
-            </EmptyState>
-            <template v-else>
-                <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-7">
+
+            <Section title="This week">
+                <!-- Mobile: one row per day; tap to choose a routine or rest. -->
+                <Card padding="none" class="lg:hidden">
+                    <List>
+                        <ListRow
+                            v-for="slot in week"
+                            :key="slot.dow"
+                            :pending="pendingDays.has(slot.dow)"
+                            @click="pickerSlot = slot"
+                        >
+                            <template #leading>
+                                <span
+                                    class="w-9 text-sm font-medium"
+                                    :class="slot.isToday ? 'text-accent' : 'text-fg-muted'"
+                                >{{ slot.short }}</span>
+                            </template>
+                            <span v-if="slot.plan" class="font-medium">{{ slot.plan.name }}</span>
+                            <span v-else class="text-fg-subtle">Rest</span>
+                            <template v-if="slot.plan" #subtitle>{{ planMeta(slot.plan).join(" · ") }}</template>
+                            <template #trailing>
+                                <Badge v-if="slot.isToday" tone="accent">Today</Badge>
+                                <ChevronRight v-if="slot.plan" class="size-4 text-fg-subtle" aria-hidden="true" />
+                                <Plus v-else class="size-4 text-fg-subtle" aria-hidden="true" />
+                            </template>
+                        </ListRow>
+                    </List>
+                </Card>
+
+                <!-- Desktop: seven columns. Drag a routine between days or to "Not scheduled"; click to choose. -->
+                <div class="hidden grid-cols-7 gap-2 lg:grid">
                     <Card
-                        v-for="slot in weekdaysSundayFirst"
+                        v-for="slot in week"
                         :key="slot.dow"
                         padding="sm"
-                        class="min-h-32 transition-shadow"
-                        :class="dropTargetKey === slot.dow ? 'ring-2 ring-accent' : ''"
-                        @dragover="onDragOverDay($event, slot.dow)"
+                        interactive
+                        fill
+                        role="button"
+                        tabindex="0"
+                        :aria-label="`${slot.name}: ${slot.plan ? slot.plan.name : 'rest day'}. Choose routine`"
+                        :draggable="slot.plan ? 'true' : 'false'"
+                        class="min-h-36"
+                        :class="[
+                            slot.plan ? '' : 'border-dashed',
+                            dropTarget === slot.dow ? 'outline-2 outline-accent' : '',
+                            dragging && dragging.from === slot.dow ? 'opacity-60' : '',
+                            pendingDays.has(slot.dow) ? 'opacity-60' : '',
+                        ]"
+                        :aria-busy="pendingDays.has(slot.dow) || undefined"
+                        @click="pickerSlot = slot"
+                        @keydown.enter.prevent="pickerSlot = slot"
+                        @keydown.space.prevent="pickerSlot = slot"
+                        @dragstart="slot.plan && onDragStart($event, slot.plan, slot.dow)"
+                        @dragend="onDragEnd"
+                        @dragover="onDragOver($event, slot.dow)"
+                        @dragleave="dropTarget === slot.dow && (dropTarget = null)"
                         @drop.prevent="onDropDay(slot.dow)"
                     >
-                        <div class="flex flex-col gap-2">
-                        <div class="flex flex-wrap items-center gap-1.5">
-                            <span class="text-sm font-semibold text-fg">{{ slot.label }}</span>
-                            <Badge v-if="slot.dow === todayDow()" tone="accent">Today</Badge>
-                        </div>
-                        <div
-                            v-if="planByDay[slot.dow]"
-                            role="button"
-                            tabindex="0"
-                            draggable="true"
-                            :class="[planCardClasses, planDraggingClass(planByDay[slot.dow]!.ID)]"
-                            @dragstart="onDragStart($event, planByDay[slot.dow]!, slot.dow)"
-                            @dragend="onDragEnd"
-                            @click="goDetail(planByDay[slot.dow]!.ID)"
-                            @keydown.enter="goDetail(planByDay[slot.dow]!.ID)"
-                        >
-                            <div class="flex items-start gap-2">
-                                <span
-                                    class="mt-0.5 hidden shrink-0 cursor-grab text-fg-subtle hover:text-fg-muted active:cursor-grabbing lg:block"
-                                    aria-hidden="true"
-                                    @mousedown="onHandleMouseDown"
-                                >
-                                    <GripVertical class="size-4" />
+                        <div class="flex flex-1 flex-col gap-2">
+                            <div class="flex items-center justify-between gap-1">
+                                <span class="text-xs font-medium" :class="slot.isToday ? 'text-accent' : 'text-fg-muted'">
+                                    {{ slot.short }}
                                 </span>
-                                <div class="min-w-0 flex-1">
-                                    <div class="truncate text-sm font-medium text-fg">{{ planByDay[slot.dow]!.name }}</div>
-                                    <div class="mt-1 text-xs text-fg-muted">
-                                        {{ exerciseCountLabel(planByDay[slot.dow]!.exercises.length) }}
-                                    </div>
-                                    <div
-                                        v-if="planByDay[slot.dow]!.planned_cardio_type?.trim()"
-                                        class="mt-1 truncate text-2xs text-fg-muted"
-                                    >
-                                        Cardio: {{ planByDay[slot.dow]!.planned_cardio_type }}
-                                    </div>
-                                </div>
+                                <Badge v-if="slot.isToday" tone="accent">Today</Badge>
                             </div>
-                        </div>
-                        <Button v-else variant="secondary" block @click="promptCreateDay(slot.dow)">
-                            <template #icon-left><Plus class="size-4" /></template>
-                            Add
-                        </Button>
+                            <template v-if="slot.plan">
+                                <span class="text-sm font-semibold break-words text-fg">{{ slot.plan.name }}</span>
+                                <span class="flex flex-col gap-0.5 text-xs text-fg-muted">
+                                    <span v-for="m in planMeta(slot.plan)" :key="m">{{ m }}</span>
+                                </span>
+                            </template>
+                            <span v-else class="flex flex-1 items-center justify-center text-xs text-fg-subtle">Rest</span>
                         </div>
                     </Card>
                 </div>
-                <Section title="Plan Days">
-                    <template #actions>
-                        <Button size="sm" :loading="createPlan.isPending.value" @click="promptCreateDay()">
-                            Create day
-                        </Button>
-                    </template>
-                    <Card
-                        padding="sm"
-                        class="min-h-18 transition-shadow"
-                        :class="dropTargetKey === 'pool' ? 'ring-2 ring-accent' : ''"
-                        @dragover="onDragOverPool($event)"
-                        @drop.prevent="onDropPool()"
-                    >
-                        <div class="flex flex-wrap content-start gap-2">
-                        <EmptyState
-                            v-if="planDays.length === 0"
-                            class="w-full"
-                            title="No plan days yet"
-                            description="Create one to add it to the week."
-                        />
-                        <div
-                            v-for="p in planDays"
+            </Section>
+
+            <!-- The program's routine library. A routine can be on several days: drag one onto a day to add
+                 that day (desktop), or pick it from a day's sheet. Drop a day here to clear that day. -->
+            <Section title="Routines">
+                <template v-if="plans.length" #actions>
+                    <span class="text-xs text-fg-subtle max-lg:hidden">Drag onto a day to add it</span>
+                </template>
+                <Card
+                    padding="none"
+                    :class="dropTarget === 'pool' ? 'outline-2 outline-accent' : ''"
+                    @dragover="onDragOver($event, 'pool')"
+                    @dragleave="dropTarget === 'pool' && (dropTarget = null)"
+                    @drop.prevent="onDropPool"
+                >
+                    <List v-if="plans.length">
+                        <ListRow
+                            v-for="p in plans"
                             :key="p.ID"
-                            role="button"
-                            tabindex="0"
                             draggable="true"
-                            :class="[planCardClasses, planDraggingClass(p.ID)]"
+                            @click="goDetail(p)"
                             @dragstart="onDragStart($event, p, null)"
                             @dragend="onDragEnd"
-                            @click="goDetail(p.ID)"
-                            @keydown.enter="goDetail(p.ID)"
                         >
-                            <div class="flex items-start gap-2">
-                                <span
-                                    class="mt-0.5 hidden shrink-0 cursor-grab text-fg-subtle hover:text-fg-muted active:cursor-grabbing lg:block"
-                                    aria-hidden="true"
-                                    @mousedown="onHandleMouseDown"
-                                >
-                                    <GripVertical class="size-4" />
-                                </span>
-                                <div class="min-w-0 flex-1">
-                                    <div class="truncate text-sm font-medium text-fg">{{ p.name }}</div>
-                                    <div class="mt-1 text-xs text-fg-muted">{{ exerciseCountLabel(p.exercises.length) }}</div>
-                                </div>
-                            </div>
-                        </div>
-                        </div>
-                    </Card>
-                </Section>
-            </template>
+                            {{ p.name }}
+                            <template #subtitle>{{ planMeta(p).join(" · ") }}</template>
+                            <template #trailing>
+                                <span :class="assignedCount(p) ? 'text-fg-muted' : 'text-fg-subtle'">{{ daysLabel(p) }}</span>
+                                <ChevronRight class="size-4 text-fg-subtle" aria-hidden="true" />
+                            </template>
+                        </ListRow>
+                    </List>
+                    <EmptyState
+                        v-else
+                        title="No routines in this program"
+                        description="Create a routine, then put it on a day."
+                    />
+                </Card>
+            </Section>
+
+            <Button variant="primary" size="lg" block class="lg:hidden" @click="nameDialog = { mode: 'new-routine', dow: null }">
+                <template #icon-left><Plus class="size-4" /></template>
+                New routine
+            </Button>
         </template>
+
+        <DayPicker
+            v-model:open="pickerOpen"
+            :day="pickerSlot"
+            :plans="plans"
+            :program-id="program?.ID ?? null"
+            @choose="onPick"
+            @rest="onPickRest"
+            @create="onPickCreate"
+        />
+        <NameDialog
+            v-model:open="nameDialogOpen"
+            :title="nameDialogCopy.title"
+            :label="nameDialogCopy.label"
+            :initial="nameDialogCopy.initial"
+            :placeholder="nameDialogCopy.placeholder"
+            :confirm-text="nameDialogCopy.confirm"
+            :loading="nameDialogLoading"
+            @submit="onNameSubmit"
+        />
     </div>
 </template>
