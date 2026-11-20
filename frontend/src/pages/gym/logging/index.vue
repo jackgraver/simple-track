@@ -7,6 +7,7 @@ import { ErrorState, SkeletonList, useDelayedFlag } from "~/shared/ui";
 import { getApiErrorMessage } from "~/api/httpError";
 import { toast } from "~/composables/toast/useToast";
 import { useLoggingRouteContext } from "./composables/useLoggingRouteContext";
+import { buildWorkoutSteps, type WorkoutStep } from "./domain/workoutSteps";
 
 const router = useRouter();
 const route = useRoute();
@@ -15,7 +16,9 @@ const {
     log,
     plannedCardio,
     loggedCardio,
+    plannedPreMobility,
     loggedPreMobility,
+    plannedPostMobility,
     loggedPostMobility,
     pending,
     error,
@@ -30,6 +33,37 @@ const showSkeleton = useDelayedFlag(() => pending.value);
 const removingId = ref<number | null>(null);
 
 const workoutName = computed(() => data.value?.day?.workout_plan?.name || "");
+
+const steps = computed(() =>
+    buildWorkoutSteps({
+        log: log.value,
+        plannedCardio: plannedCardio.value,
+        loggedCardio: loggedCardio.value,
+        plannedPreMobility: plannedPreMobility.value,
+        loggedPreMobility: loggedPreMobility.value,
+        plannedPostMobility: plannedPostMobility.value,
+        loggedPostMobility: loggedPostMobility.value,
+    }),
+);
+
+const dateLabel = computed(() => {
+    if (offset.value === 0) return "Today";
+    if (offset.value === 1) return "Yesterday";
+    const d = new Date();
+    d.setDate(d.getDate() - offset.value);
+    return d.toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" });
+});
+
+const selectStep = (step: WorkoutStep) => {
+    if (step.kind === "lift" && step.exerciseIndex != null) selectExercise(step.exerciseIndex);
+    else if (step.kind === "cardio") selectCardio();
+    else if (step.kind === "warmup") selectPreMobility();
+    else if (step.kind === "cooldown") selectPostMobility();
+};
+
+const finish = () => {
+    router.push({ name: "gym", query: route.query });
+};
 
 const selectExercise = (index: number) => {
     const exerciseGroup = log.value[index];
@@ -114,19 +148,15 @@ const handleRemoveExercise = async (index: number) => {
         <SkeletonList v-else-if="pending && showSkeleton" :rows="5" :leading="false" />
         <ExerciseListView
             v-else-if="!pending"
+            :workout-name="workoutName"
+            :date-label="dateLabel"
+            :steps="steps"
             :exercises="log"
-            :planned-cardio="plannedCardio"
-            :logged-cardio="loggedCardio"
-            :logged-pre-mobility="loggedPreMobility"
-            :logged-post-mobility="loggedPostMobility"
-            :workoutName="workoutName"
             :removing-id="removingId"
-            @select-exercise="selectExercise"
+            @select-step="selectStep"
             @add-exercise="handleAddExercise"
             @remove-exercise="handleRemoveExercise"
-            @select-cardio="selectCardio"
-            @select-pre-mobility="selectPreMobility"
-            @select-post-mobility="selectPostMobility"
+            @finish="finish"
         />
     </div>
 </template>
