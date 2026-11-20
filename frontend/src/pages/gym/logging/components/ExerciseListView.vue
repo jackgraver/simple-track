@@ -8,6 +8,8 @@ import { useExercisesPaginated } from "~/api/workout/queries";
 import StepMarker from "~/pages/gym/components/StepMarker.vue";
 import StepProgress from "~/pages/gym/components/StepProgress.vue";
 import { nextStepIndex, stepKindLabel, type WorkoutStep } from "../domain/workoutSteps";
+import { buildSessionSummary } from "../domain/sessionSummary";
+import SessionSummary from "./SessionSummary.vue";
 
 const props = defineProps<{
     workoutName: string;
@@ -28,6 +30,9 @@ const next = computed(() => nextStepIndex(props.steps));
 const nextStep = computed(() => (next.value >= 0 ? props.steps[next.value] : null));
 const doneCount = computed(() => props.steps.filter((s) => s.done).length);
 const allDone = computed(() => props.steps.length > 0 && next.value === -1);
+
+const summary = computed(() => buildSessionSummary(props.exercises));
+const hasGains = computed(() => summary.value.lifts.length > 0);
 
 const stateOf = (i: number) => (props.steps[i]?.done ? "done" : i === next.value ? "next" : "todo");
 
@@ -107,6 +112,9 @@ const onRowMenu = (s: WorkoutStep, key: string) => {
             </div>
         </Card>
 
+        <!-- After the workout, the payoff comes first; mid-session it sits below the list -->
+        <SessionSummary v-if="allDone && hasGains" :summary="summary" complete />
+
         <!-- The whole session, in order -->
         <section aria-labelledby="session-plan" class="flex flex-col gap-3">
             <h2 id="session-plan" class="m-0 text-xs font-semibold uppercase tracking-wide text-fg-muted">Session</h2>
@@ -152,6 +160,8 @@ const onRowMenu = (s: WorkoutStep, key: string) => {
                 @search="(q: string) => (exerciseSearch = q)"
             />
         </section>
+
+        <SessionSummary v-if="!allDone && hasGains" :summary="summary" :complete="false" />
 
         <Button v-if="!allDone" variant="secondary" size="lg" block @click="emit('finish')">
             {{ doneCount > 0 ? "Finish workout" : "Back to Gym" }}

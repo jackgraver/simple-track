@@ -56,9 +56,15 @@ const tileClass = (d: WeekDay) => [
                         <template v-else>{{ week.sessionsThisWeek.value }} sessions · no active program</template>
                     </p>
                 </div>
-                <Badge v-if="week.weekStreak.value > 1" tone="warn" size="md">
+                <Badge
+                    v-if="week.streak.value > 1"
+                    tone="warn"
+                    size="md"
+                    :title="`${week.streak.value} sessions in a row. Rest days don't break a streak, missed training days do.`"
+                >
                     <Flame aria-hidden="true" class="size-3.5" />
-                    <span class="tabular-nums">{{ week.weekStreak.value }} wk streak</span>
+                    <span class="tabular-nums">{{ week.streak.value }}</span>
+                    <span>in a row</span>
                 </Badge>
                 <IconButton label="Previous week" size="sm" @click="emit('update:offset', offset + 7)">
                     <ChevronLeft />

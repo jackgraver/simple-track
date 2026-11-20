@@ -61,9 +61,11 @@ func run() error {
 	return nil
 }
 
+// Local midnight, the same day boundary the API uses (utils.ZerodTime). UTC midnight lands on the
+// previous local day west of UTC, so seeded logs would show up a day early.
 func today() time.Time {
 	n := time.Now()
-	return time.Date(n.Year(), n.Month(), n.Day(), 0, 0, 0, 0, time.UTC)
+	return time.Date(n.Year(), n.Month(), n.Day(), 0, 0, 0, 0, time.Local)
 }
 
 func seed(tx *gorm.DB) error {
@@ -142,11 +144,29 @@ func seedGym(tx *gorm.DB) error {
 		}
 	}
 
-	// Past sessions: one every 2-3 days over the last ~4 weeks, cycling plans.
-	for i := 0; i < 9; i++ {
-		p := plans[i%3]
-		wp := created[i%3]
-		log := workm.WorkoutLog{Date: today().AddDate(0, 0, -(i*3 + 1)), WorkoutPlanID: &wp.ID}
+	// Past sessions on each plan's scheduled weekday over the last four weeks (today excluded), with
+	// weights rising session by session. One session is skipped so the UI shows a missed day.
+	byWeekday := map[time.Weekday]int{}
+	for i, p := range plans {
+		byWeekday[time.Weekday(p.day)] = i
+	}
+	const daysBack = 28
+	skipped := false
+	session := 0
+	for back := daysBack; back >= 1; back-- {
+		date := today().AddDate(0, 0, -back)
+		pi, ok := byWeekday[date.Weekday()]
+		if !ok {
+			continue
+		}
+		if !skipped && back > 7 && back <= 14 {
+			skipped = true
+			continue
+		}
+		session++
+		p := plans[pi]
+		wp := created[pi]
+		log := workm.WorkoutLog{Date: date, WorkoutPlanID: &wp.ID}
 		if err := tx.Create(&log).Error; err != nil {
 			return err
 		}
@@ -155,7 +175,7 @@ func seedGym(tx *gorm.DB) error {
 			if err := tx.Create(&le).Error; err != nil {
 				return err
 			}
-			base := float32(45 + ei*10 + (9-i)*2)
+			base := float32(45 + ei*10 + session*2)
 			for s := 0; s < 3; s++ {
 				set := workm.LoggedSet{LoggedExerciseID: le.ID, Reps: uint(10 - s), Weight: base, WeightSetup: ""}
 				if err := tx.Create(&set).Error; err != nil {
@@ -175,7 +195,7 @@ func seedGym(tx *gorm.DB) error {
 
 func seedDiet(tx *gorm.DB) error {
 	type fd struct {
-		name, serving string
+		name, serving          string
 		amt, cal, p, f, c, fat float32
 	}
 	defs := []fd{

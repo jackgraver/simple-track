@@ -4,6 +4,7 @@ import { useRoute, useRouter } from "vue-router";
 import WorkoutActivityGraph from "~/pages/gym/WorkoutActivityGraph.vue";
 import ModuleTitleBar from "~/shared/ModuleTitleBar.vue";
 import { Card } from "~/shared/ui";
+import InsightsSection from "./home/InsightsSection.vue";
 import TodayCard from "./home/TodayCard.vue";
 import WeekStrip from "./home/WeekStrip.vue";
 import { useGymWeek } from "./home/useGymWeek";
@@ -30,6 +31,7 @@ const setOffset = (offset: number) => {
             <ModuleTitleBar title="Gym" :links="[]" />
             <WeekStrip :week="week" :offset="dayOffset" @update:offset="setOffset" />
             <TodayCard :offset="dayOffset" :week="week" />
+            <InsightsSection />
             <Card padding="sm">
                 <WorkoutActivityGraph />
             </Card>

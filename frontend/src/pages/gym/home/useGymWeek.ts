@@ -34,13 +34,35 @@ function addDays(d: Date, n: number): Date {
     return new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
 }
 
-/** Training weeks start on Monday. */
+/** Weeks start on Sunday, like the activity heatmap. */
 function startOfWeek(d: Date): Date {
-    return addDays(d, -((d.getDay() + 6) % 7));
+    return addDays(d, -d.getDay());
 }
 
 function offsetOf(d: Date, today: Date): number {
     return Math.round((today.getTime() - d.getTime()) / DAY_MS);
+}
+
+/**
+ * Sessions in a row. Walking back from today: a trained day adds one, a rest day (nothing
+ * scheduled) is skipped, and only a scheduled day that was missed breaks it. Today never breaks it,
+ * since it may still happen. Without a schedule, seven days in a row with no session break it.
+ */
+export function sessionStreak(trained: Set<string>, scheduledWeekdays: Set<number>, today: Date): number {
+    const hasSchedule = scheduledWeekdays.size > 0;
+    let count = 0;
+    let idle = 0;
+    for (let back = 0; back < 365; back++) {
+        const d = addDays(today, -back);
+        if (trained.has(dateKey(d))) {
+            count++;
+            idle = 0;
+            continue;
+        }
+        if (back === 0) continue;
+        if (hasSchedule ? scheduledWeekdays.has(d.getDay()) : ++idle >= 7) break;
+    }
+    return count;
 }
 
 export function weekdayLong(d: Date): string {
@@ -108,21 +130,7 @@ export function useGymWeek(offset: MaybeRefOrGetter<number>) {
     const weeklyTarget = computed(() => Math.max(1, schedule.value.size));
     const sessionsThisWeek = computed(() => days.value.filter((d) => d.trained).length);
 
-    /** Consecutive weeks (ending at the current one) that hit the target. The current week counts once it's hit. */
-    const weekStreak = computed(() => {
-        const set = trainedSet.value;
-        let streak = 0;
-        let weekStart = startOfWeek(today.value);
-        for (let w = 0; w < 52; w++) {
-            let count = 0;
-            for (let i = 0; i < 7; i++) if (set.has(dateKey(addDays(weekStart, i)))) count++;
-            const hit = count >= weeklyTarget.value;
-            if (hit) streak++;
-            else if (w > 0) break; // the current week may still be in progress
-            weekStart = addDays(weekStart, -7);
-        }
-        return streak;
-    });
+    const streak = computed(() => sessionStreak(trainedSet.value, new Set(schedule.value.keys()), today.value));
 
     /** The next scheduled training day after the selected one, within two weeks. */
     const nextScheduled = computed(() => {
@@ -141,7 +149,7 @@ export function useGymWeek(offset: MaybeRefOrGetter<number>) {
         isCurrentWeek,
         weeklyTarget,
         sessionsThisWeek,
-        weekStreak,
+        streak,
         nextScheduled,
         scheduledFor: (d: Date) => schedule.value.get(d.getDay()) ?? null,
         isPending: computed(() => programs.isPending.value || activity.isPending.value),
