@@ -12,7 +12,7 @@ ENV VITE_API_BASE=$API_BASE
 
 RUN npm run build
 
-FROM nginxinc/nginx-unprivileged:1.28-alpine
+FROM nginxinc/nginx-unprivileged:1.30-alpine
 
 COPY --from=build --chown=101:101 /app/dist /usr/share/nginx/html
 
