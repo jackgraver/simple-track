@@ -10,11 +10,13 @@ defineProps<{
     plannedProtein: number;
     plannedFat: number;
     plannedCarbs: number;
+    /** Stay 2×2 at lg too (for narrow side-by-side spots). */
+    twoByTwo?: boolean;
 }>();
 </script>
 
 <template>
-    <div class="grid w-full grid-cols-2 gap-x-4 gap-y-3 lg:grid-cols-4">
+    <div class="grid w-full grid-cols-2 gap-x-4 gap-y-3" :class="twoByTwo ? '' : 'lg:grid-cols-4'">
         <MacroBar
             :total="totalCalories"
             :planned="plannedCalories"

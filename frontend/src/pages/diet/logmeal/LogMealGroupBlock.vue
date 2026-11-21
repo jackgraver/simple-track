@@ -6,7 +6,8 @@ import type { MealItemDisplayBlock } from "~/utils/mealItemGroups";
 import { blockMacros } from "~/utils/mealItemGroups";
 import { toast } from "~/composables/toast/useToast";
 import LogMealItemRow from "./LogMealItemRow.vue";
-import SimpleMacros from "~/shared/SimpleMacros.vue";
+import { formatKcal, shareOfMeal } from "./domain/mealCard";
+import MacroValues from "./components/MacroValues.vue";
 import { useCreateCompositeFood } from "./queries/useMealMutations";
 import { IconButton, Input, List, Menu } from "~/shared/ui";
 
@@ -14,6 +15,8 @@ const props = defineProps<{
     block: Extract<MealItemDisplayBlock, { kind: "group" }>;
     expanded: boolean;
     selectedForGroup: Record<number, boolean>;
+    selecting?: boolean;
+    mealCalories: number;
 }>();
 
 const emit = defineEmits<{
@@ -34,6 +37,7 @@ const label = computed({
     set: (v) => emit("setGroupLabel", props.block.groupId, String(v)),
 });
 const totals = computed(() => blockMacros(props.block.rows));
+const share = computed(() => shareOfMeal(totals.value.calories, props.mealCalories));
 const menuItems = computed(() => [
     {
         key: "composite",
@@ -87,49 +91,44 @@ async function saveAsCompositeFood() {
 </script>
 
 <template>
-    <li class="bg-surface-2/40" :aria-busy="savingComposite || undefined">
-        <div class="flex flex-col gap-1 px-3 py-2 lg:px-4">
-            <div class="flex items-center gap-2">
-                <IconButton
-                    :label="expanded ? 'Collapse group' : 'Expand group'"
-                    variant="secondary"
+    <li :aria-busy="savingComposite || undefined">
+        <div class="flex min-h-touch flex-wrap items-center gap-x-2 gap-y-1 bg-surface-2 px-4 py-2 lg:min-h-row">
+            <IconButton
+                :label="expanded ? 'Collapse group' : 'Expand group'"
+                size="sm"
+                @click="emit('toggleCollapse', block.groupId)"
+            >
+                <ChevronDown v-if="expanded" class="size-5" />
+                <ChevronRight v-else class="size-5" />
+            </IconButton>
+            <div class="min-w-0 flex-1">
+                <Input
+                    v-model="label"
                     size="sm"
-                    @click="emit('toggleCollapse', block.groupId)"
-                >
-                    <ChevronDown v-if="expanded" class="size-5" />
-                    <ChevronRight v-else class="size-5" />
-                </IconButton>
-                <div class="min-w-0 flex-1">
-                    <Input
-                        v-model="label"
-                        aria-label="Group name"
-                        placeholder="Name this group"
-                    />
-                </div>
-                <Menu :items="menuItems" @select="onMenu">
-                    <IconButton label="Group options" size="sm">
-                        <MoreVertical class="size-5" />
-                    </IconButton>
-                </Menu>
+                    aria-label="Group name"
+                    placeholder="Name this group"
+                />
             </div>
-            <SimpleMacros
-                class="pl-12"
-                :calories="totals.calories"
-                :protein="totals.protein"
-                :fat="totals.fat"
-                :carbs="totals.carbs"
-                :fiber="totals.fiber"
-                decimals="none"
-            />
+            <span class="order-last flex w-full flex-wrap items-baseline gap-x-3 pl-12 text-sm text-fg-muted tabular-nums">
+                <span><span class="font-medium text-fg">{{ formatKcal(totals.calories) }}</span> kcal</span>
+                <MacroValues :macros="totals" />
+                <span class="text-xs">{{ share }}% of meal kcal</span>
+            </span>
+            <Menu :items="menuItems" @select="onMenu">
+                <IconButton label="Group options" size="sm">
+                    <MoreVertical class="size-5" />
+                </IconButton>
+            </Menu>
         </div>
-        <List v-if="expanded" class="border-t border-line pl-4">
+        <List v-if="expanded" class="border-l-2 border-line-strong">
             <LogMealItemRow
                 v-for="{ item, index: i } in block.rows"
                 :key="`g-${i}`"
                 :item="item"
                 :row-index="i"
                 :selected="!!selectedForGroup[i]"
-                compact-name
+                :selecting="selecting"
+                :meal-calories="mealCalories"
                 @toggle-select="emit('toggleSelect', $event)"
                 @set-item-amount="
                     (rowI, amt) => emit('setItemAmount', rowI, amt)
