@@ -11,6 +11,8 @@ declare module "vue-router" {
         dated?: boolean;
         /** Page supplies its own header: hide the mobile top bar (tab bar and sidebar stay). */
         focus?: boolean;
+        /** Multi-column workspace: wider desktop content column (`spacing-content-wide`). */
+        wide?: boolean;
     }
 }
 
@@ -47,7 +49,7 @@ const routes: RouteRecordRaw[] = [
                 path: "edit-planned",
                 name: "diet-edit-planned",
                 component: () => import("~/pages/diet/edit-planned/index.vue"),
-                meta: { breadcrumb: "Edit planned" },
+                meta: { breadcrumb: "Plan meals", wide: true, dated: false },
             },
             {
                 path: "targets",

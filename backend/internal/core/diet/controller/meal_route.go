@@ -580,6 +580,34 @@ func PostPlannedFromSaved(c *gin.Context) {
 	c.JSON(http.StatusOK, dayWithTotalsResponse(result))
 }
 
+type CopyPlannedDayRequest struct {
+	FromOffset int   `json:"from_offset"`
+	ToOffsets  []int `json:"to_offsets"`
+}
+
+// PostPlannedCopyDay appends the source day's planned meals to each target day.
+func PostPlannedCopyDay(c *gin.Context) {
+	var req CopyPlannedDayRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		apierr.BadRequest(c, err.Error())
+		return
+	}
+	if len(req.ToOffsets) == 0 {
+		apierr.BadRequest(c, "to_offsets is required")
+		return
+	}
+	if len(req.ToOffsets) > 62 {
+		apierr.BadRequest(c, "at most 62 target days")
+		return
+	}
+	n, err := services.CopyPlannedMeals(req.FromOffset, req.ToOffsets)
+	if err != nil {
+		apierr.Internal(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"copied_meals": n, "days": len(req.ToOffsets)})
+}
+
 type ReorderPlannedMealsRequest struct {
 	Offset         int    `json:"offset"`
 	PlannedMealIDs []uint `json:"planned_meal_ids"`
