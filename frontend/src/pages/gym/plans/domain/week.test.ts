@@ -3,7 +3,6 @@ import type { WorkoutPlan, WorkoutProgram } from "~/types/workout";
 import {
     assignedDays,
     buildWeek,
-    daysLabel,
     formatWeekSummary,
     pickDefaultProgram,
     planMeta,
@@ -62,12 +61,7 @@ describe("weekSummary", () => {
     });
 });
 
-describe("daysLabel / planMeta", () => {
-    it("names the days a routine is on, in week order", () => {
-        expect(daysLabel(plan(1, "Full body", [5, 1, 3]))).toBe("Mon, Wed, Fri");
-        expect(daysLabel(plan(4, "Upper", []))).toBe("Not on the week");
-    });
-
+describe("planMeta", () => {
     it("describes exercises and cardio", () => {
         expect(planMeta(ppl[1]!)).toEqual(["4 exercises", "Bike 15 min"]);
         expect(planMeta(plan(9, "X", [], 1))).toEqual(["1 exercise"]);

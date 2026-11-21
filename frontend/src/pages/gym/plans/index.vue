@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
 import { useRouter } from "vue-router";
-import { CalendarDays, ChevronRight, Ellipsis, Pencil, Plus } from "lucide-vue-next";
+import { CalendarDays, ChevronRight, Ellipsis, GripVertical, Pencil, Plus } from "lucide-vue-next";
 import { getApiErrorMessage } from "~/api/httpError";
 import type { WorkoutPlan } from "~/types/workout";
 import { toast } from "~/composables/toast/useToast";
@@ -40,7 +40,6 @@ import {
     buildWeek,
     formatWeekSummary,
     pickDefaultProgram,
-    daysLabel,
     planMeta,
     weekSummary,
 } from "./domain/week";
@@ -245,7 +244,6 @@ const onDropPool = () => {
 };
 
 const goDetail = (plan: WorkoutPlan) => router.push(detailRoute(plan));
-const assignedCount = (plan: WorkoutPlan) => week.value.filter((s) => s.plan?.ID === plan.ID).length;
 </script>
 
 <template>
@@ -360,12 +358,15 @@ const assignedCount = (plan: WorkoutPlan) => week.value.filter((s) => s.plan?.ID
                                 </span>
                                 <Badge v-if="slot.isToday" tone="accent">Today</Badge>
                             </div>
-                            <template v-if="slot.plan">
-                                <span class="text-sm font-semibold break-words text-fg">{{ slot.plan.name }}</span>
-                                <span class="flex flex-col gap-0.5 text-xs text-fg-muted">
-                                    <span v-for="m in planMeta(slot.plan)" :key="m">{{ m }}</span>
-                                </span>
-                            </template>
+                            <div v-if="slot.plan" class="flex items-start gap-1.5">
+                                <GripVertical class="mt-0.5 size-4 shrink-0 cursor-grab text-fg-subtle" aria-hidden="true" />
+                                <div class="flex min-w-0 flex-col gap-1">
+                                    <span class="text-sm font-semibold break-words text-fg">{{ slot.plan.name }}</span>
+                                    <span class="flex flex-col gap-0.5 text-xs text-fg-muted">
+                                        <span v-for="m in planMeta(slot.plan)" :key="m">{{ m }}</span>
+                                    </span>
+                                </div>
+                            </div>
                             <span v-else class="flex flex-1 items-center justify-center text-xs text-fg-subtle">Rest</span>
                         </div>
                     </Card>
@@ -385,23 +386,28 @@ const assignedCount = (plan: WorkoutPlan) => week.value.filter((s) => s.plan?.ID
                     @dragleave="dropTarget === 'pool' && (dropTarget = null)"
                     @drop.prevent="onDropPool"
                 >
-                    <List v-if="plans.length">
-                        <ListRow
+                    <div v-if="plans.length" class="flex flex-wrap content-start gap-2 p-3">
+                        <div
                             v-for="p in plans"
                             :key="p.ID"
+                            role="button"
+                            tabindex="0"
                             draggable="true"
+                            :aria-label="`Open ${p.name}`"
+                            class="flex min-h-touch min-w-36 cursor-pointer items-start gap-2 rounded-control border border-line bg-surface-2 px-3 py-2 text-left transition-colors duration-100 hover:bg-surface-3 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent lg:cursor-grab lg:active:cursor-grabbing"
+                            :class="dragging?.plan.ID === p.ID && dragging.from === null ? 'opacity-60' : ''"
                             @click="goDetail(p)"
+                            @keydown.enter.prevent="goDetail(p)"
                             @dragstart="onDragStart($event, p, null)"
                             @dragend="onDragEnd"
                         >
-                            {{ p.name }}
-                            <template #subtitle>{{ planMeta(p).join(" · ") }}</template>
-                            <template #trailing>
-                                <span :class="assignedCount(p) ? 'text-fg-muted' : 'text-fg-subtle'">{{ daysLabel(p) }}</span>
-                                <ChevronRight class="size-4 text-fg-subtle" aria-hidden="true" />
-                            </template>
-                        </ListRow>
-                    </List>
+                            <GripVertical class="mt-0.5 hidden size-4 shrink-0 text-fg-subtle lg:block" aria-hidden="true" />
+                            <span class="flex min-w-0 flex-col">
+                                <span class="truncate text-sm font-medium text-fg">{{ p.name }}</span>
+                                <span class="text-xs text-fg-muted">{{ planMeta(p).join(" · ") }}</span>
+                            </span>
+                        </div>
+                    </div>
                     <EmptyState
                         v-else
                         title="No routines in this program"

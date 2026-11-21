@@ -47,11 +47,6 @@ export function buildWeek(plans: WorkoutPlan[], todayDow: number): DaySlot[] {
     }));
 }
 
-/** "Mon, Thu" in week order, or "Not on the week". A routine can sit on several days. */
-export function daysLabel(plan: WorkoutPlan): string {
-    const days = [...new Set(assignedDays(plan))].sort((a, b) => a - b);
-    return days.length ? days.map((d) => DAY_SHORT[d]).join(", ") : "Not on the week";
-}
 
 export type WeekSummary = { sessions: number; exercises: number; restDays: number };
 
