@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
-import { useRoute, useRouter } from "vue-router";
+import { useRouter } from "vue-router";
 import { CalendarDays, ChevronRight, Ellipsis, GripVertical, Pencil, Plus } from "lucide-vue-next";
 import { getApiErrorMessage } from "~/api/httpError";
 import type { WorkoutPlan } from "~/types/workout";
@@ -43,18 +43,15 @@ import {
     planMeta,
     weekSummary,
 } from "./domain/week";
-import { parseId } from "./domain/routine";
 
 const router = useRouter();
-const route = useRoute();
 
 // --- data -------------------------------------------------------------------------------------
 const { data, isPending, isError, error, refetch } = useWorkoutPrograms();
 const showSkeleton = useDelayedFlag(() => isPending.value);
 const programs = computed(() => data.value?.programs ?? []);
 
-// `?program=` (set when leaving a routine page) picks which program shows first.
-const selectedProgramId = ref<number | null>(parseId(route.query.program));
+const selectedProgramId = ref<number | null>(null);
 const program = computed(
     () => programs.value.find((p) => p.ID === selectedProgramId.value) ?? pickDefaultProgram(programs.value),
 );

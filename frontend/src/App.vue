@@ -21,7 +21,6 @@ const showMobileHeader = computed(
     () => showNav.value && route.meta.focus !== true,
 );
 const showDate = computed(() => route.meta.dated === true);
-const wide = computed(() => route.meta.wide === true);
 
 </script>
 
@@ -36,10 +35,7 @@ const wide = computed(() => route.meta.wide === true);
         >
             <div
                 class="flex w-full flex-col items-stretch"
-                :class="[
-                    showNav ? 'max-lg:mx-auto max-lg:max-w-6xl max-lg:px-4 lg:app-content' : 'mx-auto max-w-6xl px-4 lg:px-8',
-                    showNav && wide ? 'lg:app-content-wide' : '',
-                ]"
+                :class="showNav ? 'max-lg:mx-auto max-lg:max-w-6xl max-lg:px-4 lg:app-content' : 'mx-auto max-w-6xl px-4 lg:px-8'"
             >
                 <MobileHeader v-if="showMobileHeader" class="lg:hidden" />
                 <DateAndBreadcrumbs

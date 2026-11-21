@@ -61,7 +61,7 @@ Shared conventions:
 in `#icon-left` / `#icon-right` (lucide, `size-4`).
 | Variant | Look | Use |
 |---|---|---|
-| `primary` | `bg-primary text-on-primary` (blue), hover a step dimmer | The one main action per view/dialog |
+| `primary` | `bg-fg text-fg-inverse`, hover a step dimmer | The one main action per view/dialog |
 | `secondary` | `bg-surface-2 border border-line text-fg`, hover `bg-surface-3` | Everything else |
 | `ghost` | transparent, `text-fg-muted`, hover `bg-surface-3 text-fg` | Toolbar, inline, "Cancel" |
 | `danger` | `bg-danger-soft text-danger` | Destructive action in a list or form |
@@ -211,8 +211,7 @@ so fast loads never flash a skeleton. Replaces the 16 "Loading…" / 2 "Loading.
 ## PageHeader / Section
 - `<PageHeader :title>` with `#actions` and `#meta` slots: title `text-xl font-semibold
   tracking-tight`, actions right-aligned on desktop. On mobile, actions collapse into a primary
-  Button below or an IconButton menu. `inline` keeps a single icon action (a ⋯ menu) beside the
-  title at every width. Use alongside `ModuleTitleBar.vue` (module sub-nav), not
+  Button below or an IconButton menu. Use alongside `ModuleTitleBar.vue` (module sub-nav), not
   instead of it; decide on a merge when diet/gym migrate.
 - `<Section :title>` with `#actions`: `text-base font-semibold`, `gap-3`, `gap-6` between sections.
 

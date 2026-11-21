@@ -12,7 +12,6 @@ import {
     deletePlannedMeal,
     addPlannedMealFromSaved,
     reorderPlannedMeals,
-    copyPlannedDay,
     getDietLogsToday,
     getAllPlans,
 } from './api';
@@ -41,19 +40,6 @@ export function useRecentDietDays(n: number) {
             queryFn: () => getDietLogsToday(i + 1),
             staleTime: 1000 * 60 * 2,
         })),
-    });
-}
-
-/** Several days by offset (e.g. a week), sharing cache entries with `useDietLogsToday`. */
-export function useDietDays(offsets: MaybeRefOrGetter<number[]>) {
-    return useQueries({
-        queries: computed(() =>
-            toValue(offsets).map((o) => ({
-                queryKey: dietKeys.days.day(o),
-                queryFn: () => getDietLogsToday(o),
-                staleTime: 1000 * 60 * 2,
-            })),
-        ),
     });
 }
 
@@ -159,50 +145,6 @@ export function useReorderPlannedMeals(offset: MaybeRefOrGetter<number>) {
             queryClient.invalidateQueries({
                 queryKey: dietKeys.days.day(toValue(offset)),
             });
-            invalidateMonthPlannedSummaries(queryClient);
-        },
-    });
-}
-
-// ---- Planning across days: the offset travels with each call (the week board edits 7 days) ----
-
-function invalidateDay(queryClient: QueryClient, offset: number) {
-    queryClient.invalidateQueries({ queryKey: dietKeys.days.day(offset) });
-    invalidateMonthPlannedSummaries(queryClient);
-}
-
-export function useAddPlannedFromSavedAt() {
-    const queryClient = useQueryClient();
-    return useMutation({
-        mutationFn: ({ savedMealId, offset }: { savedMealId: number; offset: number }) =>
-            addPlannedMealFromSaved(savedMealId, offset),
-        onSuccess: (_d, { offset }) => invalidateDay(queryClient, offset),
-    });
-}
-
-export function useDeletePlannedMealAt() {
-    const queryClient = useQueryClient();
-    return useMutation({
-        mutationFn: ({ plannedMealId, offset }: { plannedMealId: number; offset: number }) =>
-            deletePlannedMeal(plannedMealId, offset),
-        onSuccess: (_d, { offset }) => invalidateDay(queryClient, offset),
-    });
-}
-
-export function useReorderPlannedMealsAt() {
-    const queryClient = useQueryClient();
-    return useMutation({
-        mutationFn: ({ ids, offset }: { ids: number[]; offset: number }) => reorderPlannedMeals(ids, offset),
-        onSuccess: (_d, { offset }) => invalidateDay(queryClient, offset),
-    });
-}
-
-export function useCopyPlannedDay() {
-    const queryClient = useQueryClient();
-    return useMutation({
-        mutationFn: ({ from, to }: { from: number; to: number[] }) => copyPlannedDay(from, to),
-        onSuccess: (_d, { to }) => {
-            for (const o of to) queryClient.invalidateQueries({ queryKey: dietKeys.days.day(o) });
             invalidateMonthPlannedSummaries(queryClient);
         },
     });

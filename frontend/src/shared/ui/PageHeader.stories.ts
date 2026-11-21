@@ -36,13 +36,3 @@ export const PageWithSections: Story = {
         </div>`,
     }),
 };
-
-/** `inline`: one icon action (a ⋯ menu) stays beside the title on mobile too. */
-export const InlineIconAction: Story = {
-    args: { title: "Push", inline: true },
-    render: (args) => ({
-        components: { PageHeader, Button },
-        setup: () => ({ args }),
-        template: `<PageHeader v-bind="args"><template #meta>Push Pull Legs · 4 exercises</template><template #actions><Button variant="ghost" size="sm" aria-label="Routine actions">⋯</Button></template></PageHeader>`,
-    }),
-};

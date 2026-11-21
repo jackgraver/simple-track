@@ -29,10 +29,8 @@ never class names. Don't use Tailwind's `dark:` variant: the tokens flip on thei
 | `fg` | primary text, icons | `hsl(0 0% 95%)` | `hsl(0 0% 9%)` | `textPrimary`, `text-zinc-100/200`, `text-white` |
 | `fg-muted` | secondary text, labels | `hsl(0 0% 68%)` | `hsl(0 0% 38%)` | `textSecondary`, `text-zinc-300/400`, `rgb(150,150,150)` |
 | `fg-subtle` | placeholder, hint, disabled, overline | `hsl(0 0% 50%)` | `hsl(0 0% 50%)` | `text-zinc-500/600`, `rgb(120,120,120)` |
-| `fg-inverse` | text on `fg`- or `danger`-filled surfaces | `hsl(0 0% 7%)` | `hsl(0 0% 98%)` | (new) |
+| `fg-inverse` | text on `fg`-filled (primary) button | `hsl(0 0% 7%)` | `hsl(0 0% 98%)` | (new) |
 | `on-solid` | text on solid semantic/accent fill | `hsl(0 0% 100%)` | `hsl(0 0% 100%)` | `text-white` on coloured buttons |
-| `primary` / `on-primary` | primary button fill / its text (white, 4.9:1 dark, 5.8:1 light) | `hsl(214 70% 48%)` | `hsl(217 85% 46%)` | (new, replaced `bg-fg` primary) |
-| `thumb` | selected segment of a SegmentedControl | `hsl(0 0% 22%)` | `hsl(0 0% 100%)` | (new) |
 | `accent` | focus ring, selection, active, links, progress | `hsl(212 92% 62%)` | `hsl(217 85% 46%)` | `focus-visible:ring-sky-500`, `--color-cf-red` as highlight |
 | `accent-soft` | selected bg, accent chip | accent @ 16% | accent @ 12% (all `*-soft` use the same alphas) | (new) |
 | `success` / `success-soft` | done, +progress, positive money | `hsl(142 65% 48%)` | `hsl(142 70% 27%)` | `green-*`, `emerald-400`, `#28a745`, `#55db2c`, `rgb(34,139,34)` |
@@ -83,7 +81,6 @@ Keep Tailwind's 4px scale (`--spacing: 0.25rem`). Allowed steps: 0, 0.5, 1, 1.5,
 | `--spacing-tabbar` | 4rem (64px) | BottomTabBar height (currently `h-16`) |
 | `--spacing-sidenav` | 14rem | SideNav width (now `--nav-w` in `.app-content`) |
 | `--spacing-content` | 56rem | desktop content column (now `--content-w`) |
-| `--spacing-content-wide` | 80rem | wide desktop column for multi-panel pages (route meta `wide` → `lg:app-content-wide`) |
 | `--spacing-gutter` | 1rem / 2rem at lg | page side padding (`px-4 lg:px-8` today) |
 
 ### Radius
@@ -99,7 +96,6 @@ Plain `rounded` (0.25rem) and `rounded-[5px]` go away.
 Flat by default. Surfaces separate by colour step and `line`.
 | Utility | Dark | Light | Use |
 |---|---|---|---|
-| `shadow-thumb` | `0 1px 2px hsl(0 0% 0% / .5)` | `0 1px 2px / .12` + 1px hairline ring | SegmentedControl selected segment |
 | `shadow-raised` | `0 4px 12px hsl(0 0% 0% / .45)` | `0 2px 8px hsl(0 0% 0% / .08)` | dropdown, popover, sticky action bar |
 | `shadow-overlay` | `0 12px 32px hsl(0 0% 0% / .6)` | `0 12px 32px hsl(0 0% 0% / .16)` | dialog, sheet, toast |
 
@@ -108,7 +104,7 @@ Durations come from bare utilities: `duration-100` (hover, press), `duration-150
 change, default), `duration-250` (enter and exit). Easing: `ease-out` to enter, `ease-in` to
 exit (Tailwind defaults). CSS vars `--duration-fast|base|slow` exist for `<Transition>` CSS
 inside primitives. A global reduced-motion rule clamps all transitions and animations.
-Overlay animations are tokens in `style.css` (`animate-overlay-in/out`, `animate-sheet-in/out`; centred dialogs and their backdrop are deliberately instant: enter 250ms ease-out, exit 150ms ease-in). Reka waits for the exit animation before unmounting, so overlays use keyframes, not transitions.
+Overlay animations are tokens in `style.css` (`animate-overlay-in/out`, `animate-sheet-in/out`, `animate-dialog-in/out`: enter 250ms ease-out, exit 150ms ease-in). Reka waits for the exit animation before unmounting, so overlays use keyframes, not transitions.
 
 ### z-index (semantic utilities, nothing else)
 | Utility | Value | Layer |
@@ -151,9 +147,6 @@ emitted even when no utility uses it, which JS such as the chart theme reads). V
     --color-fg-muted: hsl(0 0% 68%);
     --color-fg-subtle: hsl(0 0% 50%);
     --color-fg-inverse: hsl(0 0% 7%);
-    --color-primary: hsl(214 70% 48%);
-    --color-on-primary: hsl(0 0% 100%);
-    --color-thumb: hsl(0 0% 22%);
     --color-on-solid: hsl(0 0% 100%);
 
     --color-accent: hsl(212 92% 62%);
@@ -193,15 +186,12 @@ emitted even when no utility uses it, which JS such as the chart theme reads). V
     --spacing-tabbar: 4rem;
     --spacing-sidenav: 14rem;
     --spacing-content: 56rem;
-    --spacing-content-wide: 80rem;
 
     --radius-control: 0.375rem;
-    --radius-control-inner: 0.25rem;
     --radius-card: 0.5rem;
     --radius-dialog: 0.75rem;
 
     --shadow-raised: 0 4px 12px hsl(0 0% 0% / 0.45);
-    --shadow-thumb: 0 1px 2px hsl(0 0% 0% / 0.5);
     --shadow-overlay: 0 12px 32px hsl(0 0% 0% / 0.6);
 }
 
@@ -225,8 +215,6 @@ emitted even when no utility uses it, which JS such as the chart theme reads). V
     --color-fg-muted: hsl(0 0% 38%);
     --color-fg-subtle: hsl(0 0% 50%);
     --color-fg-inverse: hsl(0 0% 98%);
-    --color-primary: hsl(217 85% 46%);
-    --color-thumb: hsl(0 0% 100%);
     --color-accent: hsl(217 85% 50%);
     --color-accent-soft: color-mix(in oklab, var(--color-accent) 12%, transparent);
     --color-success: hsl(142 70% 33%);
@@ -245,7 +233,6 @@ emitted even when no utility uses it, which JS such as the chart theme reads). V
     --color-chart-4: hsl(270 70% 55%);
     --color-chart-5: hsl(330 70% 50%);
     --shadow-raised: 0 2px 8px hsl(0 0% 0% / 0.08);
-    --shadow-thumb: 0 1px 2px hsl(0 0% 0% / 0.12), 0 0 0 1px hsl(0 0% 0% / 0.06);
     --shadow-overlay: 0 12px 32px hsl(0 0% 0% / 0.16);
 }
 

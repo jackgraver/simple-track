@@ -208,11 +208,6 @@ func AddPlannedMealFromSavedMeal(offset int, savedMealID uint) error {
 	return dietrepo.AddPlannedMealFromSavedMeal(offset, savedMealID, mealFromSaved(sm))
 }
 
-// CopyPlannedMeals copies one day's planned meals onto other days. See dietrepo.CopyPlannedMeals.
-func CopyPlannedMeals(fromOffset int, toOffsets []int) (int, error) {
-	return dietrepo.CopyPlannedMeals(fromOffset, toOffsets)
-}
-
 func ReorderPlannedMeals(offset int, orderedIDs []uint) error {
 	day, err := dietrepo.FindDayByDate(utils.ZerodTime(offset))
 	if err != nil {

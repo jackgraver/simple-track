@@ -68,8 +68,7 @@ function afterClose(isOpen: boolean) {
     <DialogRoot :open="open" @update:open="afterClose">
         <DialogPortal>
             <DialogOverlay
-                class="fixed inset-0 z-overlay bg-overlay"
-                :class="sheet && 'data-[state=closed]:animate-overlay-out data-[state=open]:animate-overlay-in'"
+                class="fixed inset-0 z-overlay bg-overlay data-[state=closed]:animate-overlay-out data-[state=open]:animate-overlay-in"
             />
             <DialogContent
                 class="fixed z-overlay flex flex-col overflow-hidden border border-line bg-surface text-fg shadow-overlay outline-none"
@@ -77,7 +76,7 @@ function afterClose(isOpen: boolean) {
                     sheet
                         ? 'inset-x-0 bottom-0 max-h-[90dvh] rounded-t-dialog border-b-0 pb-safe data-[state=closed]:animate-sheet-out data-[state=open]:animate-sheet-in'
                         : [
-                              'top-[10vh] left-1/2 max-h-[80vh] max-w-[90vw] -translate-x-1/2 rounded-dialog',
+                              'top-[10vh] left-1/2 max-h-[80vh] max-w-[90vw] -translate-x-1/2 rounded-dialog data-[state=closed]:animate-dialog-out data-[state=open]:animate-dialog-in',
                               width[size],
                           ]
                 "

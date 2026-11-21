@@ -1,14 +1,12 @@
 <script setup lang="ts" generic="T extends string | number">
 // Native <select>: the OS picker wins on mobile (PRIMITIVES). Same skin as Input.
-import { computed } from "vue";
 import { ChevronDown } from "lucide-vue-next";
 import { useField } from "./fieldContext";
 
 const model = defineModel<T | "">({ required: true });
 const props = withDefaults(
     defineProps<{
-        // `group` renders the option inside an <optgroup>; consecutive options with the same group share one.
-        options: { label: string; value: T; group?: string }[];
+        options: { label: string; value: T }[];
         placeholder?: string;
         size?: "md" | "sm";
         invalid?: boolean;
@@ -19,16 +17,6 @@ const props = withDefaults(
     { size: "md" },
 );
 const field = useField();
-
-const sections = computed(() => {
-    const out: { group?: string; options: typeof props.options }[] = [];
-    for (const o of props.options) {
-        const last = out[out.length - 1];
-        if (last && last.group === o.group) last.options.push(o);
-        else out.push({ group: o.group, options: [o] });
-    }
-    return out;
-});
 </script>
 
 <template>
@@ -51,14 +39,7 @@ const sections = computed(() => {
             ]"
         >
             <option v-if="placeholder" value="" disabled>{{ placeholder }}</option>
-            <template v-for="(sec, si) in sections" :key="si">
-                <optgroup v-if="sec.group" :label="sec.group">
-                    <option v-for="o in sec.options" :key="String(o.value)" :value="o.value">{{ o.label }}</option>
-                </optgroup>
-                <template v-else>
-                    <option v-for="o in sec.options" :key="String(o.value)" :value="o.value">{{ o.label }}</option>
-                </template>
-            </template>
+            <option v-for="o in options" :key="String(o.value)" :value="o.value">{{ o.label }}</option>
         </select>
         <ChevronDown
             aria-hidden="true"

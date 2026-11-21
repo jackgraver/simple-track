@@ -22,7 +22,7 @@ const base =
     "inline-flex shrink-0 cursor-pointer items-center justify-center gap-2 rounded-control border font-medium whitespace-nowrap transition-colors duration-100 select-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent";
 
 const variants: Record<ButtonVariant, [rest: string, interactive: string]> = {
-    primary: ["border-transparent bg-primary text-on-primary", "hover:opacity-90 active:opacity-80"],
+    primary: ["border-transparent bg-fg text-fg-inverse", "hover:opacity-90 active:opacity-80"],
     secondary: ["border-line bg-surface-2 text-fg", "hover:bg-surface-3 active:bg-line"],
     ghost: ["border-transparent bg-transparent text-fg-muted", "hover:bg-surface-3 hover:text-fg active:bg-line"],
     danger: ["border-transparent bg-danger-soft text-danger", "hover:bg-danger/25 active:bg-danger/35"],
