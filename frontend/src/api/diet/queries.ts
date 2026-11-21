@@ -48,6 +48,19 @@ export function usePlans() {
     return useQuery({ queryKey: dietKeys.plans.all, queryFn: getAllPlans });
 }
 
+/** Several days by offset (e.g. a week), sharing cache entries with `useDietLogsToday`. */
+export function useDietDays(offsets: MaybeRefOrGetter<number[]>) {
+    return useQueries({
+        queries: computed(() =>
+            toValue(offsets).map((o) => ({
+                queryKey: dietKeys.days.day(o),
+                queryFn: () => getDietLogsToday(o),
+                staleTime: 1000 * 60 * 2,
+            })),
+        ),
+    });
+}
+
 function invalidateMonthPlannedSummaries(queryClient: QueryClient) {
     queryClient.invalidateQueries({
         queryKey: dietKeys.days.monthPlannedSummaryAll,

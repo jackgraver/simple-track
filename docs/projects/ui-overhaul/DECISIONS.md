@@ -146,3 +146,11 @@ Brief: fill the coming week so each day lands near its kcal and protein target; 
 - Status: "Nothing planned" badge on empty upcoming days, warn "N kcal over" past 105% of the target. The 90–105% band (`ON_TARGET_*`) feeds the header summary.
 - Desktop tray: pick a saved meal (the chip turns primary), then each day's add button adds it in one click. Esc or ✕ drops the pick. On mobile, add opens a sheet that shows the day's total after each meal ("→ 1,331").
 - Copy a day uses a new endpoint, `POST /diet/meals/planned/copy-day {from_offset, to_offsets}`. It clones each planned meal into its own Meal row and appends it after the target day's meals. Client-side copying via from-saved didn't work because planned meals don't always have a `saved_meal_id`.
+
+## 2026-11-20: /diet redesigned as week strip + "left today" (ui-page)
+Brief: log what I ate, then see what's left; phone and desk equally. Owner picked a mix of two sketches: the /gym-style week strip (kcal vs target per day, Sun–Sat, same week start as /gym) on top of a summary card led by kcal left, with macros as "g left", water and fiber, and one-tap water from drink presets. Planned and Logged stay separate sections.
+- Planned meals show a check and "Logged" when a day log has the same `meal_id` (logging a planned meal creates exactly that). `PlannedMeal.logged` isn't used: deleting the log never resets it.
+- One-tap **Log** on a planned meal only shows for today: `POST /diet/meals/meal/log-planned` always logs to today's day. Other days keep "Edit and log" in the row menu.
+- Meals are expandable rows (`pages/diet/home/MealRow.vue`), not full cards with every food. `MealCard`/`MealCardMacroDetails` deleted; the item list moved to `MealItemsList.vue`.
+- Over target: warn colour, an icon and the word "over" only past 5% over (`isMeaningfullyOver`), so landing 20 kcal over doesn't look like a failure.
+- Log meal (primary) and Quick log sit at the bottom on mobile and under the summary on desktop. The title bar now carries planning links (Plan meals, Targets, New saved meal); Log water moved onto the page. The Macros / Water & fiber SegmentedControl is gone, since everything fits in one card.
