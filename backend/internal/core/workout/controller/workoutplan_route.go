@@ -3,6 +3,7 @@ package controller
 import (
 	"be-simpletracker/internal/core/workout/models"
 	"be-simpletracker/internal/core/workout/services"
+	"errors"
 	"net/http"
 	"strconv"
 	"strings"
@@ -313,5 +314,64 @@ func UnassignPlanFromDay(c *gin.Context) {
 		return
 	}
 
+	c.JSON(http.StatusOK, gin.H{"plan": plan})
+}
+
+func parsePlanID(c *gin.Context) (uint, bool) {
+	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid plan ID"})
+		return 0, false
+	}
+	return uint(id), true
+}
+
+func planErrorStatus(err error) int {
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return http.StatusNotFound
+	}
+	return http.StatusInternalServerError
+}
+
+func RenameWorkoutPlan(c *gin.Context) {
+	id, ok := parsePlanID(c)
+	if !ok {
+		return
+	}
+	var body workoutProgramRequest
+	if err := c.ShouldBindJSON(&body); err != nil || strings.TrimSpace(body.Name) == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "name is required"})
+		return
+	}
+	plan, err := services.RenameWorkoutPlan(id, body.Name)
+	if err != nil {
+		c.JSON(planErrorStatus(err), gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"plan": plan})
+}
+
+func DeleteWorkoutPlan(c *gin.Context) {
+	id, ok := parsePlanID(c)
+	if !ok {
+		return
+	}
+	if err := services.DeleteWorkoutPlan(id); err != nil {
+		c.JSON(planErrorStatus(err), gin.H{"error": err.Error()})
+		return
+	}
+	c.Status(http.StatusNoContent)
+}
+
+func RestoreWorkoutPlan(c *gin.Context) {
+	id, ok := parsePlanID(c)
+	if !ok {
+		return
+	}
+	plan, err := services.RestoreWorkoutPlan(id)
+	if err != nil {
+		c.JSON(planErrorStatus(err), gin.H{"error": err.Error()})
+		return
+	}
 	c.JSON(http.StatusOK, gin.H{"plan": plan})
 }

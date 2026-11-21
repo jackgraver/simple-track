@@ -246,10 +246,6 @@ const onTickClick = (index: number) => {
         >
             <div class="relative h-13">
                 <div
-                    class="pointer-events-none absolute inset-y-0 left-1/2 z-raised w-0.5 -translate-x-1/2 rounded-full bg-accent"
-                    aria-hidden="true"
-                />
-                <div
                     v-for="marker in visibleMarkers"
                     :key="`${marker.index}-${marker.label}-${marker.labelPosition}`"
                     class="pointer-events-none absolute bottom-0 z-raised flex -translate-x-1/2 flex-col items-center justify-end gap-1"
@@ -295,6 +291,11 @@ const onTickClick = (index: number) => {
                         {{ marker.label }}
                     </span>
                 </div>
+                <!-- Centre line after the markers: same z, so DOM order keeps it on top (a lined-up marker hides under it). -->
+                <div
+                    class="pointer-events-none absolute inset-y-0 left-1/2 z-raised w-0.5 -translate-x-1/2 rounded-full bg-accent"
+                    aria-hidden="true"
+                />
                 <div
                     ref="scrollEl"
                     class="relative flex h-full touch-pan-x overflow-x-auto overflow-y-hidden overscroll-x-contain overscroll-y-none [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"

@@ -330,3 +330,55 @@ func ReorderPlanExercises(planID uint, exerciseIDs []uint) error {
 		return nil
 	})
 }
+
+func UpdateWorkoutPlanName(id uint, name string) error {
+	res := conn().Model(&models.WorkoutPlan{}).Where("id = ?", id).Update("name", name)
+	if res.Error != nil {
+		return res.Error
+	}
+	if res.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
+}
+
+// SoftDeleteWorkoutPlan hides a routine but keeps its exercises and day rows, so
+// RestoreWorkoutPlan can bring it back unchanged. Past logs keep their plan id.
+func SoftDeleteWorkoutPlan(id uint) error {
+	res := conn().Delete(&models.WorkoutPlan{}, id)
+	if res.Error != nil {
+		return res.Error
+	}
+	if res.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
+}
+
+// RestoreWorkoutPlan undoes SoftDeleteWorkoutPlan. Days that another live routine of the same
+// program took in the meantime stay with that routine: this one drops them.
+func RestoreWorkoutPlan(id uint) error {
+	return conn().Transaction(func(tx *gorm.DB) error {
+		var plan models.WorkoutPlan
+		if err := tx.Unscoped().Where("id = ? AND deleted_at IS NOT NULL", id).First(&plan).Error; err != nil {
+			return err
+		}
+		if err := tx.Unscoped().Model(&models.WorkoutPlan{}).Where("id = ?", id).Update("deleted_at", nil).Error; err != nil {
+			return err
+		}
+		if plan.WorkoutProgramID == nil {
+			return nil
+		}
+		taken := tx.Model(&models.WorkoutPlanDay{}).Select("workout_plan_days.day_of_week").
+			Joins("INNER JOIN workout_plans AS wp ON wp.id = workout_plan_days.workout_plan_id").
+			Where("wp.workout_program_id = ? AND wp.id != ? AND wp.deleted_at IS NULL", *plan.WorkoutProgramID, id)
+		if err := tx.Where("workout_plan_id = ? AND day_of_week IN (?)", id, taken).
+			Delete(&models.WorkoutPlanDay{}).Error; err != nil {
+			return err
+		}
+		return nil
+	})
+}
+
+// RefreshLegacyDay re-syncs workout_plans.day_of_week with the plan's day rows.
+func RefreshLegacyDay(planID uint) error { return refreshLegacyDay(planID) }

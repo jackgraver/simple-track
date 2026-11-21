@@ -8,6 +8,9 @@ export const dietKeys = {
         monthPlannedSummary: (monthOffset: number) =>
             ['diet', 'days', 'month-planned-summary', monthOffset] as const,
     },
+    plans: {
+        all: ['diet', 'plans'] as const,
+    },
     meals: {
         detail: (id: number) => ['diet', 'meals', 'detail', id] as const,
     },

@@ -155,6 +155,18 @@ export async function addPlannedMealFromSaved(
     return response.data;
 }
 
+/** Appends every planned meal of `fromOffset` to each day in `toOffsets` (after what's there). */
+export async function copyPlannedDay(
+    fromOffset: number,
+    toOffsets: number[],
+): Promise<{ copied_meals: number; days: number }> {
+    const response = await apiClient.post<{ copied_meals: number; days: number }>(
+        "/diet/meals/planned/copy-day",
+        { from_offset: fromOffset, to_offsets: toOffsets },
+    );
+    return response.data;
+}
+
 export async function reorderPlannedMeals(
     plannedMealIds: number[],
     offset = 0,
@@ -340,4 +352,9 @@ export async function updatePlanMacros(
         payload,
     );
     return response.data;
+}
+
+export async function getAllPlans(): Promise<Plan[]> {
+    const response = await apiClient.get<{ plans: Plan[] | null }>("/diet/plans/plan/all");
+    return response.data.plans ?? [];
 }

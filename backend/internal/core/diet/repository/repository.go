@@ -855,3 +855,72 @@ func EditLoggedMeal(dayID uint, oldMealID uint, meal *models.Meal) error {
 		return tx.Save(&log).Error
 	})
 }
+
+// CopyPlannedMeals appends a copy of every unlogged planned meal on the source day (in its order) to
+// each target day, after whatever that day already has. Each copy gets its own Meal row, so editing
+// or logging one day never touches another. Targets equal to the source are skipped. Returns how many
+// meals the source day had.
+func CopyPlannedMeals(fromOffset int, toOffsets []int) (int, error) {
+	var n int
+	err := conn().Transaction(func(tx *gorm.DB) error {
+		src, err := findOrCreateDietDayForCalendarDateInTx(tx, utils.ZerodTime(fromOffset))
+		if err != nil {
+			return err
+		}
+		var planned []models.PlannedMeal
+		if err := tx.Where("day_id = ? AND logged = ?", src.ID, false).
+			Order("display_order ASC, id ASC").
+			Preload("Meal.Items").
+			Find(&planned).Error; err != nil {
+			return err
+		}
+		n = len(planned)
+		if n == 0 {
+			return nil
+		}
+		seen := map[int]bool{fromOffset: true}
+		for _, off := range toOffsets {
+			if seen[off] {
+				continue
+			}
+			seen[off] = true
+			day, err := findOrCreateDietDayForCalendarDateInTx(tx, utils.ZerodTime(off))
+			if err != nil {
+				return err
+			}
+			var next int
+			if err := tx.Model(&models.PlannedMeal{}).
+				Where("day_id = ? AND logged = ?", day.ID, false).
+				Select("COALESCE(MAX(display_order), -1) + 1").
+				Scan(&next).Error; err != nil {
+				return err
+			}
+			for i, p := range planned {
+				meal := models.Meal{Name: p.Meal.Name}
+				for _, it := range p.Meal.Items {
+					meal.Items = append(meal.Items, models.MealItem{
+						FoodID:          it.FoodID,
+						Amount:          it.Amount,
+						GroupID:         it.GroupID,
+						GroupLabel:      it.GroupLabel,
+						CompositeFoodID: it.CompositeFoodID,
+					})
+				}
+				if err := tx.Create(&meal).Error; err != nil {
+					return err
+				}
+				pm := models.PlannedMeal{
+					DayID:        day.ID,
+					MealID:       meal.ID,
+					SavedMealID:  p.SavedMealID,
+					DisplayOrder: next + i,
+				}
+				if err := tx.Create(&pm).Error; err != nil {
+					return err
+				}
+			}
+		}
+		return nil
+	})
+	return n, err
+}

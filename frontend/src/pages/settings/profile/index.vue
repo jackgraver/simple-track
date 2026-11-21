@@ -32,6 +32,8 @@ async function save() {
             height_in: heightIn.value,
             age: age.value,
             sex: sex.value,
+            // Keep the level chosen on /diet/targets; this form doesn't edit it.
+            activity_level: profileRow.value?.activity_level,
         });
         toast.push('Profile saved', 'success');
     } catch (err: unknown) {

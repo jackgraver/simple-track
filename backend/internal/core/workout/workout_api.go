@@ -23,6 +23,9 @@ func RegisterRoutes(router *gin.Engine, authMiddleware gin.HandlerFunc) {
 		plans := group.Group("/plans")
 		{
 			plans.GET("/all", controller.GetAllWorkoutPlans)
+			plans.PATCH("/:id", controller.RenameWorkoutPlan)
+			plans.DELETE("/:id", controller.DeleteWorkoutPlan)
+			plans.POST("/:id/restore", controller.RestoreWorkoutPlan)
 			plans.POST("/:id/exercises/add", controller.AddExerciseToPlan)
 			plans.DELETE("/:id/exercises/remove", controller.RemoveExerciseFromPlan)
 			plans.PUT("/:id/exercises/reorder", controller.ReorderPlanExercises)

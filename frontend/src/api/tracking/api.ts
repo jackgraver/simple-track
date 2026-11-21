@@ -1,5 +1,6 @@
 import { apiDELETE, apiGET, apiPATCH, apiPOST, apiPUT } from '~/api/client';
 import type {
+    ActivityLevel,
     BodyWeightLog,
     WeightImportResult,
     DrinkSizePreset,
@@ -19,10 +20,11 @@ export async function saveProfile(body: {
     height_in: number;
     age: number;
     sex: 'male' | 'female';
+    activity_level?: ActivityLevel;
 }): Promise<UserProfile> {
     const res = await apiPUT<{ profile: UserProfile }>('/tracking/profile', {
         ...body,
-        activity_level: 'moderately_active',
+        activity_level: body.activity_level ?? 'moderately_active',
     });
     return res.profile;
 }

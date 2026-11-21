@@ -46,18 +46,12 @@ const planSelectValue = computed(() => {
 
 const switchingPlan = computed(() => switchPlanMutation.isPending.value);
 
-const planOptions = computed(() => {
-    const grouped = planGroups.value.length > 1;
-    return [
-        { label: "No plan", value: "" },
-        ...planGroups.value.flatMap((group) =>
-            group.plans.map((plan) => ({
-                label: grouped ? `${group.name}: ${plan.name}` : plan.name,
-                value: String(plan.ID),
-            })),
-        ),
-    ];
-});
+const planOptions = computed(() => [
+    { label: "No plan", value: "" },
+    ...planGroups.value.flatMap((group) =>
+        group.plans.map((plan) => ({ label: plan.name, value: String(plan.ID), group: group.name })),
+    ),
+]);
 
 const handleSwitchPlan = async (v: string) => {
     const planId = v === "" ? null : Number(v);

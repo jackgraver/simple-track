@@ -272,3 +272,44 @@ func TestDayByIDGeneric_notFound(t *testing.T) {
 		t.Fatal("expected error")
 	}
 }
+
+func TestCopyPlannedMeals_appendsInOrderWithOwnMeals(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	plan := testutil.SeedPlan(t, db, "P")
+	src := testutil.SeedDay(t, db, utils.ZerodTime(0), plan.ID)
+	dst := testutil.SeedDay(t, db, utils.ZerodTime(-1), plan.ID)
+	food := testutil.SeedFood(t, db, "Oats", models.Food{ServingAmount: 1, Calories: 100})
+	a := testutil.SeedMeal(t, db, "A", food.ID, 1)
+	b := testutil.SeedMeal(t, db, "B", food.ID, 2)
+	testutil.SeedPlannedMeal(t, db, src.ID, b.ID, 1, false)
+	testutil.SeedPlannedMeal(t, db, src.ID, a.ID, 0, false)
+	logged := testutil.SeedMeal(t, db, "Eaten", food.ID, 1)
+	testutil.SeedPlannedMeal(t, db, src.ID, logged.ID, 2, true)
+	existing := testutil.SeedMeal(t, db, "Existing", food.ID, 1)
+	testutil.SeedPlannedMeal(t, db, dst.ID, existing.ID, 0, false)
+
+	n, err := dietrepo.CopyPlannedMeals(0, []int{-1, 0, -1})
+	if err != nil || n != 2 {
+		t.Fatalf("n %d err %v", n, err)
+	}
+	var got []models.PlannedMeal
+	db.Where("day_id = ?", dst.ID).Order("display_order").Preload("Meal.Items").Find(&got)
+	names := []string{}
+	for _, p := range got {
+		names = append(names, p.Meal.Name)
+		if p.Meal.Name != "Existing" && (p.MealID == a.ID || p.MealID == b.ID) {
+			t.Fatalf("copy shares the source meal row")
+		}
+	}
+	if strings.Join(names, ",") != "Existing,A,B" {
+		t.Fatalf("got %v", names)
+	}
+	if got[2].Meal.Items[0].Amount != 2 {
+		t.Fatalf("items not copied: %+v", got[2].Meal.Items)
+	}
+	var srcCount int64
+	db.Model(&models.PlannedMeal{}).Where("day_id = ?", src.ID).Count(&srcCount)
+	if srcCount != 3 {
+		t.Fatalf("source changed: %d", srcCount)
+	}
+}
