@@ -23,7 +23,16 @@ import {
     importWeightCsv,
     updateDrinkSizePreset,
 } from "~/api/tracking/api";
-import type { BodyWeightLog } from "~/api/tracking/types";
+import type { BodyWeightLog, GroceryItem } from "~/api/tracking/types";
+import { getApiErrorMessage } from "~/api/httpError";
+import { useOptimisticMutation } from "~/api/optimistic";
+import {
+    addGroceryItem,
+    completeGroceryItemInList,
+    reconcileGroceryItem,
+    removeGroceryItemByClientId,
+    restoreGroceryItem,
+} from "~/api/tracking/groceryCache";
 import { trackingKeys } from "~/api/tracking/keys";
 
 export function latestWeightLbs(logs: BodyWeightLog[] | undefined): number | null {
@@ -118,13 +127,26 @@ export function useGrocerySuggestions(query: MaybeRefOrGetter<string>) {
     });
 }
 
+/** Optimistic add: appends a temp row (client_id), swaps in the server row on success. */
 export function useCreateGroceryItem() {
-    const queryClient = useQueryClient();
-    return useMutation({
-        mutationFn: ({ name }: { name: string }) => createGroceryItem(name),
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: trackingKeys.groceryItems });
-        },
+    return useOptimisticMutation<{ client_id: string; name: string }, GroceryItem>({
+        mutationKey: ["tracking", "grocery", "create"],
+        mutationFn: ({ client_id, name }) => createGroceryItem(name, client_id),
+        // Safe to retry: the server de-duplicates by client_id.
+        retry: 2,
+        optimistic: () => [
+            {
+                queryKey: trackingKeys.groceryItems,
+                apply: (old: GroceryItem[], vars) => addGroceryItem(old, vars),
+                revert: (cur: GroceryItem[], vars) => removeGroceryItemByClientId(cur, vars),
+            },
+        ],
+        reconcile: (item, v, qc) =>
+            qc.setQueryData<GroceryItem[]>(trackingKeys.groceryItems, (cur) =>
+                cur ? reconcileGroceryItem(cur, item, v.client_id) : cur,
+            ),
+        invalidate: () => [trackingKeys.groceryItems],
+        errorMessage: (err) => getApiErrorMessage(err, "Couldn’t add item"),
     });
 }
 
@@ -144,16 +166,22 @@ export function useCreateGroceryItems() {
     });
 }
 
+/** Optimistic complete: the row leaves the list now. Suggestions (built from completed items) refetch on settle. */
 export function useCompleteGroceryItem() {
-    const queryClient = useQueryClient();
-    return useMutation({
-        mutationFn: (id: number) => completeGroceryItem(id),
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: trackingKeys.groceryItems });
-            queryClient.invalidateQueries({
-                queryKey: trackingKeys.grocerySuggestionsAll,
-            });
-        },
+    return useOptimisticMutation<{ id: number }, GroceryItem>({
+        mutationKey: ["tracking", "grocery", "complete"],
+        mutationFn: ({ id }) => completeGroceryItem(id),
+        // PATCH complete is idempotent on the server.
+        retry: 2,
+        optimistic: () => [
+            {
+                queryKey: trackingKeys.groceryItems,
+                apply: (old: GroceryItem[], v) => completeGroceryItemInList(old, v),
+                revert: (cur: GroceryItem[], v, snapshot) => restoreGroceryItem(cur, v, snapshot),
+            },
+        ],
+        invalidate: () => [trackingKeys.groceryItems, trackingKeys.grocerySuggestionsAll],
+        errorMessage: (err) => getApiErrorMessage(err, "Couldn’t complete item"),
     });
 }
 

@@ -60,6 +60,8 @@ export type GroceryItem = {
     name: string;
     completed_at: string | null;
     CreatedAt?: string;
+    /** Set on rows created through the optimistic add; stable across the temp -> server swap. */
+    client_id?: string;
 };
 
 export type ParsedGroceryLine = {

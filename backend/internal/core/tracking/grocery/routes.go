@@ -34,7 +34,8 @@ func (h *handler) getItems(c *gin.Context) {
 }
 
 type itemBody struct {
-	Name string `json:"name"`
+	Name     string `json:"name"`
+	ClientID string `json:"client_id"`
 }
 
 func (h *handler) postItem(c *gin.Context) {
@@ -43,7 +44,7 @@ func (h *handler) postItem(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	row, err := CreateItem(h.db, body.Name)
+	row, err := CreateItem(h.db, body.Name, body.ClientID)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
