@@ -3,6 +3,7 @@ import { RotateCcw, X } from "lucide-vue-next";
 import { IconButton, List, ListRow } from "~/shared/ui";
 import type { LoggedSetWithStatus } from "../../store/useWorkoutStore";
 import type { ProgressVerdict } from "../domain/liveLogging";
+import { useOnline } from "~/api/online";
 
 // Below the fold: every set today next to the same set last session, and whether the weight goes up next time.
 // Tap a saved set to edit it with the slider above; tap it again to go back to the current set.
@@ -19,6 +20,8 @@ const emit = defineEmits<{
     (e: "delete", index: number): void;
     (e: "retry", index: number): void;
 }>();
+
+const online = useOnline();
 
 function diff(index: number): { text: string; tone: string } {
     const set = props.sets[index];
@@ -49,11 +52,7 @@ function diff(index: number): { text: string; tone: string } {
                 :key="set.key"
                 :pending="set.status === 'pending'"
                 :selected="editingIndex === index"
-                v-bind="
-                    set.status === 'success'
-                        ? { onClick: (ev: MouseEvent) => emit('select', index, ev.currentTarget as HTMLElement) }
-                        : {}
-                "
+                @click="(ev: MouseEvent) => emit('select', index, ev.currentTarget as HTMLElement)"
             >
                 <span class="tabular-nums">Set {{ index + 1 }} · {{ set.weight }} × {{ set.reps }}</span>
                 <template #subtitle>
@@ -62,8 +61,9 @@ function diff(index: number): { text: string; tone: string } {
                     </span>
                 </template>
                 <template #trailing>
-                    <span v-if="set.status === 'error'" class="text-xs text-danger">Didn't save</span>
-                    <span v-else-if="editingIndex === index" class="text-xs font-medium text-accent">Editing</span>
+                    <span v-if="editingIndex === index" class="text-xs font-medium text-accent">Editing</span>
+                    <span v-else-if="set.status === 'error'" class="text-xs text-danger">Didn't save</span>
+                    <span v-else-if="set.status === 'pending' && !online" class="text-xs text-fg-muted">Waiting for connection</span>
                     <span v-else class="text-sm font-medium tabular-nums" :class="diff(index).tone">{{ diff(index).text }}</span>
                 </template>
                 <template #end>

@@ -39,6 +39,7 @@ import {
     setRef,
     type DeleteSetResponse,
     type DeleteSetVars,
+    type FailedSetWrites,
     type LocalSetIntents,
     type LogSetResponse,
     type LogSetVars,
@@ -465,21 +466,17 @@ export function useSetIntents() {
     }));
 }
 
-/** Variables of a failed set write, so Retry/Delete can re-run or dismiss exactly that call. */
-export function findFailedSetVars(
-    qc: QueryClient,
-    key: string,
-): { kind: 'create'; vars: LogSetVars } | { kind: 'update'; vars: UpdateSetVars } | null {
-    const failed = qc
-        .getMutationCache()
-        .findAll({ mutationKey: workoutKeys.mutations.sets, status: 'error' })
-        .filter((m) => (m.state.variables as { client_id?: string } | undefined)?.client_id === key);
-    const last = failed[failed.length - 1];
-    if (!last) return null;
-    const kind = last.options.mutationKey?.[3];
-    if (kind === 'create') return { kind, vars: last.state.variables as LogSetVars };
-    if (kind === 'update') return { kind, vars: last.state.variables as UpdateSetVars };
-    return null;
+/** The latest failed create and edit of a set, so Retry can re-run the right call (see `planSetRetry`). */
+export function findFailedSetWrites(qc: QueryClient, key: string): FailedSetWrites {
+    const out: FailedSetWrites = {};
+    for (const m of qc.getMutationCache().findAll({ mutationKey: workoutKeys.mutations.sets, status: 'error' })) {
+        const v = m.state.variables as { client_id?: string } | undefined;
+        if (v?.client_id !== key) continue;
+        const kind = m.options.mutationKey?.[3];
+        if (kind === 'create') out.create = m.state.variables as LogSetVars;
+        if (kind === 'update') out.update = m.state.variables as UpdateSetVars;
+    }
+    return out;
 }
 
 /** A notes save for this exercise is already in flight with these notes (avoid re-sending). */

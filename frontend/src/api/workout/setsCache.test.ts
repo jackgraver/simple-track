@@ -18,6 +18,7 @@ import {
     withGroup,
     type LogSetVars,
     type SetIntentState,
+    planSetRetry,
 } from "./setsCache";
 
 const DATE = "2026-11-22";
@@ -339,5 +340,32 @@ describe("deriveSetRows", () => {
             target,
         );
         expect(rows).toEqual([expect.objectContaining({ key: "a", weight: 130, reps: 2, status: "pending" })]);
+    });
+});
+
+describe("planSetRetry", () => {
+    const create = { client_id: "c1", date: "2026-11-22", exercise_id: 5, created_at: "t", reps: 8, weight: 100, weight_setup: "" };
+    const update = { client_id: "c1", date: "2026-11-22", exercise_id: 5, reps: 10, weight: 105, weight_setup: "" };
+
+    it("nothing failed: nothing to send", () => {
+        expect(planSetRetry({})).toBeNull();
+    });
+
+    it("a failed edit is re-sent, with new values when editing", () => {
+        expect(planSetRetry({ update })).toEqual({ kind: "update", vars: update });
+        expect(planSetRetry({ update }, { reps: 6, weight: 90, weight_setup: "x" })).toEqual({
+            kind: "update",
+            vars: { ...update, reps: 6, weight: 90, weight_setup: "x" },
+        });
+    });
+
+    it("a failed create wins over the edit queued behind it and takes its values", () => {
+        expect(planSetRetry({ create, update })).toEqual({
+            kind: "create",
+            vars: { ...create, reps: 10, weight: 105 },
+            dismissUpdate: update,
+        });
+        const edited = planSetRetry({ create }, { reps: 3, weight: 50, weight_setup: "" });
+        expect(edited).toEqual({ kind: "create", vars: { ...create, reps: 3, weight: 50 } });
     });
 });

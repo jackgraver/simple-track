@@ -331,3 +331,33 @@ export function deriveSetRows(
             return failed ? { ...r, status: "error" as const, failed } : r;
         });
 }
+
+// ── Retry / edit of unsaved rows ───────────────────────────────────────────────────────────────
+
+/** The latest failed create and edit of one set (from the mutation cache). */
+export type FailedSetWrites = { create?: LogSetVars; update?: UpdateSetVars };
+
+export type SetWritePlan =
+    | { kind: "create"; vars: LogSetVars; dismissUpdate?: UpdateSetVars }
+    | { kind: "update"; vars: UpdateSetVars }
+    | null;
+
+/**
+ * What Retry (no `fields`) or an edit of a failed row (`fields`) sends. A failed create wins: an
+ * edit queued behind it can only fail too (the set doesn't exist), so the create is re-sent with
+ * the newest values (the failed edit's, then `fields`) and the failed edit is dismissed.
+ */
+export function planSetRetry(failed: FailedSetWrites, fields?: SetFields): SetWritePlan {
+    if (failed.create) {
+        const fromEdit = failed.update
+            ? { reps: failed.update.reps, weight: failed.update.weight, weight_setup: failed.update.weight_setup }
+            : {};
+        return {
+            kind: "create",
+            vars: { ...failed.create, ...fromEdit, ...fields },
+            ...(failed.update && { dismissUpdate: failed.update }),
+        };
+    }
+    if (failed.update) return { kind: "update", vars: { ...failed.update, ...fields } };
+    return null;
+}

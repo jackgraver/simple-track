@@ -13,7 +13,7 @@ import { useWebStorageJsonSync } from "~/composables/useWebStorageJsonSync";
 import { newClientId } from "~/api/ids";
 import { offsetToDate } from "~/api/workout/dates";
 import {
-    findFailedSetVars,
+    findFailedSetWrites,
     notesSavePending,
     useDeleteSet,
     useLogSet,
@@ -21,7 +21,7 @@ import {
     useSetIntents,
     useUpdateSet,
 } from "~/api/workout/queries";
-import { deriveSetRows } from "~/api/workout/setsCache";
+import { deriveSetRows, planSetRetry, type SetFields } from "~/api/workout/setsCache";
 import {
     DEFAULT_REPS_AFTER_WEIGHT_CHANGE,
     initializeWeightAndReps,
@@ -245,10 +245,7 @@ export function useExerciseLoggingSession(options: {
 
         if (draftStorage.restore()) {
             weightProgression.value = null;
-            if (
-                editingSetIndex.value != null &&
-                loggedSets.value[editingSetIndex.value]?.status !== "success"
-            ) {
+            if (editingSetIndex.value != null && !loggedSets.value[editingSetIndex.value]) {
                 editingSetIndex.value = null;
             }
         }
@@ -372,7 +369,7 @@ export function useExerciseLoggingSession(options: {
         if (editingIndex != null) {
             const row = loggedSets.value[editingIndex];
             if (!row) return false;
-            updateSet.mutate({ client_id: row.key, date: day, exercise_id: exerciseId, ...fields });
+            saveEditedSet(row, day, exerciseId, fields);
             // A fix to an earlier set isn't a new set: the rest clock keeps running.
         } else {
             logSet.mutate({
@@ -421,12 +418,32 @@ export function useExerciseLoggingSession(options: {
         return true;
     };
 
+    /** Re-send a failed row: its create (with the newest values) if that failed, else its edit. */
+    const runRetry = (key: string, fields?: SetFields): boolean => {
+        const plan = planSetRetry(findFailedSetWrites(qc, key), fields);
+        if (plan?.kind === "create") {
+            if (plan.dismissUpdate) updateSet.dismiss(plan.dismissUpdate);
+            logSet.retry(plan.vars);
+        } else if (plan?.kind === "update") {
+            updateSet.retry(plan.vars);
+        }
+        return plan != null;
+    };
+
+    /**
+     * Save an edit to any row. Saved or still being created: a PATCH by client_id, which waits in the
+     * exercise's scope for the create (offline, both wait for the connection). Failed: re-send the
+     * failed write with the new values instead, since an edit behind a failed create would fail too.
+     */
+    const saveEditedSet = (row: LoggedSetWithStatus, day: string, exerciseId: number, fields: SetFields) => {
+        if (row.status === "error" && runRetry(row.key, fields)) return;
+        updateSet.mutate({ client_id: row.key, date: day, exercise_id: exerciseId, ...fields });
+    };
+
     const retrySet = (setIndex: number) => {
         const row = loggedSets.value[setIndex];
         if (!row || row.status !== "error") return;
-        const failed = findFailedSetVars(qc, row.key);
-        if (failed?.kind === "create") logSet.retry(failed.vars);
-        else if (failed?.kind === "update") updateSet.retry(failed.vars);
+        runRetry(row.key);
     };
 
     /**
@@ -447,11 +464,6 @@ export function useExerciseLoggingSession(options: {
     const editSet = (setIndex: number) => {
         const set = loggedSets.value[setIndex];
         if (!set) return;
-
-        if (set.status !== "success") {
-            toast.push("Can only edit sets that have been saved", "error");
-            return;
-        }
 
         currentWeight.value = set.weight;
         currentReps.value = normalizeReps(set.reps);

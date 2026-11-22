@@ -5,6 +5,7 @@ import ToastContainer from "./composables/toast/ToastContainer.vue";
 import DialogContainer from "./composables/dialog/DialogContainer.vue";
 import { isAuthenticated } from "./composables/auth/session";
 import DateAndBreadcrumbs from "./shared/DateAndBreadcrumbs.vue";
+import OfflineNotice from "./shared/OfflineNotice.vue";
 // Breadcrumbs (./shared/Breadcrumbs.vue) are kept but not displayed for now.
 import SideNav from "./shared/nav/SideNav.vue";
 import MobileHeader from "./shared/nav/mobile/MobileHeader.vue";
@@ -46,6 +47,7 @@ const wide = computed(() => route.meta.wide === true);
                     v-if="showDate"
                     :class="showNav ? 'pb-4 lg:pt-4' : 'py-4'"
                 />
+                <OfflineNotice v-if="showNav" :class="{ 'mt-3': route.meta.focus === true }" />
                 <RouterView />
             </div>
         </main>
