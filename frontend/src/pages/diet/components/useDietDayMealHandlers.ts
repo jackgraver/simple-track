@@ -6,7 +6,10 @@ import {
     useDietLogsToday,
     useLogPlannedMeal,
     useDeleteLoggedMeal,
+    dayRef,
 } from "~/api/diet/queries";
+import { isTempId } from "~/api/diet/dayPatches";
+import { newClientId } from "~/api/ids";
 import { LOG_TYPE, EDIT_TYPE, EDIT_LOGGED_TYPE } from "~/pages/diet/logmeal/logmealMode";
 import { withDietDayOffsetQuery } from "~/utils/dateUtil";
 import { mealHasQuickEntryFood } from "~/utils/dietMealQuickLog";
@@ -19,13 +22,16 @@ export function useDietDayMealHandlers(getOffset: () => number) {
     const logPlannedMealMutation = useLogPlannedMeal();
     const deleteLoggedMealMutation = useDeleteLoggedMeal();
 
-    const logPlannedMeal = async (meal: Meal) => {
-        try {
-            await logPlannedMealMutation.mutateAsync({ mealId: meal.ID, offset: getOffset() });
-            toast.push("Planned Meal Log Successfully!", "success");
-        } catch {
-            toast.push("Planned Meal Log Failed!", "error");
-        }
+    // Optimistic: the row flips and the totals move on tap. A failure rolls back with a Retry toast.
+    const logPlannedMeal = (meal: Meal) => {
+        const dayId = data.value?.day.ID;
+        if (!dayId || isTempId(meal.ID)) return;
+        logPlannedMealMutation.mutate({
+            mealId: meal.ID,
+            dayId,
+            ...dayRef(getOffset()),
+            client_id: newClientId(),
+        });
     };
 
     const logMeal = async (
@@ -85,16 +91,13 @@ export function useDietDayMealHandlers(getOffset: () => number) {
             return;
         }
 
-        try {
-            await deleteLoggedMealMutation.mutateAsync({
-                mealId: meal.ID,
-                dayId: data.value.day.ID,
-                offset: getOffset(),
-            });
-            toast.push("Delete Successfully!", "success");
-        } catch {
-            toast.push("Delete Failed!", "error");
-        }
+        if (isTempId(meal.ID)) return; // still saving; nothing to delete on the server yet
+        deleteLoggedMealMutation.mutate({
+            mealId: meal.ID,
+            dayId: data.value.day.ID,
+            ...dayRef(getOffset()),
+            client_id: newClientId(),
+        });
     };
 
     return {

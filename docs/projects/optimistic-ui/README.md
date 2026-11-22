@@ -43,6 +43,7 @@
 - D1 done (migration 0005): `log-planned` takes `day_id` (omit = today), log/unlog are idempotent, `client_id` accepted on quick-log and planned/from-saved. Unlog still leaves `planned_meals.logged` set (Q1). D2 should send `day_id` and `client_id`. Migration 0004 belongs to G1: the migrate no-gaps test fails until it is merged.
 - `crypto.randomUUID()` is undefined on plain-http LAN testing from a phone. Use `newClientId()` from `api/ids.ts`.
 - TanStack v5 mutation `scope` is per `useMutation` instance, not per call. Use the helper's `scope(vars)` option instead (DECISIONS.md, F6).
+- D2 done: diet day mutations (log/unlog planned, quick log, add-from-saved, delete planned, reorder) are optimistic via `api/diet/dayPatches.ts` (pure apply/revert, tested). Vars carry `{offset, date, client_id}` from `dayRef(offset)`; requests for one day are serialised with `scope`. Temp rows have negative ids (`isTempId`); UI ignores actions on them. Not done: copy-day, saved-meal CRUD, logmeal page submits (create/edit meal) stay pessimistic.
 - Next: G1 (in progress, migration 0004), then G2 (first user-visible slice), D2, T1, T2.
 - Open questions for the owner are listed at the bottom of this README. Answers go into DECISIONS.md.
 

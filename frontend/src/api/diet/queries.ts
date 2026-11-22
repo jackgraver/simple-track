@@ -30,16 +30,34 @@ import {
     updatePlanMacros,
     updateSavedMeal,
     type QuickLogPayload,
+    type DietLogsTodayResponse,
     type SavedMealItemPayload,
     type UpdatePlanMacrosPayload,
 } from './api';
+import {
+    applyAddPlanned,
+    applyDeletePlanned,
+    applyLogPlanned,
+    applyQuickLog,
+    applyReorder,
+    applyUnlog,
+    revertAddPlanned,
+    revertDeletePlanned,
+    revertLogPlanned,
+    revertQuickLog,
+    revertReorder,
+    revertUnlog,
+    type QuickLogEntry,
+} from './dayPatches';
 import { createFood } from './food';
 import { dietKeys } from './keys';
 import { getApiErrorMessage } from '~/api/httpError';
+import { newClientId } from '~/api/ids';
+import { useOptimisticMutation, type CachePatch, type ReconcileHelpers } from '~/api/optimistic';
 import { toast } from '~/composables/toast/useToast';
 import { searchListKeys } from '~/shared/searchListKeys';
 import { parseDietDayOffsetQuery, ymdForDayOffset } from '~/utils/dateUtil';
-import type { Food, Meal } from '~/types/diet';
+import type { Food, Meal, SavedMeal } from '~/types/diet';
 
 const DAY_STALE_MS = 1000 * 60 * 2;
 const DETAIL_STALE_MS = 1000 * 60 * 5;
@@ -132,67 +150,129 @@ function invalidateMonthPlannedSummaries(queryClient: QueryClient) {
     queryClient.invalidateQueries({ queryKey: dietKeys.days.monthPlannedSummaryAll });
 }
 
-/** Resolve the key date when the mutation starts, not when it settles (the user may have swiped or crossed midnight). */
-const dayContext = (vars: { offset: number }) => ({ date: ymdForDayOffset(vars.offset) });
+/**
+ * The day a mutation targets, resolved when the caller builds the variables (not at settle, and not
+ * every time the helper re-reads them), so the key and the request describe the same day even if the
+ * user swipes away or crosses midnight.
+ */
+export const dayRef = (offset: number) => ({ offset, date: ymdForDayOffset(offset) });
+type DayVars = ReturnType<typeof dayRef>;
 
-function invalidateDay(queryClient: QueryClient, date: string) {
-    queryClient.invalidateQueries({ queryKey: dietKeys.days.day(date) });
-    invalidateMonthPlannedSummaries(queryClient);
+const dayKey = (v: DayVars) => dietKeys.days.day(v.date);
+const monthSummaries = () => [dietKeys.days.monthPlannedSummaryAll];
+
+/**
+ * Day mutations run one after another per day (reorder validates the exact planned set, so it must not
+ * overtake an add), while their cache patches still apply instantly.
+ */
+const dayScope = (v: DayVars) => ({ id: `diet-day:${v.date}` });
+
+/** The server's full day replaces the cache only when no other write to that day is in flight. */
+function reconcileDay(data: DietLogsTodayResponse, v: DayVars, qc: QueryClient, h: ReconcileHelpers) {
+    if (h.siblingsPending(dayKey(v)) === 0) qc.setQueryData(dayKey(v), data);
 }
 
+type DayPatch<V> = CachePatch<V, DietLogsTodayResponse>;
+type LogVars = DayVars & { mealId: number; dayId: number; client_id: string };
+type AddPlannedVars = DayVars & { savedMeal: SavedMeal; client_id: string };
+type DeletePlannedVars = DayVars & { plannedMealId: number; client_id: string };
+type ReorderVars = DayVars & { ids: number[]; client_id: string };
+
 export function useLogPlannedMeal() {
-    const queryClient = useQueryClient();
-    return useMutation({
-        mutationFn: ({ mealId }: { mealId: number; offset: number }) => logPlannedMeal(mealId),
-        onMutate: dayContext,
-        onSuccess: (day, _vars, ctx) => {
-            queryClient.setQueryData(dietKeys.days.day(ctx.date), day);
-            invalidateMonthPlannedSummaries(queryClient);
-        },
+    return useOptimisticMutation({
+        mutationKey: dietKeys.mutations.logPlanned(),
+        mutationFn: (v: LogVars) =>
+            logPlannedMeal(v.mealId, v.dayId),
+        optimistic: (v: LogVars): DayPatch<LogVars>[] => [
+            {
+                queryKey: dayKey(v),
+                apply: (old) => applyLogPlanned(old, v.mealId),
+                revert: (cur) => revertLogPlanned(cur, v.mealId),
+            },
+        ],
+        reconcile: reconcileDay,
+        invalidate: monthSummaries,
+        scope: dayScope,
+        retry: 1, // idempotent on the server (D1)
+        errorMessage: () => "Couldn’t log that meal",
     });
 }
 
 export function useDeleteLoggedMeal() {
-    const queryClient = useQueryClient();
-    return useMutation({
-        mutationFn: ({ mealId, dayId }: { mealId: number; dayId: number; offset: number }) =>
-            deleteLoggedMeal(mealId, dayId),
-        onMutate: dayContext,
-        onSuccess: (day, _vars, ctx) => {
-            queryClient.setQueryData(dietKeys.days.day(ctx.date), day);
-        },
+    return useOptimisticMutation({
+        mutationKey: dietKeys.mutations.unlog(),
+        mutationFn: (v: LogVars) =>
+            deleteLoggedMeal(v.mealId, v.dayId),
+        optimistic: (v: LogVars): DayPatch<LogVars>[] => [
+            {
+                queryKey: dayKey(v),
+                apply: (old) => applyUnlog(old, v.mealId),
+                revert: (cur, _v, snap) => revertUnlog(cur, v.mealId, snap),
+            },
+        ],
+        reconcile: reconcileDay,
+        scope: dayScope,
+        retry: 1, // idempotent on the server (D1)
+        errorMessage: () => "Couldn’t remove that meal",
     });
 }
 
 // Planning across days: the week board edits 7 days, so each call names its own day.
 
 export function useAddPlannedFromSavedAt() {
-    const queryClient = useQueryClient();
-    return useMutation({
-        mutationFn: ({ savedMealId, offset }: { savedMealId: number; offset: number }) =>
-            addPlannedMealFromSaved(savedMealId, offset),
-        onMutate: dayContext,
-        onSuccess: (_d, _vars, ctx) => invalidateDay(queryClient, ctx.date),
+    return useOptimisticMutation({
+        mutationKey: dietKeys.mutations.addPlanned(),
+        mutationFn: (v: AddPlannedVars) =>
+            addPlannedMealFromSaved(v.savedMeal.ID, v.offset, v.client_id),
+        optimistic: (v: AddPlannedVars): DayPatch<AddPlannedVars>[] => [
+            {
+                queryKey: dayKey(v),
+                apply: (old) => applyAddPlanned(old, v.savedMeal, v.client_id),
+                revert: (cur) => revertAddPlanned(cur, v.client_id),
+            },
+        ],
+        reconcile: reconcileDay,
+        invalidate: monthSummaries,
+        scope: dayScope,
+        retry: 1, // client_id makes a replay create nothing
+        errorMessage: (_e, v) => `Couldn’t add ${v.savedMeal.name}`,
     });
 }
 
 export function useDeletePlannedMealAt() {
-    const queryClient = useQueryClient();
-    return useMutation({
-        mutationFn: ({ plannedMealId, offset }: { plannedMealId: number; offset: number }) =>
-            deletePlannedMeal(plannedMealId, offset),
-        onMutate: dayContext,
-        onSuccess: (_d, _vars, ctx) => invalidateDay(queryClient, ctx.date),
+    return useOptimisticMutation({
+        mutationKey: dietKeys.mutations.deletePlanned(),
+        mutationFn: (v: DeletePlannedVars) =>
+            deletePlannedMeal(v.plannedMealId, v.offset),
+        optimistic: (v: DeletePlannedVars): DayPatch<DeletePlannedVars>[] => [
+            {
+                queryKey: dayKey(v),
+                apply: (old) => applyDeletePlanned(old, v.plannedMealId),
+                revert: (cur, _v, snap) => revertDeletePlanned(cur, v.plannedMealId, snap),
+            },
+        ],
+        reconcile: reconcileDay,
+        invalidate: monthSummaries,
+        scope: dayScope,
+        errorMessage: () => "Couldn’t remove that meal",
     });
 }
 
 export function useReorderPlannedMealsAt() {
-    const queryClient = useQueryClient();
-    return useMutation({
-        mutationFn: ({ ids, offset }: { ids: number[]; offset: number }) =>
-            reorderPlannedMeals(ids, offset),
-        onMutate: dayContext,
-        onSuccess: (_d, _vars, ctx) => invalidateDay(queryClient, ctx.date),
+    return useOptimisticMutation({
+        mutationKey: dietKeys.mutations.reorderPlanned(),
+        mutationFn: (v: ReorderVars) => reorderPlannedMeals(v.ids, v.offset),
+        optimistic: (v: ReorderVars): DayPatch<ReorderVars>[] => [
+            {
+                queryKey: dayKey(v),
+                apply: (old) => applyReorder(old, v.ids),
+                revert: (cur, _v, snap) => revertReorder(cur, snap),
+            },
+        ],
+        reconcile: reconcileDay,
+        scope: dayScope,
+        retry: 1, // idempotent
+        errorMessage: () => "Couldn’t change the order",
     });
 }
 
@@ -259,14 +339,29 @@ function afterMealLogNavigate(router: ReturnType<typeof useRouter>) {
     router.push({ name: 'gym' });
 }
 
-export function useQuickLog() {
-    const queryClient = useQueryClient();
+export type QuickLogVars = DayVars & QuickLogEntry;
 
-    return useMutation({
-        mutationFn: (payload: QuickLogPayload) => quickLog(payload),
-        onSuccess: () => {
-            invalidateDietQueries(queryClient);
-        },
+/** Build the variables at call time: fixes the day and the retry-safe `client_id`. */
+export function quickLogVars(payload: Omit<QuickLogPayload, 'offset' | 'client_id'>, offset: number): QuickLogVars {
+    return { ...payload, ...dayRef(offset), client_id: newClientId() };
+}
+
+export function useQuickLog() {
+    return useOptimisticMutation({
+        mutationKey: dietKeys.mutations.quickLog(),
+        mutationFn: (v: QuickLogVars) => quickLog(v),
+        optimistic: (v: QuickLogVars): DayPatch<QuickLogVars>[] => [
+            {
+                queryKey: dayKey(v),
+                apply: (old) => applyQuickLog(old, v),
+                revert: (cur, _v, snap) => revertQuickLog(cur, v, snap),
+            },
+        ],
+        reconcile: reconcileDay,
+        invalidate: monthSummaries,
+        scope: dayScope,
+        retry: 1, // client_id makes a replay create nothing
+        errorMessage: (_e, v) => `Couldn’t log ${v.name}`,
     });
 }
 

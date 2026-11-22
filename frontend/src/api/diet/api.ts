@@ -52,6 +52,8 @@ export type QuickLogPayload = {
     fiber: number;
     offset?: number;
     replace_meal_id?: number;
+    /** Retry-safe: the server creates nothing for a known id and returns the current day. */
+    client_id?: string;
 };
 
 export async function quickLog(payload: QuickLogPayload): Promise<DietLogsTodayResponse> {
@@ -64,6 +66,7 @@ export async function quickLog(payload: QuickLogPayload): Promise<DietLogsTodayR
         fiber: payload.fiber,
         offset: payload.offset ?? 0,
     };
+    if (payload.client_id) body.client_id = payload.client_id;
     if (
         payload.replace_meal_id != null &&
         payload.replace_meal_id > 0
@@ -99,12 +102,14 @@ export async function getMonthPlannedSummary(
     return response.data.planned_counts;
 }
 
+/** `dayId` is the diet day row id (`day.ID`); 0 or omitted means today. */
 export async function logPlannedMeal(
     mealId: number,
+    dayId = 0,
 ): Promise<DietLogsTodayResponse> {
     const response = await apiClient.post<DietLogsTodayResponse>(
         "/diet/meals/meal/log-planned",
-        { meal_id: mealId },
+        dayId > 0 ? { meal_id: mealId, day_id: dayId } : { meal_id: mealId },
     );
     return response.data;
 }
@@ -144,12 +149,14 @@ export async function deletePlannedMeal(
 export async function addPlannedMealFromSaved(
     savedMealId: number,
     offset = 0,
+    clientId?: string,
 ): Promise<DietLogsTodayResponse> {
     const response = await apiClient.post<DietLogsTodayResponse>(
         "/diet/meals/planned/from-saved",
         {
             saved_meal_id: savedMealId,
             offset,
+            ...(clientId && { client_id: clientId }),
         },
     );
     return response.data;

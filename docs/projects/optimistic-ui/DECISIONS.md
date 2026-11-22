@@ -68,3 +68,10 @@ Rollback also counts failed `mark` mutations (their rows are still cached); sett
 `mark` mode: no toast, `gcTime: Infinity` so the failure outlives the 5 min default, `apply` must be idempotent (Retry re-runs it), and the hook returns `retry(vars)` /
 `dismiss(vars)` which drop the failed mutation (matched by `client_id`). `reconcile` gets a 4th arg `{ siblingsPending(key) }`. `usePendingIds` returns a `Set`.
 `useServerMutation` toasts without Retry (forms keep inputs); `errorMessage: false` leaves the error to the caller.
+
+## 2026-11-22: D2 diet optimistic
+All five day mutations use `useOptimisticMutation`; the patch is one key, `dietKeys.days.day(date)`, via pure functions in `api/diet/dayPatches.ts` (vitest covers apply and revert). `reconcile` writes the server's full day only when no other write to that day is pending; month summaries are invalidated on settle for planned changes. No extra day GET after a write.
+Day and `client_id` are stamped into the variables at call time (`dayRef(offset)`), so key, scope and request cannot drift after a swipe or midnight. Every diet day mutation shares scope `diet-day:<date>` so reorder (which validates the exact planned set) cannot overtake an add. `retry: 1` only on idempotent calls (D1 made log/unlog idempotent; quick-log/from-saved carry `client_id`).
+Logging adds a `DayLog` and unlogging removes it; planned rows stay in the cache (the UI derives "logged" from `loggedMeals`), consistent with Q1 unanswered (server still leaves `planned_meals.logged` set).
+Optimistic rows have negative temp ids; delete/unlog/reorder on them are ignored until the server row replaces them (conservative, avoids sending a temp id). Success toasts were dropped (UI already changed); failure = rollback + Retry toast from the helper. Quick-log dialog now closes immediately. Optimistic totals use food macros in the cache; any gap is corrected when the response lands.
+Left pessimistic on purpose: copy-day, saved-meal CRUD, `createMeal`/`logEditedMeal`/`updateLoggedMeal` (logmeal page; navigation after submit).

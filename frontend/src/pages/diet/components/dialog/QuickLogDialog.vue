@@ -1,10 +1,9 @@
 <script setup lang="ts">
-import { getApiErrorMessage } from "~/api/httpError";
 import type { Meal } from "~/types/diet";
 import { computed, ref, watch } from "vue";
 import { Button, Field, Input } from "~/shared/ui";
 import { toast } from "~/composables/toast/useToast";
-import { useQuickLog } from "~/api/diet/queries";
+import { quickLogVars, useQuickLog } from "~/api/diet/queries";
 
 const props = defineProps<{
     dateOffset: number;
@@ -23,7 +22,6 @@ const fat = ref<number | string>(0);
 const fiber = ref<number | string>(0);
 
 const isEditing = computed(() => !!(props.editingMeal?.ID ?? 0));
-const pending = computed(() => mutation.isPending.value);
 
 function totalsFromMeal(m: Meal) {
     let calories = 0;
@@ -89,30 +87,29 @@ function num(v: number | string, fallback = 0): number {
     return x;
 }
 
-async function submit() {
+function submit() {
     const name = label.value.trim();
     if (!name) {
         toast.push("Enter a label for this meal", "error");
         return;
     }
-    try {
-        const editId = props.editingMeal?.ID;
-        await mutation.mutateAsync({
-            name,
-            calories: num(calories.value, 0),
-            protein: num(protein.value, 0),
-            carbs: num(carbs.value, 0),
-            fat: num(fat.value, 0),
-            fiber: num(fiber.value, 0),
-            offset: props.dateOffset ?? 0,
-            replace_meal_id:
-                editId != null && editId > 0 ? editId : undefined,
-        });
-        toast.push(isEditing.value ? "Updated" : "Logged", "success");
-        props.onResolve?.(true);
-    } catch (err: unknown) {
-        toast.push(getApiErrorMessage(err, "Failed to log"), "error");
-    }
+    const editId = props.editingMeal?.ID;
+    // Optimistic: the day updates and the dialog closes now; a failure rolls back with a Retry toast.
+    mutation.mutate({
+        ...quickLogVars(
+            {
+                name,
+                calories: num(calories.value, 0),
+                protein: num(protein.value, 0),
+                carbs: num(carbs.value, 0),
+                fat: num(fat.value, 0),
+                fiber: num(fiber.value, 0),
+                replace_meal_id: editId != null && editId > 0 ? editId : undefined,
+            },
+            props.dateOffset ?? 0,
+        ),
+    });
+    props.onResolve?.(true);
 }
 </script>
 
@@ -146,7 +143,7 @@ async function submit() {
                 <Input v-model="fiber" type="number" inputmode="decimal" />
             </Field>
         </div>
-        <Button type="submit" variant="primary" size="lg" block :loading="pending">
+        <Button type="submit" variant="primary" size="lg" block>
             {{ isEditing ? "Save changes" : "Log meal" }}
         </Button>
     </form>
