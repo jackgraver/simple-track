@@ -25,9 +25,19 @@ export function setMobilityChecked(day: Day, slot: MobilitySlot, checked: string
     return { ...day, [loggedKey(slot)]: { ...base, checked } };
 }
 
+/** The slot's logged value (what rollback puts back). */
+export function loggedMobility(day: Day, slot: MobilitySlot): MobilityLogged | null | undefined {
+    return day[loggedKey(slot)];
+}
+
+/** Put a slot's logged value back as given (rollback). */
+export function withLoggedMobility(cur: Day, slot: MobilitySlot, value: MobilityLogged | null | undefined): Day {
+    return { ...cur, [loggedKey(slot)]: value };
+}
+
 /** Rollback when siblings also patched the day: put back only this slot's logged value. */
 export function restoreMobility(cur: Day, snapshot: Day, slot: MobilitySlot): Day {
-    return { ...cur, [loggedKey(slot)]: snapshot[loggedKey(slot)] };
+    return withLoggedMobility(cur, slot, loggedMobility(snapshot, slot));
 }
 
 /** Server answer for a mobility upsert: the slot's logged view. */
@@ -51,8 +61,12 @@ export function setCardio(day: Day, v: CardioVars): Day {
     return { ...day, logged_cardio: next };
 }
 
+export function withLoggedCardio(cur: Day, value: Day["logged_cardio"]): Day {
+    return { ...cur, logged_cardio: value };
+}
+
 export function restoreCardio(cur: Day, snapshot: Day): Day {
-    return { ...cur, logged_cardio: snapshot.logged_cardio };
+    return withLoggedCardio(cur, snapshot.logged_cardio);
 }
 
 export function applyCardioResponse(day: Day, cardio: Cardio): Day {
@@ -88,13 +102,19 @@ export function addExerciseGroup(day: Day, v: AddExerciseVars): Day {
     return { ...day, planned_exercises: [...groups, { logged: emptyLoggedFor(day, v.exercise) }] };
 }
 
-/** Server answer for add: the saved logged row replaces the temporary one (previous/max arrive on refetch). */
-export function applyAddedExercise(day: Day, exerciseId: number, logged: LoggedExercise): Day {
+/**
+ * Server answer for add: the saved logged row replaces the temporary one (previous/max arrive on
+ * refetch). With `keepSets` (other writes to the day still pending, e.g. the first set right after
+ * the add) the cached sets stay: the add's response has none yet, and those writes merge their own.
+ */
+export function applyAddedExercise(day: Day, exerciseId: number, logged: LoggedExercise, keepSets = false): Day {
     const groups = day.planned_exercises ?? [];
     const i = groups.findIndex((g) => groupMatches(g, exerciseId));
     if (i < 0) return { ...day, planned_exercises: [...groups, { logged }] };
+    const cached = groups[i].logged;
+    const next = keepSets && cached ? { ...logged, sets: cached.sets } : logged;
     const planned_exercises = [...groups];
-    planned_exercises[i] = { ...groups[i], logged };
+    planned_exercises[i] = { ...groups[i], logged: next };
     return { ...day, planned_exercises };
 }
 

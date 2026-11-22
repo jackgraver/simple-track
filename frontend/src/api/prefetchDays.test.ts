@@ -1,10 +1,15 @@
 import { describe, expect, it, vi } from "vitest";
-import { adjacentOffsets, prefetchAdjacentDays, prefetchAppStart } from "./prefetchDays";
+import { adjacentOffsets, prefetchAdjacentDays } from "./prefetchDays";
 
 describe("adjacentOffsets", () => {
     it("is the day before and after (offsets grow into the past)", () => {
-        expect(adjacentOffsets(0)).toEqual([1, -1]);
         expect(adjacentOffsets(5)).toEqual([6, 4]);
+    });
+
+    it("never includes a future day: the day GETs create the row and pin its plan (nfix #1)", () => {
+        expect(adjacentOffsets(0)).toEqual([1]);
+        expect(adjacentOffsets(-1)).toEqual([0]);
+        expect(adjacentOffsets(-3)).toEqual([]);
     });
 });
 
@@ -17,15 +22,5 @@ describe("prefetchAdjacentDays", () => {
             ["d", 3],
             ["d", 1],
         ]);
-    });
-});
-
-describe("prefetchAppStart", () => {
-    it("prefetches today's diet and gym day", () => {
-        const prefetchQuery = vi.fn().mockResolvedValue(undefined);
-        prefetchAppStart({ prefetchQuery });
-        const keys = prefetchQuery.mock.calls.map((c) => JSON.stringify((c[0] as { queryKey: unknown }).queryKey));
-        expect(keys).toHaveLength(2);
-        expect(keys[0]).not.toBe(keys[1]);
     });
 });

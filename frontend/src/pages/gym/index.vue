@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import { useRoute, useRouter } from "vue-router";
+import { parseDietDayOffsetQuery } from "~/utils/dateUtil";
 import WorkoutActivityGraph from "~/pages/gym/WorkoutActivityGraph.vue";
 import { gymDayOptions, useAdjacentDayPrefetch } from "~/api/prefetchDays";
 import ModuleTitleBar from "~/shared/ModuleTitleBar.vue";
@@ -13,11 +14,7 @@ import { useGymWeek } from "./home/useGymWeek";
 const route = useRoute();
 const router = useRouter();
 const isGymHome = computed(() => route.name === "gym");
-const dayOffset = computed(() => {
-    const raw = route.query.offset;
-    const value = typeof raw === "string" ? Number.parseInt(raw, 10) : 0;
-    return Number.isNaN(value) ? 0 : value;
-});
+const dayOffset = computed(() => parseDietDayOffsetQuery(route.query.offset));
 
 useAdjacentDayPrefetch(dayOffset, gymDayOptions, isGymHome);
 

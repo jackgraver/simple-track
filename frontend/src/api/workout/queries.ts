@@ -7,17 +7,20 @@ import { useOptimisticMutation, usePendingIds, useServerMutation } from '~/api/o
 import { activateWorkoutProgram, createWorkoutPlan, createWorkoutProgram, getWorkoutPrograms, renameWorkoutProgram, switchWorkoutPlan, type WorkoutActivityResponse, WorkoutLogsPreviousResponse } from '~/api/workout/api';
 import { dayParams, offsetToDate } from '~/api/workout/dates';
 import { workoutKeys } from '~/api/workout/keys';
+import { upsertChain } from '~/api/workout/upsertChain';
+import { getApiErrorMessage } from '~/api/httpError';
 import {
     addExerciseGroup,
     applyAddedExercise,
     applyCardioResponse,
     applyMobilityResponse,
     removeExerciseGroup,
-    restoreCardio,
+    loggedMobility,
     restoreExerciseGroup,
-    restoreMobility,
     setCardio,
     setMobilityChecked,
+    withLoggedCardio,
+    withLoggedMobility,
     type AddExerciseVars,
     type CardioVars,
     type MobilitySlot,
@@ -522,8 +525,11 @@ export function useAddExerciseToWorkout() {
                 revert: (day: Day, vars: AddExerciseVars, snapshot: Day) => removeAddedGroup(day, snapshot, vars),
             },
         ],
-        reconcile: (logged, v) =>
-            qc.setQueryData<Day>(workoutKeys.days.day(v.date), (day) => (day ? applyAddedExercise(day, v.exerciseId, logged) : day)),
+        reconcile: (logged, v, client, { siblingsPending }) => {
+            const dayKey = workoutKeys.days.day(v.date);
+            const keepSets = siblingsPending(dayKey) > 0;
+            client.setQueryData<Day>(dayKey, (day) => (day ? applyAddedExercise(day, v.exerciseId, logged, keepSets) : day));
+        },
         invalidate: (v) => [workoutKeys.days.day(v.date), ...activityKeys()],
         scope: (v) => setsScope({ date: v.date, exercise_id: v.exerciseId }),
         errorMessage: () => 'Couldn’t add the exercise',
@@ -574,6 +580,7 @@ export function useRemoveExerciseFromWorkout() {
 function useUpsertMobility(slot: MobilitySlot) {
     const qc = useQueryClient();
     const key = slot === 'pre' ? workoutKeys.mutations.mobilityPre() : workoutKeys.mutations.mobilityPost();
+    const chain = upsertChain<MobilityLogged | null | undefined>(qc, key);
     return useOptimisticMutation<Omit<MobilityVars, 'slot'>, MobilityLogged>({
         mutationKey: key,
         mutationFn: async (v) => {
@@ -588,11 +595,16 @@ function useUpsertMobility(slot: MobilitySlot) {
             {
                 queryKey: workoutKeys.days.day(v.date),
                 apply: (day: Day) => setMobilityChecked(day, slot, v.checked),
-                revert: (day: Day, _v, snapshot: Day) => restoreMobility(day, snapshot, slot),
+                revert: (day: Day, vars, snapshot: Day) => {
+                    const r = chain.rollback(vars, loggedMobility(snapshot, slot));
+                    return r.keep ? day : withLoggedMobility(day, slot, r.value);
+                },
+                alwaysRevert: true,
             },
         ],
         // The next tick has already patched the cache while an earlier call is in flight; let the last one win.
         reconcile: (mobility, v, client, { siblingsPending }) => {
+            chain.confirmed(v, mobility);
             const dayKey = workoutKeys.days.day(v.date);
             if (siblingsPending(dayKey) > 0) return;
             client.setQueryData<Day>(dayKey, (day) => (day ? applyMobilityResponse(day, slot, mobility) : day));
@@ -617,6 +629,7 @@ export function useUpsertMobilityPost() {
 /** Save cardio. The logged cardio shows at once; the server upserts by workout log, so retries are safe. */
 export function useUpsertCardio() {
     const qc = useQueryClient();
+    const chain = upsertChain<Day['logged_cardio']>(qc, workoutKeys.mutations.cardio());
     return useOptimisticMutation<CardioVars, Cardio>({
         mutationKey: workoutKeys.mutations.cardio(),
         mutationFn: async (v) => {
@@ -635,10 +648,15 @@ export function useUpsertCardio() {
             {
                 queryKey: workoutKeys.days.day(v.date),
                 apply: (day: Day) => setCardio(day, v),
-                revert: (day: Day, _v, snapshot: Day) => restoreCardio(day, snapshot),
+                revert: (day: Day, vars, snapshot: Day) => {
+                    const r = chain.rollback(vars, snapshot.logged_cardio);
+                    return r.keep ? day : withLoggedCardio(day, r.value);
+                },
+                alwaysRevert: true,
             },
         ],
         reconcile: (cardio, v, client, { siblingsPending }) => {
+            chain.confirmed(v, cardio);
             const dayKey = workoutKeys.days.day(v.date);
             if (siblingsPending(dayKey) > 0) return;
             client.setQueryData<Day>(dayKey, (day) => (day ? applyCardioResponse(day, cardio) : day));
@@ -653,24 +671,30 @@ export function useUpsertCardio() {
 
 /**
  * Switch the day's plan. Waits for the server (it rebuilds the planned exercises) and writes the full
- * day it returns into the cache, so no follow-up GET. If another write to the day is still pending the
- * response would erase its optimistic rows, so the day is only marked stale then (no refetch now).
+ * day it returns into the cache, so no follow-up GET. A day GET already in flight is cancelled first so
+ * it can't land the old plan on top. If another write to the day is still pending the response would
+ * erase its optimistic rows, so the day is refetched once the last of those writes settles instead.
  */
 export function useSwitchWorkoutPlan() {
     const qc = useQueryClient();
     return useServerMutation<{ date: string; planId: number | null }, Day>({
         mutationKey: workoutKeys.mutations.switchPlan(),
-        mutationFn: ({ date, planId }) => switchWorkoutPlan(date, planId),
-        reconcile: (res, v, client, { siblingsPending }) => {
+        mutationFn: async ({ date, planId }) => {
+            const res = await switchWorkoutPlan(date, planId);
+            // The response is newer than any GET still in flight for the day.
+            await qc.cancelQueries({ queryKey: workoutKeys.days.day(date), exact: true });
+            return res;
+        },
+        reconcile: (res, v, client, { siblingsPending, deferInvalidate }) => {
             const dayKey = workoutKeys.days.day(v.date);
             if (siblingsPending(dayKey) > 0) {
-                void client.invalidateQueries({ queryKey: dayKey, exact: true, refetchType: 'none' });
+                deferInvalidate(dayKey);
                 return;
             }
             client.setQueryData<Day>(dayKey, res);
         },
         invalidate: () => activityKeys(),
-        errorMessage: () => 'Couldn’t switch the plan',
+        errorMessage: (err) => getApiErrorMessage(err, 'Couldn’t switch the plan'),
         queryClient: qc,
     });
 }

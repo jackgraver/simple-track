@@ -11,7 +11,7 @@ import { trackingQueries } from "~/api/tracking/queries";
 import { workoutQueries } from "~/api/workout/queries";
 import { offsetToDate } from "~/api/workout/dates";
 import { parseDietDayOffsetQuery } from "~/utils/dateUtil";
-import { warmRoute, type RouteQueries } from "./prefetch";
+import { prefetchRoute, warmNavigation, type RouteQueries } from "./prefetch";
 
 declare module "vue-router" {
     interface RouteMeta {
@@ -24,7 +24,8 @@ declare module "vue-router" {
         wide?: boolean;
         /**
          * Primary queries of this route (`queryOptions` objects built from the target location).
-         * Prefetched on nav intent (NavLink) and awaited briefly in `beforeResolve`.
+         * Prefetched on nav intent (NavLink) and awaited briefly in `beforeResolve`. Only the matched
+         * leaf record's own value is used: child routes do not inherit it.
          */
         queries?: RouteQueries;
     }
@@ -284,16 +285,16 @@ router.beforeEach(async (to, from) => {
     if (authStatus.value !== "authenticated") {
         return { name: "signin", query: { redirect: to.fullPath } };
     }
+    // App start: begin the landing page's queries while its component chunk loads (redirects are
+    // already applied here, so `/` warms the gym day and `/media` warms nothing day-related).
+    if (from === START_LOCATION) prefetchRoute(queryClient, to);
     return true;
 });
 
 // Warm the target's primary queries, waiting at most NAV_BUDGET_MS so a slow network never blocks
 // navigation: the page renders from cache if ready and otherwise shows its own cold-load state.
 // Only for authenticated targets (the auth guard above has already redirected otherwise).
-router.beforeResolve(async (to, from) => {
-    if (to.name === "signin" || to.fullPath === from.fullPath) return;
-    await warmRoute(queryClient, to);
-});
+router.beforeResolve((to, from) => warmNavigation(queryClient, to, from));
 
 router.afterEach((to, _from, failure) => {
     if (failure || to.name === "signin" || to.name === "not-found" || to.name === "launch") return;
