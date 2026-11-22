@@ -43,7 +43,7 @@ func TestCreateItemIdempotentByClientID(t *testing.T) {
 		t.Fatalf("want 1 row, got %d", n)
 	}
 	// Still returned after being completed.
-	if _, err := CompleteItem(db, a.ID); err != nil {
+	if _, err := CompleteItem(db, itemRef{id: a.ID}); err != nil {
 		t.Fatal(err)
 	}
 	c, err := CreateItem(db, "milk", id)

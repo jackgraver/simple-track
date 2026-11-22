@@ -7,6 +7,7 @@ import {
     useGrocerySuggestions,
 } from "~/api/tracking/queries";
 import { newClientId } from "~/api/ids";
+import type { GroceryItem } from "~/api/tracking/types";
 import { isTempGroceryId } from "~/api/tracking/groceryCache";
 import { ClipboardList, ShoppingBasket } from "lucide-vue-next";
 import {
@@ -28,7 +29,6 @@ const COMPLETE_DELAY_MS = 1200;
 
 const newItem = ref("");
 const completingIds = ref<Set<number>>(new Set());
-const hiddenIds = ref<Set<number>>(new Set());
 const inputFocused = ref(false);
 const activeSuggestionIndex = ref(0);
 const addWrap = useTemplateRef<HTMLElement>("addWrap");
@@ -41,8 +41,9 @@ const createMutation = useCreateGroceryItem();
 const completeMutation = useCompleteGroceryItem();
 
 const items = computed(() => data.value ?? []);
-// The list refetches as soon as the check is saved, which would drop the row before the strike-through
-// has been seen. Remember where each row was and keep completing rows in place until they're hidden.
+// Completing drops the row from the cache at once, before the strike-through has been seen. Remember
+// where each row was and keep completing rows in place for a moment. A failed save puts the row back
+// in the cache (shared helper rollback), so nothing else needs undoing here.
 const lastSeen = ref(new Map<number, { item: (typeof items.value)[number]; index: number }>());
 watch(
     items,
@@ -54,7 +55,7 @@ watch(
     { immediate: true },
 );
 const displayItems = computed(() => {
-    const list = items.value.filter((item) => !hiddenIds.value.has(item.ID));
+    const list = [...items.value];
     const present = new Set(list.map((item) => item.ID));
     for (const id of completingIds.value) {
         const seen = lastSeen.value.get(id);
@@ -63,15 +64,6 @@ const displayItems = computed(() => {
     return list;
 });
 
-watch(items, (list) => {
-    const present = new Set(list.map((item) => item.ID));
-    const next = new Set(
-        [...hiddenIds.value].filter((id) => present.has(id)),
-    );
-    if (next.size !== hiddenIds.value.size) {
-        hiddenIds.value = next;
-    }
-});
 const trimmedItem = computed(() => newItem.value.trim());
 const suggestions = computed(() =>
     trimmedItem.value.length > 0 ? (suggestionsQuery.data.value ?? []) : [],
@@ -132,42 +124,19 @@ async function addItem(name?: string) {
     await focusNewItemInput();
 }
 
-function onItemCheck(id: number, checked: boolean | "indeterminate") {
-    // A row that hasn't been saved yet has no server id to complete.
-    if (checked === true && !isTempGroceryId(id)) {
-        void completeItem(id);
-    }
+function onItemCheck(item: GroceryItem, checked: boolean | "indeterminate") {
+    // A row still being created is completed by its client_id once the create has gone through.
+    if (checked === true) completeItem(item);
 }
 
-function hideItem(id: number) {
-    hiddenIds.value = new Set([...hiddenIds.value, id]);
-}
-
-function unhideItem(id: number) {
-    const next = new Set(hiddenIds.value);
-    next.delete(id);
-    hiddenIds.value = next;
-}
-
-function clearItemState(id: number) {
-    updateIdSet(id, false);
-    unhideItem(id);
-}
-
-async function completeItem(id: number) {
+function completeItem(item: GroceryItem) {
+    const id = item.ID;
     if (isCompleting(id)) return;
     updateIdSet(id, true);
-    const persistPromise = completeMutation.mutateAsync({ id });
-    await new Promise((resolve) => setTimeout(resolve, COMPLETE_DELAY_MS));
-    try {
-        await persistPromise;
-    } catch {
-        // The helper already rolled the row back and toasted with Retry.
-        clearItemState(id);
-        return;
-    }
-    hideItem(id);
-    updateIdSet(id, false);
+    // Leaves the list after the strike-through, saved or not (offline, the request waits for the
+    // connection). A failure puts it back with a Retry toast.
+    completeMutation.mutate({ id, client_id: item.client_id });
+    window.setTimeout(() => updateIdSet(id, false), COMPLETE_DELAY_MS);
 }
 
 function acceptSuggestion() {
@@ -264,12 +233,12 @@ function onInputKeydown(event: KeyboardEvent) {
                     <ListRow
                         v-for="item in displayItems"
                         :key="item.client_id ?? item.ID"
-                        :pending="isCompleting(item.ID)"
+                        :pending="isCompleting(item.ID) || isTempGroceryId(item.ID)"
                     >
                         <Checkbox
                             :model-value="isCompleting(item.ID)"
                             :label="`Complete ${item.name}`"
-                            @update:model-value="onItemCheck(item.ID, $event)"
+                            @update:model-value="onItemCheck(item, $event)"
                         >
                             <span
                                 class="transition-colors duration-700"

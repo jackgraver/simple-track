@@ -80,4 +80,38 @@ describe("useCompleteGroceryItem", () => {
         await vi.advanceTimersByTimeAsync(5000);
         expect(qc.getQueryData<GroceryItem[]>(trackingKeys.groceryItems)!.map((r) => r.ID)).toEqual([1, 2]);
     });
+
+    it("a row ticked before its create returns is completed by client_id after the create", async () => {
+        let resolveCreate!: (r: GroceryItem) => void;
+        api.createGroceryItem.mockReturnValue(new Promise((r) => (resolveCreate = r)));
+        api.completeGroceryItem.mockResolvedValue({ ...row(9, "rice", "c1"), completed_at: "now" });
+        const create = scope.run(() => useCreateGroceryItem())!;
+        const complete = scope.run(() => useCompleteGroceryItem())!;
+        create.mutate({ client_id: "c1", name: "rice" });
+        await flush();
+        const temp = qc.getQueryData<GroceryItem[]>(trackingKeys.groceryItems)!.find((r) => r.client_id === "c1")!;
+        complete.mutate({ id: temp.ID, client_id: "c1" });
+        await flush();
+        expect(qc.getQueryData<GroceryItem[]>(trackingKeys.groceryItems)!.map((r) => r.ID)).toEqual([1, 2]);
+        expect(api.completeGroceryItem).not.toHaveBeenCalled();
+        resolveCreate(row(9, "rice", "c1"));
+        await flush();
+        await flush();
+        expect(api.completeGroceryItem).toHaveBeenCalledWith("c1");
+        // The create's reconcile did not bring the ticked row back.
+        expect(qc.getQueryData<GroceryItem[]>(trackingKeys.groceryItems)!.map((r) => r.ID)).toEqual([1, 2]);
+    });
+
+    it("does not resurrect a row whose create failed", async () => {
+        api.createGroceryItem.mockRejectedValue(new Error("boom"));
+        api.completeGroceryItem.mockRejectedValue(new Error("not found"));
+        const create = scope.run(() => useCreateGroceryItem())!;
+        const complete = scope.run(() => useCompleteGroceryItem())!;
+        create.mutate({ client_id: "c1", name: "rice" });
+        await flush();
+        const temp = qc.getQueryData<GroceryItem[]>(trackingKeys.groceryItems)!.find((r) => r.client_id === "c1")!;
+        complete.mutate({ id: temp.ID, client_id: "c1" });
+        await vi.advanceTimersByTimeAsync(20_000);
+        expect(qc.getQueryData<GroceryItem[]>(trackingKeys.groceryItems)!.map((r) => r.ID)).toEqual([1, 2]);
+    });
 });

@@ -84,9 +84,10 @@ export async function createGroceryItems(
     return { items: res.items ?? [], skipped: res.skipped ?? [] };
 }
 
-export async function completeGroceryItem(id: number): Promise<GroceryItem> {
+/** `ref` is the numeric id or the item's client_id (the server accepts either). */
+export async function completeGroceryItem(ref: number | string): Promise<GroceryItem> {
     const res = await apiPATCH<{ item: GroceryItem }>(
-        `/tracking/grocery/items/${id}/complete`,
+        `/tracking/grocery/items/${ref}/complete`,
         {},
     );
     return res.item;

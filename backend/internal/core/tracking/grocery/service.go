@@ -133,9 +133,18 @@ func CreateItems(db *gorm.DB, names []string) ([]GroceryItem, []string, error) {
 	return created, skipped, nil
 }
 
-func CompleteItem(db *gorm.DB, id uint) (*GroceryItem, error) {
+func findItem(db *gorm.DB, ref itemRef) (GroceryItem, error) {
 	var row GroceryItem
-	if err := db.First(&row, id).Error; err != nil {
+	if ref.clientID != "" {
+		return row, db.Where("client_id = ?", ref.clientID).First(&row).Error
+	}
+	return row, db.First(&row, ref.id).Error
+}
+
+// CompleteItem marks the item done. Idempotent: completing a completed item returns it unchanged.
+func CompleteItem(db *gorm.DB, ref itemRef) (*GroceryItem, error) {
+	row, err := findItem(db, ref)
+	if err != nil {
 		return nil, err
 	}
 	if row.CompletedAt == nil {
@@ -148,9 +157,9 @@ func CompleteItem(db *gorm.DB, id uint) (*GroceryItem, error) {
 	return &row, nil
 }
 
-func DeleteItem(db *gorm.DB, id uint) error {
-	var row GroceryItem
-	if err := db.First(&row, id).Error; err != nil {
+func DeleteItem(db *gorm.DB, ref itemRef) error {
+	row, err := findItem(db, ref)
+	if err != nil {
 		return err
 	}
 	return db.Delete(&row).Error

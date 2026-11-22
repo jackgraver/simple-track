@@ -61,3 +61,29 @@ func TestPostItem_dbErrorIs500WithoutDetails(t *testing.T) {
 		t.Fatalf("want opaque 500, got %d %s", w.Code, w.Body.String())
 	}
 }
+
+// A row created offline is completed by its client_id before the client knows the server id.
+func TestCompleteItem_byClientID(t *testing.T) {
+	r, post := groceryRouter(t)
+	const cid = "66666666-6666-4666-8666-666666666666"
+	if w := post(`{"name": "eggs", "client_id": "` + cid + `"}`); w.Code != http.StatusOK {
+		t.Fatalf("create: %d %s", w.Code, w.Body.String())
+	}
+	patch := func(id string) *httptest.ResponseRecorder {
+		req := httptest.NewRequest(http.MethodPatch, "/grocery/items/"+id+"/complete", nil)
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+		return w
+	}
+	for i := 0; i < 2; i++ { // idempotent replay
+		if w := patch(cid); w.Code != http.StatusOK || !strings.Contains(w.Body.String(), `"completed_at":"`) {
+			t.Fatalf("complete by client_id (%d): %d %s", i, w.Code, w.Body.String())
+		}
+	}
+	if w := patch("77777777-7777-4777-8777-777777777777"); w.Code != http.StatusNotFound {
+		t.Fatalf("unknown client_id: %d %s", w.Code, w.Body.String())
+	}
+	if w := patch("nope"); w.Code != http.StatusBadRequest {
+		t.Fatalf("bad id: %d %s", w.Code, w.Body.String())
+	}
+}

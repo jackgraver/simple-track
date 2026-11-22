@@ -9,6 +9,7 @@ import {
     removeGroceryItemByClientId,
     restoreGroceryItem,
     tempGroceryId,
+    groceryPathRef,
 } from "./groceryCache";
 
 const item = (ID: number, name: string, client_id?: string): GroceryItem => ({ ID, name, completed_at: null, client_id });
@@ -35,8 +36,8 @@ describe("grocery cache patches", () => {
         const next = reconcileGroceryItem(withTemp, server, "c1");
         expect(next).toHaveLength(4);
         expect(next.slice(-1)[0]).toEqual(server);
-        // Row already gone (refetch raced) -> appended; already real -> no duplicate.
-        expect(reconcileGroceryItem(base, server, "c1")).toHaveLength(4);
+        // Row already gone (ticked off while the create was in flight) -> stays gone; already real -> no duplicate.
+        expect(reconcileGroceryItem(base, server, "c1")).toEqual(base);
         expect(reconcileGroceryItem(next, server, "c1")).toHaveLength(4);
     });
 
@@ -51,5 +52,19 @@ describe("grocery cache patches", () => {
         expect(restoreGroceryItem(after, { id: 2 }, base).map((r) => r.ID)).toEqual([1, 2, 3, -5]);
         expect(restoreGroceryItem(base, { id: 2 }, base)).toEqual(base);
         expect(restoreGroceryItem(after, { id: 99 }, base)).toEqual(after);
+    });
+
+    it("a row still on its temp id is completed and restored by client_id", () => {
+        const withTemp = addGroceryItem(base, { client_id: "c1", name: "rice" });
+        const temp = withTemp[3];
+        const v = { id: temp.ID, client_id: "c1" };
+        const after = completeGroceryItemInList(withTemp, v);
+        expect(after).toEqual(base);
+        // The create reconciled meanwhile: the row is not re-added by the swap...
+        expect(reconcileGroceryItem(after, item(9, "rice", "c1"), "c1")).toEqual(base);
+        // ...and a failed complete restores it (matched by client_id).
+        expect(restoreGroceryItem(after, v, withTemp).slice(-1)[0]).toEqual(temp);
+        expect(groceryPathRef(v)).toBe("c1");
+        expect(groceryPathRef({ id: 4 })).toBe("4");
     });
 });

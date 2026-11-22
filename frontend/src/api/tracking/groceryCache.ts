@@ -30,24 +30,37 @@ export function removeGroceryItemByClientId(cur: GroceryItem[], v: { client_id: 
     return cur.filter((r) => r.client_id !== v.client_id);
 }
 
-/** Swap the optimistic row for the server's (real ID, same client_id). Appends if it vanished. */
+/**
+ * Swap the optimistic row for the server's (real ID, same client_id). A row that is gone (ticked
+ * off while its create was in flight) stays gone: the settle-time refetch has the final say.
+ */
 export function reconcileGroceryItem(cur: GroceryItem[], item: GroceryItem, clientId: string): GroceryItem[] {
-    const known = cur.some((r) => r.client_id === clientId || r.ID === item.ID);
-    if (!known) return [...cur, item];
     return cur.map((r) => (r.client_id === clientId || r.ID === item.ID ? item : r));
 }
 
+/** Identifies the row to complete: its server id, or its client_id while the id is still temporary. */
+export type GroceryItemRef = { id: number; client_id?: string | null };
+
+function matches(r: GroceryItem, v: GroceryItemRef): boolean {
+    return r.ID === v.id || (!!v.client_id && r.client_id === v.client_id);
+}
+
 /** Completed items leave the active list. */
-export function completeGroceryItemInList(old: GroceryItem[], v: { id: number }): GroceryItem[] {
-    return old.filter((r) => r.ID !== v.id);
+export function completeGroceryItemInList(old: GroceryItem[], v: GroceryItemRef): GroceryItem[] {
+    return old.filter((r) => !matches(r, v));
 }
 
 /** Inverse of completing: put the snapshot's row back at its old position unless something re-added it. */
-export function restoreGroceryItem(cur: GroceryItem[], v: { id: number }, snapshot: GroceryItem[]): GroceryItem[] {
-    if (cur.some((r) => r.ID === v.id)) return cur;
-    const index = snapshot.findIndex((r) => r.ID === v.id);
+export function restoreGroceryItem(cur: GroceryItem[], v: GroceryItemRef, snapshot: GroceryItem[]): GroceryItem[] {
+    if (cur.some((r) => matches(r, v))) return cur;
+    const index = snapshot.findIndex((r) => matches(r, v));
     if (index < 0) return cur;
     const next = [...cur];
     next.splice(Math.min(index, next.length), 0, snapshot[index]);
     return next;
+}
+
+/** Path ref for complete/delete: the client_id when known (works before the create returns), else the id. */
+export function groceryPathRef(v: GroceryItemRef): string {
+    return v.client_id ?? String(v.id);
 }
