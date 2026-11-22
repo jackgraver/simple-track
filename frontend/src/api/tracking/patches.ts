@@ -9,7 +9,15 @@ export type AddWaterVars = {
     /** Cached preset, so the optimistic row can show it before the server answers. */
     preset?: DrinkSizePreset | null;
 };
-export type DeleteWaterVars = { id: number; date: string };
+/** `client_id` (when the entry has one) lets a delete target an entry that is still being created. */
+export type DeleteWaterVars = { id: number; date: string; client_id?: string | null };
+
+const isWaterRow = (r: WaterLog, v: DeleteWaterVars) => r.ID === v.id || (!!v.client_id && r.client_id === v.client_id);
+
+/** Path ref for `DELETE /tracking/water/:ref`: the client_id when known, else the id. */
+export function waterPathRef(v: DeleteWaterVars): string {
+    return v.client_id ?? String(v.id);
+}
 
 /** Negative, deterministic per client_id: unique list key that can never collide with a server id. */
 export function tempWaterId(clientId: string): number {
@@ -40,18 +48,18 @@ export function revertAddWater(cur: WaterLog[], v: AddWaterVars): WaterLog[] {
 
 /** Swap the optimistic row for the server's (merging only this entity, siblings stay untouched). */
 export function reconcileWater(cur: WaterLog[], v: AddWaterVars, saved: WaterLog): WaterLog[] {
-    const next = cur.map((r) => (r.client_id === v.client_id ? { ...saved, client_id: v.client_id } : r));
-    return next.some((r) => r.ID === saved.ID) ? next : [...next, saved];
+    // A row that is gone (deleted while the create was in flight) stays gone; the settle refetch decides.
+    return cur.map((r) => (r.client_id === v.client_id ? { ...saved, client_id: v.client_id } : r));
 }
 
 export function deleteWaterPatch(old: WaterLog[], v: DeleteWaterVars): WaterLog[] {
-    return old.filter((r) => r.ID !== v.id);
+    return old.filter((r) => !isWaterRow(r, v));
 }
 
 /** Put the deleted row back (from the snapshot) without touching other pending changes. */
 export function revertDeleteWater(cur: WaterLog[], v: DeleteWaterVars, snapshot: WaterLog[]): WaterLog[] {
-    if (cur.some((r) => r.ID === v.id)) return cur;
-    const row = snapshot.find((r) => r.ID === v.id);
+    if (cur.some((r) => isWaterRow(r, v))) return cur;
+    const row = snapshot.find((r) => isWaterRow(r, v));
     return row ? [...cur, row] : cur;
 }
 

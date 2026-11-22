@@ -7,6 +7,7 @@ import {
     reconcileWater,
     revertAddWater,
     revertDeleteWater,
+    waterPathRef,
     revertUpsertByDay,
     saveStepsPatch,
     saveWeightPatch,
@@ -41,8 +42,9 @@ describe("water add", () => {
         expect(next[1].client_id).toBe(A);
     });
 
-    it("reconcile appends if the temp row vanished (refetch) and the server row is not there yet", () => {
-        expect(reconcileWater([w(1, 8)], add(A), w(42, 16)).map((r) => r.ID)).toEqual([1, 42]);
+    it("reconcile does not bring back a row deleted while its create was in flight", () => {
+        // The settle-time refetch of the day has the final say.
+        expect(reconcileWater([w(1, 8)], add(A), w(42, 16)).map((r) => r.ID)).toEqual([1]);
         // Refetch already brought the server row: no duplicate.
         expect(reconcileWater([w(1, 8), w(42, 16, A)], add(A), w(42, 16)).map((r) => r.ID)).toEqual([1, 42]);
     });
@@ -91,5 +93,14 @@ describe("weight / steps upsert by day", () => {
         const optimistic = saveWeightPatch([], { date: "2026-11-22", weightLbs: 179 });
         const next = reconcileByDay(optimistic, wt("2026-11-22T00:00:00Z", 179, 77));
         expect(next).toEqual([wt("2026-11-22T00:00:00Z", 179, 77)]);
+    });
+    it("an entry still being saved is deleted and restored by client_id", () => {
+        const withTemp = addWaterPatch([w(1, 8)], add(A));
+        const v = { id: tempWaterId(A), date: "d", client_id: A };
+        const patched = deleteWaterPatch(withTemp, v);
+        expect(patched.map((r) => r.ID)).toEqual([1]);
+        expect(revertDeleteWater(patched, v, withTemp)).toEqual(withTemp);
+        expect(waterPathRef(v)).toBe(A);
+        expect(waterPathRef({ id: 7, date: "d" })).toBe("7");
     });
 });

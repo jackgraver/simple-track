@@ -38,6 +38,7 @@ import {
 import {
     addWaterPatch,
     deleteWaterPatch,
+    waterPathRef,
     reconcileByDay,
     reconcileWater,
     revertAddWater,
@@ -265,6 +266,7 @@ export function useSaveWater() {
         // Idempotent through client_id, so a transient failure may be retried safely.
         retry: 1,
         retryDelay: 800,
+        scope: (v) => ({ id: `water:${v.client_id}` }),
         optimistic: (v) => [
             {
                 queryKey: trackingKeys.water(v.date),
@@ -283,14 +285,16 @@ export function useDeleteWater() {
     return useOptimisticMutation<DeleteWaterVars, void>({
         mutationKey: trackingKeys.mutations.deleteWater,
         // Already gone (404) is the state we wanted.
-        mutationFn: async ({ id }) => {
+        // Never-saved entries (create failed) answer 404 too, which is right: nothing to delete.
+        mutationFn: async (v) => {
             try {
-                await deleteWater(id);
+                await deleteWater(waterPathRef(v));
             } catch (err) {
                 if (!(axios.isAxiosError(err) && err.response?.status === 404)) throw err;
             }
         },
-        scope: (v) => ({ id: `water:${v.id}` }),
+        // Same scope as the entry's create, so deleting an entry still being saved waits for it.
+        scope: (v) => ({ id: v.client_id ? `water:${v.client_id}` : `water:id:${v.id}` }),
         optimistic: (v) => [
             {
                 queryKey: trackingKeys.water(v.date),

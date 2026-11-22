@@ -79,6 +79,18 @@ func DeleteWaterLog(db *gorm.DB, id uint) error {
 	return nil
 }
 
+// DeleteWaterLogByClientID deletes the entry created with clientID (gorm.ErrRecordNotFound if none).
+func DeleteWaterLogByClientID(db *gorm.DB, clientID string) error {
+	res := db.Where("client_id = ?", clientID).Delete(&WaterLog{})
+	if res.Error != nil {
+		return res.Error
+	}
+	if res.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
+}
+
 func ListDrinkSizePresets(db *gorm.DB) ([]DrinkSizePreset, error) {
 	var rows []DrinkSizePreset
 	err := db.Order("name ASC").Find(&rows).Error

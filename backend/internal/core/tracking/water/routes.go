@@ -78,12 +78,18 @@ func (h *handler) postWater(c *gin.Context) {
 }
 
 func (h *handler) deleteWater(c *gin.Context) {
-	id64, err := strconv.ParseUint(c.Param("id"), 10, 32)
-	if err != nil {
+	// :id is the numeric id or the entry's client_id (an entry added offline can be deleted before
+	// the client knows its server id).
+	raw := c.Param("id")
+	var err error
+	if id64, perr := strconv.ParseUint(raw, 10, 32); perr == nil && id64 != 0 {
+		err = DeleteWaterLog(h.db, uint(id64))
+	} else if u, uerr := uuid.Parse(raw); uerr == nil && u != uuid.Nil {
+		err = DeleteWaterLogByClientID(h.db, u.String())
+	} else {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
 		return
 	}
-	err = DeleteWaterLog(h.db, uint(id64))
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "not found"})

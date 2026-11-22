@@ -51,14 +51,14 @@ const sortedLogs = computed(() =>
     [...(logs.value ?? [])].sort((a, b) => createdMs(a) - createdMs(b)),
 );
 
-/** Rows whose create is still in flight have no server id yet (negative temp id), so they can't be deleted. */
+/** Rows whose create is still in flight have no server id yet (negative temp id). */
 function isUnsaved(log: WaterLog): boolean {
     return log.ID < 0;
 }
 
+/** Any row can be deleted: one still being saved is deleted by client_id once its create is through. */
 function removeLog(log: WaterLog) {
-    if (isUnsaved(log)) return;
-    deleteMutation.mutate({ id: log.ID, date: props.dateStr });
+    deleteMutation.mutate({ id: log.ID, date: props.dateStr, client_id: log.client_id });
 }
 </script>
 
@@ -90,7 +90,6 @@ function removeLog(log: WaterLog) {
                     <IconButton
                         variant="danger"
                         :label="`Delete water entry ${amountLine(log)}`"
-                        :disabled="isUnsaved(log)"
                         @click="removeLog(log)"
                     >
                         <Trash2 class="size-5" />

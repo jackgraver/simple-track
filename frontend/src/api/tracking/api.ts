@@ -134,8 +134,9 @@ export async function saveWater(
     return res.log;
 }
 
-export async function deleteWater(id: number): Promise<void> {
-    await apiDELETE(`/tracking/water/${id}`);
+/** `ref` is the numeric id or the entry's client_id. */
+export async function deleteWater(ref: number | string): Promise<void> {
+    await apiDELETE(`/tracking/water/${ref}`);
 }
 
 export async function fetchDrinkSizePresets(): Promise<DrinkSizePreset[]> {

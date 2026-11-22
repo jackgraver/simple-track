@@ -72,3 +72,18 @@ func TestCreateWaterLogWithoutClientIDAlwaysCreates(t *testing.T) {
 		t.Fatalf("want 2 rows, got %d", n)
 	}
 }
+
+func TestDeleteWaterLogByClientID(t *testing.T) {
+	db := testDB(t)
+	day := time.Date(2026, 11, 22, 0, 0, 0, 0, time.UTC)
+	id := "6f1c2c1e-0000-4000-8000-000000000009"
+	if _, err := CreateWaterLog(db, day, 8, nil, id); err != nil {
+		t.Fatal(err)
+	}
+	if err := DeleteWaterLogByClientID(db, id); err != nil {
+		t.Fatal(err)
+	}
+	if err := DeleteWaterLogByClientID(db, id); err != gorm.ErrRecordNotFound {
+		t.Fatalf("second delete: want not found, got %v", err)
+	}
+}
