@@ -1,12 +1,10 @@
 <script setup lang="ts">
-import { getApiErrorMessage } from "~/api/httpError";
-import { computed, ref } from "vue";
+import { computed } from "vue";
 import type { WaterLog } from "~/api/tracking/types";
 import { useDeleteWater, useWaterLogs } from "~/api/tracking/queries";
 import { useWaterPrefs } from "~/composables/water/useWaterPrefs";
 import { Trash2 } from "lucide-vue-next";
 import { EmptyState, ErrorState, IconButton, List, ListRow, SkeletonList, useDelayedFlag } from "~/shared/ui";
-import { toast } from "~/composables/toast/useToast";
 
 const props = defineProps<{
     dateStr: string;
@@ -22,7 +20,6 @@ const {
 } = useWaterLogs(() => props.dateStr);
 const showSkeleton = useDelayedFlag(isPending);
 const deleteMutation = useDeleteWater();
-const deletingId = ref<number | null>(null);
 
 const { displayUnit, formatVolumeFromOz } = useWaterPrefs();
 
@@ -54,17 +51,14 @@ const sortedLogs = computed(() =>
     [...(logs.value ?? [])].sort((a, b) => createdMs(a) - createdMs(b)),
 );
 
-async function removeLog(log: WaterLog) {
-    if (deletingId.value != null || deleteMutation.isPending.value) return;
-    deletingId.value = log.ID;
-    try {
-        await deleteMutation.mutateAsync({ id: log.ID, date: props.dateStr });
-        toast.push("Removed", "success");
-    } catch (err: unknown) {
-        toast.push(getApiErrorMessage(err, "Failed to delete"), "error");
-    } finally {
-        deletingId.value = null;
-    }
+/** Rows whose create is still in flight have no server id yet (negative temp id), so they can't be deleted. */
+function isUnsaved(log: WaterLog): boolean {
+    return log.ID < 0;
+}
+
+function removeLog(log: WaterLog) {
+    if (isUnsaved(log)) return;
+    deleteMutation.mutate({ id: log.ID, date: props.dateStr });
 }
 </script>
 
@@ -88,7 +82,7 @@ async function removeLog(log: WaterLog) {
             <ListRow
                 v-for="log in sortedLogs"
                 :key="log.ID"
-                :pending="deletingId === log.ID"
+                :pending="isUnsaved(log)"
             >
                 <span class="font-semibold tabular-nums">{{ amountLine(log) }}</span>
                 <template #subtitle>{{ formatTime(log) }}</template>
@@ -96,9 +90,7 @@ async function removeLog(log: WaterLog) {
                     <IconButton
                         variant="danger"
                         :label="`Delete water entry ${amountLine(log)}`"
-                        :disabled="
-                            deletingId != null || deleteMutation.isPending.value
-                        "
+                        :disabled="isUnsaved(log)"
                         @click="removeLog(log)"
                     >
                         <Trash2 class="size-5" />

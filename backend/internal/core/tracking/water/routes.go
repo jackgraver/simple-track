@@ -8,6 +8,7 @@ import (
 	"be-simpletracker/internal/core/tracking/common"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
@@ -48,6 +49,7 @@ type postWaterBody struct {
 	Date     string  `json:"date"`
 	AmountOz float64 `json:"amount_oz"`
 	PresetID *uint   `json:"preset_id"`
+	ClientID string  `json:"client_id"`
 }
 
 func (h *handler) postWater(c *gin.Context) {
@@ -61,7 +63,13 @@ func (h *handler) postWater(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid date"})
 		return
 	}
-	row, err := CreateWaterLog(h.db, date, body.AmountOz, body.PresetID)
+	if body.ClientID != "" {
+		if _, err := uuid.Parse(body.ClientID); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid client_id"})
+			return
+		}
+	}
+	row, err := CreateWaterLog(h.db, date, body.AmountOz, body.PresetID, body.ClientID)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return

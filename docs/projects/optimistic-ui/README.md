@@ -54,6 +54,8 @@
 - `PostLogPlanned` ignores the day (500 off-today). Fixed in D1, and until then don't build optimistic log-planned on top of it.
 - `crypto.randomUUID()` is undefined on plain-http LAN testing from a phone. Use `newClientId()` (F6).
 - TanStack v5 mutation `scope` is per `useMutation` instance, not per call. See DESIGN.md §2 "Concurrency".
+
+- T1 done (migration 0006): `POST /tracking/water` takes `client_id` (idempotent). Water add/delete and weight/steps save use `useOptimisticMutation` with pure patch fns in `api/tracking/patches.ts` (vitest). Callers `mutate()` instead of awaiting; the helper toasts failures with Retry. T2 uses 0007 and can reuse `GroceryItem.client_id` the same way.
 - Open questions for the owner are listed at the bottom of this README. Answers go into DECISIONS.md.
 
 ## Open questions (owner)

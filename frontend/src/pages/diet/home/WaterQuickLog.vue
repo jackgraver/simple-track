@@ -1,8 +1,7 @@
 <script setup lang="ts">
-import { ref } from "vue";
 import { useRouter } from "vue-router";
 import { List as ListIcon, Plus } from "lucide-vue-next";
-import { getApiErrorMessage } from "~/api/httpError";
+import { newClientId } from "~/api/ids";
 import { useDrinkSizePresets, useSaveWater } from "~/api/tracking/queries";
 import type { DrinkSizePreset } from "~/api/tracking/types";
 import { dialogManager } from "~/composables/dialog/useDialog";
@@ -23,19 +22,11 @@ const vol = (oz: number) => {
 const { data: presets, isPending, isError } = useDrinkSizePresets();
 const showSkeleton = useDelayedFlag(isPending);
 const save = useSaveWater();
-const savingId = ref<number | null>(null);
 
-async function logPreset(p: DrinkSizePreset) {
-    if (savingId.value != null) return;
-    savingId.value = p.ID;
-    try {
-        await save.mutateAsync({ date: props.dateStr, amountOz: p.amount_oz, presetId: p.ID });
-        toast.push(`Logged ${vol(p.amount_oz)} water`, "success");
-    } catch (err) {
-        toast.push(getApiErrorMessage(err, "Couldn't log water"), "error");
-    } finally {
-        savingId.value = null;
-    }
+/** Optimistic: the entry is in the cache before the request returns; a failure rolls back with a Retry toast. */
+function logPreset(p: DrinkSizePreset) {
+    save.mutate({ client_id: newClientId(), date: props.dateStr, amountOz: p.amount_oz, presetId: p.ID, preset: p });
+    toast.push(`Logged ${vol(p.amount_oz)} water`, "success");
 }
 
 function openCustom() {
@@ -66,8 +57,6 @@ function openEntries() {
                 :key="p.ID"
                 variant="secondary"
                 size="sm"
-                :loading="savingId === p.ID"
-                :disabled="savingId != null && savingId !== p.ID"
                 :aria-label="`Log ${p.name}, ${vol(p.amount_oz)} of water`"
                 @click="logPreset(p)"
             >

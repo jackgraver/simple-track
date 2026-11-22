@@ -121,11 +121,13 @@ export async function saveWater(
     date: string,
     amountOz: number,
     presetId?: number,
+    clientId?: string,
 ): Promise<WaterLog> {
     const body: Record<string, unknown> = {
         date: date || undefined,
         amount_oz: amountOz,
     };
+    if (clientId) body.client_id = clientId;
     if (presetId != null) body.preset_id = presetId;
     const res = await apiPOST<{ log: WaterLog }>('/tracking/water', body);
     return res.log;
