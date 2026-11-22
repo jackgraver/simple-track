@@ -8,7 +8,7 @@ export const NAV_BUDGET_MS = 150;
 export type PrefetchQuery = object;
 
 /** What prefetch reads from a location: both normalized and resolved locations fit. */
-export type RouteLike = Pick<RouteLocationNormalized, "meta" | "query" | "params">;
+export type RouteLike = Pick<RouteLocationNormalized, "meta" | "query" | "params" | "matched">;
 
 /** `route.meta.queries`: the route's primary queries for the target location. */
 export type RouteQueries = (route: RouteLike) => PrefetchQuery[];
@@ -32,8 +32,16 @@ export function settleWithin(p: Promise<unknown>, ms: number): Promise<boolean> 
     });
 }
 
+/**
+ * The leaf record's own `queries`. Not `route.meta`: vue-router merges parent meta into children,
+ * so `/gym/plans` would otherwise warm (and create) the gym day it never reads.
+ */
+function leafQueries(route: RouteLike): RouteQueries | undefined {
+    return route.matched[route.matched.length - 1]?.meta.queries;
+}
+
 function safeQueries(route: RouteLike): PrefetchQuery[] {
-    const fn = route.meta.queries;
+    const fn = leafQueries(route);
     if (!fn) return [];
     try {
         return fn(route);
@@ -68,4 +76,20 @@ export function prefetchRoute(qc: Prefetcher, route: RouteLike): void {
     for (const q of safeQueries(route)) {
         void qc.prefetchQuery(q as Parameters<Prefetcher["prefetchQuery"]>[0]);
     }
+}
+
+type NavLike = RouteLike & Pick<RouteLocationNormalized, "name" | "fullPath">;
+
+/**
+ * `beforeResolve` warmup. A query-only change on the same page (day nav, week strip) is not held:
+ * the page shows its own loading state for a cold day, so it only prefetches. Other navigations wait
+ * up to the budget (`warmRoute`).
+ */
+export async function warmNavigation(qc: Prefetcher, to: NavLike, from: NavLike): Promise<void> {
+    if (to.name === "signin" || to.fullPath === from.fullPath) return;
+    if (to.name === from.name) {
+        prefetchRoute(qc, to);
+        return;
+    }
+    await warmRoute(qc, to);
 }

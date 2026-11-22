@@ -246,7 +246,8 @@ Also: `queryClient.clear()` on logout. Wrap axios errors once (`isClientError`, 
    the background.
 5. **Skeletons only on true cold loads:** `isPending && data === undefined`. Never show a skeleton or
    spinner over cached data. A background refetch is invisible (or a 1 px progress bar at most).
-6. **App start.** After `resolveAuthSession`, prefetch today's diet + gym in parallel (cheap, the most
-   likely first screens).
+6. **App start.** Prefetch the landing route's own queries in the first `beforeEach` (after redirects),
+   so only a page that reads today's day fetches it. Day GETs create the row, so never prefetch a
+   future day (DECISIONS "NFIX").
 7. **(Stage 4)** `persistQueryClient` with IndexedDB, keyed by build hash, `maxAge` = `gcTime`. Absolute
    date keys (convention 2) are a prerequisite, or a persisted "offset 0" would be wrong the next day.

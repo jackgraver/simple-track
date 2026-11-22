@@ -1,11 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { QueryClient } from "@tanstack/vue-query";
-import type { RouteLocationNormalized } from "vue-router";
+import { createMemoryHistory, createRouter, type RouteLocationNormalized } from "vue-router";
 
-import { NAV_BUDGET_MS, prefetchRoute, settleWithin, warmRoute } from "./prefetch";
+import { NAV_BUDGET_MS, prefetchRoute, settleWithin, warmNavigation, warmRoute } from "./prefetch";
 
 const routeWith = (queries?: (r: RouteLocationNormalized) => never[] | object[]) =>
-    ({ meta: { queries }, query: {}, params: {} }) as unknown as RouteLocationNormalized;
+    ({ meta: { queries }, matched: [{ meta: { queries } }], query: {}, params: {} }) as unknown as RouteLocationNormalized;
 
 describe("settleWithin", () => {
     beforeEach(() => vi.useFakeTimers());
@@ -99,5 +99,50 @@ describe("prefetchRoute", () => {
         prefetchRoute(qc, routeWith(() => [{ queryKey: ["a"], queryFn: a, staleTime: 60_000 }]));
         await Promise.resolve();
         expect(a).not.toHaveBeenCalled();
+    });
+});
+
+describe("leaf-only route queries (nfix #5)", () => {
+    const Empty = { render: () => null };
+    const dayFn = vi.fn(async () => "day");
+    const router = createRouter({
+        history: createMemoryHistory(),
+        routes: [
+            {
+                path: "/gym",
+                name: "gym",
+                component: Empty,
+                meta: { queries: (to) => [{ queryKey: ["day", to.query.offset ?? "0"], queryFn: dayFn }] },
+                children: [{ path: "plans", name: "gym-plans", component: Empty }],
+            },
+        ],
+    });
+
+    it("a child route does not warm the parent's queries (vue-router merges meta)", async () => {
+        const qc = new QueryClient();
+        const plans = router.resolve("/gym/plans");
+        expect(plans.meta.queries).toBeDefined(); // inherited
+        prefetchRoute(qc, plans);
+        expect(await warmRoute(qc, plans)).toBe(true);
+        expect(dayFn).not.toHaveBeenCalled();
+        prefetchRoute(qc, router.resolve("/gym"));
+        await vi.waitFor(() => expect(dayFn).toHaveBeenCalledTimes(1));
+    });
+
+    it("a query-only change on the same route prefetches without waiting", async () => {
+        vi.useFakeTimers();
+        const qc = new QueryClient();
+        const slow = vi.fn(() => new Promise((r) => setTimeout(r, 1000)));
+        const r = (o: string) => ({
+            ...routeWith(() => [{ queryKey: ["d", o], queryFn: slow }]),
+            name: "gym",
+            fullPath: `/gym?offset=${o}`,
+        });
+        let done = false;
+        void warmNavigation(qc, r("2"), r("1")).then(() => (done = true));
+        await vi.advanceTimersByTimeAsync(0);
+        expect(done).toBe(true);
+        expect(slow).toHaveBeenCalledTimes(1);
+        vi.useRealTimers();
     });
 });

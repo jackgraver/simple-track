@@ -47,6 +47,12 @@ export type CachePatch<TVars, TCache = any> = {
      * Without it the helper invalidates the key instead.
      */
     revert?: (current: TCache, vars: TVars, snapshot: TCache) => TCache;
+    /**
+     * Roll back through `revert` even when this mutation is the last writer and the cache is untouched.
+     * For whole-value upserts: a stacked call's snapshot holds the earlier call's optimistic value,
+     * which the server may never have saved, so `revert` must decide what to put back.
+     */
+    alwaysRevert?: boolean;
 };
 
 export type FailureMode = "rollback" | "mark";
@@ -55,6 +61,12 @@ export type FailureMode = "rollback" | "mark";
 export type ReconcileHelpers = {
     /** Other in-flight mutations (not this one) patching `queryKey` or a key overlapping it by prefix. */
     siblingsPending: (queryKey: QueryKey) => number;
+    /**
+     * Invalidate `queryKey` once no sibling writes it any more (now, if none does). For a reconcile
+     * that has to skip writing because siblings are pending: their own reconcile would otherwise
+     * clear the stale flag and nothing would refetch.
+     */
+    deferInvalidate: (queryKey: QueryKey) => void;
 };
 
 type BaseOptions<TVars, TData> = {
@@ -261,7 +273,13 @@ function useCoreMutation<TVars, TData>(opts: CoreOptions<TVars, TData>): Optimis
                 for (const { patch } of ctx?.snapshots ?? []) {
                     if (siblingCount(qc, patch.queryKey, ctx) > 0) remember(unreconciled, qc, patch.queryKey);
                 }
-                opts.reconcile?.(data, vars, qc, { siblingsPending: (key) => siblingCount(qc, key, ctx) });
+                opts.reconcile?.(data, vars, qc, {
+                    siblingsPending: (key) => siblingCount(qc, key, ctx),
+                    deferInvalidate: (key) => {
+                        if (siblingCount(qc, key, ctx) === 0) void qc.invalidateQueries({ queryKey: key });
+                        else remember(deferredInvalidations, qc, key);
+                    },
+                });
             },
             onSettled: (data, err, vars, ctx) => {
                 if (ctx) ctx.settled = true;
@@ -349,7 +367,7 @@ function rollback<TVars>(qc: QueryClient, ctx: OptimisticContext, vars: TVars) {
         const untouched = qc.getQueryData(patch.queryKey) === next;
         // We are the last writer and a sibling's success may never have reached the cache: refetch.
         const refetch = others === 0 && forget(unreconciled, qc, patch.queryKey);
-        if (others === 0 && untouched) {
+        if (others === 0 && untouched && !patch.alwaysRevert) {
             qc.setQueryData(patch.queryKey, prev);
         } else if (patch.revert) {
             const revert = patch.revert;

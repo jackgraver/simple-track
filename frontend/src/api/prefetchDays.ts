@@ -7,9 +7,13 @@ import { offsetToDate } from "~/api/workout/dates";
 type DayOptions = (offset: number) => object;
 type Prefetcher = Pick<QueryClient, "prefetchQuery">;
 
-/** Day offsets next to `offset`: older (+1) and newer (-1), as the day views swipe. */
+/**
+ * Day offsets next to `offset`: older (+1) and newer (-1), as the day views swipe. Future days
+ * (offset < 0) are left out: the day GETs create the row with the weekday's current plan, so an
+ * early fetch would pin tomorrow's plan before the user changes their program or weekday plans.
+ */
 export function adjacentOffsets(offset: number): number[] {
-    return [offset + 1, offset - 1];
+    return [offset + 1, offset - 1].filter((o) => o >= 0);
 }
 
 /** Diet and gym day queries by offset (gym keys are dates, diet derives its date itself). */
@@ -21,12 +25,6 @@ export function prefetchAdjacentDays(qc: Prefetcher, offset: number, day: DayOpt
     for (const o of adjacentOffsets(offset)) {
         void qc.prefetchQuery(day(o) as Parameters<Prefetcher["prefetchQuery"]>[0]);
     }
-}
-
-/** After login / app start: today's diet and gym, in parallel (the likeliest first screens). */
-export function prefetchAppStart(qc: Prefetcher): void {
-    void qc.prefetchQuery(dietDayOptions(0) as Parameters<Prefetcher["prefetchQuery"]>[0]);
-    void qc.prefetchQuery(gymDayOptions(0) as Parameters<Prefetcher["prefetchQuery"]>[0]);
 }
 
 /**

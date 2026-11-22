@@ -66,7 +66,7 @@
 - $1 done: `useMoneyMutation(fn, failureMessage)` is a `useServerMutation` (one error toast, invalidates `moneyKeys.all` on settle); call sites only `catch` to stop their flow. `useDeleteTransaction` / `useDeleteBalance` (`api/money/queries.ts`, pure patches in `api/money/cache.ts`) are optimistic: row removed now, totals refetch on settle.
 
 - N1 done: `route.meta.queries` + `router/prefetch.ts` (`warmRoute`, 150 ms budget in `beforeResolve`), `shared/nav/NavLink.vue` and tab-bar hover/touch prefetch. Add `meta.queries` to a route to opt in; use `queryOptions` factories (`trackingQueries`, `moneyQueries`, `mediaQueries` added). Not browser-verified.
-- N2 done: `api/prefetchDays.ts` (adjacent-day prefetch in diet/gym index pages, `prefetchAppStart` in `main.ts`). Skeletons are already cold-only (`isPending`); keep it that way, never gate on `isFetching`. Remaining stage 3: list to detail seeding (design item 4) if not yet covered.
+- N2 done: `api/prefetchDays.ts` (adjacent-day prefetch in diet/gym index pages, landing-route prefetch in the router's first `beforeEach`; no future days, see DECISIONS NFIX). Skeletons are already cold-only (`isPending`); keep it that way, never gate on `isFetching`. Remaining stage 3: list to detail seeding (design item 4) if not yet covered.
 - Open questions for the owner are listed at the bottom of this README. Answers go into DECISIONS.md.
 
 ## Open questions (owner)
