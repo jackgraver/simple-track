@@ -6,6 +6,8 @@ import './style.css'
 import { setUnauthorizedRedirect } from './composables/auth/session'
 import { resolveAuthSession } from './composables/auth/useAuth'
 import { queryClient } from './api/queryClient'
+import { isAuthenticated } from './composables/auth/session'
+import { prefetchAppStart } from './api/prefetchDays'
 import { initTheme } from './composables/useTheme'
 
 // After a deploy, a tab still running the previous build asks for chunks
@@ -44,5 +46,7 @@ app.use(router)
 app.use(VueQueryPlugin, { queryClient })
 
 void resolveAuthSession().then(() => {
+  // Today's diet + gym are the likeliest first screens: start fetching before the router resolves.
+  if (isAuthenticated.value) prefetchAppStart(queryClient)
   app.mount('#app')
 })

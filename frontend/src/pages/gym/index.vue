@@ -2,6 +2,7 @@
 import { computed } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import WorkoutActivityGraph from "~/pages/gym/WorkoutActivityGraph.vue";
+import { gymDayOptions, useAdjacentDayPrefetch } from "~/api/prefetchDays";
 import ModuleTitleBar from "~/shared/ModuleTitleBar.vue";
 import { Card } from "~/shared/ui";
 import InsightsSection from "./home/InsightsSection.vue";
@@ -17,6 +18,8 @@ const dayOffset = computed(() => {
     const value = typeof raw === "string" ? Number.parseInt(raw, 10) : 0;
     return Number.isNaN(value) ? 0 : value;
 });
+
+useAdjacentDayPrefetch(dayOffset, gymDayOptions, isGymHome);
 
 const week = useGymWeek(dayOffset);
 

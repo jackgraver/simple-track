@@ -4,6 +4,7 @@ import { useRoute } from "vue-router";
 import DietDayView from "./components/DietDayView.vue";
 import { CREATE_TYPE } from "~/pages/diet/logmeal/logmealMode";
 import { parseDietDayOffsetQuery, withDietDayOffsetQuery } from "~/utils/dateUtil";
+import { dietDayOptions, useAdjacentDayPrefetch } from "~/api/prefetchDays";
 import ModuleTitleBar from "~/shared/ModuleTitleBar.vue";
 import type { ModuleTitleLink } from "~/shared/ModuleTitleBar.vue";
 
@@ -11,6 +12,7 @@ const route = useRoute();
 const isDietHome = computed(() => route.name === "diet");
 
 const dateOffset = computed(() => parseDietDayOffsetQuery(route.query.offset));
+useAdjacentDayPrefetch(dateOffset, dietDayOptions, isDietHome);
 
 // Logging (meal, quick log, water) lives on the page itself; the title bar is for planning.
 const dietNavLinks = computed<ModuleTitleLink[]>(() => [

@@ -73,8 +73,8 @@ References: AUDIT.md (findings), MUTATIONS.md (per-mutation plan), ID-STRATEGY.m
 - [x] **N1 Prefetch on intent:** (done; see DECISIONS 2026-11-22 "N1") `route.meta.queries` + NavLink `pointerenter`/`touchstart` prefetch +
   `beforeResolve` `ensureQueryData` with a 150 ms budget. *Done:* main nav switches render without a
   skeleton after hovering or touching (screen recording).
-- [ ] **N2 Adjacent days + cold-only skeletons:** prefetch date ± 1 in diet/gym. Skeleton only when
-  `isPending && !data` across pages. App-start prefetch of today's diet + gym.
+- [x] **N2 Adjacent days + cold-only skeletons:** prefetch date ± 1 in diet/gym. Skeleton only when
+  `isPending && !data` across pages. App-start prefetch of today's diet + gym. (done; see DECISIONS 2026-11-22 "N2")
 
 ## Stage 4 (deferred)
 - [ ] Cache persistence (IndexedDB) and offline mutation queue. Needs F3/F4 date keys and `client_id` everywhere.
