@@ -27,4 +27,12 @@ export const workoutKeys = {
         list: () => ['workout', 'plans', 'all'] as const,
     },
     programs: ['workout', 'programs'] as const,
+    /** Mutation keys (not query keys): pending/failed state is read from the mutation cache. */
+    mutations: {
+        sets: ['workout', 'mutations', 'sets'] as const,
+        logSet: () => ['workout', 'mutations', 'sets', 'create'] as const,
+        updateSet: () => ['workout', 'mutations', 'sets', 'update'] as const,
+        deleteSet: () => ['workout', 'mutations', 'sets', 'delete'] as const,
+        notes: () => ['workout', 'mutations', 'sets', 'notes'] as const,
+    },
 } as const;

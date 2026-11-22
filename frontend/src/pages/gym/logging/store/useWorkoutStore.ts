@@ -1,10 +1,8 @@
 import type { Exercise, LoggedExercise } from "~/types/workout";
 import {
     useWorkoutLogsPrevious,
-    useLogExercise,
     useAddExerciseToWorkout,
     useRemoveExerciseFromWorkout,
-    useDeleteLoggedSet,
     useUpsertCardio,
     useUpsertMobilityPre,
     useUpsertMobilityPost,
@@ -14,6 +12,7 @@ import { useWebStorageJsonSync } from "~/composables/useWebStorageJsonSync";
 import { sortExerciseGroupsByLogOrder } from "./sortExerciseGroupsByLogOrder";
 import { computed, ref, toValue, watch, type MaybeRefOrGetter } from "vue";
 import { offsetToDate } from "~/api/workout/dates";
+import type { SetRow } from "~/api/workout/setsCache";
 
 const HIDDEN_EXERCISES_STORAGE_PREFIX = "simpletracker:workout:hidden-exercises:";
 
@@ -26,25 +25,16 @@ export type ExerciseGroup = {
     max?: LoggedExercise;
 };
 
-export type LoggedSetWithStatus = {
-    weight: number;
-    reps: number;
-    weight_setup: string;
-    status: 'pending' | 'success' | 'error';
-    id: number | null;
-    error: string | null;
-    tempId: string;
-};
+/** A set row with its derived save state (cache + pending/failed mutations, see `deriveSetRows`). */
+export type LoggedSetWithStatus = SetRow;
 
 export function useWorkoutStore(offset: MaybeRefOrGetter<number> = 0) {
     const workoutLogsQuery = useWorkoutLogsPrevious(offset);
     /** The day a write targets, fixed when the action starts (not when it settles). */
     const currentDate = () => offsetToDate(toValue(offset));
 
-    const logExerciseMutation = useLogExercise();
     const addExerciseMutation = useAddExerciseToWorkout();
     const removeExerciseMutation = useRemoveExerciseFromWorkout();
-    const deleteLoggedSetMutation = useDeleteLoggedSet();
     const upsertCardioMutation = useUpsertCardio();
     const upsertMobilityPreMutation = useUpsertMobilityPre();
     const upsertMobilityPostMutation = useUpsertMobilityPost();
@@ -152,23 +142,6 @@ export function useWorkoutStore(offset: MaybeRefOrGetter<number> = 0) {
     const pending = computed(() => workoutLogsQuery.isPending.value);
     const error = computed(() => workoutLogsQuery.error.value);
 
-    const logExercise = async (
-        exercise: LoggedExercise,
-        type: "logged" | "previous",
-    ): Promise<LoggedExercise | null> => {
-        try {
-            const result = await logExerciseMutation.mutateAsync({
-                date: currentDate(),
-                exercise,
-                type,
-            });
-            return result;
-        } catch (error) {
-            console.error("Error logging exercise:", error);
-            return null;
-        }
-    };
-
     const addExerciseToWorkout = async (exerciseId: number): Promise<void> => {
         try {
             await addExerciseMutation.mutateAsync({ date: currentDate(), exerciseId });
@@ -190,15 +163,6 @@ export function useWorkoutStore(offset: MaybeRefOrGetter<number> = 0) {
             }
             console.error("Error removing exercise:", err);
             throw err;
-        }
-    };
-
-    const deleteLoggedSet = async (setId: number): Promise<void> => {
-        try {
-            await deleteLoggedSetMutation.mutateAsync({ date: currentDate(), setId });
-        } catch (error) {
-            console.error("Error deleting logged set:", error);
-            throw error;
         }
     };
 
@@ -237,11 +201,9 @@ export function useWorkoutStore(offset: MaybeRefOrGetter<number> = 0) {
         pending,
         error,
         refetch: () => workoutLogsQuery.refetch(),
-        logExercise,
         addExerciseToWorkout,
         removeExerciseFromLog,
         hideExerciseLocally,
-        deleteLoggedSet,
         saveCardio,
         savePreMobility,
         savePostMobility,

@@ -42,7 +42,7 @@ References: AUDIT.md (findings), MUTATIONS.md (per-mutation plan), ID-STRATEGY.m
   /workout/sets` (idempotent by `client_id`, upserts the parent), `PATCH /workout/sets/:id`, `DELETE`
   treating repeats as success. *Done:* Go tests for idempotent replay and concurrent first-set
   (no duplicate parent), `dev migrate check` clean.
-- [ ] **G2 Gym set logging optimistic** (pairs with ui-overhaul gym/logging). Replace the
+- [x] **G2 Gym set logging optimistic** (done, see DECISIONS 2026-11-22 "G2"; throttled/airplane/390 px browser checks NOT run, no dev stack) (pairs with ui-overhaul gym/logging). Replace the
   `loggedSets` local copy with cache + `usePendingIds`. Log/edit/delete sets via the helper, `mark` on
   failure, rest timer starts on tap, activity invalidated only on the day's first log. *Done:* with
   "Slow 3G" throttling, a set appears instantly; airplane mode → set marked failed → retry succeeds with

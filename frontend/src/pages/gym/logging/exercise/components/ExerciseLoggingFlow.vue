@@ -36,23 +36,14 @@ const route = useRoute();
 const router = useRouter();
 const { offset, goBackToLogging } = useLoggingRouteContext();
 const store = useWorkoutStore(offset);
-const { log, data, pending, logExercise, deleteLoggedSet } = store;
+const { log, pending } = store;
 
 const exerciseId = computed(() => parseExerciseIdParam(route));
 const exerciseGroup = computed(() => {
     if (exerciseId.value == null || pending.value) return null;
     return findExerciseGroupByExerciseId(log.value, exerciseId.value);
 });
-const dayId = computed(() => data.value?.day.ID ?? 0);
-const session = useExerciseLoggingSession({
-    exerciseGroup,
-    pending,
-    dayId,
-    offset,
-    logExercise,
-    deleteLoggedSet,
-    router,
-});
+const session = useExerciseLoggingSession({ exerciseGroup, pending, offset, router });
 
 /* ---------- exercise facts ---------- */
 const exercise = computed(() => session.exerciseGroup?.planned ?? session.exerciseGroup?.logged?.exercise ?? null);
@@ -115,17 +106,11 @@ watch(exerciseId, () => {
 const scrollToTop = () => window.scrollTo({ top: 0, behavior: "instant" });
 
 /* ---------- actions ---------- */
-const logging = ref(false);
 // No scrolling after a log: the clock is already at the top, and a jump on top of the setup card
-// collapsing read as a flicker on the phone.
-const logSet = async () => {
-    if (logging.value) return;
-    logging.value = true;
-    try {
-        if (await session.addNextSet()) extraSetOpen.value = false;
-    } finally {
-        logging.value = false;
-    }
+// collapsing read as a flicker on the phone. No busy state either: the set appears on tap
+// (optimistic, saved in the background; a failed save is marked in the list below).
+const logSet = () => {
+    if (session.addNextSet()) extraSetOpen.value = false;
 };
 
 // Tap a set in the list below to edit it with the slider; tap it again (or "Back to set N") to stop.
@@ -143,17 +128,10 @@ const selectSet = (index: number, row?: HTMLElement) => {
     }
 };
 
-const finishing = ref(false);
-const finish = async () => {
-    if (finishing.value) return;
-    finishing.value = true;
-    try {
-        if (await session.finishLogging()) {
-            view.value = "next";
-            scrollToTop();
-        }
-    } finally {
-        finishing.value = false;
+const finish = () => {
+    if (session.finishLogging()) {
+        view.value = "next";
+        scrollToTop();
     }
 };
 
@@ -305,11 +283,11 @@ const goTo = (item: UpNextItem) => {
             </section>
 
             <div class="flex flex-col gap-2">
-                <Button v-if="showSlider" variant="primary" size="lg" block :loading="logging" @click="logSet">
+                <Button v-if="showSlider" variant="primary" size="lg" block @click="logSet">
                     {{ editing ? `Save set ${(session.editingSetIndex ?? 0) + 1}` : `Log set ${session.currentSetNumber}` }}
                     · {{ session.currentReps }} reps
                 </Button>
-                <Button v-if="plannedDone && !editing && !extraSetOpen" variant="primary" size="lg" block :loading="finishing" @click="finish">
+                <Button v-if="plannedDone && !editing && !extraSetOpen" variant="primary" size="lg" block @click="finish">
                     Finish {{ exerciseName }}
                 </Button>
                 <Button
@@ -341,7 +319,7 @@ const goTo = (item: UpNextItem) => {
                         v-if="loggedCount > 0 && !plannedDone && !editing"
                         variant="ghost"
                         size="sm"
-                        :loading="finishing"
+                       
                         @click="finish"
                     >
                         Finish early
