@@ -153,3 +153,21 @@ func UpsertMobilityPost(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, gin.H{"mobility": view})
 }
+
+func GetWorkoutTimingStats(c *gin.Context) {
+	days, err := utils.ParseQueryInt(c, utils.QueryIntVar{
+		Key:        "days",
+		Default:    90,
+		ErrInvalid: "days must be an integer",
+	})
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	stats, err := services.GetWorkoutTimingStats(c.Request.Context(), days)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, stats)
+}

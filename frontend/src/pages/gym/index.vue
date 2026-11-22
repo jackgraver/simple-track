@@ -3,6 +3,7 @@ import { computed } from "vue";
 import { useRoute } from "vue-router";
 import { useWorkoutLogToday } from "~/api/workout/queries";
 import WorkoutActivityGraph from "~/pages/gym/WorkoutActivityGraph.vue";
+import WorkoutTimingStats from "~/pages/gym/WorkoutTimingStats.vue";
 import SwitchWorkoutPlanDialog from "~/pages/gym/components/SwitchWorkoutPlanDialog.vue";
 import ModuleTitleBar from "~/shared/ModuleTitleBar.vue";
 import { dialogManager } from "~/composables/dialog/useDialog";
@@ -65,6 +66,7 @@ const loggingRoute = computed(() => ({
                     >Log workout</router-link
                 >
                 <WorkoutActivityGraph />
+                <WorkoutTimingStats />
             </template>
         </template>
         <router-view v-else />

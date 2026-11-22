@@ -49,6 +49,7 @@ func RegisterRoutes(router *gin.Engine, authMiddleware gin.HandlerFunc) {
 			logs.GET("/month", controller.GetWorkoutMonth)
 			logs.GET("/previous", controller.GetPreviousWorkout)
 			logs.GET("/activity", controller.GetWorkoutActivity)
+			logs.GET("/timing", controller.GetWorkoutTimingStats)
 			logs.POST("/cardio", controller.UpsertCardio)
 			logs.POST("/mobility/pre", controller.UpsertMobilityPre)
 			logs.POST("/mobility/post", controller.UpsertMobilityPost)

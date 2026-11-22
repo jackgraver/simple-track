@@ -1,7 +1,7 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/vue-query';
 import { computed, toValue, type MaybeRefOrGetter } from 'vue';
 import { apiDELETE, apiGET, apiPOST } from '~/api/client';
-import { activateWorkoutProgram, createWorkoutPlan, createWorkoutProgram, getWorkoutPrograms, renameWorkoutProgram, switchWorkoutPlan, type WorkoutActivityResponse, WorkoutLogsPreviousResponse } from '~/api/workout/api';
+import { activateWorkoutProgram, createWorkoutPlan, createWorkoutProgram, getWorkoutPrograms, renameWorkoutProgram, switchWorkoutPlan, type WorkoutActivityResponse, type WorkoutTimingStatsResponse, WorkoutLogsPreviousResponse } from '~/api/workout/api';
 import { liveworkoutKeys, workoutKeys } from '~/api/workout/keys';
 import type { Cardio, Exercise, LoggedExercise, MobilityLogged, WorkoutPlan } from '~/types/workout';
 
@@ -40,6 +40,21 @@ export function useWorkoutExercisesAllQuery(enabled: MaybeRefOrGetter<boolean> =
 
 function invalidateWorkoutActivityQueries(queryClient: ReturnType<typeof useQueryClient>) {
     queryClient.invalidateQueries({ queryKey: liveworkoutKeys.workouts.activityPrefix() });
+    queryClient.invalidateQueries({ queryKey: liveworkoutKeys.workouts.timingPrefix() });
+}
+
+export function useWorkoutTimingStats(days: MaybeRefOrGetter<number>) {
+    return useQuery(
+        computed(() => {
+            const d = toValue(days);
+            return {
+                queryKey: liveworkoutKeys.workouts.timing(d),
+                queryFn: () =>
+                    apiGET<WorkoutTimingStatsResponse>('/workout/logs/timing', { params: { days: d } }),
+                staleTime: 1000 * 60 * 5,
+            };
+        }),
+    );
 }
 
 export function useWorkoutActivity(opts: MaybeRefOrGetter<WorkoutActivityQueryOpts>) {
