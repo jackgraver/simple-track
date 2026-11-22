@@ -47,7 +47,7 @@ References: AUDIT.md (findings), MUTATIONS.md (per-mutation plan), ID-STRATEGY.m
   failure, rest timer starts on tap, activity invalidated only on the day's first log. *Done:* with
   "Slow 3G" throttling, a set appears instantly; airplane mode → set marked failed → retry succeeds with
   no duplicate; 390 px screenshots.
-- [ ] **G3 Gym rest of logging:** cardio, mobility, add/remove exercise optimistic, switch-plan uses the
+- [x] **G3 Gym rest of logging:** (done in code, see DECISIONS 2026-11-22 "G3"; throttled checks NOT run, no dev stack; add/remove still refetch the day once for previous/max) cardio, mobility, add/remove exercise optimistic, switch-plan uses the
   response (SQD). *Done:* each action updates instantly under throttling, and no follow-up GET appears
   in the network tab.
 - [x] **D1 Diet backend fixes:** (done; migration 0005, see DECISIONS 2026-11-22) `log-planned` takes `day_id` (fixes the 500 off-today), unlog

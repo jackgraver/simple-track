@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { offsetToDate } from "~/api/workout/dates";
 import { computed } from "vue";
-import axios from "axios";
 import {
     useWorkoutPlansAll,
     useWorkoutPrograms,
@@ -61,20 +60,8 @@ const handleSwitchPlan = async (v: string) => {
         await switchPlanMutation.mutateAsync({ date: offsetToDate(props.dayOffset), planId });
         toast.push("Workout plan updated", "success");
         props.onResolve?.(true);
-    } catch (err: unknown) {
-        let msg = "Failed to switch plan";
-        if (
-            axios.isAxiosError(err) &&
-            err.response?.data &&
-            typeof err.response.data === "object" &&
-            "error" in err.response.data
-        ) {
-            const e0 = (err.response.data as { error?: string }).error;
-            if (e0) msg = e0;
-        } else if (err instanceof Error) {
-            msg = err.message;
-        }
-        toast.push(msg, "error");
+    } catch {
+        // The mutation already showed the error toast.
     }
 };
 </script>

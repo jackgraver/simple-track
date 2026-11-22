@@ -7,7 +7,6 @@ import {
     useUpsertMobilityPre,
     useUpsertMobilityPost,
 } from "~/api/workout/queries";
-import axios from "axios";
 import { useWebStorageJsonSync } from "~/composables/useWebStorageJsonSync";
 import { sortExerciseGroupsByLogOrder } from "./sortExerciseGroupsByLogOrder";
 import { computed, ref, toValue, watch, type MaybeRefOrGetter } from "vue";
@@ -142,40 +141,35 @@ export function useWorkoutStore(offset: MaybeRefOrGetter<number> = 0) {
     const pending = computed(() => workoutLogsQuery.isPending.value);
     const error = computed(() => workoutLogsQuery.error.value);
 
-    const addExerciseToWorkout = async (exerciseId: number): Promise<void> => {
-        try {
-            await addExerciseMutation.mutateAsync({ date: currentDate(), exerciseId });
-            unhideExerciseFromSession(exerciseId);
-        } catch (error) {
-            console.error("Error adding exercise:", error);
-            throw error;
+    // All of these update the cache at once and report failures themselves (rollback + Retry toast).
+    const addExerciseToWorkout = (exerciseId: number, exercise?: Exercise): void => {
+        unhideExerciseFromSession(exerciseId);
+        addExerciseMutation.mutate({ date: currentDate(), exerciseId, exercise });
+    };
+
+    const removeExerciseFromLog = (exerciseId: number): void => {
+        const group = workoutLogsQuery.data.value?.planned_exercises?.find(
+            (eg) => eg.planned?.ID === exerciseId || eg.logged?.exercise_id === exerciseId,
+        );
+        // Nothing logged: the server has nothing to delete (it answered 404), so just hide it here.
+        if (!group?.logged) {
+            hideExerciseLocally(exerciseId);
+            return;
         }
+        unhideExerciseFromSession(exerciseId);
+        removeExerciseMutation.mutate({ date: currentDate(), exerciseId });
     };
 
-    const removeExerciseFromLog = async (exerciseId: number): Promise<void> => {
-        try {
-            await removeExerciseMutation.mutateAsync({ date: currentDate(), exerciseId });
-            unhideExerciseFromSession(exerciseId);
-        } catch (err: unknown) {
-            if (axios.isAxiosError(err) && err.response?.status === 404) {
-                hideExerciseLocally(exerciseId);
-                return;
-            }
-            console.error("Error removing exercise:", err);
-            throw err;
-        }
+    const saveCardio = (minutes: number, type?: string, notes?: string): void => {
+        upsertCardioMutation.mutate({ date: currentDate(), minutes, type, notes });
     };
 
-    const saveCardio = async (minutes: number, type?: string, notes?: string): Promise<void> => {
-        await upsertCardioMutation.mutateAsync({ date: currentDate(), minutes, type, notes });
+    const savePreMobility = (checked: string[]): void => {
+        upsertMobilityPreMutation.mutate({ date: currentDate(), checked });
     };
 
-    const savePreMobility = async (checked: string[]): Promise<void> => {
-        await upsertMobilityPreMutation.mutateAsync({ date: currentDate(), checked });
-    };
-
-    const savePostMobility = async (checked: string[]): Promise<void> => {
-        await upsertMobilityPostMutation.mutateAsync({ date: currentDate(), checked });
+    const savePostMobility = (checked: string[]): void => {
+        upsertMobilityPostMutation.mutate({ date: currentDate(), checked });
     };
 
     const getExerciseByIndex = (index: number): ExerciseGroup | null => {
