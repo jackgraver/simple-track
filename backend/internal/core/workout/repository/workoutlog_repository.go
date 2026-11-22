@@ -16,7 +16,8 @@ func LoadByDate(ctx context.Context, date time.Time) (models.WorkoutLog, error) 
 		Preload("Cardio").
 		Preload("Exercises.Sets").
 		Preload("Exercises.Exercise").
-		Preload("WorkoutPlan").
+		// Unscoped: a routine deleted after the session was logged still names and shapes that log.
+		Preload("WorkoutPlan", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
 		Where("date = ?", date).
 		First(&workoutDay).Error
 	if err != nil {

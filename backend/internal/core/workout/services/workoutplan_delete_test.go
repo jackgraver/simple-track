@@ -4,6 +4,8 @@ import (
 	"be-simpletracker/internal/core/workout/models"
 	"be-simpletracker/internal/core/workout/services"
 	"be-simpletracker/internal/core/workout/testutil"
+	"be-simpletracker/internal/utils"
+	"context"
 	"testing"
 )
 
@@ -87,5 +89,36 @@ func TestDeleteAndRestoreWorkoutPlanKeepsExercisesAndFreeDays(t *testing.T) {
 	}
 	if _, err := services.RestoreWorkoutPlan(push.ID); err == nil {
 		t.Fatal("restoring a live routine should fail")
+	}
+}
+
+func TestLogKeepsRoutineAfterDelete(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	plan := models.WorkoutPlan{Name: "Legs"}
+	squat := models.Exercise{Name: "Squat"}
+	for _, v := range []any{&plan, &squat} {
+		if err := db.Create(v).Error; err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := services.AddExerciseToPlan(plan.ID, squat.ID); err != nil {
+		t.Fatal(err)
+	}
+	past := models.WorkoutLog{Date: utils.ZerodTime(3), WorkoutPlanID: &plan.ID}
+	if err := db.Create(&past).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := services.DeleteWorkoutPlan(plan.ID); err != nil {
+		t.Fatal(err)
+	}
+	got, err := services.GetOrCreateToday(context.Background(), 3)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.WorkoutPlan == nil || got.WorkoutPlan.Name != "Legs" {
+		t.Fatalf("log lost its deleted routine: %+v", got.WorkoutPlan)
+	}
+	if len(got.WorkoutPlan.Exercises) != 1 || got.WorkoutPlan.Exercises[0].ID != squat.ID {
+		t.Fatalf("exercises missing: %+v", got.WorkoutPlan.Exercises)
 	}
 }
