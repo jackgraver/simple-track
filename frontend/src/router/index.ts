@@ -3,6 +3,15 @@ import type { RouteRecordRaw } from "vue-router";
 import { authStatus } from "~/composables/auth/session";
 import { resolveAuthSession } from "~/composables/auth/useAuth";
 import { loadLastRoute, saveLastRoute } from "~/utils/lastRoute";
+import { dietQueries } from "~/api/diet/queries";
+import { mediaQueries } from "~/api/media/queries";
+import { moneyQueries } from "~/api/money/queries";
+import { queryClient } from "~/api/queryClient";
+import { trackingQueries } from "~/api/tracking/queries";
+import { workoutQueries } from "~/api/workout/queries";
+import { offsetToDate } from "~/api/workout/dates";
+import { parseDietDayOffsetQuery } from "~/utils/dateUtil";
+import { warmRoute, type RouteQueries } from "./prefetch";
 
 declare module "vue-router" {
     interface RouteMeta {
@@ -13,6 +22,11 @@ declare module "vue-router" {
         focus?: boolean;
         /** Multi-column workspace: wider desktop content column (`spacing-content-wide`). */
         wide?: boolean;
+        /**
+         * Primary queries of this route (`queryOptions` objects built from the target location).
+         * Prefetched on nav intent (NavLink) and awaited briefly in `beforeResolve`.
+         */
+        queries?: RouteQueries;
     }
 }
 
@@ -37,7 +51,11 @@ const routes: RouteRecordRaw[] = [
         path: "/diet",
         name: "diet",
         component: () => import("~/pages/diet/index.vue"),
-        meta: { breadcrumb: "Diet", dated: true },
+        meta: {
+            breadcrumb: "Diet",
+            dated: true,
+            queries: (to) => [dietQueries.day(parseDietDayOffsetQuery(to.query.offset))],
+        },
         children: [
             {
                 path: "log",
@@ -69,7 +87,11 @@ const routes: RouteRecordRaw[] = [
         path: "/gym",
         name: "gym",
         component: () => import("~/pages/gym/index.vue"),
-        meta: { breadcrumb: "Gym", dated: true },
+        meta: {
+            breadcrumb: "Gym",
+            dated: true,
+            queries: (to) => [workoutQueries.day(offsetToDate(parseDietDayOffsetQuery(to.query.offset)))],
+        },
         children: [
             {
                 path: "plans",
@@ -148,13 +170,16 @@ const routes: RouteRecordRaw[] = [
         path: "/grocery",
         name: "grocery",
         component: () => import("~/pages/grocery/index.vue"),
-        meta: { breadcrumb: "Grocery" },
+        meta: { breadcrumb: "Grocery", queries: () => [trackingQueries.groceryItems()] },
     },
     {
         path: "/finances",
         name: "finances",
         component: () => import("~/pages/finances/index.vue"),
-        meta: { breadcrumb: "Finances" },
+        meta: {
+            breadcrumb: "Finances",
+            queries: () => [moneyQueries.accounts(false), moneyQueries.netWorth()],
+        },
     },
     {
         path: "/finances/accounts/:id(\\d+)",
@@ -180,7 +205,11 @@ const routes: RouteRecordRaw[] = [
         path: "/media",
         name: "media",
         component: () => import("~/pages/media/index.vue"),
-        meta: { breadcrumb: "Media" },
+        meta: {
+            breadcrumb: "Media",
+            // Same default filters as the page, so the keys match.
+            queries: () => [mediaQueries.list({ sort: "updated" }), mediaQueries.stats()],
+        },
     },
     {
         path: "/media/new",
@@ -256,6 +285,14 @@ router.beforeEach(async (to, from) => {
         return { name: "signin", query: { redirect: to.fullPath } };
     }
     return true;
+});
+
+// Warm the target's primary queries, waiting at most NAV_BUDGET_MS so a slow network never blocks
+// navigation: the page renders from cache if ready and otherwise shows its own cold-load state.
+// Only for authenticated targets (the auth guard above has already redirected otherwise).
+router.beforeResolve(async (to, from) => {
+    if (to.name === "signin" || to.fullPath === from.fullPath) return;
+    await warmRoute(queryClient, to);
 });
 
 router.afterEach((to, _from, failure) => {

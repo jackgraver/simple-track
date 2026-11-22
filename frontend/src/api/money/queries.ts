@@ -1,9 +1,23 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/vue-query";
+import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/vue-query";
 import { computed, type MaybeRefOrGetter, toValue } from "vue";
 import * as api from "./api";
 import { moneyKeys } from "./keys";
 
 export { moneyKeys };
+
+/** Single source for hooks and route prefetch. */
+export const moneyQueries = {
+    accounts: (includeArchived = false) =>
+        queryOptions({
+            queryKey: moneyKeys.accounts(includeArchived),
+            queryFn: () => api.fetchAccounts(includeArchived),
+        }),
+    netWorth: () =>
+        queryOptions({
+            queryKey: moneyKeys.netWorth,
+            queryFn: api.fetchNetWorthHistory,
+        }),
+};
 
 export function useAccounts(includeArchived: MaybeRefOrGetter<boolean> = false) {
     return useQuery({
@@ -38,10 +52,7 @@ export function useTransactions(id: MaybeRefOrGetter<number>) {
 }
 
 export function useNetWorthHistory() {
-    return useQuery({
-        queryKey: moneyKeys.netWorth,
-        queryFn: api.fetchNetWorthHistory,
-    });
+    return useQuery(moneyQueries.netWorth());
 }
 
 export function useContributionTypes() {
