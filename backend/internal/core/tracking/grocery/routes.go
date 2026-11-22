@@ -4,8 +4,12 @@ import (
 	"errors"
 	"net/http"
 	"strconv"
+	"strings"
+
+	"be-simpletracker/internal/utils/apierr"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
@@ -44,9 +48,23 @@ func (h *handler) postItem(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	row, err := CreateItem(h.db, body.Name, body.ClientID)
+	clientID := strings.TrimSpace(body.ClientID)
+	if clientID != "" {
+		id, err := uuid.Parse(clientID)
+		if err != nil || id == uuid.Nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid client_id"})
+			return
+		}
+		clientID = id.String()
+	}
+	row, err := CreateItem(h.db, body.Name, clientID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		if errors.Is(err, ErrNameRequired) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		// Don't echo driver errors to the client.
+		apierr.Internal(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"item": row})

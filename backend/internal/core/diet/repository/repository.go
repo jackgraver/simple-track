@@ -12,6 +12,7 @@ import (
 	"be-simpletracker/internal/utils"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 func EnrichFoodVariants(f *models.Food) {
@@ -625,8 +626,13 @@ func DeleteLoggedMeal(dayID uint, mealID uint) error {
 // planned meal.
 func LogPlannedMeal(dayID uint, mealID uint) error {
 	return conn().Transaction(func(tx *gorm.DB) error {
+		// FOR UPDATE serializes concurrent calls for the same planned meal even when it is
+		// already logged=true (after an unlog, which keeps the flag), so the day_log count below
+		// sees the other call's insert instead of both inserting and one hitting
+		// uq_day_logs_day_meal.
 		var pm models.PlannedMeal
-		if err := tx.Where("day_id = ? AND meal_id = ?", dayID, mealID).First(&pm).Error; err != nil {
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+			Where("day_id = ? AND meal_id = ?", dayID, mealID).First(&pm).Error; err != nil {
 			return err
 		}
 		if !pm.Logged {
@@ -734,6 +740,17 @@ func DeleteSavedMeal(id uint) error {
 	})
 }
 
+// lockClientID serializes creates that carry the same client_id (a retry racing the original
+// request, or a double submit) with a transaction-scoped advisory lock on Postgres. The caller's
+// "does a row with this client_id exist?" check then runs after the other transaction committed,
+// so the replay returns cleanly instead of failing on the unique index with a 500.
+func lockClientID(tx *gorm.DB, table, clientID string) error {
+	if tx.Dialector.Name() != "postgres" {
+		return nil
+	}
+	return tx.Exec("SELECT pg_advisory_xact_lock(hashtext(?))", table+".client_id:"+clientID).Error
+}
+
 func nilIfEmpty(s string) *string {
 	if s == "" {
 		return nil
@@ -750,8 +767,13 @@ func AddPlannedMealFromSavedMeal(offset int, savedMealID uint, meal *models.Meal
 			return err
 		}
 		if clientID != "" {
+			if err := lockClientID(tx, "planned_meals", clientID); err != nil {
+				return err
+			}
+			// Unscoped: the unique index covers soft-deleted planned meals too, so a replay
+			// after the planned meal was removed is still a replay.
 			var existing int64
-			if err := tx.Model(&models.PlannedMeal{}).Where("client_id = ?", clientID).Count(&existing).Error; err != nil {
+			if err := tx.Unscoped().Model(&models.PlannedMeal{}).Where("client_id = ?", clientID).Count(&existing).Error; err != nil {
 				return err
 			}
 			if existing > 0 {
@@ -838,8 +860,11 @@ func QuickLogMeal(params QuickLogParams) (dayID uint, err error) {
 		}
 		dayID = day.ID
 		if params.ClientID != "" {
+			if err := lockClientID(tx, "meals", params.ClientID); err != nil {
+				return err
+			}
 			var existing int64
-			if cerr := tx.Model(&models.Meal{}).Where("client_id = ?", params.ClientID).Count(&existing).Error; cerr != nil {
+			if cerr := tx.Unscoped().Model(&models.Meal{}).Where("client_id = ?", params.ClientID).Count(&existing).Error; cerr != nil {
 				return cerr
 			}
 			if existing > 0 {

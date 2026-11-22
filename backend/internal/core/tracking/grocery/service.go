@@ -10,6 +10,9 @@ import (
 
 const suggestionLimit = 20
 
+// ErrNameRequired is returned when an item name is empty after trimming.
+var ErrNameRequired = errors.New("name is required")
+
 func normalizeName(name string) string {
 	return strings.Join(strings.Fields(name), " ")
 }
@@ -25,7 +28,7 @@ func ListActiveItems(db *gorm.DB) ([]GroceryItem, error) {
 func CreateItem(db *gorm.DB, name, clientID string) (*GroceryItem, error) {
 	name = normalizeName(name)
 	if name == "" {
-		return nil, errors.New("name is required")
+		return nil, ErrNameRequired
 	}
 	row := GroceryItem{Name: name}
 	if clientID == "" {

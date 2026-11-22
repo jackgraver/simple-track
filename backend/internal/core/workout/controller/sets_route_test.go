@@ -87,7 +87,8 @@ func TestSetsRoutes_validation(t *testing.T) {
 	cases := []struct{ name, body string }{
 		{"missing client_id", `{"exercise_id": 1, "reps": 5}`},
 		{"bad client_id", `{"client_id": "abc", "exercise_id": 1}`},
-		{"missing exercise", `{"client_id": "0193a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b"}`},
+		{"missing exercise", `{"client_id": "0193a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b", "date": "2026-11-20"}`},
+		{"missing date", `{"client_id": "0193a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b", "exercise_id": 1, "reps": 5}`},
 		{"bad date", `{"client_id": "0193a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b", "exercise_id": 1, "date": "20/11/2026"}`},
 	}
 	for _, tc := range cases {
@@ -95,7 +96,7 @@ func TestSetsRoutes_validation(t *testing.T) {
 			t.Errorf("%s: want 400, got %d", tc.name, code)
 		}
 	}
-	if code, _ := do(t, r, http.MethodPost, "/workout/sets", `{"client_id": "0193a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b", "exercise_id": 999}`); code != http.StatusNotFound {
+	if code, _ := do(t, r, http.MethodPost, "/workout/sets", `{"client_id": "0193a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b", "exercise_id": 999, "date": "2026-11-20"}`); code != http.StatusNotFound {
 		t.Errorf("unknown exercise: want 404, got %d", code)
 	}
 	if code, _ := do(t, r, http.MethodDelete, "/workout/sets/not-an-id", ""); code != http.StatusBadRequest {

@@ -14,8 +14,25 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
+
+// normalizeClientID accepts an empty client_id (the request is not idempotent) or a uuid, which
+// it returns in canonical lowercase form. Anything else is rejected with a 400 instead of
+// reaching the uuid column and failing there with a 500.
+func normalizeClientID(c *gin.Context, s string) (string, bool) {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return "", true
+	}
+	id, err := uuid.Parse(s)
+	if err != nil || id == uuid.Nil {
+		apierr.BadRequest(c, "client_id must be a uuid")
+		return "", false
+	}
+	return id.String(), true
+}
 
 type CreateFoodRequest struct {
 	models.Food
@@ -56,6 +73,10 @@ func PostQuickLog(c *gin.Context) {
 		apierr.BadRequest(c, "name is required")
 		return
 	}
+	clientID, ok := normalizeClientID(c, req.ClientID)
+	if !ok {
+		return
+	}
 	result, err := services.QuickLogMeal(dietrepo.QuickLogParams{
 		DisplayName:   displayName,
 		FoodRowName:   fmt.Sprintf("%s [ql-%d]", displayName, time.Now().UnixNano()),
@@ -66,7 +87,7 @@ func PostQuickLog(c *gin.Context) {
 		Fiber:         req.Fiber,
 		Offset:        req.Offset,
 		ReplaceMealID: req.ReplaceMealID,
-		ClientID:      req.ClientID,
+		ClientID:      clientID,
 	})
 	if err != nil {
 		apierr.Internal(c, err)
@@ -523,6 +544,10 @@ func DeleteLoggedMeal(c *gin.Context) {
 	}
 	day, err := services.FindMealPlanDayByRowIDOrToday(req.DayID)
 	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			apierr.NotFound(c, "Day not found")
+			return
+		}
 		apierr.Internal(c, err)
 		return
 	}
@@ -558,7 +583,11 @@ func PostPlannedFromSaved(c *gin.Context) {
 		apierr.BadRequest(c, "saved_meal_id is required")
 		return
 	}
-	if err := services.AddPlannedMealFromSavedMeal(req.Offset, req.SavedMealID, req.ClientID); err != nil {
+	clientID, ok := normalizeClientID(c, req.ClientID)
+	if !ok {
+		return
+	}
+	if err := services.AddPlannedMealFromSavedMeal(req.Offset, req.SavedMealID, clientID); err != nil {
 		apierr.Internal(c, err)
 		return
 	}

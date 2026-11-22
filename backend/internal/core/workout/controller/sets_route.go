@@ -3,7 +3,6 @@ package controller
 import (
 	workoutrepo "be-simpletracker/internal/core/workout/repository"
 	"be-simpletracker/internal/core/workout/services"
-	"be-simpletracker/internal/utils"
 	"be-simpletracker/internal/utils/apierr"
 	"errors"
 	"net/http"
@@ -21,8 +20,9 @@ import (
 
 type logSetRequest struct {
 	ClientID string `json:"client_id"`
-	// Date is the workout day as YYYY-MM-DD (server local time). When empty, the ?offset= query
-	// param is used (0 = today).
+	// Date is the workout day as YYYY-MM-DD (server local time). Required: resolving the day
+	// from ?offset= at request time would put a replay that crosses midnight on a different
+	// workout log, which then fails as a client_id conflict instead of returning the stored set.
 	Date        string  `json:"date"`
 	ExerciseID  uint    `json:"exercise_id"`
 	Reps        uint    `json:"reps"`
@@ -47,14 +47,14 @@ func LogSet(c *gin.Context) {
 		apierr.BadRequest(c, "exercise_id is required")
 		return
 	}
-	day := utils.ZerodTime(utils.GetDayOffset(c))
-	if req.Date != "" {
-		d, err := time.ParseInLocation("2006-01-02", req.Date, time.Local)
-		if err != nil {
-			apierr.BadRequest(c, "date must be YYYY-MM-DD")
-			return
-		}
-		day = d
+	if req.Date == "" {
+		apierr.BadRequest(c, "date is required (YYYY-MM-DD)")
+		return
+	}
+	day, err := time.ParseInLocation("2006-01-02", req.Date, time.Local)
+	if err != nil {
+		apierr.BadRequest(c, "date must be YYYY-MM-DD")
+		return
 	}
 
 	res, err := services.LogSet(c.Request.Context(), services.LogSetInput{

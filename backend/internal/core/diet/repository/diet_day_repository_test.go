@@ -377,3 +377,32 @@ func TestQuickLogMeal_clientIDIdempotent(t *testing.T) {
 		t.Fatalf("want 1 day log after replay, got %d", n)
 	}
 }
+
+// A replay of from-saved after its planned meal was deleted is still a replay (the unique index
+// on client_id covers soft-deleted rows).
+func TestAddPlannedMealFromSavedMeal_replayAfterDelete(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	plan := testutil.SeedPlan(t, db, "P")
+	testutil.SeedDay(t, db, testutil.Today(), plan.ID)
+	food := testutil.SeedFood(t, db, "Oats", testutil.DefaultMacros())
+	saved := testutil.SeedSavedMeal(t, db, "Breakfast", food.ID)
+	cid := "44444444-4444-4444-8444-444444444444"
+	add := func() error {
+		meal := models.Meal{Name: saved.Name, Items: []models.MealItem{{FoodID: food.ID, Amount: 1}}}
+		return dietrepo.AddPlannedMealFromSavedMeal(0, saved.ID, &meal, cid)
+	}
+	if err := add(); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Where("client_id = ?", cid).Delete(&models.PlannedMeal{}).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := add(); err != nil {
+		t.Fatal(err)
+	}
+	var n int64
+	db.Unscoped().Model(&models.PlannedMeal{}).Where("client_id = ?", cid).Count(&n)
+	if n != 1 {
+		t.Fatalf("replay after delete created a new planned meal: %d rows", n)
+	}
+}
