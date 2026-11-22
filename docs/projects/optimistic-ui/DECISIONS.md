@@ -184,7 +184,7 @@ optimistic writes keep that (an in-memory queue, sent on reconnect; a reload dro
 The QueryClient default is now `mutations.networkMode: 'always'`. `useOptimisticMutation` sets `'online'`. A server write
 offline fails at once with `OFFLINE_MESSAGE` (`getApiErrorMessage` maps a no-response axios error while
 `navigator.onLine` is false), and it never waits at a scope gate behind paused writes. `api/online.ts` (`useOnline`,
-`usePausedMutationCount`) drives an app-wide `shared/OfflineNotice.vue` ("N changes will be sent when you reconnect")
+`usePausedMutationCount`) drove an app-wide `shared/OfflineNotice.vue`, removed at the owner's request (2026-11-22),
 and per-row "Waiting for connection" labels (gym sets, routine step labels) instead of an endless pending or "Saving…".
 Pending rows stay interactive. An action on a row that is still being created goes to the server by `client_id`, in the
 create's scope, so it is sent after the create. Backend: `PATCH /tracking/grocery/items/:id/complete`,
