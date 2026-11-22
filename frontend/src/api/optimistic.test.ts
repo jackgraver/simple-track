@@ -620,3 +620,37 @@ describe("useServerMutation", () => {
         expect(m.error.value).toBeInstanceOf(Error);
     });
 });
+
+describe("offline", () => {
+    it("pauses optimistic writes (sent on reconnect) and fails wait-for-server writes at once", async () => {
+        const { onlineManager, QueryClient } = await import("@tanstack/vue-query");
+        const { effectScope } = await import("vue");
+        const { useOptimisticMutation, useServerMutation } = await import("./optimistic");
+        const qc = new QueryClient({ defaultOptions: { mutations: { networkMode: "always" } } });
+        qc.setQueryData(["k"], [1]);
+        const sent: string[] = [];
+        const scope = effectScope();
+        const [opt, srv] = scope.run(() => [
+            useOptimisticMutation({
+                mutationKey: ["opt"],
+                queryClient: qc,
+                mutationFn: async () => void sent.push("opt"),
+                optimistic: () => [{ queryKey: ["k"], apply: (old: number[]) => [...old, 2] }],
+            }),
+            useServerMutation({ mutationKey: ["srv"], queryClient: qc, mutationFn: async () => void sent.push("srv") }),
+        ])!;
+        onlineManager.setOnline(false);
+        try {
+            opt.mutate(undefined);
+            await expect(srv.mutateAsync(undefined)).rejects.toThrow(/offline/);
+            await new Promise((r) => setTimeout(r, 0));
+            expect(qc.getQueryData(["k"])).toEqual([1, 2]);
+            expect(sent).toEqual([]);
+        } finally {
+            onlineManager.setOnline(true);
+        }
+        await qc.resumePausedMutations();
+        expect(sent).toEqual(["opt"]);
+        scope.stop();
+    });
+});

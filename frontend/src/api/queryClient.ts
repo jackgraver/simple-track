@@ -53,8 +53,10 @@ export function createQueryClient(notifyError: Notify = (m) => toast.push(m, "er
                 refetchOnWindowFocus: true,
                 refetchOnReconnect: true,
             },
-            // Idempotent hooks opt in to retries explicitly.
-            mutations: { retry: 0 },
+            // Idempotent hooks opt in to retries explicitly. 'always': a wait-for-server write (a form)
+            // fails at once offline with "You're offline" and keeps its inputs, instead of pausing
+            // with a spinner until reconnect. Optimistic writes opt back into 'online' (queued).
+            mutations: { retry: 0, networkMode: "always" },
         },
     });
 }

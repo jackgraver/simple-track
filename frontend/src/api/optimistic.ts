@@ -18,6 +18,7 @@
  */
 import {
     hashKey,
+    onlineManager,
     partialMatchKey,
     useMutation,
     useMutationState,
@@ -32,7 +33,7 @@ import {
 } from "@tanstack/vue-query";
 import { computed, type Ref } from "vue";
 
-import { getApiErrorMessage } from "~/api/httpError";
+import { getApiErrorMessage, OFFLINE_MESSAGE } from "~/api/httpError";
 import { toast } from "~/composables/toast/useToast";
 
 /** One cache entry a mutation patches. `TCache` is the cached value's type at `queryKey`. */
@@ -228,10 +229,16 @@ function useCoreMutation<TVars, TData>(opts: CoreOptions<TVars, TData>): Optimis
             mutationKey: opts.mutationKey,
             meta,
             retry: opts.retry ?? 0,
+            // Optimistic writes are already on screen: offline they pause and go out on reconnect
+            // (an in-memory queue). Wait-for-server writes keep the client default ('always'): they
+            // fail at once with "You're offline" instead of hanging.
+            networkMode: opts.optimistic ? "online" : "always",
             ...(opts.retryDelay !== undefined && { retryDelay: opts.retryDelay }),
             // Failed 'mark' mutations are the failed-row state, so they must outlive the default 5 min.
             ...(mark && { gcTime: Infinity }),
             mutationFn: async (vars, fnCtx: MutationFunctionContext) => {
+                // Don't queue a wait-for-server write behind paused optimistic ones in its scope.
+                if (!opts.optimistic && !onlineManager.isOnline()) throw new Error(OFFLINE_MESSAGE);
                 const gate = gates.get(fnCtx);
                 if (gate) await gate;
                 return opts.mutationFn(vars);
