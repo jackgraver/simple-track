@@ -3,7 +3,6 @@ import { computed, reactive } from "vue";
 import { createContributionType, updateContributionType } from "~/api/money/api";
 import { useMoneyMutation } from "~/api/money/queries";
 import type { ContributionType, ContributionTypeSettings } from "~/api/money/types";
-import { getApiErrorMessage } from "~/api/httpError";
 import { toast } from "~/composables/toast/useToast";
 import { Button, Checkbox, Field, Input, Select } from "~/shared/ui";
 import { parseAmount } from "../format";
@@ -65,7 +64,7 @@ function settings(): ContributionTypeSettings {
 const mutation = useMoneyMutation(async (payload: ContributionTypeSettings) => {
     if (existing) await updateContributionType(existing.ID, payload);
     else await createContributionType(payload);
-});
+}, "Failed to save rules");
 
 async function submit() {
     if (!form.name.trim() || mutation.isPending.value) return;
@@ -73,8 +72,8 @@ async function submit() {
         await mutation.mutateAsync(settings());
         toast.push(existing ? "Rules saved" : "Account type added", "success");
         props.onResolve?.(true);
-    } catch (error) {
-        toast.push(getApiErrorMessage(error, "Failed to save rules"), "error");
+    } catch {
+        // useMoneyMutation already toasted the error.
     }
 }
 </script>

@@ -54,6 +54,7 @@
 - `PostLogPlanned` ignores the day (500 off-today). Fixed in D1, and until then don't build optimistic log-planned on top of it.
 - `crypto.randomUUID()` is undefined on plain-http LAN testing from a phone. Use `newClientId()` (F6).
 - TanStack v5 mutation `scope` is per `useMutation` instance, not per call. See DESIGN.md §2 "Concurrency".
+- $1 done: `useMoneyMutation(fn, failureMessage)` is a `useServerMutation` (one error toast, invalidates `moneyKeys.all` on settle); call sites only `catch` to stop their flow. `useDeleteTransaction` / `useDeleteBalance` (`api/money/queries.ts`, pure patches in `api/money/cache.ts`) are optimistic: row removed now, totals refetch on settle.
 - Open questions for the owner are listed at the bottom of this README. Answers go into DECISIONS.md.
 
 ## Open questions (owner)

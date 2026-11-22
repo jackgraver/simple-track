@@ -63,7 +63,7 @@ References: AUDIT.md (findings), MUTATIONS.md (per-mutation plan), ID-STRATEGY.m
   exercise key.
 - [x] **M1 Media on TanStack Query:** list/detail/stats hooks, list → detail `initialData`, optimistic
   status/favorite/rating. Create/save/delete stay `useServerMutation`.
-- [ ] **$1 Finances:** adopt `useServerMutation` error convention. Delete transaction/balance as partial
+- [x] **$1 Finances:** (done, see DECISIONS 2026-11-22) adopt `useServerMutation` error convention. Delete transaction/balance as partial
   optimistic (row removed now, totals pending).
 
 ## Stage 3: instant navigation
