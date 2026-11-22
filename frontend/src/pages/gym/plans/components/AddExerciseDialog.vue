@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { onlineManager } from "@tanstack/vue-query";
 import { getApiErrorMessage } from "~/api/httpError";
 import type { WorkoutPlan, Exercise } from "~/types/workout";
 import SearchList from "~/shared/SearchList.vue";
@@ -14,22 +15,20 @@ const props = defineProps<{
 const addToPlan = useAddRoutineExercise();
 const createExerciseMutation = useCreateExercise();
 
+/** Optimistic: the row is in the routine at once and the dialog closes; a failure rolls back with Retry. */
 const addExerciseToPlan = async (exercise: Exercise): Promise<boolean> => {
-    try {
-        await addToPlan.mutateAsync({ planId: props.plan.ID, exerciseId: exercise.ID });
-        toast.push(`Added ${exercise.name} to ${props.plan.name}`, "success");
-        props.onResolve?.(true);
-        return true;
-    } catch (err: unknown) {
-        const message = getApiErrorMessage(err, "Something went wrong");
-        toast.push("Failed to add exercise: " + message, "error");
-        return false;
-    }
+    addToPlan.mutate({ planId: props.plan.ID, exercise });
+    props.onResolve?.(true);
+    return true;
 };
 
 const createExercise = async (name: string) => {
     if (!name.trim()) return false;
-
+    // A new exercise needs the server (names are unique), so it can't wait in the offline queue.
+    if (!onlineManager.isOnline()) {
+        toast.push("You're offline. Creating an exercise needs a connection; pick one from the list instead.", "error");
+        return false;
+    }
     try {
         // Create and add in one step: typing a name that isn't in the library means "this one".
         const created = await createExerciseMutation.mutateAsync({ name: name.trim(), rep_rollover: 10, cues: "" });

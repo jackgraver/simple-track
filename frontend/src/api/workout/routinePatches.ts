@@ -1,4 +1,4 @@
-import type { WorkoutPlan, WorkoutProgram } from "~/types/workout";
+import type { Exercise, WorkoutPlan, WorkoutProgram } from "~/types/workout";
 
 /**
  * Pure cache patches for routine (workout plan) edits, applied to the cached
@@ -73,4 +73,16 @@ export function reorderExercises(p: WorkoutPlan, exerciseIds: number[]): Workout
 
 export function removeExercise(p: WorkoutPlan, exerciseId: number): WorkoutPlan {
     return { ...p, exercises: p.exercises.filter((e) => e.ID !== exerciseId) };
+}
+
+/** Add an exercise (at `index`, default the end, as the backend appends). No-op if already there. */
+export function addExercise(p: WorkoutPlan, exercise: Exercise, index?: number): WorkoutPlan {
+    if (p.exercises.some((e) => e.ID === exercise.ID)) return p;
+    const exercises = [...p.exercises];
+    exercises.splice(index ?? exercises.length, 0, exercise);
+    return { ...p, exercises };
+}
+
+export function findPlan(data: ProgramsData | undefined, planId: number): WorkoutPlan | undefined {
+    return data?.programs.flatMap((prog) => prog.plans).find((p) => p.ID === planId);
 }

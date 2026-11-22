@@ -1,10 +1,14 @@
 import { apiDELETE, apiPATCH, apiPOST, apiPUT } from "~/api/client";
 import { useOptimisticMutation, useServerMutation, type CachePatch } from "~/api/optimistic";
 import { workoutKeys } from "~/api/workout/keys";
+import { useQueryClient } from "@tanstack/vue-query";
+import { getApiErrorMessage } from "~/api/httpError";
 import {
     ASSIGN_FIELDS,
+    addExercise,
     assignAffected,
     assignDay,
+    findPlan,
     patchRoutine,
     removeExercise,
     reorderExercises,
@@ -96,15 +100,41 @@ export function useRemoveRoutineExercise() {
     });
 }
 
-/** Adds at the end of the routine (the backend appends). Needs the exercise row, so it waits for the server. */
+type AddExerciseVars = { planId: number; exercise: Exercise; /** Put it back here (Undo of a remove). */ index?: number };
+
+/**
+ * Add an exercise from the library. Shown at once (the picker has the full row); a failure rolls it
+ * back with Retry. The backend appends, so a given `index` is sent as a reorder in the same call.
+ * A replay after a lost answer gets "already in plan", which means it worked.
+ */
 export function useAddRoutineExercise() {
-    return useServerMutation({
+    const qc = useQueryClient();
+    return useOptimisticMutation({
         mutationKey: ["workout", "mutations", "addRoutineExercise"],
-        mutationFn: ({ planId, exerciseId }: { planId: number; exerciseId: number }) =>
-            apiPOST(`/workout/plans/${planId}/exercises/add`, { exercise_id: exerciseId }),
+        mutationFn: async ({ planId, exercise, index }: AddExerciseVars) => {
+            try {
+                await apiPOST(`/workout/plans/${planId}/exercises/add`, { exercise_id: exercise.ID });
+            } catch (err) {
+                if (!/already in plan/i.test(getApiErrorMessage(err, ""))) throw err;
+            }
+            if (index === undefined) return;
+            // The cache already holds the order we want, including writes queued after this one.
+            const order = findPlan(qc.getQueryData<ProgramsData>(PROGRAMS), planId)?.exercises.map((e) => e.ID);
+            if (order) await apiPUT(`/workout/plans/${planId}/exercises/reorder`, { exercise_ids: order });
+        },
+        optimistic: () => [
+            {
+                queryKey: PROGRAMS,
+                apply: (old: ProgramsData, x: AddExerciseVars) =>
+                    patchRoutine(old, x.planId, (p) => addExercise(p, x.exercise, x.index)),
+                revert: (cur: ProgramsData, x: AddExerciseVars) =>
+                    patchRoutine(cur, x.planId, (p) => removeExercise(p, x.exercise.ID)),
+            } satisfies CachePatch<AddExerciseVars, ProgramsData>,
+        ],
         invalidate: settleKeys,
         scope,
-        errorMessage: false,
+        errorMessage: (_e, v) => `Couldn’t add ${v.exercise.name}`,
+        queryClient: qc,
     });
 }
 

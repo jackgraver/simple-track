@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
-import type { WorkoutPlan } from "~/types/workout";
+import type { Exercise, WorkoutPlan } from "~/types/workout";
 import {
     ASSIGN_FIELDS,
+    addExercise,
     assignAffected,
     assignDay,
+    findPlan,
     removeExercise,
     reorderExercises,
     restoreFields,
@@ -68,5 +70,23 @@ describe("exercises", () => {
         snap.programs[0]!.plans[0] = plan(1, [1], [10, 11]);
         const cur = { programs: [{ ...snap.programs[0]!, plans: [reorderExercises(snap.programs[0]!.plans[0]!, [11, 10]), snap.programs[0]!.plans[1]!] }, snap.programs[1]!] };
         expect(restoreFields(cur as ProgramsData, snap, [1], ["exercises"]).programs[0]!.plans[0]!.exercises.map((e) => e.ID)).toEqual([10, 11]);
+    });
+});
+
+describe("addExercise / findPlan", () => {
+    const ex = (ID: number) => ({ ID, name: `E${ID}` }) as Exercise;
+    const plan = { ID: 1, exercises: [ex(1), ex(2)] } as WorkoutPlan;
+
+    it("appends by default, inserts at an index, and is a no-op when present", () => {
+        expect(addExercise(plan, ex(3)).exercises.map((e) => e.ID)).toEqual([1, 2, 3]);
+        expect(addExercise(plan, ex(3), 0).exercises.map((e) => e.ID)).toEqual([3, 1, 2]);
+        expect(addExercise(plan, ex(2))).toBe(plan);
+    });
+
+    it("finds a plan across programs", () => {
+        const progs = { programs: [{ ID: 9, plans: [plan] }] } as unknown as ProgramsData;
+        expect(findPlan(progs, 1)).toBe(plan);
+        expect(findPlan(progs, 2)).toBeUndefined();
+        expect(findPlan(undefined, 1)).toBeUndefined();
     });
 });

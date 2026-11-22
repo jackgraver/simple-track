@@ -5,6 +5,7 @@ import { useQueryClient } from "@tanstack/vue-query";
 import { ArrowDown, ArrowUp, Dumbbell, Ellipsis, GripVertical, Pencil, Plus, SearchX, Trash2, X } from "lucide-vue-next";
 import { getApiErrorMessage } from "~/api/httpError";
 import { workoutKeys } from "~/api/workout/keys";
+import { useOnline } from "~/api/online";
 import { useWorkoutPrograms } from "~/api/workout/queries";
 import {
     useAddRoutineExercise,
@@ -111,9 +112,12 @@ function saving(step: StepKey, run: () => Promise<unknown>) {
         },
     );
 }
+// Offline the save is queued (paused), not slow: say so instead of an endless "Saving…".
+const online = useOnline();
 const stepMeta = (step: StepKey, fallback: string) => {
     const s = saveState.value[step];
-    return s === "saving" ? "Saving…" : s === "saved" ? "Saved" : fallback;
+    if (s === "saving") return online.value ? "Saving…" : "Waiting for connection";
+    return s === "saved" ? "Saved" : fallback;
 };
 
 // --- header: rename / delete --------------------------------------------------------------------
@@ -236,39 +240,30 @@ const move = (from: number, to: number) => {
     reorder.mutate({ planId: p.ID, exerciseIds: next.map((e) => e.ID) });
 };
 
-/** Remove now; Undo adds it back and restores its place. A failed remove rolls back with its own toast. */
+/**
+ * Remove now, with Undo straight away (not on success: offline the request waits, and per-call
+ * callbacks only fire for the latest call). Undo queues behind the remove (same routine scope) and
+ * puts the exercise back in its place. A failed remove rolls back with its own toast.
+ */
 const remove = (exercise: Exercise) => {
     const p = plan.value;
     if (!p) return;
-    const order = p.exercises.map((e) => e.ID);
-    removeExercise.mutate(
-        { planId: p.ID, exerciseId: exercise.ID },
-        {
-            onSuccess: () =>
-                toast.push({
-                    message: `Removed ${exercise.name}`,
-                    action: {
-                        label: "Undo",
-                        onClick: () => {
-                            addExercise
-                                .mutateAsync({ planId: p.ID, exerciseId: exercise.ID })
-                                .then(() => reorder.mutate({ planId: p.ID, exerciseIds: order }))
-                                .catch((err: unknown) => failToast(`Couldn't put ${exercise.name} back`, err));
-                        },
-                    },
-                }),
+    const index = p.exercises.findIndex((e) => e.ID === exercise.ID);
+    removeExercise.mutate({ planId: p.ID, exerciseId: exercise.ID });
+    toast.push({
+        message: `Removed ${exercise.name}`,
+        action: {
+            label: "Undo",
+            onClick: () => addExercise.mutate({ planId: p.ID, exercise, index }),
         },
-    );
+    });
 };
 
 const openAdd = () => {
     const p = plan.value;
     if (!p) return;
     void dialogManager
-        .custom<boolean>({ title: `Add to ${p.name}`, component: AddExerciseDialog, componentProps: { plan: p } })
-        .then((ok) => {
-            if (ok) void refreshPrograms();
-        });
+        .custom<boolean>({ title: `Add to ${p.name}`, component: AddExerciseDialog, componentProps: { plan: p } });
 };
 const openEdit = (exercise: Exercise) => {
     void dialogManager
