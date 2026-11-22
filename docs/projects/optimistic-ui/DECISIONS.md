@@ -68,3 +68,11 @@ Rollback also counts failed `mark` mutations (their rows are still cached); sett
 `mark` mode: no toast, `gcTime: Infinity` so the failure outlives the 5 min default, `apply` must be idempotent (Retry re-runs it), and the hook returns `retry(vars)` /
 `dismiss(vars)` which drop the failed mutation (matched by `client_id`). `reconcile` gets a 4th arg `{ siblingsPending(key) }`. `usePendingIds` returns a `Set`.
 `useServerMutation` toasts without Retry (forms keep inputs); `errorMessage: false` leaves the error to the caller.
+
+## 2026-11-22: T1 tracking optimistic (migration 0006)
+`water_logs.client_id uuid` + partial unique index (migration `0006_water_client_id.sql`). `POST /tracking/water` accepts optional `client_id` (400 if not a uuid); a replay returns the existing row, including one soft-deleted since (a retry must not resurrect a deleted entry), and a unique-violation race re-reads the winner. Delete stays 404-on-missing; the frontend treats 404 as success.
+Weight/steps need no backend change (upsert by unique date is already idempotent); their optimistic rows have `ID: 0` until reconcile and are keyed by day (`scope` per date so same-day saves reach the server in order).
+Water rows pending create get a negative deterministic temp `ID` from the `client_id`; the log dialog disables delete on them (no server id yet) rather than queueing a delete behind the create. Water add retries once (idempotent); weight/steps do not retry.
+Failures use the default rollback mode with the helper's Retry toast (no inline mark mode: nothing to keep on screen). Success toasts ("Logged"/"Saved") now fire on tap, not on server ack. Save buttons lost their loading state because the write is instant; Overwrite confirm dialogs for weight/steps are kept.
+`google/uuid` is now a direct dependency (was `// indirect`), used only to validate `client_id`.
+Not verified in a browser or against real Postgres (no dev stack/docker allowed): migration SQL checked by reading only, Go tests use SQLite with the partial index created by hand.

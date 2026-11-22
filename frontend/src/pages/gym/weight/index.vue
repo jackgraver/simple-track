@@ -19,7 +19,6 @@ import {
     seriesThroughSelectedDay,
     trackingDayKey,
 } from "~/pages/gym/trackingLogChart";
-import axios from "axios";
 import { ClipboardList } from "lucide-vue-next";
 import { openImportWeightDialog } from "./dialog/useImportDialog";
 import { Button, Card, ErrorState, PageHeader, Section, Skeleton, useDelayedFlag } from "~/shared/ui";
@@ -97,26 +96,10 @@ const handleSave = async () => {
         });
         if (!confirmed) return;
     }
-    try {
-        await saveMutation.mutateAsync({ date: dateStr.value, weightLbs: w });
-        toast.push("Saved", "success");
-    } catch (err: unknown) {
-        let msg = "Failed to save";
-        if (
-            axios.isAxiosError(err) &&
-            err.response?.data &&
-            typeof err.response.data === "object" &&
-            "error" in err.response.data
-        ) {
-            const e0 = (err.response.data as { error?: string }).error;
-            if (e0) msg = e0;
-        } else if (err instanceof Error) {
-            msg = err.message;
-        }
-        toast.push(msg, "error");
-    }
+    // Optimistic: the chart and list update now; a failure rolls back with a Retry toast.
+    saveMutation.mutate({ date: dateStr.value, weightLbs: w });
+    toast.push("Saved", "success");
 };
-const saving = computed(() => saveMutation.isPending.value);
 
 const metricsForDay = computed(() => {
     const l = existingLogForDate.value;
@@ -147,7 +130,7 @@ const metricsForDay = computed(() => {
         <Card>
             <form class="flex flex-col gap-3" @submit.prevent="handleSave">
                 <NumberSlider v-model="weightLbs" :label="weightLabel" :step="0.1" :min="sliderMin" :max="sliderMax" />
-                <Button type="submit" variant="primary" :loading="saving">{{ saving ? "Saving…" : "Save" }}</Button>
+                <Button type="submit" variant="primary">Save</Button>
             </form>
         </Card>
         <Card v-if="metricsForDay.length">

@@ -82,4 +82,6 @@ export type WaterLog = {
     preset_id: number | null;
     preset?: DrinkSizePreset | null;
     CreatedAt?: string;
+    /** Idempotency key of rows created from this client. */
+    client_id?: string | null;
 };

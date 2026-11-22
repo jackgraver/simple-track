@@ -23,7 +23,23 @@ import {
     importWeightCsv,
     updateDrinkSizePreset,
 } from "~/api/tracking/api";
-import type { BodyWeightLog } from "~/api/tracking/types";
+import axios from "axios";
+import { getApiErrorMessage } from "~/api/httpError";
+import { useOptimisticMutation } from "~/api/optimistic";
+import {
+    addWaterPatch,
+    deleteWaterPatch,
+    reconcileByDay,
+    reconcileWater,
+    revertAddWater,
+    revertDeleteWater,
+    revertUpsertByDay,
+    saveStepsPatch,
+    saveWeightPatch,
+    type AddWaterVars,
+    type DeleteWaterVars,
+} from "~/api/tracking/patches";
+import type { BodyWeightLog, StepLog, WaterLog } from "~/api/tracking/types";
 import { trackingKeys } from "~/api/tracking/keys";
 
 export function latestWeightLbs(logs: BodyWeightLog[] | undefined): number | null {
@@ -56,18 +72,24 @@ export function useWeightLogs() {
 }
 
 export function useSaveWeight() {
-    const queryClient = useQueryClient();
-    return useMutation({
-        mutationFn: ({
-            date,
-            weightLbs,
-        }: {
-            date: string;
-            weightLbs: number;
-        }) => saveWeight(date, weightLbs),
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: trackingKeys.weight });
+    return useOptimisticMutation<{ date: string; weightLbs: number }, BodyWeightLog>({
+        mutationKey: trackingKeys.mutations.saveWeight,
+        mutationFn: ({ date, weightLbs }) => saveWeight(date, weightLbs),
+        // Upsert by date: same-day saves must reach the server in order.
+        scope: (v) => ({ id: `weight:${v.date}` }),
+        optimistic: () => [
+            {
+                queryKey: trackingKeys.weight,
+                apply: (old: BodyWeightLog[], vars) => saveWeightPatch(old, vars),
+                revert: (cur: BodyWeightLog[], vars, snap: BodyWeightLog[]) => revertUpsertByDay(cur, vars.date, snap),
+            },
+        ],
+        reconcile: (saved, _v, qc, { siblingsPending }) => {
+            if (siblingsPending(trackingKeys.weight) > 0) return;
+            qc.setQueryData<BodyWeightLog[]>(trackingKeys.weight, (cur) => cur && reconcileByDay(cur, saved));
         },
+        invalidate: () => [trackingKeys.weight],
+        errorMessage: (err) => getApiErrorMessage(err, "Couldn't save weight"),
     });
 }
 
@@ -89,13 +111,23 @@ export function useStepLogs() {
 }
 
 export function useSaveSteps() {
-    const queryClient = useQueryClient();
-    return useMutation({
-        mutationFn: ({ date, steps }: { date: string; steps: number }) =>
-            saveSteps(date, steps),
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: trackingKeys.steps });
+    return useOptimisticMutation<{ date: string; steps: number }, StepLog>({
+        mutationKey: trackingKeys.mutations.saveSteps,
+        mutationFn: ({ date, steps }) => saveSteps(date, steps),
+        scope: (v) => ({ id: `steps:${v.date}` }),
+        optimistic: () => [
+            {
+                queryKey: trackingKeys.steps,
+                apply: (old: StepLog[], vars) => saveStepsPatch(old, vars),
+                revert: (cur: StepLog[], vars, snap: StepLog[]) => revertUpsertByDay(cur, vars.date, snap),
+            },
+        ],
+        reconcile: (saved, _v, qc, { siblingsPending }) => {
+            if (siblingsPending(trackingKeys.steps) > 0) return;
+            qc.setQueryData<StepLog[]>(trackingKeys.steps, (cur) => cur && reconcileByDay(cur, saved));
         },
+        invalidate: () => [trackingKeys.steps],
+        errorMessage: (err) => getApiErrorMessage(err, "Couldn't save steps"),
     });
 }
 
@@ -174,38 +206,49 @@ export function useWaterLogs(dateStr: MaybeRefOrGetter<string>) {
     });
 }
 
+/** Log water. Vars need a `client_id` from `newClientId()` (the backend dedupes retries by it). */
 export function useSaveWater() {
-    const queryClient = useQueryClient();
-    return useMutation({
-        mutationFn: ({
-            date,
-            amountOz,
-            presetId,
-        }: {
-            date: string;
-            amountOz: number;
-            presetId?: number;
-        }) => saveWater(date, amountOz, presetId),
-        onSuccess: (_data, vars) => {
-            queryClient.invalidateQueries({
-                queryKey: trackingKeys.water(vars.date),
-            });
-        },
+    return useOptimisticMutation<AddWaterVars, WaterLog>({
+        mutationKey: trackingKeys.mutations.addWater,
+        mutationFn: ({ date, amountOz, presetId, client_id }) => saveWater(date, amountOz, presetId, client_id),
+        // Idempotent through client_id, so a transient failure may be retried safely.
+        retry: 1,
+        retryDelay: 800,
+        optimistic: (v) => [
+            {
+                queryKey: trackingKeys.water(v.date),
+                apply: (old: WaterLog[], vars) => addWaterPatch(old, vars),
+                revert: (cur: WaterLog[], vars) => revertAddWater(cur, vars),
+            },
+        ],
+        reconcile: (saved, v, qc) =>
+            qc.setQueryData<WaterLog[]>(trackingKeys.water(v.date), (cur) => cur && reconcileWater(cur, v, saved)),
+        invalidate: (v) => [trackingKeys.water(v.date)],
+        errorMessage: (err) => getApiErrorMessage(err, "Couldn't log water"),
     });
 }
 
 export function useDeleteWater() {
-    const queryClient = useQueryClient();
-    return useMutation({
-        mutationFn: async ({ id, date }: { id: number; date: string }) => {
-            await deleteWater(id);
-            return date;
+    return useOptimisticMutation<DeleteWaterVars, void>({
+        mutationKey: trackingKeys.mutations.deleteWater,
+        // Already gone (404) is the state we wanted.
+        mutationFn: async ({ id }) => {
+            try {
+                await deleteWater(id);
+            } catch (err) {
+                if (!(axios.isAxiosError(err) && err.response?.status === 404)) throw err;
+            }
         },
-        onSuccess: (date) => {
-            queryClient.invalidateQueries({
-                queryKey: trackingKeys.water(date),
-            });
-        },
+        scope: (v) => ({ id: `water:${v.id}` }),
+        optimistic: (v) => [
+            {
+                queryKey: trackingKeys.water(v.date),
+                apply: (old: WaterLog[], vars) => deleteWaterPatch(old, vars),
+                revert: (cur: WaterLog[], vars, snap: WaterLog[]) => revertDeleteWater(cur, vars, snap),
+            },
+        ],
+        invalidate: (v) => [trackingKeys.water(v.date)],
+        errorMessage: (err) => getApiErrorMessage(err, "Couldn't delete water entry"),
     });
 }
 

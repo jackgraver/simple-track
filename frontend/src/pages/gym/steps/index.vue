@@ -15,7 +15,6 @@ import {
     seriesLastDaysThroughSelectedDay,
     trackingDayKey,
 } from "~/pages/gym/trackingLogChart";
-import axios from "axios";
 import { Button, Card, ErrorState, Field, Input, PageHeader, Section, Skeleton, useDelayedFlag } from "~/shared/ui";
 
 const route = useRoute();
@@ -58,27 +57,11 @@ const handleSave = async () => {
         });
         if (!confirmed) return;
     }
-    try {
-        await saveMutation.mutateAsync({ date: dateStr.value, steps: n });
-        toast.push("Saved", "success");
+    // Optimistic: the chart and list update now; a failure rolls back with a Retry toast.
+    saveMutation.mutate({ date: dateStr.value, steps: n });
+    toast.push("Saved", "success");
         stepsInput.value = "";
-    } catch (err: unknown) {
-        let msg = "Failed to save";
-        if (
-            axios.isAxiosError(err) &&
-            err.response?.data &&
-            typeof err.response.data === "object" &&
-            "error" in err.response.data
-        ) {
-            const e0 = (err.response.data as { error?: string }).error;
-            if (e0) msg = e0;
-        } else if (err instanceof Error) {
-            msg = err.message;
-        }
-        toast.push(msg, "error");
-    }
 };
-const saving = computed(() => saveMutation.isPending.value);
 </script>
 <template>
     <div class="flex w-full min-w-0 flex-col gap-6">
@@ -92,7 +75,7 @@ const saving = computed(() => saveMutation.isPending.value);
                 <Field :label="`Steps (${formatDateLong(`${dateStr}T12:00:00`)})`">
                     <Input v-model="stepsInput" inputmode="numeric" autocomplete="off" placeholder="e.g. 8420" />
                 </Field>
-                <Button type="submit" variant="primary" :loading="saving">{{ saving ? "Saving…" : "Save" }}</Button>
+                <Button type="submit" variant="primary">Save</Button>
             </form>
         </Card>
         <ErrorState v-if="isError" :error="error" title="Couldn't load your step history" @retry="refetch()" />

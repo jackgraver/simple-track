@@ -12,4 +12,10 @@ export const trackingKeys = {
     waterLogsAll: ['tracking', 'water', 'logs'] as const,
     water: (date: string) => ['tracking', 'water', 'logs', date] as const,
     waterPresets: ['tracking', 'water', 'presets'] as const,
+    mutations: {
+        addWater: ['tracking', 'mutation', 'water-add'] as const,
+        deleteWater: ['tracking', 'mutation', 'water-delete'] as const,
+        saveWeight: ['tracking', 'mutation', 'weight-save'] as const,
+        saveSteps: ['tracking', 'mutation', 'steps-save'] as const,
+    },
 };

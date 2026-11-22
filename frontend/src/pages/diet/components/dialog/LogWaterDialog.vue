@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { getApiErrorMessage } from "~/api/httpError";
+import { newClientId } from "~/api/ids";
 import { computed, ref } from "vue";
 import { useRouter } from "vue-router";
 import type { DrinkSizePreset } from "~/api/tracking/types";
@@ -28,21 +28,19 @@ const saveMutation = useSaveWater();
 const customInput = ref("");
 const savingCustom = computed(() => saveMutation.isPending.value);
 
-async function logPreset(p: DrinkSizePreset) {
-    try {
-        await saveMutation.mutateAsync({
-            date: props.dateStr,
-            amountOz: p.amount_oz,
-            presetId: p.ID,
-        });
-        toast.push("Logged", "success");
-        props.onResolve?.(true);
-    } catch (err: unknown) {
-        toast.push(getApiErrorMessage(err, "Failed to log"), "error");
-    }
+function logPreset(p: DrinkSizePreset) {
+    saveMutation.mutate({
+        client_id: newClientId(),
+        date: props.dateStr,
+        amountOz: p.amount_oz,
+        presetId: p.ID,
+        preset: p,
+    });
+    toast.push("Logged", "success");
+    props.onResolve?.(true);
 }
 
-async function submitCustom() {
+function submitCustom() {
     const raw = customInput.value.replace(/\s/g, "");
     const n = Number.parseFloat(raw);
     if (Number.isNaN(n) || n <= 0) {
@@ -50,17 +48,10 @@ async function submitCustom() {
         return;
     }
     const oz = ozFromDisplayAmount(n, displayUnit.value);
-    try {
-        await saveMutation.mutateAsync({
-            date: props.dateStr,
-            amountOz: oz,
-        });
-        toast.push("Logged", "success");
-        customInput.value = "";
-        props.onResolve?.(true);
-    } catch (err: unknown) {
-        toast.push(getApiErrorMessage(err, "Failed to log"), "error");
-    }
+    saveMutation.mutate({ client_id: newClientId(), date: props.dateStr, amountOz: oz });
+    toast.push("Logged", "success");
+    customInput.value = "";
+    props.onResolve?.(true);
 }
 
 function manageSizes() {
