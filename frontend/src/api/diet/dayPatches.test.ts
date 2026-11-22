@@ -16,6 +16,7 @@ import {
     revertQuickLog,
     revertReorder,
     revertUnlog,
+    resolveLoggedMealId,
 } from "./dayPatches";
 
 const base = { created_at: "", updated_at: "" };
@@ -58,9 +59,17 @@ describe("log planned", () => {
         const d = day();
         expect(applyLogPlanned(d, 999)).toBe(d);
     });
-    it("revert removes only the temp row and its macros", () => {
+    it("moves the meal out of the planned list at once", () => {
         const next = applyLogPlanned(day(), 12);
-        expect(revertLogPlanned(next, 12)).toEqual(day());
+        expect(next.day.plannedMeals.map((p) => p.meal_id)).toEqual([11]);
+    });
+    it("revert removes only the temp row and its macros, and re-plans the meal", () => {
+        const next = applyLogPlanned(day(), 12);
+        expect(revertLogPlanned(next, 12, day())).toEqual(day());
+        // Without a snapshot (or already re-planned) the planned list is left alone.
+        expect(revertLogPlanned(next, 12).day.plannedMeals.map((p) => p.meal_id)).toEqual([11]);
+        const back = revertLogPlanned(next, 12, day());
+        expect(revertLogPlanned(back, 12, day())).toEqual(back);
     });
 });
 
@@ -143,5 +152,17 @@ describe("planned meals", () => {
         const next = applyReorder(day(), [102]);
         const sorted = [...next.day.plannedMeals].sort((a, b) => a.display_order! - b.display_order!);
         expect(sorted.map((p) => p.ID)).toEqual([102, 101]);
+    });
+});
+
+describe("resolveLoggedMealId", () => {
+    it("keeps a real id, maps a temp quick log to the saved meal by client_id, null when never saved", () => {
+        expect(resolveLoggedMealId(11, undefined, [])).toBe(11);
+        const saved = day();
+        const quick = { ...meal(77, food(3, 100)), client_id: "q1" };
+        saved.day.loggedMeals = [...(saved.day.loggedMeals ?? []), logged(9, quick)];
+        expect(resolveLoggedMealId(-3, "q1", [undefined, saved])).toBe(77);
+        expect(resolveLoggedMealId(-3, "q2", [saved])).toBeNull();
+        expect(resolveLoggedMealId(-3, null, [saved])).toBeNull();
     });
 });

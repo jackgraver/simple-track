@@ -16,6 +16,8 @@ const props = defineProps<{
     onLog?: (meal: Meal) => void | Promise<void>;
     onEdit: (meal: Meal) => void;
     onDelete?: (meal: Meal) => void | Promise<void>;
+    /** Logged only: not saved yet (subtle tint; still deletable). */
+    pending?: boolean;
 }>();
 
 const open = ref(false);
@@ -50,7 +52,7 @@ function onMenu(key: string) {
 </script>
 
 <template>
-    <ListRow :pending="busy" :aria-expanded="open" :aria-controls="panelId" @click="open = !open">
+    <ListRow :pending="busy || pending" :aria-expanded="open" :aria-controls="panelId" @click="open = !open">
         <template #leading>
             <Check v-if="kind === 'planned' && logged" class="size-5 text-success" aria-hidden="true" />
             <Circle v-else-if="kind === 'planned'" class="size-5 text-fg-subtle" aria-hidden="true" />

@@ -21,11 +21,14 @@ const editRoute = computed(() => ({
     query: { offset: String(props.dateOffset) },
 }));
 
-const rows = computed(() => plannedRows(data.value?.day.plannedMeals ?? [], data.value?.day.loggedMeals ?? []));
-const loggedCount = computed(() => rows.value.filter((r) => r.logged).length);
-const title = computed(() =>
-    rows.value.length ? `Planned · ${loggedCount.value} of ${rows.value.length} logged` : "Planned",
+// A logged planned meal leaves this list at once (the cache patch, like the server, moves it) and
+// shows under Logged, pending until saved. The filter covers a day log that points at a still
+// planned meal (older data).
+const rows = computed(() =>
+    plannedRows(data.value?.day.plannedMeals ?? [], data.value?.day.loggedMeals ?? []).filter((r) => !r.logged),
 );
+const anythingLogged = computed(() => (data.value?.day.loggedMeals?.length ?? 0) > 0);
+const title = computed(() => (rows.value.length ? `Planned · ${rows.value.length} to go` : "Planned"));
 </script>
 
 <template>
@@ -38,6 +41,15 @@ const title = computed(() =>
         </template>
         <Card padding="none">
             <SkeletonList v-if="isPending" :rows="showSkeleton ? 3 : 0" :leading="true" />
+            <EmptyState
+                v-else-if="rows.length === 0 && anythingLogged"
+                title="Nothing left to log"
+                description="Planned meals move to Logged as you log them."
+            >
+                <template #action>
+                    <Button variant="secondary" size="sm" :to="editRoute">Plan more</Button>
+                </template>
+            </EmptyState>
             <EmptyState
                 v-else-if="rows.length === 0"
                 title="Nothing planned"
@@ -53,7 +65,6 @@ const title = computed(() =>
                     :key="r.planned.ID"
                     :meal="r.planned.meal"
                     kind="planned"
-                    :logged="r.logged"
                     :can-log="dateOffset === 0"
                     :on-log="logPlannedMeal"
                     :on-edit="(m) => logMeal(m, EDIT_LOGGED_TYPE)"

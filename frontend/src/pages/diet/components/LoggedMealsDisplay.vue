@@ -5,6 +5,7 @@ import { useDietDayMealHandlers } from "./useDietDayMealHandlers";
 import { EDIT_TYPE } from "~/pages/diet/logmeal/logmealMode";
 import { Card, EmptyState, List, Section, SkeletonList, useDelayedFlag } from "~/shared/ui";
 import { useDietLogsToday } from "~/api/diet/queries";
+import { isTempId } from "~/api/diet/dayPatches";
 
 const props = defineProps<{
     dateOffset: number;
@@ -32,6 +33,7 @@ const loggedMeals = computed(() => data.value?.day.loggedMeals ?? []);
                     :key="log.ID"
                     :meal="log.meal"
                     kind="logged"
+                    :pending="isTempId(log.ID)"
                     :on-edit="(m) => logMeal(m, EDIT_TYPE)"
                     :on-delete="deleteLoggedMeal"
                 />

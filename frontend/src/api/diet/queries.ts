@@ -41,6 +41,8 @@ import {
     applyQuickLog,
     applyReorder,
     applyUnlog,
+    isTempId,
+    resolveLoggedMealId,
     revertAddPlanned,
     revertDeletePlanned,
     revertLogPlanned,
@@ -193,7 +195,7 @@ export function useLogPlannedMeal() {
             {
                 queryKey: dayKey(v),
                 apply: (old) => applyLogPlanned(old, v.mealId),
-                revert: (cur) => revertLogPlanned(cur, v.mealId),
+                revert: (cur, _v, snap) => revertLogPlanned(cur, v.mealId, snap),
             },
         ],
         reconcile: reconcileDay,
@@ -204,22 +206,43 @@ export function useLogPlannedMeal() {
     });
 }
 
+/**
+ * The real meal id of each saved quick log, by client_id, so a delete queued behind a quick log can
+ * find the real meal id. Written in reconcile: when the scope lets the delete go, the quick log's
+ * mutation is not marked 'success' yet (TanStack dispatches that after onSettled). Small and
+ * short-lived: an entry is dropped when a delete uses it.
+ */
+const quickLogMealIds = new Map<string, number>();
+
+type UnlogVars = LogVars & { /** The meal's client_id, for a quick log that is still saving. */ mealClientId?: string | null };
+
+/**
+ * Delete a logged meal, saved or still saving. It queues behind the log in the day's scope; a quick
+ * log's temp id is swapped for the real one from that log's answer at send time (`quickLogMealIds`).
+ */
 export function useDeleteLoggedMeal() {
+    const qc = useQueryClient();
     return useOptimisticMutation({
         mutationKey: dietKeys.mutations.unlog(),
-        mutationFn: (v: LogVars) =>
-            deleteLoggedMeal(v.mealId, v.dayId),
-        optimistic: (v: LogVars): DayPatch<LogVars>[] => [
+        mutationFn: async (v: UnlogVars) => {
+            const mealId = isTempId(v.mealId) ? (quickLogMealIds.get(v.mealClientId ?? '') ?? null) : v.mealId;
+            if (v.mealClientId) quickLogMealIds.delete(v.mealClientId);
+            return mealId === null ? null : deleteLoggedMeal(mealId, v.dayId);
+        },
+        optimistic: (v: UnlogVars): DayPatch<UnlogVars>[] => [
             {
                 queryKey: dayKey(v),
                 apply: (old) => applyUnlog(old, v.mealId),
                 revert: (cur, _v, snap) => revertUnlog(cur, v.mealId, snap),
             },
         ],
-        reconcile: reconcileDay,
+        reconcile: (data, v, qcl, h) => {
+            if (data) reconcileDay(data, v, qcl, h);
+        },
         scope: dayScope,
         retry: 1, // idempotent on the server (D1)
         errorMessage: () => "Couldn’t remove that meal",
+        queryClient: qc,
     });
 }
 
@@ -364,7 +387,11 @@ export function useQuickLog() {
                 revert: (cur, _v, snap) => revertQuickLog(cur, v, snap),
             },
         ],
-        reconcile: reconcileDay,
+        reconcile: (data, v, qc, h) => {
+            const mealId = resolveLoggedMealId(-1, v.client_id, [data]);
+            if (mealId !== null) quickLogMealIds.set(v.client_id, mealId);
+            reconcileDay(data, v, qc, h);
+        },
         invalidate: monthSummaries,
         scope: dayScope,
         retry: 1, // client_id makes a replay create nothing

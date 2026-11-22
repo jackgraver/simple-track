@@ -4,8 +4,8 @@
  * are in flight. The server's full-day response replaces the day once nothing else is pending, so
  * rounding or missing food data in these patches is only ever visible for one round trip.
  *
- * Planned meals are never flagged "logged" in the cache: the UI derives that from `loggedMeals`
- * (`plannedRows`), so logging adds a `DayLog` and unlogging removes it.
+ * Logging a planned meal moves it to `loggedMeals` (the server only returns planned meals not yet
+ * logged); unlogging removes the `DayLog` and, like the server, does not re-plan the meal.
  */
 import type { DietLogsTodayResponse } from './api';
 import type { DayLog, Food, Meal, PlannedMeal, SavedMeal } from '~/types/diet';
@@ -60,10 +60,15 @@ const mealIdOf = (l: DayLog) => l.meal_id || l.meal?.ID;
 
 // ---- Log / unlog -------------------------------------------------------------------------------
 
+/**
+ * Log a planned meal: it moves from the planned list to the logged list, as on the server (the day
+ * response only returns planned meals not yet logged, and unlogging does not bring them back).
+ */
 export function applyLogPlanned(old: DietLogsTodayResponse, mealId: number): DietLogsTodayResponse {
     const logged = old.day.loggedMeals ?? [];
     if (logged.some((l) => mealIdOf(l) === mealId)) return old; // idempotent, like the server
-    const planned = (old.day.plannedMeals ?? []).find((p) => (p.meal_id || p.meal?.ID) === mealId);
+    const plannedList = old.day.plannedMeals ?? [];
+    const planned = plannedList.find((p) => (p.meal_id || p.meal?.ID) === mealId);
     if (!planned) return old;
     const now = new Date().toISOString();
     const row: DayLog = {
@@ -74,14 +79,30 @@ export function applyLogPlanned(old: DietLogsTodayResponse, mealId: number): Die
         meal_id: mealId,
         meal: planned.meal,
     };
-    return shift(withDay(old, { loggedMeals: [...logged, row] }), macrosOf(planned.meal), 1);
+    return shift(
+        withDay(old, { loggedMeals: [...logged, row], plannedMeals: plannedList.filter((p) => p !== planned) }),
+        macrosOf(planned.meal),
+        1,
+    );
 }
 
-export function revertLogPlanned(cur: DietLogsTodayResponse, mealId: number): DietLogsTodayResponse {
+/** Undo a log: drop the temp row and put the planned meal back (from the snapshot) if it is gone. */
+export function revertLogPlanned(
+    cur: DietLogsTodayResponse,
+    mealId: number,
+    snapshot?: DietLogsTodayResponse,
+): DietLogsTodayResponse {
     const logged = cur.day.loggedMeals ?? [];
     const row = logged.find((l) => mealIdOf(l) === mealId && isTempId(l.ID));
-    if (!row) return cur;
-    return shift(withDay(cur, { loggedMeals: logged.filter((l) => l !== row) }), macrosOf(row.meal), -1);
+    let next = cur;
+    if (row) next = shift(withDay(cur, { loggedMeals: logged.filter((l) => l !== row) }), macrosOf(row.meal), -1);
+    const plannedNow = next.day.plannedMeals ?? [];
+    const before = snapshot?.day.plannedMeals?.find((p) => (p.meal_id || p.meal?.ID) === mealId);
+    if (before && !plannedNow.some((p) => p.ID === before.ID)) {
+        // display_order is kept on rows, so the readers' sort restores the position.
+        next = withDay(next, { plannedMeals: [...plannedNow, before] });
+    }
+    return next;
 }
 
 export function applyUnlog(old: DietLogsTodayResponse, mealId: number): DietLogsTodayResponse {
@@ -292,4 +313,26 @@ export function revertReorder(
             orders.has(p.ID) ? { ...p, display_order: orders.get(p.ID) } : p,
         ),
     });
+}
+
+// ---- Unlogging a row that is still saving -----------------------------------------------------
+
+/**
+ * The server id of the logged meal to delete. A quick log still saving has a temp id: its real id
+ * is in the day the quick log's request returned (matched by the meal's `client_id`). `null` when
+ * the quick log never saved (failed), so there is nothing to delete on the server.
+ */
+export function resolveLoggedMealId(
+    mealId: number,
+    mealClientId: string | null | undefined,
+    savedDays: readonly (DietLogsTodayResponse | undefined)[],
+): number | null {
+    if (!isTempId(mealId)) return mealId;
+    if (!mealClientId) return null;
+    for (const day of savedDays) {
+        const row = day?.day.loggedMeals?.find((l) => l.meal?.client_id === mealClientId);
+        const id = row ? mealIdOf(row) : undefined;
+        if (id && !isTempId(id)) return id;
+    }
+    return null;
 }

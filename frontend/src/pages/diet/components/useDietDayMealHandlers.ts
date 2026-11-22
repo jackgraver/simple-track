@@ -22,7 +22,8 @@ export function useDietDayMealHandlers(getOffset: () => number) {
     const logPlannedMealMutation = useLogPlannedMeal();
     const deleteLoggedMealMutation = useDeleteLoggedMeal();
 
-    // Optimistic: the row flips and the totals move on tap. A failure rolls back with a Retry toast.
+    // Optimistic: the meal moves to the logged list (pending) and the totals move on tap. A failure
+    // rolls back with a Retry toast.
     const logPlannedMeal = (meal: Meal) => {
         const dayId = data.value?.day.ID;
         if (!dayId || isTempId(meal.ID)) return;
@@ -97,9 +98,10 @@ export function useDietDayMealHandlers(getOffset: () => number) {
             return;
         }
 
-        if (isTempId(meal.ID)) return; // still saving; nothing to delete on the server yet
+        // A row still saving is removed now too: the delete queues behind its log (same day scope).
         deleteLoggedMealMutation.mutate({
             mealId: meal.ID,
+            mealClientId: meal.client_id,
             dayId: data.value.day.ID,
             ...dayRef(getOffset()),
             client_id: newClientId(),
