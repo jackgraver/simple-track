@@ -27,6 +27,7 @@ export interface PlannedMeal extends BaseModel {
     meal: Meal;
     display_order?: number;
     saved_meal_id?: number | null;
+    client_id?: string | null;
 }
 
 export interface DayLog extends BaseModel {
@@ -37,6 +38,7 @@ export interface DayLog extends BaseModel {
 
 export interface Meal extends BaseModel {
     name: string;
+    client_id?: string | null;
     items: MealItem[];
 }
 

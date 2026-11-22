@@ -58,6 +58,8 @@
 - T1 done (migration 0006): `POST /tracking/water` takes `client_id` (idempotent). Water add/delete and weight/steps save use `useOptimisticMutation` with pure patch fns in `api/tracking/patches.ts` (vitest). Callers `mutate()` instead of awaiting; the helper toasts failures with Retry. T2 uses 0007 and can reuse `GroceryItem.client_id` the same way.
 
 - P1 done: `pages/gym/plans/**` has no axios. Routine hooks (rename/reorder/remove/mobility/cardio/assign/unassign, plus `useCreateExercise`/`useUpdateExercise`) live in `api/workout/routines.ts`, pure patches in `routinePatches.ts` (tested). Assign/unassign moved out of `queries.ts`. Not browser-verified.
+
+- D2 done: diet day mutations (log/unlog planned, quick log, add-from-saved, delete planned, reorder) are optimistic via `api/diet/dayPatches.ts` (pure apply/revert, tested). Vars carry `{offset, date, client_id}` from `dayRef(offset)`; requests for one day are serialised with `scope`. Temp rows have negative ids (`isTempId`); UI ignores actions on them. Not done: copy-day, saved-meal CRUD, logmeal page submits (create/edit meal) stay pessimistic.
 - Open questions for the owner are listed at the bottom of this README. Answers go into DECISIONS.md.
 
 ## Open questions (owner)

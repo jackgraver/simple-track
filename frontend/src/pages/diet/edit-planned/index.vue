@@ -3,6 +3,7 @@ import { ChevronLeft, ChevronRight, X } from "lucide-vue-next";
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import {
+    dayRef,
     useAddPlannedFromSavedAt,
     useCopyPlannedDay,
     useDeletePlannedMealAt,
@@ -10,6 +11,8 @@ import {
     useReorderPlannedMealsAt,
     useSavedMeals,
 } from "~/api/diet/queries";
+import { isTempId } from "~/api/diet/dayPatches";
+import { newClientId } from "~/api/ids";
 import { dialogManager } from "~/composables/dialog/useDialog";
 import { toast } from "~/composables/toast/useToast";
 import { dietWeek, formatInt } from "~/pages/diet/home/dietDay";
@@ -91,51 +94,30 @@ const removeMeal = useDeletePlannedMealAt();
 const reorder = useReorderPlannedMealsAt();
 const copyDay = useCopyPlannedDay();
 
-// Several days can be busy at once, so pending is tracked per day / meal, not per mutation.
+// Day edits are optimistic (instant, rollback + Retry toast on failure), so only copy shows a busy state.
 const busyDays = reactive(new Set<number>());
 const busyMeals = reactive(new Set<number>());
 const addingSaved = reactive(new Set<number>());
 
-async function addTo(day: PlanDay, sm: SavedMeal) {
-    busyDays.add(day.offset);
-    addingSaved.add(sm.ID);
-    try {
-        // No success toast: the day's totals and chips update, and rapid adds would stack toasts.
-        await addMeal.mutateAsync({ savedMealId: sm.ID, offset: day.offset });
-    } catch {
-        toast.push(`Couldn't add ${sm.name}`, "error");
-    } finally {
-        busyDays.delete(day.offset);
-        addingSaved.delete(sm.ID);
-    }
+function addTo(day: PlanDay, sm: SavedMeal) {
+    // No success toast: the day's totals and chips update, and rapid adds would stack toasts.
+    addMeal.mutate({ savedMeal: sm, ...dayRef(day.offset), client_id: newClientId() });
 }
 
-async function remove(day: PlanDay, mealId: number) {
-    busyMeals.add(mealId);
-    try {
-        await removeMeal.mutateAsync({ plannedMealId: mealId, offset: day.offset });
-    } catch {
-        toast.push("Couldn't remove that meal", "error");
-    } finally {
-        busyMeals.delete(mealId);
-    }
+function remove(day: PlanDay, mealId: number) {
+    if (isTempId(mealId)) return; // still saving
+    removeMeal.mutate({ plannedMealId: mealId, ...dayRef(day.offset), client_id: newClientId() });
 }
 
-async function move(day: PlanDay, index: number, dir: -1 | 1) {
+function move(day: PlanDay, index: number, dir: -1 | 1) {
+    if (day.meals.some((m) => isTempId(m.id))) return; // reorder needs the server ids
     const ids = moveId(
         day.meals.map((m) => m.id),
         index,
         dir,
     );
     if (!ids) return;
-    busyDays.add(day.offset);
-    try {
-        await reorder.mutateAsync({ ids, offset: day.offset });
-    } catch {
-        toast.push("Couldn't change the order", "error");
-    } finally {
-        busyDays.delete(day.offset);
-    }
+    reorder.mutate({ ids, ...dayRef(day.offset), client_id: newClientId() });
 }
 
 async function clear(day: PlanDay) {
@@ -148,16 +130,8 @@ async function clear(day: PlanDay) {
         tone: "danger",
     });
     if (!ok) return;
-    busyDays.add(day.offset);
-    try {
-        for (const m of day.meals) {
-            await removeMeal.mutateAsync({ plannedMealId: m.id, offset: day.offset });
-        }
-    } catch {
-        toast.push("Couldn't clear the whole day", "error");
-    } finally {
-        busyDays.delete(day.offset);
-    }
+    // Each removal is its own optimistic mutation; requests for one day run in order.
+    for (const m of day.meals) remove(day, m.id);
 }
 
 async function copy(from: PlanDay, to: number[]) {
