@@ -44,6 +44,8 @@
 - `crypto.randomUUID()` is undefined on plain-http LAN testing from a phone. Use `newClientId()` from `api/ids.ts`.
 - TanStack v5 mutation `scope` is per `useMutation` instance, not per call. Use the helper's `scope(vars)` option instead (DECISIONS.md, F6).
 - M1 done: media pages use `api/media/queries.ts` (list/detail/stats, detail seeded from list cache, quick status via `useQuickUpdateMedia`; create/save/delete are `useServerMutation`). Pure patches in `api/media/cache.ts`.
+
+- T2 done (migration 0007): `POST /tracking/grocery/items` takes `client_id` (idempotent replay). `useCreateGroceryItem` / `useCompleteGroceryItem` are optimistic (`{client_id, name}` / `{id}` vars; pure patches in `api/tracking/groceryCache.ts`). Bulk add (`useCreateGroceryItems`) stays pessimistic. Migration numbers: 0004 G1, 0005 D1, 0006 T1, 0007 T2; the no-gaps test fails until all are merged.
 - Next: G1 (in progress, migration 0004), then G2 (first user-visible slice), D2, T1, T2.
 - Open questions for the owner are listed at the bottom of this README. Answers go into DECISIONS.md.
 

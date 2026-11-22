@@ -20,13 +20,39 @@ func ListActiveItems(db *gorm.DB) ([]GroceryItem, error) {
 	return rows, err
 }
 
-func CreateItem(db *gorm.DB, name string) (*GroceryItem, error) {
+// CreateItem adds an item. A non-empty clientID makes the call idempotent: if an item with that
+// id already exists (even completed or deleted since), it is returned and nothing is created.
+func CreateItem(db *gorm.DB, name, clientID string) (*GroceryItem, error) {
 	name = normalizeName(name)
 	if name == "" {
 		return nil, errors.New("name is required")
 	}
 	row := GroceryItem{Name: name}
+	if clientID == "" {
+		if err := db.Create(&row).Error; err != nil {
+			return nil, err
+		}
+		return &row, nil
+	}
+	find := func() (*GroceryItem, error) {
+		var existing GroceryItem
+		err := db.Unscoped().Where("client_id = ?", clientID).First(&existing).Error
+		if err != nil {
+			return nil, err
+		}
+		return &existing, nil
+	}
+	if existing, err := find(); err == nil {
+		return existing, nil
+	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, err
+	}
+	row.ClientID = &clientID
 	if err := db.Create(&row).Error; err != nil {
+		// Lost a race with a concurrent retry of the same request.
+		if existing, ferr := find(); ferr == nil {
+			return existing, nil
+		}
 		return nil, err
 	}
 	return &row, nil

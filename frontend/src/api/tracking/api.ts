@@ -58,8 +58,11 @@ export async function fetchGroceryItems(): Promise<GroceryItem[]> {
     return res.items ?? [];
 }
 
-export async function createGroceryItem(name: string): Promise<GroceryItem> {
-    const res = await apiPOST<{ item: GroceryItem }>('/tracking/grocery/items', { name });
+export async function createGroceryItem(name: string, clientId: string): Promise<GroceryItem> {
+    const res = await apiPOST<{ item: GroceryItem }>('/tracking/grocery/items', {
+        name,
+        client_id: clientId,
+    });
     return res.item;
 }
 

@@ -6,7 +6,8 @@ import {
     useGroceryItems,
     useGrocerySuggestions,
 } from "~/api/tracking/queries";
-import { toast } from "~/composables/toast/useToast";
+import { newClientId } from "~/api/ids";
+import { isTempGroceryId } from "~/api/tracking/groceryCache";
 import { ClipboardList, ShoppingBasket } from "lucide-vue-next";
 import {
     Button,
@@ -19,7 +20,6 @@ import {
     ListRow,
     PageHeader,
     SkeletonList,
-    Spinner,
     useDelayedFlag,
 } from "~/shared/ui";
 import { openAddListDialog } from "./dialog/useListDialog";
@@ -124,20 +124,17 @@ async function focusNewItemInput() {
 
 async function addItem(name?: string) {
     const value = (name ?? trimmedItem.value).trim();
-    if (!value || createMutation.isPending.value) return;
-    try {
-        await createMutation.mutateAsync({ name: value });
-        newItem.value = "";
-        activeSuggestionIndex.value = 0;
-        await focusNewItemInput();
-    } catch (err) {
-        const message = err instanceof Error ? err.message : "Failed to add item";
-        toast.push(message, "error");
-    }
+    if (!value) return;
+    // The row appears now; a failure rolls it back with a Retry toast (from the shared helper).
+    createMutation.mutate({ client_id: newClientId(), name: value });
+    newItem.value = "";
+    activeSuggestionIndex.value = 0;
+    await focusNewItemInput();
 }
 
 function onItemCheck(id: number, checked: boolean | "indeterminate") {
-    if (checked === true) {
+    // A row that hasn't been saved yet has no server id to complete.
+    if (checked === true && !isTempGroceryId(id)) {
         void completeItem(id);
     }
 }
@@ -160,15 +157,13 @@ function clearItemState(id: number) {
 async function completeItem(id: number) {
     if (isCompleting(id)) return;
     updateIdSet(id, true);
-    const persistPromise = completeMutation.mutateAsync(id);
+    const persistPromise = completeMutation.mutateAsync({ id });
     await new Promise((resolve) => setTimeout(resolve, COMPLETE_DELAY_MS));
     try {
         await persistPromise;
-    } catch (err) {
+    } catch {
+        // The helper already rolled the row back and toasted with Retry.
         clearItemState(id);
-        const message =
-            err instanceof Error ? err.message : "Failed to complete item";
-        toast.push(message, "error");
         return;
     }
     hideItem(id);
@@ -268,7 +263,7 @@ function onInputKeydown(event: KeyboardEvent) {
                 <List v-else>
                     <ListRow
                         v-for="item in displayItems"
-                        :key="item.ID"
+                        :key="item.client_id ?? item.ID"
                         :pending="isCompleting(item.ID)"
                     >
                         <Checkbox
@@ -297,7 +292,7 @@ function onInputKeydown(event: KeyboardEvent) {
                             placeholder="Add item…"
                             @input="activeSuggestionIndex = 0"
                         >
-                            <template v-if="createMutation.isPending.value" #suffix><Spinner size="sm" /></template>
+
                         </Input>
                     </div>
                     <List v-if="visibleSuggestions.length" class="rounded-control border border-line">
