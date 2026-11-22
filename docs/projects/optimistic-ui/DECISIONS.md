@@ -34,3 +34,16 @@ Dev-only Retry demo button lives in the Settings Appearance section (`import.met
 Water logs moved to `['tracking','water','logs',date]` so invalidating `waterLogsAll` no longer hits presets. `moneyKeys` now lives in `api/money/keys.ts` (re-exported from `queries.ts`).
 `SearchList` is keyed by route only: the `?exclude=` suffix is dropped (the backend honoured one id at most, and the component already filters client-side), so one cache entry serves every prefilter.
 Media gets `mediaKeys` plus read hooks only; pages keep calling `api.ts` until M1. `SearchList`'s unused `queryKey` prop was left in place for F3 to remove when it folds exercises into `workoutKeys`.
+
+## 2026-11-22: F6 per-entity scope = promise chain in `api/optimistic.ts`, not TanStack `scope`
+TanStack v5 `scope` is fixed per `useMutation` instance, and building mutations by hand per call loses the hook's reactive state. The helper's `scope(vars)` instead
+chains requests per scope id (module-level `Map`): the slot is taken synchronously in `onMutate` (so order = call order, across hooks), `mutationFn` awaits
+the predecessor, and the slot is released in `onSettled` (after all retries, success or failure). Patches still apply instantly. A request that never settles blocks its scope.
+
+## 2026-11-22: F6 helper details that differ from or extend DESIGN.md §2
+Siblings are found through `meta.optimisticKeys(vars)`, so they count from the moment they are pending (before `onMutate` resolves) and across hooks; keys
+overlap when either prefixes the other. A mutation stops counting once it reaches `onSettled` (flag on its context), so two settling in one tick invalidate exactly once.
+Rollback also counts failed `mark` mutations (their rows are still cached); settle-invalidation only counts pending ones. `apply` is skipped when the entry isn't cached.
+`mark` mode: no toast, `gcTime: Infinity` so the failure outlives the 5 min default, `apply` must be idempotent (Retry re-runs it), and the hook returns `retry(vars)` /
+`dismiss(vars)` which drop the failed mutation (matched by `client_id`). `reconcile` gets a 4th arg `{ siblingsPending(key) }`. `usePendingIds` returns a `Set`.
+`useServerMutation` toasts without Retry (forms keep inputs); `errorMessage: false` leaves the error to the caller.

@@ -36,10 +36,12 @@
 - F1 done: `api/queryClient.ts` (defaults, `isClientError`, `STALE` tiers, cache `onError` toasts; cleared on logout/401). Hooks should pick `STALE.hot/catalog/static` explicitly where the 60 s default is wrong.
 - F2 done: `toast.push(msg, tone, { action: { label, onClick }, duration })` (key is `onClick`, not `run`). Dev demo: Settings > Appearance.
 - F5 done (tracking/money/media/searchList keys). Remaining literal `queryKey: [` sites, if any, belong to F3/F4. `api/media/queries.ts` has read hooks only; M1 migrates the pages.
-- Next: F3/F4 (date keys) before any optimistic hook, then F6. G1+G2 (gym sets) is the first user-visible slice.
+- F6 done: `api/optimistic.ts` (`useOptimisticMutation`, `useServerMutation`, `usePendingIds`, `siblingCount`) and `api/ids.ts` (`newClientId`). Pass `scope: v => ({ id: 'set:' + v.client_id })` for same-entity ordering (promise chain, not TanStack scope).
+- Gotcha (G2): a background refetch/invalidate of a key drops failed `mark` rows from the cache (the server never got them), while `usePendingIds(key, 'error')` still lists them. G2 must re-add failed rows (e.g. from `useMutationState` variables) or keep them out of refetch-owned data.
+- Next: F3/F4 (date keys) before any optimistic hook. G1+G2 (gym sets) is the first user-visible slice.
 - `PostLogPlanned` ignores the day (500 off-today). Fixed in D1, and until then don't build optimistic log-planned on top of it.
-- `crypto.randomUUID()` is undefined on plain-http LAN testing from a phone. Use `newClientId()` (F6).
-- TanStack v5 mutation `scope` is per `useMutation` instance, not per call. See DESIGN.md §2 "Concurrency".
+- `crypto.randomUUID()` is undefined on plain-http LAN testing from a phone. Use `newClientId()` from `api/ids.ts`.
+- TanStack v5 mutation `scope` is per `useMutation` instance, not per call. Use the helper's `scope(vars)` option instead (DECISIONS.md, F6).
 - Open questions for the owner are listed at the bottom of this README. Answers go into DECISIONS.md.
 
 ## Open questions (owner)
