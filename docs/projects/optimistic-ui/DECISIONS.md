@@ -55,3 +55,16 @@ Not verified in a browser (no dev stack allowed): the "one request gym index -> 
 Migration `0005_diet_idempotency.sql`: partial unique `day_logs(day_id, meal_id) WHERE deleted_at IS NULL` (existing live duplicates soft-deleted first, oldest kept; soft-deleted rows are exempt so unlog + relog works), and nullable `client_id uuid` + partial unique index on `meals` and `planned_meals`.
 `client_id` is optional on `POST /quick-log` (stored on the meal) and `POST /planned/from-saved` (stored on the planned meal); a replay with a known id creates nothing and returns the current full day. Not wired to `meal/new` or `logedited` yet (D2 can, if needed).
 Numbering: G1 takes 0004, D1 takes 0005. `TestEmbeddedMigrationsParse` (no gaps) fails on this branch until G1 merges; it passes once both are in.
+
+## 2026-11-22: F6 per-entity scope = promise chain in `api/optimistic.ts`, not TanStack `scope`
+TanStack v5 `scope` is fixed per `useMutation` instance, and building mutations by hand per call loses the hook's reactive state. The helper's `scope(vars)` instead
+chains requests per scope id (module-level `Map`): the slot is taken synchronously in `onMutate` (so order = call order, across hooks), `mutationFn` awaits
+the predecessor, and the slot is released in `onSettled` (after all retries, success or failure). Patches still apply instantly. A request that never settles blocks its scope.
+
+## 2026-11-22: F6 helper details that differ from or extend DESIGN.md §2
+Siblings are found through `meta.optimisticKeys(vars)`, so they count from the moment they are pending (before `onMutate` resolves) and across hooks; keys
+overlap when either prefixes the other. A mutation stops counting once it reaches `onSettled` (flag on its context), so two settling in one tick invalidate exactly once.
+Rollback also counts failed `mark` mutations (their rows are still cached); settle-invalidation only counts pending ones. `apply` is skipped when the entry isn't cached.
+`mark` mode: no toast, `gcTime: Infinity` so the failure outlives the 5 min default, `apply` must be idempotent (Retry re-runs it), and the hook returns `retry(vars)` /
+`dismiss(vars)` which drop the failed mutation (matched by `client_id`). `reconcile` gets a 4th arg `{ siblingsPending(key) }`. `usePendingIds` returns a `Set`.
+`useServerMutation` toasts without Retry (forms keep inputs); `errorMessage: false` leaves the error to the caller.

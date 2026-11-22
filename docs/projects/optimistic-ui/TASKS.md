@@ -31,7 +31,7 @@ References: AUDIT.md (findings), MUTATIONS.md (per-mutation plan), ID-STRATEGY.m
 - [x] **F5 Tracking/money/media/searchList keys.** Prefix factories (no literals), `moneyKeys` → `keys.ts`,
   new `mediaKeys` + `api/media/queries.ts` (no behaviour change yet). `SearchList` keyed by route only,
   with client-side exclusion. *Done:* `grep -rn "queryKey: \[" frontend/src` is empty.
-- [ ] **F6 `useOptimisticMutation`, `useServerMutation`, `usePendingIds`, `newClientId`** in
+- [x] **F6 `useOptimisticMutation`, `useServerMutation`, `usePendingIds`, `newClientId`** in
   `api/optimistic.ts` / `api/ids.ts` per DESIGN.md §2, including the per-entity scope decision. *Done:*
   vitest covers apply/rollback, revert with a sibling pending, reconcile merge, settle-invalidate
   suppression, `mark` mode.
