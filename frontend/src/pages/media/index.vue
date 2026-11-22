@@ -1,18 +1,16 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, onBeforeUnmount, ref, watch } from "vue";
 import {
-    getMediaStats,
-    listMedia,
     MEDIA_STATUS_LABELS,
     MEDIA_STATUSES,
     MEDIA_TYPE_LABELS,
     MEDIA_TYPES,
     type MediaItem,
     type MediaListParams,
-    type MediaStats,
     type MediaStatus,
     type MediaType,
 } from "~/api/media/api";
+import { useMediaList, useMediaStats } from "~/api/media/queries";
 import { Heart } from "lucide-vue-next";
 import {
     Badge,
@@ -27,12 +25,6 @@ import {
     useDelayedFlag,
 } from "~/shared/ui";
 import StarRating from "./StarRating.vue";
-
-const items = ref<MediaItem[]>([]);
-const stats = ref<MediaStats | null>(null);
-const isLoading = ref(true);
-const hasError = ref(false);
-const loadError = ref<unknown>(null);
 
 const status = ref<MediaStatus | "">("");
 const type = ref<MediaType | "">("");
@@ -52,7 +44,25 @@ const sortOptions = [
     { label: "Title", value: "title" as const },
     { label: "Release year", value: "release" as const },
 ];
-const showSkeleton = useDelayedFlag(computed(() => isLoading.value && !items.value.length));
+// Debounced copy of the search box drives the query key; filters change the key, cached lists show instantly.
+const debouncedSearch = ref("");
+const params = computed<MediaListParams>(() => ({
+    status: status.value || undefined,
+    type: type.value || undefined,
+    q: debouncedSearch.value.trim() || undefined,
+    favorite: favoritesOnly.value || undefined,
+    sort: sort.value,
+}));
+const listQuery = useMediaList(params);
+const statsQuery = useMediaStats();
+const items = computed<MediaItem[]>(() => listQuery.data.value ?? []);
+const stats = computed(() => statsQuery.data.value ?? null);
+// Skeleton only on a true cold load (no data at all).
+const isLoading = computed(() => listQuery.isPending.value);
+const isRefreshing = computed(() => listQuery.isPlaceholderData.value);
+const hasError = computed(() => listQuery.isError.value && listQuery.data.value === undefined);
+const loadError = computed(() => listQuery.error.value);
+const showSkeleton = useDelayedFlag(isLoading);
 
 const statusTabs = computed(() => [
     { value: "" as const, label: "All", count: stats.value?.total ?? 0 },
@@ -64,47 +74,22 @@ const statusTabs = computed(() => [
 ]);
 
 let searchTimer: ReturnType<typeof setTimeout> | undefined;
-let requestId = 0;
-
-async function load() {
-    const id = ++requestId;
-    isLoading.value = true;
-    hasError.value = false;
-    try {
-        const [list, s] = await Promise.all([
-            listMedia({
-                status: status.value || undefined,
-                type: type.value || undefined,
-                q: search.value.trim() || undefined,
-                favorite: favoritesOnly.value || undefined,
-                sort: sort.value,
-            }),
-            getMediaStats(),
-        ]);
-        if (id !== requestId) return;
-        items.value = list;
-        stats.value = s;
-    } catch (error) {
-        if (id !== requestId) return;
-        hasError.value = true;
-        loadError.value = error;
-    } finally {
-        if (id === requestId) isLoading.value = false;
-    }
-}
-
-watch([status, type, sort, favoritesOnly], () => void load());
-watch(search, () => {
+watch(search, (value) => {
     clearTimeout(searchTimer);
-    searchTimer = setTimeout(() => void load(), 250);
+    searchTimer = setTimeout(() => (debouncedSearch.value = value), 250);
 });
+onBeforeUnmount(() => clearTimeout(searchTimer));
+
+function load() {
+    void listQuery.refetch();
+    void statsQuery.refetch();
+}
 
 function progressLabel(item: MediaItem) {
     if (item.progress == null) return "";
     return item.length ? `${item.progress}/${item.length}` : `${item.progress}`;
 }
 
-onMounted(() => void load());
 </script>
 
 <template>
@@ -146,7 +131,7 @@ onMounted(() => void load());
             <Checkbox v-model="favoritesOnly" label="Favourites" />
         </div>
 
-        <ErrorState v-if="hasError" :error="loadError" title="Couldn't load media" @retry="load()" />
+        <ErrorState v-if="hasError" :error="loadError" title="Couldn't load media" @retry="load" />
         <div v-else-if="showSkeleton" class="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
             <div v-for="n in 10" :key="n" class="flex flex-col gap-2">
                 <div class="aspect-[2/3] w-full"><Skeleton shape="block" width="100%" height="100%" /></div>
@@ -162,7 +147,7 @@ onMounted(() => void load());
                 <Button variant="primary" :to="{ name: 'media-new' }">Add something</Button>
             </template>
         </EmptyState>
-        <section v-else-if="items.length" class="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5" :class="isLoading ? 'opacity-60' : ''">
+        <section v-else-if="items.length" class="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5" :class="isRefreshing ? 'opacity-60' : ''">
             <router-link
                 v-for="item in items"
                 :key="item.ID"

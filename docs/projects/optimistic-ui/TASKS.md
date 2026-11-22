@@ -61,7 +61,7 @@ References: AUDIT.md (findings), MUTATIONS.md (per-mutation plan), ID-STRATEGY.m
 - [ ] **P1 Gym plans into hooks:** remove axios from `pages/gym/plans/**`. Assign/unassign/reorder
   optimistic. Plan edits invalidate programs + today's workout. Exercise create/update invalidates every
   exercise key.
-- [ ] **M1 Media on TanStack Query:** list/detail/stats hooks, list → detail `initialData`, optimistic
+- [x] **M1 Media on TanStack Query:** list/detail/stats hooks, list → detail `initialData`, optimistic
   status/favorite/rating. Create/save/delete stay `useServerMutation`.
 - [ ] **$1 Finances:** adopt `useServerMutation` error convention. Delete transaction/balance as partial
   optimistic (row removed now, totals pending).

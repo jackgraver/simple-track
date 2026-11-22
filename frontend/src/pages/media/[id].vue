@@ -1,10 +1,7 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from "vue";
+import { computed, reactive, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import {
-    createMedia,
-    deleteMedia,
-    getMedia,
     LOOKUP_SOURCE_LABELS,
     LOOKUP_TYPES,
     lookupMedia,
@@ -13,13 +10,13 @@ import {
     MEDIA_STATUSES,
     MEDIA_TYPE_LABELS,
     MEDIA_TYPES,
-    updateMedia,
     type LookupResult,
     type MediaInput,
     type MediaItem,
     type MediaStatus,
     type MediaType,
 } from "~/api/media/api";
+import { useCreateMedia, useDeleteMedia, useMediaItem, useQuickUpdateMedia, useUpdateMedia } from "~/api/media/queries";
 import { getApiErrorMessage } from "~/api/httpError";
 import { useDialog } from "~/composables/dialog/useDialog";
 import { toast } from "~/composables/toast/useToast";
@@ -50,11 +47,18 @@ const { confirm } = useDialog();
 const isNew = computed(() => route.name === "media-new");
 const itemId = computed(() => Number(route.params.id));
 
-const isLoading = ref(!isNew.value);
-const isSaving = ref(false);
-const hasError = ref(false);
-const loadError = ref<unknown>(null);
-const isDeleting = ref(false);
+// NaN id (new item) disables the query. The list cache seeds the detail, so most visits skip the cold load.
+const itemQuery = useMediaItem(() => (isNew.value ? NaN : itemId.value));
+const createMut = useCreateMedia();
+const updateMut = useUpdateMedia();
+const quickMut = useQuickUpdateMedia();
+const deleteMut = useDeleteMedia();
+
+const isLoading = computed(() => !isNew.value && itemQuery.data.value === undefined && !itemQuery.isError.value);
+const hasError = computed(() => !isNew.value && itemQuery.isError.value && itemQuery.data.value === undefined);
+const loadError = computed(() => itemQuery.error.value);
+const isSaving = computed(() => createMut.isPending.value || updateMut.isPending.value);
+const isDeleting = computed(() => deleteMut.isPending.value);
 const showSkeleton = useDelayedFlag(isLoading);
 
 const LENGTH_UNITS: Record<MediaType, string> = {
@@ -211,53 +215,62 @@ function toPayload(): MediaInput {
     };
 }
 
-async function load() {
-    if (isNew.value) return;
-    isLoading.value = true;
-    hasError.value = false;
-    try {
-        toForm(await getMedia(itemId.value));
-    } catch (error) {
-        hasError.value = true;
-        loadError.value = error;
-    } finally {
-        isLoading.value = false;
-    }
+// The form is a draft: fill it once per item, so a background refetch never clobbers unsaved edits.
+let filledId: number | null = null;
+watch(
+    () => itemQuery.data.value,
+    (item) => {
+        if (isNew.value || !item || item.ID === filledId) return;
+        filledId = item.ID;
+        toForm(item);
+    },
+    { immediate: true },
+);
+
+function load() {
+    void itemQuery.refetch();
 }
 
 async function save() {
     if (!form.title.trim() || isSaving.value) return;
-    isSaving.value = true;
     try {
         if (isNew.value) {
-            const item = await createMedia(toPayload());
+            const item = await createMut.mutateAsync(toPayload());
             toast.push("Added", "success");
+            filledId = item.ID;
             await router.replace({ name: "media-detail", params: { id: item.ID } });
             toForm(item);
         } else {
-            await updateMedia(itemId.value, toPayload());
+            await updateMut.mutateAsync({ id: itemId.value, payload: toPayload() });
             toast.push("Saved", "success");
             await router.push({ name: "media" });
         }
-    } catch (error) {
-        toast.push(getApiErrorMessage(error, "Failed to save"), "error");
-    } finally {
-        isSaving.value = false;
+    } catch {
+        // The mutation helper already toasted the error; the form keeps its inputs.
     }
 }
 
-/** Quick status change that saves immediately (backend fills in dates). */
-async function quickStatus(status: MediaStatus) {
+/** Quick status change: the form and caches update now, the server fills in dates and we adopt them. */
+function quickStatus(status: MediaStatus) {
+    const previous = form.status;
     form.status = status;
     if (isNew.value) return;
-    isSaving.value = true;
-    try {
-        toForm(await updateMedia(itemId.value, { status }));
-    } catch (error) {
-        toast.push(getApiErrorMessage(error, "Failed to update status"), "error");
-    } finally {
-        isSaving.value = false;
-    }
+    quickMut.mutate(
+        { id: itemId.value, fields: { status } },
+        {
+            onSuccess: (item) => {
+                // Adopt server-filled dates (and only those) so unsaved edits elsewhere survive.
+                if (form.status === item.status) {
+                    form.started_at = item.started_at?.slice(0, 10) ?? "";
+                    form.finished_at = item.finished_at?.slice(0, 10) ?? "";
+                    form.progress = item.progress?.toString() ?? "";
+                }
+            },
+            onError: () => {
+                if (form.status === status) form.status = previous;
+            },
+        },
+    );
 }
 
 async function remove() {
@@ -268,26 +281,21 @@ async function remove() {
         confirmText: "Delete",
     });
     if (!ok) return;
-    isDeleting.value = true;
     try {
-        await deleteMedia(itemId.value);
+        await deleteMut.mutateAsync(itemId.value);
         toast.push("Deleted", "success");
         await router.push({ name: "media" });
-    } catch (error) {
-        toast.push(getApiErrorMessage(error, "Failed to delete"), "error");
-    } finally {
-        isDeleting.value = false;
+    } catch {
+        // Toasted by the mutation helper.
     }
 }
-
-onMounted(() => void load());
 </script>
 
 <template>
     <div class="mx-auto flex w-full max-w-4xl flex-col gap-6">
         <PageHeader :title="isNew ? 'Add media' : form.title || 'Media'" />
 
-        <ErrorState v-if="hasError" :error="loadError" title="Couldn't load this item" @retry="load()" />
+        <ErrorState v-if="hasError" :error="loadError" title="Couldn't load this item" @retry="load" />
         <div v-else-if="isLoading" class="grid grid-cols-1 gap-6 lg:grid-cols-[200px_1fr]">
             <template v-if="showSkeleton">
                 <div class="aspect-[2/3] w-full max-w-50"><Skeleton shape="block" width="100%" height="100%" /></div>

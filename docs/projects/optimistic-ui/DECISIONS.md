@@ -68,3 +68,11 @@ Rollback also counts failed `mark` mutations (their rows are still cached); sett
 `mark` mode: no toast, `gcTime: Infinity` so the failure outlives the 5 min default, `apply` must be idempotent (Retry re-runs it), and the hook returns `retry(vars)` /
 `dismiss(vars)` which drop the failed mutation (matched by `client_id`). `reconcile` gets a 4th arg `{ siblingsPending(key) }`. `usePendingIds` returns a `Set`.
 `useServerMutation` toasts without Retry (forms keep inputs); `errorMessage: false` leaves the error to the caller.
+
+## 2026-11-22: M1 media on TanStack Query
+Pages hold no server state: list/stats/detail are hooks, the detail page's form is a draft filled once per item (a background refetch never overwrites edits). Detail uses `initialData` from the newest cached list containing the item.
+Only the quick **status** change is optimistic (`useQuickUpdateMedia`, scope `media:<id>`): patches `detail(id)` + every cached list containing the item, invalidates stats + lists on settle, and adopts the server-filled `started_at`/`finished_at`/`progress` into the form on success; on failure it rolls back and restores the form's status with an error toast.
+The hook accepts `favorite` and `rating` too, but there is no quick UI for them: they stay form fields saved with Save (conservative; a heart toggle / inline stars on the list/detail are a UI decision for the ui-overhaul media slice).
+Status is patched in place in lists even when a status filter is active (the row leaves on the settle refetch). Stats are not patched optimistically (old status isn't known to the patch fn), only refreshed on settle.
+Create/save/delete use `useServerMutation` (toast on error, inputs kept). Save no longer re-fills the form from the response before navigating.
+Not verified in a browser (no dev stack allowed): only vue-tsc, vitest (patch/revert functions) and eslint were run.
