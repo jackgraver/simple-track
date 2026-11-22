@@ -74,8 +74,11 @@ type BaseOptions<TVars, TData> = {
      * after another, across hooks. Optimistic patches still apply immediately.
      */
     scope?: (vars: TVars) => MutationScope;
-    /** Retries for idempotent writes (client_id creates, upserts, PATCH). Default 0. */
-    retry?: number;
+    /**
+     * Retries for idempotent writes (client_id creates, upserts, PATCH). Default 0. A function can
+     * skip errors that won't change on retry (4xx), so a scope isn't held up by backoff for nothing.
+     */
+    retry?: number | ((failureCount: number, error: unknown) => boolean);
     retryDelay?: number;
     /** Use this client instead of the injected one (tests, code outside component setup). */
     queryClient?: QueryClient;

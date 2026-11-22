@@ -28,3 +28,13 @@ export function dateToOffset(date: string, now: Date = new Date()): number {
     const today = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
     return Math.round((today - target) / MS_PER_DAY);
 }
+
+/**
+ * Query params that name a day for the workout endpoints. `date` is read by the server as its own
+ * local calendar day, the same way `POST /workout/sets` reads its body date, so reads and writes
+ * agree even when the client's time zone differs from the server's. `offset` is kept for servers
+ * that predate the `date` param.
+ */
+export function dayParams(date: string): { offset: number; date: string } {
+    return { offset: dateToOffset(date), date };
+}

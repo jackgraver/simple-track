@@ -99,7 +99,11 @@ export function useExerciseLoggingSession(options: {
     const saveNotes = useSaveExerciseNotes();
     const intents = useSetIntents();
 
-    /** The day this page writes to. Read once per action, so a write keeps its day. */
+    /**
+     * The day this page reads and writes. A computed over the route offset only, so it is fixed when
+     * the page opens (it stays on that day past midnight, like the day query's key). Each action
+     * copies it into its mutation variables, and the server reads it as its own local calendar day.
+     */
     const date = computed(() => offsetToDate(offset.value));
 
     const currentWeight = ref(0);
@@ -275,13 +279,18 @@ export function useExerciseLoggingSession(options: {
         { immediate: true },
     );
 
-    /** Save the notes when they differ from the cached exercise's (no-op otherwise). */
-    const syncNotes = (day: string, exerciseId: number) => {
+    /**
+     * Save the notes when they differ from the cached exercise's (no-op otherwise). `afterSet`: a set
+     * was just logged, so the save may go out even though the cache doesn't show a logged exercise
+     * yet (the create's patch lands a tick later). It queues behind that create in the exercise's
+     * scope, and reads the saved exercise when it is sent.
+     */
+    const syncNotes = (day: string, exerciseId: number, afterSet = false) => {
         const saved = exerciseGroup.value?.logged?.notes ?? "";
         const vars = { date: day, exercise_id: exerciseId, notes: notes.value };
         if (notes.value === saved || notesSavePending(qc, vars)) return;
         // Without a logged exercise there is nothing to attach notes to yet; the first set does it.
-        if (!exerciseGroup.value?.logged && loggedSets.value.length === 0) return;
+        if (!afterSet && !exerciseGroup.value?.logged && loggedSets.value.length === 0) return;
         saveNotes.mutate(vars);
     };
 
@@ -375,7 +384,7 @@ export function useExerciseLoggingSession(options: {
             });
             globalTimer.start(exerciseDisplayName.value);
         }
-        syncNotes(day, exerciseId);
+        syncNotes(day, exerciseId, true);
 
         draftDirty.value = false;
         editingSetIndex.value = null;
@@ -420,15 +429,16 @@ export function useExerciseLoggingSession(options: {
         else if (failed?.kind === "update") updateSet.retry(failed.vars);
     };
 
-    /** Delete any row, saved or not. A failed write is dropped first; the server delete is
-     *  idempotent (by client_id), so it is safe even if the failed create did reach the server. */
+    /**
+     * Delete any row, saved or not. The server delete is idempotent (by client_id), so it is safe
+     * even if a failed create did reach the server. `useDeleteSet` dismisses the row's failed writes
+     * only once the delete succeeds: that also covers a create that fails while the delete waits
+     * behind it, and a failed delete leaves an unsaved row marked "Didn't save".
+     */
     const deleteSet = (setIndex: number) => {
         const row = loggedSets.value[setIndex];
         const exerciseId = exerciseIdentity.value;
         if (!row || !exerciseId) return;
-        const failed = findFailedSetVars(qc, row.key);
-        if (failed?.kind === "create") logSet.dismiss(failed.vars);
-        else if (failed?.kind === "update") updateSet.dismiss(failed.vars);
         if (editingSetIndex.value === setIndex) editingSetIndex.value = null;
         else if (editingSetIndex.value != null && editingSetIndex.value > setIndex) editingSetIndex.value--;
         deleteSetMutation.mutate({ client_id: row.key, date: date.value, exercise_id: exerciseId });

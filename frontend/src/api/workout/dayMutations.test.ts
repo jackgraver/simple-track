@@ -133,7 +133,7 @@ describe("mobility and cardio", () => {
         const m = scope.run(() => useUpsertMobilityPre())!;
         m.mutate({ date: DATE, checked: ["a"] });
         await flushRetries();
-        expect(http.apiPOST).toHaveBeenCalledWith("/workout/logs/mobility/pre", { checked: ["a"] }, { params: { offset: 0 } });
+        expect(http.apiPOST).toHaveBeenCalledWith("/workout/logs/mobility/pre", { checked: ["a"] }, { params: { offset: 0, date: DATE } });
         expect(get().logged_pre_mobility).toBeNull();
     });
     it("keeps the optimistic tick and takes the response when it lands", async () => {
@@ -152,7 +152,7 @@ describe("mobility and cardio", () => {
         m.mutate({ date: DATE, minutes: 25, notes: "n" });
         await flush();
         expect(get().logged_cardio).toMatchObject({ minutes: 25, type: "Run" });
-        expect(http.apiPOST).toHaveBeenCalledWith("/workout/logs/cardio", { minutes: 25, notes: "n" }, { params: { offset: 0 } });
+        expect(http.apiPOST).toHaveBeenCalledWith("/workout/logs/cardio", { minutes: 25, notes: "n" }, { params: { offset: 0, date: DATE } });
         d.resolve({ cardio: { ID: 9, workout_log_id: 3, minutes: 25, type: "Run", notes: "n", created_at: "", updated_at: "" } });
         await flush();
         expect(get().logged_cardio?.ID).toBe(9);

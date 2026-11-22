@@ -2,9 +2,10 @@ import { infiniteQueryOptions, queryOptions, useInfiniteQuery, useMutation, useM
 import { computed, toValue, type MaybeRefOrGetter } from 'vue';
 import axios from 'axios';
 import { apiDELETE, apiGET, apiPATCH, apiPOST } from '~/api/client';
+import { isClientError } from '~/api/queryClient';
 import { useOptimisticMutation, usePendingIds, useServerMutation } from '~/api/optimistic';
 import { activateWorkoutProgram, createWorkoutPlan, createWorkoutProgram, getWorkoutPrograms, renameWorkoutProgram, switchWorkoutPlan, type WorkoutActivityResponse, WorkoutLogsPreviousResponse } from '~/api/workout/api';
-import { dateToOffset, offsetToDate } from '~/api/workout/dates';
+import { dayParams, offsetToDate } from '~/api/workout/dates';
 import { workoutKeys } from '~/api/workout/keys';
 import {
     addExerciseGroup,
@@ -101,7 +102,7 @@ export const workoutQueries = {
             queryKey: workoutKeys.days.day(date),
             queryFn: () =>
                 apiGET<WorkoutLogsPreviousResponse>('/workout/logs/previous', {
-                    params: { offset: dateToOffset(date) },
+                    params: dayParams(date),
                 }),
             staleTime: STALE_HOT,
         }),
@@ -241,6 +242,27 @@ const setsScope = (v: { date: string; exercise_id: number }) => ({ id: `sets:${v
 type SetMutationVars = Partial<LogSetVars & UpdateSetVars & SaveNotesVars> & { date?: string };
 
 /**
+ * Set writes are idempotent, so transient failures retry twice. A 4xx (set deleted elsewhere,
+ * client_id conflict, bad input) won't change on retry, and backing off would hold up every later
+ * write in the exercise's scope, so it fails at once.
+ */
+export const retrySetWrite = (failureCount: number, error: unknown) => failureCount < 2 && !isClientError(error);
+
+/**
+ * Forget failed ('mark') creates/edits of a set once it is deleted, so `deriveSetRows` doesn't
+ * rebuild the row from their variables. Done only after the delete succeeds: if it fails, the row is
+ * restored and must still show "Didn't save" with Retry (it was never saved).
+ */
+function dismissFailedSetWrites(qc: QueryClient, v: DeleteSetVars) {
+    const cache = qc.getMutationCache();
+    for (const m of cache.findAll({ mutationKey: workoutKeys.mutations.sets, status: 'error' })) {
+        const kind = m.options.mutationKey?.[3];
+        const mv = m.state.variables as SetMutationVars | undefined;
+        if ((kind === 'create' || kind === 'update') && mv?.client_id === v.client_id && mv.date === v.date) cache.remove(m);
+    }
+}
+
+/**
  * What other set mutations still own on this day, so a reconcile doesn't overwrite it. `self` is
  * the reconciling call's variables (TanStack keeps the object identity), excluded from the scan.
  */
@@ -271,7 +293,7 @@ function reconcileExercise(qc: QueryClient, v: { date: string; exercise_id: numb
 /**
  * Log one set. Appears at once; on failure the row stays, marked, with an inline retry ('mark').
  * Idempotent by `client_id`, so automatic retries and Retry never duplicate it. The activity
- * heatmap is invalidated only when this was the day's first set.
+ * heatmap is invalidated only when this was (or, on a replay, may have been) the day's first set.
  */
 export function useLogSet() {
     const qc = useQueryClient();
@@ -294,10 +316,12 @@ export function useLogSet() {
             },
         ],
         reconcile: (res, v) => reconcileExercise(qc, v, res.exercise),
-        invalidate: (_v, res) => (res?.first_set_of_day ? [workoutKeys.activity.all] : []),
+        // A replay (`created: false`) can be the day's first set whose first answer was lost; the
+        // server reports `first_set_of_day: false` then, so refresh the heatmap to be sure.
+        invalidate: (_v, res) => (res && (res.first_set_of_day || !res.created) ? [workoutKeys.activity.all] : []),
         scope: setsScope,
         onFailure: 'mark',
-        retry: 2,
+        retry: retrySetWrite,
         queryClient: qc,
     });
 }
@@ -322,14 +346,16 @@ export function useUpdateSet() {
         reconcile: (res, v) => reconcileExercise(qc, v, res.exercise),
         scope: setsScope,
         onFailure: 'mark',
-        retry: 2,
+        retry: retrySetWrite,
         queryClient: qc,
     });
 }
 
 /**
  * Delete a set (by key). Removed at once; on failure it goes back where it was, with a Retry toast.
- * The server answers 200 for an already-deleted set, so retries are safe.
+ * The server answers 200 for an already-deleted (or never-saved) set, so retries are safe, and an
+ * unsaved row is deleted on the server too in case its failed create did commit. Failed writes of the
+ * set are dismissed only on success, so a failed delete leaves an unsaved row marked as unsaved.
  */
 export function useDeleteSet() {
     const qc = useQueryClient();
@@ -345,6 +371,7 @@ export function useDeleteSet() {
             },
         ],
         reconcile: (res, v) => {
+            dismissFailedSetWrites(qc, v);
             if (!res.exercise_removed) return;
             qc.setQueryData<WorkoutLogsPreviousResponse>(workoutKeys.days.day(v.date), (day) =>
                 day ? dropRemovedExercise(day, v.exercise_id) : day,
@@ -354,23 +381,25 @@ export function useDeleteSet() {
         invalidate: (_v, res) => (res?.exercise_removed ? [workoutKeys.activity.all] : []),
         scope: setsScope,
         errorMessage: () => 'Couldn’t delete the set',
-        retry: 2,
+        retry: retrySetWrite,
         queryClient: qc,
     });
 }
 
 /**
  * Save an exercise's notes. There is no notes endpoint yet, so this uses the legacy full replace
- * (`POST /workout/exercises/log`, type "logged") with the sets the cache knows are saved. It runs in
- * the exercise's scope, so every earlier set write has settled when the payload is built (at send
- * time, from the cache), and it never deletes a set that is still being created.
+ * (`POST /workout/exercises/log`, type "logged"), which deletes every stored set missing from the
+ * payload. The payload's sets are therefore the server's own, fetched at send time, never the
+ * cache's: the cache can lack a set the server has (a create whose answer was lost, a set logged
+ * from another device) or hold values the server doesn't (a failed edit). It runs in the exercise's
+ * scope, so every earlier set write of this tab has settled by then.
  */
 export function useSaveExerciseNotes() {
     const qc = useQueryClient();
     return useOptimisticMutation<SaveNotesVars, LoggedExercise>({
         mutationKey: workoutKeys.mutations.notes(),
         mutationFn: async (v) => {
-            const day = qc.getQueryData<WorkoutLogsPreviousResponse>(workoutKeys.days.day(v.date));
+            const day = await apiGET<WorkoutLogsPreviousResponse>('/workout/logs/previous', { params: dayParams(v.date) });
             const logged = findGroup(day, v.exercise_id)?.logged;
             if (!logged || !(logged.ID > 0)) throw new Error('Log a set before saving notes');
             const body = await apiPOST<{ exercise: LoggedExercise }>('/workout/exercises/log', {
@@ -378,7 +407,7 @@ export function useSaveExerciseNotes() {
                 exercise: {
                     ...logged,
                     notes: v.notes,
-                    sets: logged.sets.filter((s) => s.ID > 0).map(({ client_id: _c, ...s }) => s),
+                    sets: logged.sets.map(({ client_id: _c, ...s }) => s),
                 },
             });
             return body.exercise;
@@ -482,7 +511,7 @@ export function useAddExerciseToWorkout() {
             const body = await apiPOST<{ exercise: LoggedExercise }>(
                 '/workout/exercises/add',
                 { exercise_id: v.exerciseId },
-                { params: { offset: dateToOffset(v.date) } },
+                { params: dayParams(v.date) },
             );
             return body.exercise;
         },
@@ -519,7 +548,7 @@ export function useRemoveExerciseFromWorkout() {
             try {
                 return await apiDELETE<{ success?: boolean }>('/workout/exercises/remove', {
                     data: { exercise_id: v.exerciseId },
-                    params: { offset: dateToOffset(v.date) },
+                    params: dayParams(v.date),
                 });
             } catch (err) {
                 if (axios.isAxiosError(err) && err.response?.status === 404) return { success: true };
@@ -551,7 +580,7 @@ function useUpsertMobility(slot: MobilitySlot) {
             const body = await apiPOST<{ mobility: MobilityLogged }>(
                 `/workout/logs/mobility/${slot}`,
                 { checked: v.checked },
-                { params: { offset: dateToOffset(v.date) } },
+                { params: dayParams(v.date) },
             );
             return body.mobility;
         },
@@ -598,7 +627,7 @@ export function useUpsertCardio() {
                     ...(v.type !== undefined && v.type !== '' ? { type: v.type } : {}),
                     ...(v.notes !== undefined ? { notes: v.notes } : {}),
                 },
-                { params: { offset: dateToOffset(v.date) } },
+                { params: dayParams(v.date) },
             );
             return body.cardio;
         },
@@ -631,7 +660,7 @@ export function useSwitchWorkoutPlan() {
     const qc = useQueryClient();
     return useServerMutation<{ date: string; planId: number | null }, Day>({
         mutationKey: workoutKeys.mutations.switchPlan(),
-        mutationFn: ({ date, planId }) => switchWorkoutPlan(dateToOffset(date), planId),
+        mutationFn: ({ date, planId }) => switchWorkoutPlan(date, planId),
         reconcile: (res, v, client, { siblingsPending }) => {
             const dayKey = workoutKeys.days.day(v.date);
             if (siblingsPending(dayKey) > 0) {

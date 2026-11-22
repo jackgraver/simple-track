@@ -1,4 +1,5 @@
 import type { QueryClient } from "@tanstack/vue-query";
+import { AxiosError, AxiosHeaders } from "axios";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { effectScope, type EffectScope } from "vue";
 
@@ -18,7 +19,7 @@ vi.mock("@tanstack/vue-query", async (orig) => ({
     useQueryClient: () => qcRef.qc,
 }));
 
-import { useDeleteSet, useLogSet, useSaveExerciseNotes, useSetIntents, useUpdateSet } from "./queries";
+import { retrySetWrite, useDeleteSet, useLogSet, useSaveExerciseNotes, useSetIntents, useUpdateSet, workoutQueries } from "./queries";
 
 const DATE = "2026-11-22";
 const BENCH = 7;
@@ -67,6 +68,11 @@ const vars = (client_id: string, reps = 8): LogSetVars => ({
     weight_setup: "",
     created_at: "2026-11-22T10:00:00Z",
 });
+
+function httpError(status: number): AxiosError {
+    const config = { headers: new AxiosHeaders() };
+    return new AxiosError("fail", "ERR_BAD_REQUEST", config, null, { status, statusText: "", headers: {}, config, data: {} });
+}
 
 function deferred<T>() {
     let resolve!: (v: T) => void;
@@ -283,11 +289,12 @@ describe("useDeleteSet", () => {
 });
 
 describe("useSaveExerciseNotes", () => {
-    it("waits for the set create, then full-replaces with only saved sets", async () => {
+    it("waits for the set create, then full-replaces with the server's sets", async () => {
         qc.setQueryData(KEY, day());
         const create = deferred<unknown>();
         http.apiPOST.mockReturnValueOnce(create.promise);
         http.apiPOST.mockResolvedValueOnce({ exercise: logged([set(11, "c1")], { ID: 77, notes: "felt good" }) });
+        http.apiGET.mockResolvedValue(day(logged([set(11, "c1")], { ID: 77 })));
         const log = scope.run(() => useLogSet())!;
         const notes = scope.run(() => useSaveExerciseNotes())!;
         log.mutate(vars("c1"));
@@ -308,6 +315,7 @@ describe("useSaveExerciseNotes", () => {
 
     it("excludes sets that are not saved yet from the full replace", async () => {
         qc.setQueryData(KEY, day(logged([set(1, "a"), set(0, "local")])));
+        http.apiGET.mockResolvedValue(day(logged([set(1, "a")])));
         http.apiPOST.mockResolvedValue({ exercise: logged([set(1, "a")], { notes: "n" }) });
         const notes = scope.run(() => useSaveExerciseNotes())!;
         notes.mutate({ date: DATE, exercise_id: BENCH, notes: "n" });
@@ -315,5 +323,80 @@ describe("useSaveExerciseNotes", () => {
         expect(http.apiPOST.mock.calls[0][1].exercise.sets.map((s: LoggedSet) => s.ID)).toEqual([1]);
         // The unsaved local row survives the reconcile.
         expect(sets().map(setKey)).toEqual(["a", "local"]);
+    });
+
+    it("rev-g2 #4: sends the server's sets, not the cache's, so the replace never deletes or edits a set", async () => {
+        // Cache: "a" carries a failed edit (reps 99); "lost" is a create whose answer was lost (ID 0)
+        // but which the server committed; "other" was logged from another device.
+        qc.setQueryData(KEY, day(logged([set(1, "a", 99), set(0, "lost")])));
+        http.apiGET.mockResolvedValue(day(logged([set(1, "a", 8), set(2, "lost"), set(3, "other")])));
+        http.apiPOST.mockResolvedValue({ exercise: logged([set(1, "a", 8), set(2, "lost"), set(3, "other")], { notes: "n" }) });
+        const notes = scope.run(() => useSaveExerciseNotes())!;
+        notes.mutate({ date: DATE, exercise_id: BENCH, notes: "n" });
+        await flush();
+        expect(http.apiGET).toHaveBeenCalledWith("/workout/logs/previous", { params: { offset: expect.any(Number), date: DATE } });
+        const sent = http.apiPOST.mock.calls[0][1].exercise.sets as LoggedSet[];
+        expect(sent.map((s) => [s.ID, s.reps])).toEqual([
+            [1, 8],
+            [2, 8],
+            [3, 8],
+        ]);
+    });
+
+    it("rev-g2 #4: a notes save queued before a delete keeps the set; the delete then removes the parent", async () => {
+        qc.setQueryData(KEY, day(logged([set(1, "a")])));
+        const notesPost = deferred<unknown>();
+        http.apiGET.mockResolvedValue(day(logged([set(1, "a")])));
+        http.apiPOST.mockReturnValue(notesPost.promise);
+        http.apiDELETE.mockResolvedValue({ success: true, deleted: true, logged_exercise_id: 50, exercise_removed: true });
+        const notes = scope.run(() => useSaveExerciseNotes())!;
+        const del = scope.run(() => useDeleteSet())!;
+        notes.mutate({ date: DATE, exercise_id: BENCH, notes: "n" });
+        del.mutate({ client_id: "a", date: DATE, exercise_id: BENCH });
+        await flush();
+        expect(http.apiPOST.mock.calls[0][1].exercise.sets.map((s: LoggedSet) => s.ID)).toEqual([1]);
+        expect(http.apiDELETE).not.toHaveBeenCalled();
+        notesPost.resolve({ exercise: logged([set(1, "a")], { notes: "n" }) });
+        await flush();
+        expect(http.apiDELETE).toHaveBeenCalledTimes(1);
+        expect(findGroup(qc.getQueryData(KEY), BENCH)?.logged).toBeUndefined();
+    });
+});
+
+describe("rev-g2 fixes", () => {
+    it("#5: a replayed create (created: false) refreshes the activity heatmap", async () => {
+        qc.setQueryData(KEY, day());
+        const spy = vi.spyOn(qc, "invalidateQueries");
+        http.apiPOST.mockResolvedValue({ exercise: logged([set(11, "c1")]), set: set(11, "c1"), created: false, first_set_of_day: false });
+        const m = scope.run(() => useLogSet())!;
+        m.mutate(vars("c1"));
+        await flush();
+        expect(spy).toHaveBeenCalledWith({ queryKey: workoutKeys.activity.all });
+    });
+
+    it("#6: a 4xx is not retried, so later writes in the scope don't wait on backoff", async () => {
+        qc.setQueryData(KEY, day(logged([set(1, "a"), set(2, "b")])));
+        http.apiPATCH.mockRejectedValueOnce(httpError(404));
+        http.apiPATCH.mockResolvedValueOnce({ exercise: logged([set(1, "a"), set(2, "b", 9)]), set: set(2, "b", 9) });
+        const m = scope.run(() => useUpdateSet())!;
+        const intents = scope.run(() => useSetIntents())!;
+        m.mutate({ client_id: "a", date: DATE, exercise_id: BENCH, weight: 100, reps: 5, weight_setup: "" });
+        m.mutate({ client_id: "b", date: DATE, exercise_id: BENCH, weight: 100, reps: 9, weight_setup: "" });
+        await flush();
+        expect(http.apiPATCH).toHaveBeenCalledTimes(2); // no backoff before the second edit
+        expect(intents.value.failedUpdate.has("a")).toBe(true);
+    });
+
+    it("#6: transient errors still retry twice", async () => {
+        expect(retrySetWrite(0, new Error("offline"))).toBe(true);
+        expect(retrySetWrite(1, httpError(503))).toBe(true);
+        expect(retrySetWrite(2, httpError(503))).toBe(false);
+        for (const status of [400, 404, 409]) expect(retrySetWrite(0, httpError(status))).toBe(false);
+    });
+
+    it("#7: the day query names the day by date, as the set POST does", async () => {
+        http.apiGET.mockResolvedValue(day());
+        await qc.fetchQuery(workoutQueries.day(DATE));
+        expect(http.apiGET).toHaveBeenCalledWith("/workout/logs/previous", { params: expect.objectContaining({ date: DATE }) });
     });
 });
