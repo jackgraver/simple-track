@@ -30,16 +30,9 @@ const isFocused = ref(false);
 
 const excludedIds = computed(() => new Set(props.prefilter ?? []));
 
-const querySuffix = computed(() =>
-    props.prefilter?.length
-        ? "?" + props.prefilter.map((id) => `exclude=${id}`).join("&")
-        : "",
+const requestPath = computed(() =>
+    props.route.startsWith("/") ? props.route : `/${props.route}`,
 );
-
-const requestPath = computed(() => {
-    const base = props.route.startsWith("/") ? props.route : `/${props.route}`;
-    return `${base}${querySuffix.value}`;
-});
 
 const { data, isPending, isError, error, refetch } = useQuery({
     queryKey: computed(() =>

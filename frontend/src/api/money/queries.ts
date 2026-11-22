@@ -1,19 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/vue-query";
 import { computed, type MaybeRefOrGetter, toValue } from "vue";
 import * as api from "./api";
+import { moneyKeys } from "./keys";
 
-export const moneyKeys = {
-    all: ["money"] as const,
-    accounts: (includeArchived: boolean) =>
-        ["money", "accounts", { includeArchived }] as const,
-    account: (id: number) => ["money", "account", id] as const,
-    balances: (id: number) => ["money", "account", id, "balances"] as const,
-    transactions: (id: number) =>
-        ["money", "account", id, "transactions"] as const,
-    netWorth: ["money", "net-worth"] as const,
-    contributionTypes: ["money", "contribution-types"] as const,
-    presets: ["money", "presets"] as const,
-};
+export { moneyKeys };
 
 export function useAccounts(includeArchived: MaybeRefOrGetter<boolean> = false) {
     return useQuery({

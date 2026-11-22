@@ -28,7 +28,7 @@ References: AUDIT.md (findings), MUTATIONS.md (per-mutation plan), ID-STRATEGY.m
   and the duplicate `editLoggedMeal` API function. *Done:* no `useQuery`/`useMutation` imports under
   `pages/diet/`, and swiping days mid-request no longer writes to the wrong day (manual check with a
   throttled network).
-- [ ] **F5 Tracking/money/media/searchList keys.** Prefix factories (no literals), `moneyKeys` → `keys.ts`,
+- [x] **F5 Tracking/money/media/searchList keys.** Prefix factories (no literals), `moneyKeys` → `keys.ts`,
   new `mediaKeys` + `api/media/queries.ts` (no behaviour change yet). `SearchList` keyed by route only,
   with client-side exclusion. *Done:* `grep -rn "queryKey: \[" frontend/src` is empty.
 - [ ] **F6 `useOptimisticMutation`, `useServerMutation`, `usePendingIds`, `newClientId`** in

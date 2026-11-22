@@ -35,7 +35,8 @@
 ## Next up / gotchas
 - F1 done: `api/queryClient.ts` (defaults, `isClientError`, `STALE` tiers, cache `onError` toasts; cleared on logout/401). Hooks should pick `STALE.hot/catalog/static` explicitly where the 60 s default is wrong.
 - F2 done: `toast.push(msg, tone, { action: { label, onClick }, duration })` (key is `onClick`, not `run`). Dev demo: Settings > Appearance.
-- Next: F3/F4 (date keys) before any optimistic hook. G1+G2 (gym sets) is the first user-visible slice.
+- F5 done (tracking/money/media/searchList keys). Remaining literal `queryKey: [` sites, if any, belong to F3/F4. `api/media/queries.ts` has read hooks only; M1 migrates the pages.
+- Next: F3/F4 (date keys) before any optimistic hook, then F6. G1+G2 (gym sets) is the first user-visible slice.
 - `PostLogPlanned` ignores the day (500 off-today). Fixed in D1, and until then don't build optimistic log-planned on top of it.
 - `crypto.randomUUID()` is undefined on plain-http LAN testing from a phone. Use `newClientId()` (F6).
 - TanStack v5 mutation `scope` is per `useMutation` instance, not per call. See DESIGN.md §2 "Concurrency".
