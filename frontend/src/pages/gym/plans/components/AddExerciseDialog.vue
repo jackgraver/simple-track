@@ -1,11 +1,9 @@
 <script setup lang="ts">
-import { searchListKeys } from "~/shared/searchListKeys";
 import { getApiErrorMessage } from "~/api/httpError";
 import type { WorkoutPlan, Exercise } from "~/types/workout";
 import SearchList from "~/shared/SearchList.vue";
 import { toast } from "~/composables/toast/useToast";
-import { useQueryClient } from "@tanstack/vue-query";
-import { apiClient } from "~/api/client";
+import { useAddRoutineExercise, useCreateExercise } from "~/api/workout/routines";
 
 const props = defineProps<{
     plan: WorkoutPlan;
@@ -13,13 +11,12 @@ const props = defineProps<{
     onCancel?: () => void;
 }>();
 
-const queryClient = useQueryClient();
+const addToPlan = useAddRoutineExercise();
+const createExerciseMutation = useCreateExercise();
 
 const addExerciseToPlan = async (exercise: Exercise): Promise<boolean> => {
     try {
-        await apiClient.post(`workout/plans/${props.plan.ID}/exercises/add`, {
-            exercise_id: exercise.ID,
-        });
+        await addToPlan.mutateAsync({ planId: props.plan.ID, exerciseId: exercise.ID });
         toast.push(`Added ${exercise.name} to ${props.plan.name}`, "success");
         props.onResolve?.(true);
         return true;
@@ -35,13 +32,8 @@ const createExercise = async (name: string) => {
 
     try {
         // Create and add in one step: typing a name that isn't in the library means "this one".
-        const res = await apiClient.post<{ exercise: Exercise }>("/workout/exercises", {
-            name: name.trim(),
-            rep_rollover: 10,
-            cues: "",
-        });
-        await queryClient.invalidateQueries({ queryKey: searchListKeys.all });
-        return addExerciseToPlan(res.data.exercise);
+        const created = await createExerciseMutation.mutateAsync({ name: name.trim(), rep_rollover: 10, cues: "" });
+        return addExerciseToPlan(created);
     } catch (err: unknown) {
         const message = getApiErrorMessage(err, "Something went wrong");
         toast.push("Failed to create exercise: " + message, "error");

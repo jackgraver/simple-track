@@ -58,7 +58,7 @@ References: AUDIT.md (findings), MUTATIONS.md (per-mutation plan), ID-STRATEGY.m
   *Done:* throttled checks, no extra GET after each write, 390 px screenshots.
 - [ ] **T1 Tracking:** water add/delete (`client_id`), weight/steps upsert optimistic. *Done:* as above.
 - [ ] **T2 Grocery:** add (`client_id`), complete optimistic, suggestions invalidated on settle.
-- [ ] **P1 Gym plans into hooks:** remove axios from `pages/gym/plans/**`. Assign/unassign/reorder
+- [x] **P1 Gym plans into hooks:** remove axios from `pages/gym/plans/**`. Assign/unassign/reorder
   optimistic. Plan edits invalidate programs + today's workout. Exercise create/update invalidates every
   exercise key.
 - [ ] **M1 Media on TanStack Query:** list/detail/stats hooks, list → detail `initialData`, optimistic

@@ -25,13 +25,12 @@ import {
 import type { MenuItem } from "~/shared/ui";
 import {
     useActivateWorkoutProgram,
-    useAssignPlanDay,
     useCreateWorkoutPlan,
     useCreateWorkoutProgram,
     useRenameWorkoutProgram,
-    useUnassignPlanDay,
     useWorkoutPrograms,
 } from "~/api/workout/queries";
+import { useAssignPlanDay, useUnassignPlanDay } from "~/api/workout/routines";
 import DayPicker from "./components/DayPicker.vue";
 import NameDialog from "./components/NameDialog.vue";
 import {
@@ -161,34 +160,14 @@ const onProgramMenu = (key: string) => {
 // --- scheduling ---------------------------------------------------------------------------------
 const assign = useAssignPlanDay();
 const unassign = useUnassignPlanDay();
-/** Days with a request in flight: their rows dim until the refetch lands. */
-const pendingDays = ref(new Set<number>());
-
-const withPending = async (days: number[], what: string, run: () => Promise<unknown>) => {
-    days.forEach((d) => pendingDays.value.add(d));
-    try {
-        await run();
-    } catch (err) {
-        failToast(what, err);
-    } finally {
-        days.forEach((d) => pendingDays.value.delete(d));
-    }
+// Assign/unassign patch the programs cache at once and roll back with a Retry toast, so no pending state here.
+const putOnDay = (plan: WorkoutPlan, dow: number) => assign.mutate({ planId: plan.ID, dayOfWeek: dow });
+const makeRest = (plan: WorkoutPlan, dow: number) => unassign.mutate({ planId: plan.ID, dayOfWeek: dow });
+/** Drag from one day to another moves the routine (assign the new day, then clear the old one; same scope, so in order). */
+const moveDay = (plan: WorkoutPlan, from: number, to: number) => {
+    assign.mutate({ planId: plan.ID, dayOfWeek: to });
+    unassign.mutate({ planId: plan.ID, dayOfWeek: from });
 };
-
-const putOnDay = (plan: WorkoutPlan, dow: number) =>
-    withPending([dow], `Couldn't put ${plan.name} on ${DAY_NAMES[dow]}`, () =>
-        assign.mutateAsync({ planId: plan.ID, dayOfWeek: dow }),
-    );
-const makeRest = (plan: WorkoutPlan, dow: number) =>
-    withPending([dow], `Couldn't make ${DAY_NAMES[dow]} a rest day`, () =>
-        unassign.mutateAsync({ planId: plan.ID, dayOfWeek: dow }),
-    );
-/** Drag from one day to another moves the routine (assign the new day, then clear the old one). */
-const moveDay = (plan: WorkoutPlan, from: number, to: number) =>
-    withPending([from, to], `Couldn't move ${plan.name} to ${DAY_NAMES[to]}`, async () => {
-        await assign.mutateAsync({ planId: plan.ID, dayOfWeek: to });
-        await unassign.mutateAsync({ planId: plan.ID, dayOfWeek: from });
-    });
 
 // Day picker (tap on mobile, click or Enter on desktop).
 const pickerSlot = ref<DaySlot | null>(null);
@@ -304,7 +283,6 @@ const goDetail = (plan: WorkoutPlan) => router.push(detailRoute(plan));
                         <ListRow
                             v-for="slot in week"
                             :key="slot.dow"
-                            :pending="pendingDays.has(slot.dow)"
                             @click="pickerSlot = slot"
                         >
                             <template #leading>
@@ -342,9 +320,7 @@ const goDetail = (plan: WorkoutPlan) => router.push(detailRoute(plan));
                             slot.plan ? '' : 'border-dashed',
                             dropTarget === slot.dow ? 'outline-2 outline-accent' : '',
                             dragging && dragging.from === slot.dow ? 'opacity-60' : '',
-                            pendingDays.has(slot.dow) ? 'opacity-60' : '',
                         ]"
-                        :aria-busy="pendingDays.has(slot.dow) || undefined"
                         @click="pickerSlot = slot"
                         @keydown.enter.prevent="pickerSlot = slot"
                         @keydown.space.prevent="pickerSlot = slot"

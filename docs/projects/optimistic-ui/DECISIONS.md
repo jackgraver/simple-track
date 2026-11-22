@@ -68,3 +68,9 @@ Rollback also counts failed `mark` mutations (their rows are still cached); sett
 `mark` mode: no toast, `gcTime: Infinity` so the failure outlives the 5 min default, `apply` must be idempotent (Retry re-runs it), and the hook returns `retry(vars)` /
 `dismiss(vars)` which drop the failed mutation (matched by `client_id`). `reconcile` gets a 4th arg `{ siblingsPending(key) }`. `usePendingIds` returns a `Set`.
 `useServerMutation` toasts without Retry (forms keep inputs); `errorMessage: false` leaves the error to the caller.
+
+## 2026-11-22: P1 gym plans hooks
+All routine hooks use the shared helper and patch only `workoutKeys.programs`; every settle invalidates programs, `plans.all` and `days.all` (plan edits change today's workout). Requests per routine are serialised with `scope: routine:<planId>`, so rapid toggles and drags reach the server in order.
+Assign mirrors the backend rule locally (the program's other routines lose that day). Revert restores only the affected routines' fields from the snapshot, so concurrent edits survive a failure.
+Optimistic hooks now toast via the helper (with Retry); the pages no longer toast for them and dropped their per-day pending dimming and the "reordering" lock. Delete/restore routine, add exercise, create/update exercise stay `useServerMutation` with `errorMessage: false` (the pages and dialogs show errors in context). Create/update exercise invalidate exercises, searchList, programs, plans and days.
+Conservative: no `client_id` on routine edits (all idempotent PUT/POST/DELETE by id). Moving a routine between days sends assign then unassign (same scope, ordered); a failure of the first leaves the second to run, as before.

@@ -5,9 +5,11 @@ import { useQueryClient } from "@tanstack/vue-query";
 import { ArrowDown, ArrowUp, Dumbbell, Ellipsis, GripVertical, Pencil, Plus, SearchX, Trash2, X } from "lucide-vue-next";
 import { getApiErrorMessage } from "~/api/httpError";
 import { workoutKeys } from "~/api/workout/keys";
-import { useAssignPlanDay, useUnassignPlanDay, useWorkoutPrograms } from "~/api/workout/queries";
+import { useWorkoutPrograms } from "~/api/workout/queries";
 import {
     useAddRoutineExercise,
+    useAssignPlanDay,
+    useUnassignPlanDay,
     useDeleteRoutine,
     useRemoveRoutineExercise,
     useReorderRoutineExercises,
@@ -84,19 +86,14 @@ const refreshPrograms = () => queryClient.invalidateQueries({ queryKey: workoutK
 type StepKey = "warmup" | "cardio" | "stretch";
 const saveState = ref<Partial<Record<StepKey, "saving" | "saved">>>({});
 const savedTimers: Partial<Record<StepKey, ReturnType<typeof setTimeout>>> = {};
-async function saving(step: StepKey, what: string, run: () => Promise<unknown>) {
+/** The edit is already on screen (optimistic); flash "Saved". A failure rolls back with its own toast. */
+function saving(step: StepKey, run: () => void) {
     clearTimeout(savedTimers[step]);
-    saveState.value = { ...saveState.value, [step]: "saving" };
-    try {
-        await run();
-        saveState.value = { ...saveState.value, [step]: "saved" };
-        savedTimers[step] = setTimeout(() => {
-            saveState.value = { ...saveState.value, [step]: undefined };
-        }, 2000);
-    } catch (err) {
+    run();
+    saveState.value = { ...saveState.value, [step]: "saved" };
+    savedTimers[step] = setTimeout(() => {
         saveState.value = { ...saveState.value, [step]: undefined };
-        failToast(what, err);
-    }
+    }, 2000);
 }
 const stepMeta = (step: StepKey, fallback: string) => {
     const s = saveState.value[step];
@@ -118,15 +115,11 @@ const onRoutineMenu = (key: string) => {
     if (key === "delete") void removeRoutine();
 };
 
-const onRename = async (name: string) => {
+const onRename = (name: string) => {
     const p = plan.value;
     if (!p) return;
-    try {
-        await renameRoutine.mutateAsync({ planId: p.ID, name });
-        renameOpen.value = false;
-    } catch (err) {
-        failToast("Couldn't rename the routine", err);
-    }
+    renameRoutine.mutate({ planId: p.ID, name });
+    renameOpen.value = false;
 };
 
 /** Soft delete, leave for the schedule, and offer Undo (restore, then come back here). */
@@ -159,11 +152,10 @@ const removeRoutine = async () => {
 // --- days ---------------------------------------------------------------------------------------
 const assign = useAssignPlanDay();
 const unassign = useUnassignPlanDay();
-const pendingDays = ref<Set<number>>(new Set());
 
 const toggleDay = async (t: DayToggle) => {
     const p = plan.value;
-    if (!p || pendingDays.value.has(t.dow)) return;
+    if (!p) return;
     if (!t.on && t.takenBy) {
         const ok = await dialogManager.confirm({
             title: `Move ${t.name} to ${p.name}?`,
@@ -173,17 +165,8 @@ const toggleDay = async (t: DayToggle) => {
         });
         if (!ok) return;
     }
-    pendingDays.value = new Set(pendingDays.value).add(t.dow);
-    try {
-        if (t.on) await unassign.mutateAsync({ planId: p.ID, dayOfWeek: t.dow });
-        else await assign.mutateAsync({ planId: p.ID, dayOfWeek: t.dow });
-    } catch (err) {
-        failToast(t.on ? `Couldn't take ${t.name} off` : `Couldn't add ${t.name}`, err);
-    } finally {
-        const next = new Set(pendingDays.value);
-        next.delete(t.dow);
-        pendingDays.value = next;
-    }
+    if (t.on) unassign.mutate({ planId: p.ID, dayOfWeek: t.dow });
+    else assign.mutate({ planId: p.ID, dayOfWeek: t.dow });
 };
 
 // --- warmup / stretch ---------------------------------------------------------------------------
@@ -193,7 +176,7 @@ const saveMobility = (step: "warmup" | "stretch", items: string[]) => {
     if (!p) return;
     const pre = step === "warmup" ? items : (p.pre_mobility_items ?? []);
     const post = step === "stretch" ? items : (p.post_mobility_items ?? []);
-    void saving(step, `Couldn't save the ${step}`, () => setMobility.mutateAsync({ planId: p.ID, pre, post }));
+    saving(step, () => setMobility.mutate({ planId: p.ID, pre, post }));
 };
 
 const stretchCount = (n: number) => `${n} ${n === 1 ? "stretch" : "stretches"}`;
@@ -216,7 +199,7 @@ const saveCardio = () => {
     if (!p) return;
     const next = normaliseCardio(cardioType.value, cardioMinutes.value);
     if (!cardioChanged(p, next)) return;
-    void saving("cardio", "Couldn't save cardio", () => setCardio.mutateAsync({ planId: p.ID, ...next }));
+    saving("cardio", () => setCardio.mutate({ planId: p.ID, ...next }));
 };
 const onCardioFocusOut = (e: FocusEvent) => {
     if (cardioBox.value?.contains(e.relatedTarget as Node | null)) return;
@@ -228,43 +211,38 @@ const reorder = useReorderRoutineExercises();
 const removeExercise = useRemoveRoutineExercise();
 const addExercise = useAddRoutineExercise();
 const exercises = computed(() => plan.value?.exercises ?? []);
-const reordering = computed(() => reorder.isPending.value);
 
-const move = async (from: number, to: number) => {
+const move = (from: number, to: number) => {
     const p = plan.value;
     if (!p) return;
     const next = moveItem(p.exercises, from, to);
     if (next === p.exercises) return;
-    try {
-        await reorder.mutateAsync({ planId: p.ID, exerciseIds: next.map((e) => e.ID) });
-    } catch (err) {
-        failToast("Couldn't reorder", err);
-    }
+    reorder.mutate({ planId: p.ID, exerciseIds: next.map((e) => e.ID) });
 };
 
-/** Remove now; Undo adds it back and restores its place. */
-const remove = async (exercise: Exercise) => {
+/** Remove now; Undo adds it back and restores its place. A failed remove rolls back with its own toast. */
+const remove = (exercise: Exercise) => {
     const p = plan.value;
     if (!p) return;
     const order = p.exercises.map((e) => e.ID);
-    try {
-        await removeExercise.mutateAsync({ planId: p.ID, exerciseId: exercise.ID });
-    } catch (err) {
-        failToast(`Couldn't remove ${exercise.name}`, err);
-        return;
-    }
-    toast.push({
-        message: `Removed ${exercise.name}`,
-        action: {
-            label: "Undo",
-            onClick: () => {
-                addExercise
-                    .mutateAsync({ planId: p.ID, exerciseId: exercise.ID })
-                    .then(() => reorder.mutateAsync({ planId: p.ID, exerciseIds: order }))
-                    .catch((err: unknown) => failToast(`Couldn't put ${exercise.name} back`, err));
-            },
+    removeExercise.mutate(
+        { planId: p.ID, exerciseId: exercise.ID },
+        {
+            onSuccess: () =>
+                toast.push({
+                    message: `Removed ${exercise.name}`,
+                    action: {
+                        label: "Undo",
+                        onClick: () => {
+                            addExercise
+                                .mutateAsync({ planId: p.ID, exerciseId: exercise.ID })
+                                .then(() => reorder.mutate({ planId: p.ID, exerciseIds: order }))
+                                .catch((err: unknown) => failToast(`Couldn't put ${exercise.name} back`, err));
+                        },
+                    },
+                }),
         },
-    });
+    );
 };
 
 const openAdd = () => {
@@ -286,8 +264,8 @@ const openEdit = (exercise: Exercise) => {
 
 const rowMenu = (index: number): MenuItem[] => [
     { key: "edit", label: "Edit exercise", icon: Pencil },
-    { key: "up", label: "Move up", icon: ArrowUp, disabled: index === 0 || reordering.value },
-    { key: "down", label: "Move down", icon: ArrowDown, disabled: index === exercises.value.length - 1 || reordering.value },
+    { key: "up", label: "Move up", icon: ArrowUp, disabled: index === 0 },
+    { key: "down", label: "Move down", icon: ArrowDown, disabled: index === exercises.value.length - 1 },
     { key: "remove", label: "Remove from routine", icon: X, tone: "danger" },
 ];
 const onRowMenu = (key: string, exercise: Exercise, index: number) => {
@@ -371,7 +349,6 @@ const onDrop = (index: number) => {
                         :aria-pressed="t.on"
                         :aria-label="t.takenBy && !t.on ? `${t.name} (${t.takenBy.name})` : t.name"
                         :title="t.takenBy && !t.on ? `${t.name}: ${t.takenBy.name}` : t.name"
-                        :loading="pendingDays.has(t.dow)"
                         class="px-0 aria-pressed:border-accent aria-pressed:text-accent lg:w-14"
                         @click="toggleDay(t)"
                     >

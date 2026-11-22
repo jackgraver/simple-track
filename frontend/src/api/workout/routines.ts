@@ -1,132 +1,214 @@
-import { useMutation, useQueryClient } from "@tanstack/vue-query";
 import { apiDELETE, apiPATCH, apiPOST, apiPUT } from "~/api/client";
+import { useOptimisticMutation, useServerMutation, type CachePatch } from "~/api/optimistic";
 import { workoutKeys } from "~/api/workout/keys";
-import type { WorkoutPlan, WorkoutProgram } from "~/types/workout";
+import {
+    ASSIGN_FIELDS,
+    assignAffected,
+    assignDay,
+    patchRoutine,
+    removeExercise,
+    reorderExercises,
+    restoreFields,
+    unassignDay,
+    type ProgramsData,
+} from "~/api/workout/routinePatches";
+import { searchListKeys } from "~/shared/searchListKeys";
+import type { Exercise, ExerciseLoadType, WorkoutPlan } from "~/types/workout";
 
 /**
- * Mutations for one routine (a `WorkoutPlan` inside a program), used by the routine page.
- * Edits that the page shows straight away (order, removal, mobility, cardio) patch the programs
- * cache first and roll back on error; the rest refetch on success.
+ * Mutations for routines (a `WorkoutPlan` inside a program) and the exercises they hold.
+ *
+ * Optimistic edits patch the programs cache (`workoutKeys.programs`), roll back on error and
+ * invalidate on settle. Routine edits change what today's workout is built from, so every settle
+ * refreshes programs, the plans list and the day views (`days.all`). Requests for one routine are
+ * serialised (`scope`) so rapid taps reach the server in order.
  */
 
-type ProgramsData = { programs: WorkoutProgram[] };
-type QueryClient = ReturnType<typeof useQueryClient>;
+const PROGRAMS = workoutKeys.programs;
+const settleKeys = () => [PROGRAMS, workoutKeys.plans.all, workoutKeys.days.all];
+const scope = (v: { planId: number }) => ({ id: `routine:${v.planId}` });
 
-function invalidate(qc: QueryClient, today = false) {
-    void qc.invalidateQueries({ queryKey: workoutKeys.programs });
-    void qc.invalidateQueries({ queryKey: workoutKeys.plans.all });
-    if (today) void qc.invalidateQueries({ queryKey: workoutKeys.days.all });
-}
-
-/** Apply `patch` to the routine in the cached programs list; returns a rollback. */
-async function patchRoutine(qc: QueryClient, planId: number, patch: (p: WorkoutPlan) => WorkoutPlan) {
-    await qc.cancelQueries({ queryKey: workoutKeys.programs });
-    const before = qc.getQueryData<ProgramsData>(workoutKeys.programs);
-    if (before) {
-        qc.setQueryData<ProgramsData>(workoutKeys.programs, {
-            programs: before.programs.map((prog) => ({
-                ...prog,
-                plans: prog.plans.map((p) => (p.ID === planId ? patch(p) : p)),
-            })),
-        });
-    }
-    return () => {
-        if (before) qc.setQueryData(workoutKeys.programs, before);
+/** A patch of one routine in the programs cache whose revert restores `fields` from the snapshot. */
+function routinePatch<V extends { planId: number }>(
+    _vars: V,
+    patch: (p: WorkoutPlan, v: V) => WorkoutPlan,
+    fields: (keyof WorkoutPlan)[],
+): CachePatch<V, ProgramsData> {
+    return {
+        queryKey: PROGRAMS,
+        apply: (old, v) => patchRoutine(old, v.planId, (p) => patch(p, v)),
+        revert: (cur, v, snap) => restoreFields(cur, snap, [v.planId], fields),
     };
 }
 
-function optimistic<V extends { planId: number }>(
-    qc: QueryClient,
-    mutationFn: (v: V) => Promise<unknown>,
-    patch: (p: WorkoutPlan, v: V) => WorkoutPlan,
-    today = false,
-) {
-    return useMutation({
-        mutationFn,
-        onMutate: async (v: V) => ({ rollback: await patchRoutine(qc, v.planId, (p) => patch(p, v)) }),
-        onError: (_err, _v, ctx) => ctx?.rollback(),
-        onSettled: () => invalidate(qc, today),
+export function useRenameRoutine() {
+    return useOptimisticMutation({
+        mutationKey: ["workout", "mutations", "renameRoutine"],
+        mutationFn: ({ planId, name }: { planId: number; name: string }) =>
+            apiPATCH<{ plan: WorkoutPlan }>(`/workout/plans/${planId}`, { name }),
+        optimistic: (v) => [routinePatch(v, (p) => ({ ...p, name: v.name }), ["name"])],
+        invalidate: settleKeys,
+        scope,
+        errorMessage: () => "Couldn’t rename the routine",
     });
 }
 
-export function useRenameRoutine() {
-    const qc = useQueryClient();
-    return optimistic(
-        qc,
-        ({ planId, name }: { planId: number; name: string }) => apiPATCH<{ plan: WorkoutPlan }>(`/workout/plans/${planId}`, { name }),
-        (p, { name }) => ({ ...p, name }),
-        true,
-    );
-}
-
-/** Soft delete: the backend keeps the routine so `useRestoreRoutine` can undo it. */
+/** Soft delete: the backend keeps the routine so `useRestoreRoutine` can undo it. Waits for the server. */
 export function useDeleteRoutine() {
-    const qc = useQueryClient();
-    return useMutation({
+    return useServerMutation({
+        mutationKey: ["workout", "mutations", "deleteRoutine"],
         mutationFn: (planId: number) => apiDELETE(`/workout/plans/${planId}`),
-        onSettled: () => invalidate(qc, true),
+        invalidate: settleKeys,
+        errorMessage: false,
     });
 }
 
 export function useRestoreRoutine() {
-    const qc = useQueryClient();
-    return useMutation({
+    return useServerMutation({
+        mutationKey: ["workout", "mutations", "restoreRoutine"],
         mutationFn: (planId: number) => apiPOST<{ plan: WorkoutPlan }>(`/workout/plans/${planId}/restore`),
-        onSettled: () => invalidate(qc, true),
+        invalidate: settleKeys,
+        errorMessage: false,
     });
 }
 
 export function useReorderRoutineExercises() {
-    const qc = useQueryClient();
-    return optimistic(
-        qc,
-        ({ planId, exerciseIds }: { planId: number; exerciseIds: number[] }) =>
+    return useOptimisticMutation({
+        mutationKey: ["workout", "mutations", "reorderRoutineExercises"],
+        mutationFn: ({ planId, exerciseIds }: { planId: number; exerciseIds: number[] }) =>
             apiPUT(`/workout/plans/${planId}/exercises/reorder`, { exercise_ids: exerciseIds }),
-        (p, { exerciseIds }) => ({
-            ...p,
-            exercises: exerciseIds.flatMap((id) => p.exercises.filter((e) => e.ID === id)),
-        }),
-    );
+        optimistic: (v) => [routinePatch(v, (p) => reorderExercises(p, v.exerciseIds), ["exercises"])],
+        invalidate: settleKeys,
+        scope,
+        errorMessage: () => "Couldn’t reorder the exercises",
+    });
 }
 
 export function useRemoveRoutineExercise() {
-    const qc = useQueryClient();
-    return optimistic(
-        qc,
-        ({ planId, exerciseId }: { planId: number; exerciseId: number }) =>
+    return useOptimisticMutation({
+        mutationKey: ["workout", "mutations", "removeRoutineExercise"],
+        mutationFn: ({ planId, exerciseId }: { planId: number; exerciseId: number }) =>
             apiDELETE(`/workout/plans/${planId}/exercises/remove`, { data: { exercise_id: exerciseId } }),
-        (p, { exerciseId }) => ({ ...p, exercises: p.exercises.filter((e) => e.ID !== exerciseId) }),
-    );
+        optimistic: (v) => [routinePatch(v, (p) => removeExercise(p, v.exerciseId), ["exercises"])],
+        invalidate: settleKeys,
+        scope,
+        errorMessage: () => "Couldn’t remove the exercise",
+    });
 }
 
-/** Adds at the end of the routine (the backend appends). */
+/** Adds at the end of the routine (the backend appends). Needs the exercise row, so it waits for the server. */
 export function useAddRoutineExercise() {
-    const qc = useQueryClient();
-    return useMutation({
+    return useServerMutation({
+        mutationKey: ["workout", "mutations", "addRoutineExercise"],
         mutationFn: ({ planId, exerciseId }: { planId: number; exerciseId: number }) =>
             apiPOST(`/workout/plans/${planId}/exercises/add`, { exercise_id: exerciseId }),
-        onSettled: () => invalidate(qc),
+        invalidate: settleKeys,
+        scope,
+        errorMessage: false,
     });
 }
 
 export function useSetRoutineMobility() {
-    const qc = useQueryClient();
-    return optimistic(
-        qc,
-        ({ planId, pre, post }: { planId: number; pre: string[]; post: string[] }) =>
+    return useOptimisticMutation({
+        mutationKey: ["workout", "mutations", "setRoutineMobility"],
+        mutationFn: ({ planId, pre, post }: { planId: number; pre: string[]; post: string[] }) =>
             apiPUT(`/workout/plans/${planId}/planned-mobility`, { pre_mobility_items: pre, post_mobility_items: post }),
-        (p, { pre, post }) => ({ ...p, pre_mobility_items: pre, post_mobility_items: post }),
-        true,
-    );
+        optimistic: (v) => [
+            routinePatch(v, (p) => ({ ...p, pre_mobility_items: v.pre, post_mobility_items: v.post }), [
+                "pre_mobility_items",
+                "post_mobility_items",
+            ]),
+        ],
+        invalidate: settleKeys,
+        scope,
+        errorMessage: () => "Couldn’t save the mobility",
+    });
 }
 
 export function useSetRoutineCardio() {
-    const qc = useQueryClient();
-    return optimistic(
-        qc,
-        ({ planId, type, minutes }: { planId: number; type: string; minutes: number }) =>
+    return useOptimisticMutation({
+        mutationKey: ["workout", "mutations", "setRoutineCardio"],
+        mutationFn: ({ planId, type, minutes }: { planId: number; type: string; minutes: number }) =>
             apiPUT(`/workout/plans/${planId}/planned-cardio`, { type, minutes }),
-        (p, { type, minutes }) => ({ ...p, planned_cardio_type: type, planned_cardio_minutes: minutes }),
-        true,
-    );
+        optimistic: (v) => [
+            routinePatch(v, (p) => ({ ...p, planned_cardio_type: v.type, planned_cardio_minutes: v.minutes }), [
+                "planned_cardio_type",
+                "planned_cardio_minutes",
+            ]),
+        ],
+        invalidate: settleKeys,
+        scope,
+        errorMessage: () => "Couldn’t save cardio",
+    });
+}
+
+type DayVars = { planId: number; dayOfWeek: number };
+
+/** Put a routine on a weekday. The backend clears whichever routine had that day in the same program. */
+export function useAssignPlanDay() {
+    return useOptimisticMutation({
+        mutationKey: ["workout", "mutations", "assignPlanDay"],
+        mutationFn: ({ planId, dayOfWeek }: DayVars) =>
+            apiPOST<{ plan: WorkoutPlan }>(`/workout/plans/${planId}/assign-day`, { day_of_week: dayOfWeek }),
+        optimistic: () => [
+            {
+                queryKey: PROGRAMS,
+                apply: (old: ProgramsData, x: DayVars) => assignDay(old, x.planId, x.dayOfWeek),
+                revert: (cur: ProgramsData, x: DayVars, snap: ProgramsData) =>
+                    restoreFields(cur, snap, assignAffected(snap, x.planId, x.dayOfWeek), ASSIGN_FIELDS),
+            } satisfies CachePatch<DayVars, ProgramsData>,
+        ],
+        invalidate: settleKeys,
+        scope,
+        errorMessage: () => "Couldn’t change the day",
+    });
+}
+
+export function useUnassignPlanDay() {
+    return useOptimisticMutation({
+        mutationKey: ["workout", "mutations", "unassignPlanDay"],
+        mutationFn: ({ planId, dayOfWeek }: DayVars) =>
+            apiDELETE<{ plan: WorkoutPlan }>(`/workout/plans/${planId}/assign-day`, { params: { day_of_week: dayOfWeek } }),
+        optimistic: () => [
+            {
+                queryKey: PROGRAMS,
+                apply: (old: ProgramsData, x: DayVars) => unassignDay(old, x.planId, x.dayOfWeek),
+                revert: (cur: ProgramsData, x: DayVars, snap: ProgramsData) =>
+                    restoreFields(cur, snap, [x.planId], ASSIGN_FIELDS),
+            } satisfies CachePatch<DayVars, ProgramsData>,
+        ],
+        invalidate: settleKeys,
+        scope,
+        errorMessage: () => "Couldn’t change the day",
+    });
+}
+
+// ── Exercises (library) ─────────────────────────────────────────────────────────────────────────
+
+/** Everything that embeds or lists exercises: library lists, search pickers, routines, today's day. */
+export function exerciseKeys() {
+    return [workoutKeys.exercises.all, searchListKeys.all, PROGRAMS, workoutKeys.plans.all, workoutKeys.days.all];
+}
+
+export type ExerciseInput = { name: string; rep_rollover: number; cues: string; load_type?: ExerciseLoadType };
+
+/** Unique names fail often, so this waits for the server; callers show the error inline. */
+export function useCreateExercise() {
+    return useServerMutation({
+        mutationKey: ["workout", "mutations", "createExercise"],
+        mutationFn: async (input: ExerciseInput) =>
+            (await apiPOST<{ exercise: Exercise }>("/workout/exercises", input)).exercise,
+        invalidate: exerciseKeys,
+        errorMessage: false,
+    });
+}
+
+export function useUpdateExercise() {
+    return useServerMutation({
+        mutationKey: ["workout", "mutations", "updateExercise"],
+        mutationFn: async ({ id, ...input }: ExerciseInput & { id: number }) =>
+            (await apiPUT<{ exercise: Exercise }>(`/workout/exercises/${id}`, input)).exercise,
+        invalidate: exerciseKeys,
+        errorMessage: false,
+    });
 }

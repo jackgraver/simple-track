@@ -1,12 +1,9 @@
 <script setup lang="ts">
-import { workoutKeys } from "~/api/workout/keys";
-import { searchListKeys } from "~/shared/searchListKeys";
 import { getApiErrorMessage } from "~/api/httpError";
 import type { Exercise, ExerciseLoadType } from "~/types/workout";
 import { DEFAULT_EXERCISE_LOAD_TYPE } from "~/types/workout";
 import { toast } from "~/composables/toast/useToast";
-import { useQueryClient } from "@tanstack/vue-query";
-import { apiClient } from "~/api/client";
+import { useUpdateExercise } from "~/api/workout/routines";
 import { Button, Field, Input, NumberField, Select, Textarea } from "~/shared/ui";
 import { ref, watch } from "vue";
 
@@ -15,7 +12,7 @@ const props = defineProps<{
     onResolve?: (ok: boolean) => void;
 }>();
 
-const queryClient = useQueryClient();
+const updateExercise = useUpdateExercise();
 const name = ref("");
 const repRollover = ref<number | null>(10);
 const cues = ref("");
@@ -48,18 +45,14 @@ const submit = async () => {
     }
     submitting.value = true;
     try {
-        await apiClient.put<{ exercise: Exercise }>(
-            `/workout/exercises/${props.exercise.ID}`,
-            {
-                name: n,
-                rep_rollover: repRollover.value || 10,
-                cues: cues.value.trim(),
-                load_type: loadType.value,
-            },
-        );
+        await updateExercise.mutateAsync({
+            id: props.exercise.ID,
+            name: n,
+            rep_rollover: repRollover.value || 10,
+            cues: cues.value.trim(),
+            load_type: loadType.value,
+        });
         toast.push(`Updated ${n}`, "success");
-        await queryClient.invalidateQueries({ queryKey: searchListKeys.all });
-        await queryClient.invalidateQueries({ queryKey: workoutKeys.plans.all });
         props.onResolve?.(true);
     } catch (err: unknown) {
         const message = getApiErrorMessage(err, "Something went wrong");
