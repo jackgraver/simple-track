@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { offsetToDate } from "~/api/workout/dates";
 import { computed } from "vue";
 import axios from "axios";
 import {
@@ -17,7 +18,7 @@ const props = defineProps<{
 
 const plansQuery = useWorkoutPlansAll();
 const programsQuery = useWorkoutPrograms();
-const switchPlanMutation = useSwitchWorkoutPlan(() => props.dayOffset);
+const switchPlanMutation = useSwitchWorkoutPlan();
 
 const planGroups = computed(() => {
     const plans = plansQuery.data.value?.plans ?? [];
@@ -57,7 +58,7 @@ const handleSwitchPlan = async (v: string) => {
     const planId = v === "" ? null : Number(v);
     if (planId === props.currentPlanId) return;
     try {
-        await switchPlanMutation.mutateAsync(planId);
+        await switchPlanMutation.mutateAsync({ date: offsetToDate(props.dayOffset), planId });
         toast.push("Workout plan updated", "success");
         props.onResolve?.(true);
     } catch (err: unknown) {

@@ -19,3 +19,10 @@ Hooks may take an offset but convert it to `YYYY-MM-DD` at the edge. Prerequisit
 ## 2026-11-19: Gym set failures stay visible ("mark"), everything else rolls back
 Losing a set mid-workout is worse than showing a failed one, so sets/water stay with an inline retry. Other optimistic writes roll back with a Retry toast.
 Pending state is derived from `useMutationState`, never stored in cache data. No spinners for optimistic actions.
+
+## 2026-11-22: F3 workout keys (date keys, one key per endpoint)
+`liveworkout` folded into `workoutKeys` (`['workout', ...]`, `days.day(date)`, `activity`, `exercises`). `workoutQueries` via `queryOptions`.
+`api/workout/dates.ts` converts offset <-> local `YYYY-MM-DD`; the offset is recomputed from the date when a request is sent. Mutation hooks take no offset, vars carry `date`.
+`/workout/logs/previous` has one key; `useWorkoutLogToday` is `select: r => r.day` on it. Local-time dates assume the backend's "today" matches the device timezone (unverified).
+Deleted `useAllExercises`, `workouts.today` and `EditCuesDialog.vue`: all had zero references, so owner Q7 is moot for them (`useEditLoggedMeal`/`useDeleteGroceryItem` untouched, not my slice).
+Not verified in a browser (no dev stack allowed): the "one request gym index -> logging" check is by construction (shared key), not by network tab.

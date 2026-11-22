@@ -1,45 +1,30 @@
-const liveworkoutKeysBase = {
-    all: ['liveworkout'] as const,
-} as const;
-
-export const liveworkoutKeys = {
-    all: liveworkoutKeysBase.all,
-    workouts: {
-        all: [...liveworkoutKeysBase.all, 'workouts'] as const,
-        day: (offset: number) =>
-            [...liveworkoutKeysBase.all, 'workouts', 'day', offset] as const,
-        previous: (offset: number) =>
-            [...liveworkoutKeysBase.all, 'workouts', 'previous', offset] as const,
-        today: () => [...liveworkoutKeysBase.all, 'workouts', 'today'] as const,
-        activity: (opts: {
-            mode: 'year' | 'rolling';
-            weeks: number | null;
-            days: number | null;
-        }) =>
-            [
-                ...liveworkoutKeysBase.all,
-                'workouts',
-                'activity',
-                opts.mode,
-                opts.weeks,
-                opts.days,
-            ] as const,
-        activityPrefix: () =>
-            [...liveworkoutKeysBase.all, 'workouts', 'activity'] as const,
-    },
-    exercises: {
-        all: [...liveworkoutKeysBase.all, 'exercises'] as const,
-        allList: () => [...liveworkoutKeysBase.all, 'exercises', 'all'] as const,
-        paginated: (search: string) =>
-            [...liveworkoutKeysBase.all, 'exercises', 'paginated', search] as const,
-    },
-} as const;
+/** One root (`['workout']`). Day-scoped keys use the absolute date, never the offset. */
+export type WorkoutActivityKeyOpts = {
+    mode: 'year' | 'rolling';
+    weeks: number | null;
+    days: number | null;
+};
 
 export const workoutKeys = {
+    all: ['workout'] as const,
+    days: {
+        all: ['workout', 'days'] as const,
+        /** `GET /workout/logs/previous` for one date. Readers needing a slice use `select`. */
+        day: (date: string) => ['workout', 'days', 'day', date] as const,
+    },
+    activity: {
+        all: ['workout', 'activity'] as const,
+        list: (opts: WorkoutActivityKeyOpts) =>
+            ['workout', 'activity', opts.mode, opts.weeks, opts.days] as const,
+    },
+    exercises: {
+        all: ['workout', 'exercises'] as const,
+        list: () => ['workout', 'exercises', 'all'] as const,
+        paginated: (search: string) => ['workout', 'exercises', 'paginated', search] as const,
+    },
     plans: {
         all: ['workout', 'plans'] as const,
         list: () => ['workout', 'plans', 'all'] as const,
     },
     programs: ['workout', 'programs'] as const,
-    exercisesAll: ['workout', 'exercises', 'all'] as const,
 } as const;
