@@ -117,9 +117,19 @@ func FindWorkoutProgramByID(id uint) (models.WorkoutProgram, error) {
 	return program, conn().First(&program, id).Error
 }
 
+// FindActiveWorkoutProgram returns the active program. Older data can have several flagged active
+// (the baseline "Default" program plus one created later): prefer the first one that has plans, the
+// same rule the frontend's week strip uses, so a day created here gets the
+// plan the UI shows for it.
 func FindActiveWorkoutProgram() (models.WorkoutProgram, error) {
 	var program models.WorkoutProgram
-	return program, conn().Where("is_active = ?", true).Order("id ASC").First(&program).Error
+	err := conn().Where("is_active = ?", true).
+		Where("EXISTS (SELECT 1 FROM workout_plans wp WHERE wp.workout_program_id = workout_programs.id AND wp.deleted_at IS NULL)").
+		Order("id ASC").First(&program).Error
+	if err == gorm.ErrRecordNotFound {
+		err = conn().Where("is_active = ?", true).Order("id ASC").First(&program).Error
+	}
+	return program, err
 }
 
 func UpdateWorkoutProgramName(id uint, name string) error {

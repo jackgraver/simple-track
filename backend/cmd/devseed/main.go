@@ -108,6 +108,10 @@ func seedGym(tx *gorm.DB) error {
 	if err := tx.Create(&prog).Error; err != nil {
 		return err
 	}
+	// One active program, as ActivateWorkoutProgram keeps it (the baseline seeds an active "Default").
+	if err := tx.Model(&workm.WorkoutProgram{}).Where("id != ?", prog.ID).Update("is_active", false).Error; err != nil {
+		return err
+	}
 
 	type pl struct {
 		name    string

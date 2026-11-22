@@ -135,3 +135,25 @@ func TestCreateWorkoutPlanWithoutDayCreatesUnassignedRoutine(t *testing.T) {
 		t.Fatalf("expected an unassigned routine, got days=%v legacy_day=%v", plan.AssignedDays, plan.DayOfWeek)
 	}
 }
+
+// Older databases have the baseline "Default" program and a later one both flagged active. New days
+// must take their plan from the one with plans (what the week strip shows), not the first by id.
+func TestGetPlanByDayPrefersActiveProgramWithPlans(t *testing.T) {
+	db := testutil.SetupTestDB(t) // creates an active, empty "Test Program" first
+	ppl := models.WorkoutProgram{Name: "PPL", IsActive: true}
+	if err := db.Create(&ppl).Error; err != nil {
+		t.Fatal(err)
+	}
+	day := 1
+	push := models.WorkoutPlan{Name: "Push", WorkoutProgramID: &ppl.ID, DayOfWeek: &day}
+	if err := db.Create(&push).Error; err != nil {
+		t.Fatal(err)
+	}
+	plan, err := services.GetPlanByDay(day)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if plan == nil || plan.ID != push.ID {
+		t.Fatalf("expected Push from the active program with plans, got %+v", plan)
+	}
+}
