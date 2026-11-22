@@ -151,7 +151,7 @@ export function useCompleteGroceryItem() {
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: trackingKeys.groceryItems });
             queryClient.invalidateQueries({
-                queryKey: ["tracking", "grocery", "suggestions"],
+                queryKey: trackingKeys.grocerySuggestionsAll,
             });
         },
     });
@@ -250,7 +250,7 @@ export function useUpdateDrinkSizePreset() {
             queryClient.invalidateQueries({
                 queryKey: trackingKeys.waterPresets,
             });
-            queryClient.invalidateQueries({ queryKey: ["tracking", "water"] });
+            queryClient.invalidateQueries({ queryKey: trackingKeys.waterLogsAll });
         },
     });
 }
@@ -263,7 +263,7 @@ export function useDeleteDrinkSizePreset() {
             queryClient.invalidateQueries({
                 queryKey: trackingKeys.waterPresets,
             });
-            queryClient.invalidateQueries({ queryKey: ["tracking", "water"] });
+            queryClient.invalidateQueries({ queryKey: trackingKeys.waterLogsAll });
         },
     });
 }

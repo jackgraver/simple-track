@@ -33,6 +33,7 @@
 - Every optimistic mutation defines: cache keys touched, rollback, and `onSettled` invalidation.
 
 ## Next up / gotchas
+- F5 done (tracking/money/media/searchList keys). Remaining literal `queryKey: [` sites, if any, belong to F3/F4. `api/media/queries.ts` has read hooks only; M1 migrates the pages.
 - Next: **F1** (defaults + error policy), then F3/F4 (date keys) before any optimistic hook. G1+G2 (gym sets) is the first user-visible slice.
 - `PostLogPlanned` ignores the day (500 off-today). Fixed in D1, and until then don't build optimistic log-planned on top of it.
 - `crypto.randomUUID()` is undefined on plain-http LAN testing from a phone. Use `newClientId()` (F6).
