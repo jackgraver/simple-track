@@ -92,7 +92,7 @@ func CreateSet(ctx context.Context, in CreateSetInput) (CreateSetResult, error) 
 			return err
 		}
 
-		parentID, _, err := upsertLoggedExercise(tx, in.WorkoutLogID, in.ExerciseID, "")
+		parentID, err := upsertAndLockParent(tx, in.WorkoutLogID, in.ExerciseID)
 		if err != nil {
 			return err
 		}
@@ -132,6 +132,32 @@ func CreateSet(ctx context.Context, in CreateSetInput) (CreateSetResult, error) 
 		return nil
 	})
 	return out, err
+}
+
+// upsertAndLockParent returns the live logged_exercise for (workout log, exercise), creating it
+// if needed, and holds a KEY SHARE lock on it until the transaction ends. DeleteSet takes FOR
+// UPDATE on the parent before deciding to delete it, so the two serialize: either the delete sees
+// this transaction's set and keeps the parent, or it deletes the parent first and the lock here
+// finds no row, in which case the upsert runs again and creates a fresh parent. Without the lock
+// a racing delete of the last set would cascade away a set this transaction already committed.
+func upsertAndLockParent(tx *gorm.DB, workoutLogID, exerciseID uint) (uint, error) {
+	for attempt := 0; attempt < 5; attempt++ {
+		parentID, _, err := upsertLoggedExercise(tx, workoutLogID, exerciseID, "")
+		if err != nil {
+			return 0, err
+		}
+		var locked []uint
+		if err := tx.Model(&models.LoggedExercise{}).
+			Clauses(clause.Locking{Strength: "KEY SHARE"}).
+			Where("id = ?", parentID).
+			Pluck("id", &locked).Error; err != nil {
+			return 0, err
+		}
+		if len(locked) == 1 {
+			return parentID, nil
+		}
+	}
+	return 0, errors.New("logged exercise kept disappearing while logging a set")
 }
 
 // findReplay returns the set already stored under in.ClientID, if any. It fails with
@@ -210,6 +236,16 @@ func DeleteSet(ctx context.Context, ref SetRef) (DeleteSetResult, error) {
 		}
 		if set.ID == 0 {
 			return nil
+		}
+		// Lock the parent before counting its sets, so a concurrent CreateSet for the same
+		// exercise either commits its set first (and the count sees it) or waits for this
+		// delete and then creates a new parent (see upsertAndLockParent).
+		var parentIDs []uint
+		if err := tx.Unscoped().Model(&models.LoggedExercise{}).
+			Clauses(clause.Locking{Strength: "UPDATE"}).
+			Where("id = ?", set.LoggedExerciseID).
+			Pluck("id", &parentIDs).Error; err != nil {
+			return err
 		}
 		if err := tx.Unscoped().Delete(&models.LoggedSet{}, set.ID).Error; err != nil {
 			return err

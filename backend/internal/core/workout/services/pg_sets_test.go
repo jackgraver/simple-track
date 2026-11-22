@@ -9,8 +9,10 @@ import (
 	"os"
 	"sync"
 	"testing"
+	"time"
 
 	"be-simpletracker/internal/core/workout/models"
+	workoutrepo "be-simpletracker/internal/core/workout/repository"
 	"be-simpletracker/internal/core/workout/services"
 	"be-simpletracker/internal/database"
 	"be-simpletracker/internal/migrate"
@@ -226,5 +228,129 @@ func TestPostgres_setsMigrationAndConcurrency(t *testing.T) {
 	var loaded []models.LoggedSet
 	if err := gdb.Where("client_id = ?", clientID(500)).Find(&loaded).Error; err != nil || len(loaded) != 1 {
 		t.Fatalf("lookup by client_id on a uuid column: %v, %d", err, len(loaded))
+	}
+}
+
+// pgMigratedGorm returns a gorm DB on a fresh, fully migrated database, installed as the
+// package-wide connection.
+func pgMigratedGorm(t *testing.T) (*gorm.DB, *sql.DB) {
+	t.Helper()
+	dsn, sqlDB := pgTestDB(t)
+	m, err := migrate.New(sqlDB, migrations.FS, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := m.Up(context.Background(), 0); err != nil {
+		t.Fatal(err)
+	}
+	gdb, err := gorm.Open(postgres.Open(dsn), &gorm.Config{Logger: logger.Default.LogMode(logger.Silent)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	database.SetDB(gdb)
+	t.Cleanup(func() {
+		if d, err := gdb.DB(); err == nil {
+			d.Close()
+		}
+	})
+	return gdb, sqlDB
+}
+
+// waitForLockWait blocks until some backend is waiting on a row lock, so a test can order two
+// transactions deterministically.
+func waitForLockWait(t *testing.T, db *sql.DB) {
+	t.Helper()
+	deadline := time.Now().Add(10 * time.Second)
+	for time.Now().Before(deadline) {
+		if count(t, db, `SELECT count(*) FROM pg_stat_activity WHERE wait_event_type = 'Lock' AND datname = current_database()`) > 0 {
+			return
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	t.Fatal("no backend started waiting on a lock")
+}
+
+// Review finding 1: deleting an exercise's only set while a new set for the same exercise is
+// being created must not cascade the new (committed) set away.
+func TestPostgres_deleteLastSetDoesNotEatConcurrentCreate(t *testing.T) {
+	_, sqlDB := pgMigratedGorm(t)
+	ctx := context.Background()
+	mustExec(t, sqlDB, `INSERT INTO exercises (id, name) VALUES (1, 'Squat')`)
+	day := utils.ZerodTime(0)
+
+	first, err := services.LogSet(ctx, services.LogSetInput{ClientID: clientID(1), Day: day, ExerciseID: 1, Reps: 5})
+	if err != nil {
+		t.Fatal(err)
+	}
+	parentID := first.Exercise.ID
+
+	// B: a create that has inserted its set under the existing parent but not committed yet
+	// (what CreateSet looks like between the set insert and commit).
+	b, err := sqlDB.BeginTx(ctx, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := b.Exec(`SELECT id FROM logged_exercises WHERE id = $1 FOR KEY SHARE`, parentID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := b.Exec(`INSERT INTO logged_sets (logged_exercise_id, client_id, reps, weight) VALUES ($1, $2, 3, 0)`,
+		parentID, clientID(2)); err != nil {
+		t.Fatal(err)
+	}
+
+	// A: delete the only committed set. It must wait for B, then see B's set and keep the parent.
+	done := make(chan workoutrepo.DeleteSetResult, 1)
+	errc := make(chan error, 1)
+	go func() {
+		res, err := workoutrepo.DeleteSet(ctx, workoutrepo.SetRef{ClientID: clientID(1)})
+		done <- res
+		errc <- err
+	}()
+	waitForLockWait(t, sqlDB)
+	if err := b.Commit(); err != nil {
+		t.Fatal(err)
+	}
+	res, err := <-done, <-errc
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !res.Deleted || res.ExerciseRemoved {
+		t.Fatalf("delete result %+v: want deleted, parent kept", res)
+	}
+	if n := count(t, sqlDB, `SELECT count(*) FROM logged_sets WHERE client_id = $1`, clientID(2)); n != 1 {
+		t.Fatalf("concurrently created set was cascaded away (%d rows)", n)
+	}
+
+	// Stress the real code paths against each other: each round deletes the only set while a
+	// new one is logged. Every successful create must still exist afterwards.
+	for i := 0; i < 150; i++ {
+		ex := uint(100 + i)
+		mustExec(t, sqlDB, `INSERT INTO exercises (id, name) VALUES ($1, $2)`, ex, fmt.Sprintf("Ex %d", ex))
+		old, newID := clientID(1000+2*i), clientID(1001+2*i)
+		if _, err := services.LogSet(ctx, services.LogSetInput{ClientID: old, Day: day, ExerciseID: ex, Reps: 1}); err != nil {
+			t.Fatal(err)
+		}
+		var wg sync.WaitGroup
+		var delErr, logErr error
+		start := make(chan struct{})
+		wg.Add(2)
+		go func() {
+			defer wg.Done()
+			<-start
+			_, delErr = workoutrepo.DeleteSet(ctx, workoutrepo.SetRef{ClientID: old})
+		}()
+		go func() {
+			defer wg.Done()
+			<-start
+			_, logErr = services.LogSet(ctx, services.LogSetInput{ClientID: newID, Day: day, ExerciseID: ex, Reps: 2})
+		}()
+		close(start)
+		wg.Wait()
+		if delErr != nil || logErr != nil {
+			t.Fatalf("round %d: delete %v, log %v", i, delErr, logErr)
+		}
+		if n := count(t, sqlDB, `SELECT count(*) FROM logged_sets WHERE client_id = $1`, newID); n != 1 {
+			t.Fatalf("round %d: confirmed set lost", i)
+		}
 	}
 }
