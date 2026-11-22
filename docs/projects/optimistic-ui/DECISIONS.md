@@ -19,3 +19,8 @@ Hooks may take an offset but convert it to `YYYY-MM-DD` at the edge. Prerequisit
 ## 2026-11-19: Gym set failures stay visible ("mark"), everything else rolls back
 Losing a set mid-workout is worse than showing a failed one, so sets/water stay with an inline retry. Other optimistic writes roll back with a Retry toast.
 Pending state is derived from `useMutationState`, never stored in cache data. No spinners for optimistic actions.
+
+## 2026-11-22: Toast action API (F2)
+The ui-overhaul toast store already carried `action` and `duration`; F2 only adds the 3rd arg `push(msg, tone, { action, duration })` alongside the object form.
+Action shape stays `{ label, onClick }` (existing Toaster contract), so DESIGN.md's `run:` snippet should read `onClick:`. Default duration with an action is 6 s, matching Failure UX.
+Dev-only Retry demo button lives in the Settings Appearance section (`import.meta.env.DEV`).
