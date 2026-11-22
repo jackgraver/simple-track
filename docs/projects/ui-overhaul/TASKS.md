@@ -53,3 +53,10 @@ dark and light.
 - [x] Remove the global `button`/`input`/`select`/`a`/`.delete-button`/`.confirm-button` CSS from `App.vue` (no `<style>` block left; base rules moved to `style.css`) and the `!`/`box-border` workarounds it forced. Checked: every route at 390/1280 in both themes, pixel-diffed before/after.
 - [x] `--color-*: initial;` in `@theme`; legacy aliases, the light bridge and the `:root` kebab vars deleted
 - [x] Final pass: `eslint-suppressions.json` is `{}`, MIGRATION.md deleted, retro in the README, README closed out
+
+## Follow-ups (after the overhaul)
+- [x] **Live exercise logging as one screen** (2026-11-21, ui-page; DECISIONS): rest clock, setup panel, just-logged fix, reps slider, Finish → Up next. Not checked in the browser yet (dev stack wasn't running).
+- [ ] **Machine settings editor**: label/value rows in the plan's exercise dialog next to load type, plus create/update endpoints. The column, type and logging UI already exist.
+- [ ] **Planned set count per exercise** in plans; replaces `plannedSetCount`'s "last session, else 2".
+- [ ] **Smart "what's next" ordering** (parked, own feature): muscle-group tags, "after" rules (triceps after all chest), openers; ranks Up next, always overridable.
+

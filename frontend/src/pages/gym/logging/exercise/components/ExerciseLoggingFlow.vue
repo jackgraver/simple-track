@@ -1,23 +1,15 @@
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
+import { computed, nextTick, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { dialogManager } from "~/composables/dialog/useDialog";
-import {
-    DEFAULT_EXERCISE_LOAD_TYPE,
-    type ExerciseLoadType,
-} from "~/types/workout";
+import { DEFAULT_EXERCISE_LOAD_TYPE, type ExerciseLoadType } from "~/types/workout";
+import { ChartLine } from "lucide-vue-next";
+import { Button, IconButton } from "~/shared/ui";
+import ExerciseProgressionChartPanel from "~/pages/gym/progression/ExerciseProgressionChartPanel.vue";
 import { useWorkoutStore } from "../../store/useWorkoutStore";
 import { useLoggingRouteContext } from "../../composables/useLoggingRouteContext";
-import {
-    findExerciseGroupByExerciseId,
-    parseExerciseIdParam,
-} from "../domain/exerciseRouteGroup";
-import {
-    parseStoredExerciseLoggingFlow,
-    transitionExerciseLoggingFlow,
-    type ExerciseLoggingFlowAction,
-    type ExerciseLoggingFlowStep,
-} from "../domain/exerciseLoggingFlow";
+import { buildWorkoutSteps, formatSets } from "../../domain/workoutSteps";
+import { findExerciseGroupByExerciseId, parseExerciseIdParam } from "../domain/exerciseRouteGroup";
 import { previousRepsForSetAtWeight } from "../domain/loggedSetDefaults";
 import {
     formatExerciseWeightSetup,
@@ -25,19 +17,26 @@ import {
     parseWeightSetup,
     type WeightSetupDialogResult,
 } from "../domain/weightSetup";
+import { overloadStatus, plannedSetCount, progressVerdict, visibleMachineSettings } from "../domain/liveLogging";
+import { buildUpNext, type UpNextItem } from "../domain/upNext";
 import { useExerciseLoggingSession } from "../composables/useExerciseLoggingSession";
-import { SegmentedControl } from "~/shared/ui";
 import WeightSetupDialog from "../dialog/WeightSetupDialog.vue";
-import ExerciseProgressionChartPanel from "~/pages/gym/progression/ExerciseProgressionChartPanel.vue";
-import ExerciseSetupScreen from "./ExerciseSetupScreen.vue";
-import ExerciseRepsScreen from "./ExerciseRepsScreen.vue";
-import ExerciseRestScreen from "./ExerciseRestScreen.vue";
+import WeightSheet, { type WeightSheetResult } from "../dialog/WeightSheet.vue";
+import NotesSheet from "../dialog/NotesSheet.vue";
+import LoggingHeader from "./LoggingHeader.vue";
+import NumberSlider from "./NumberSlider.vue";
+import RestClock from "./RestClock.vue";
+import SetupPanel from "./SetupPanel.vue";
+import TodayVsLastList from "./TodayVsLastList.vue";
+import UpNextView from "./UpNextView.vue";
 
+// One screen for the whole lift → log → rest loop (docs/projects/ui-overhaul/DECISIONS.md, 2026-11-21).
+// Top to bottom: rest clock, weight + setup, the set just logged, reps slider, one primary action.
 const route = useRoute();
 const router = useRouter();
-const { offset } = useLoggingRouteContext();
-const { log, data, pending, logExercise, deleteLoggedSet } =
-    useWorkoutStore(offset);
+const { offset, goBackToLogging } = useLoggingRouteContext();
+const store = useWorkoutStore(offset);
+const { log, data, pending, logExercise, deleteLoggedSet } = store;
 
 const exerciseId = computed(() => parseExerciseIdParam(route));
 const exerciseGroup = computed(() => {
@@ -55,114 +54,93 @@ const session = useExerciseLoggingSession({
     router,
 });
 
-const step = ref<ExerciseLoggingFlowStep>("setup");
-const restSetNumber = ref<number | null>(null);
-const exerciseName = computed(
-    () =>
-        session.exerciseGroup?.planned?.name ??
-        session.exerciseGroup?.logged?.exercise?.name ??
-        "",
-);
+/* ---------- exercise facts ---------- */
+const exercise = computed(() => session.exerciseGroup?.planned ?? session.exerciseGroup?.logged?.exercise ?? null);
+const exerciseName = computed(() => exercise.value?.name ?? "");
+const cues = computed(() => exercise.value?.cues ?? "");
+const machineSettings = computed(() => visibleMachineSettings(exercise.value?.machine_settings));
 const previousSets = computed(() =>
-    (session.exerciseGroup?.previous?.sets ?? []).map((set) => ({
-        weight: set.weight,
-        reps: set.reps,
-    })),
+    (session.exerciseGroup?.previous?.sets ?? []).map((set) => ({ weight: set.weight, reps: set.reps })),
 );
-const previousRepForCurrentSet = computed(() =>
-    previousRepsForSetAtWeight(
-        previousSets.value,
-        session.currentSetNumber - 1,
-        session.currentWeight,
-    ),
-);
-const displayedSetNumber = computed(() =>
-    step.value === "rest"
-        ? (restSetNumber.value ?? Math.max(1, session.currentSetNumber - 1))
-        : session.currentSetNumber,
-);
-const cues = computed(
-    () =>
-        session.exerciseGroup?.planned?.cues ??
-        session.exerciseGroup?.logged?.exercise?.cues ??
-        "",
-);
-const exerciseLoadType = computed<ExerciseLoadType>(
-    () =>
-        (session.exerciseGroup?.planned?.load_type ??
-            session.exerciseGroup?.logged?.exercise?.load_type ??
-            DEFAULT_EXERCISE_LOAD_TYPE) as ExerciseLoadType,
-);
-const tracksWeightSetup = computed(() =>
-    isPlateLoadedExercise(exerciseLoadType.value),
-);
-const weightSetupPlaceholder = computed(() =>
-    exerciseLoadType.value === "plate_loaded_total"
-        ? "Set total plates"
-        : "Set plates per side",
-);
-const weightSetupSummary = computed(() => {
-    const setup = session.currentWeightSetup.trim();
-    if (!setup) return weightSetupPlaceholder.value;
-    const parsed = parseWeightSetup(setup);
-    if (!parsed.parsed) return setup;
-    const formatted = formatExerciseWeightSetup(
-        exerciseLoadType.value,
-        parsed.platesPerSide,
-    );
-    return formatted || "No plates";
-});
 const repRollover = computed(() => {
     const g = session.exerciseGroup;
-    const rollover =
-        g?.planned?.rep_rollover ??
-        g?.logged?.exercise?.rep_rollover ??
-        g?.previous?.exercise?.rep_rollover;
-    return typeof rollover === "number" && Number.isFinite(rollover)
-        ? rollover
-        : undefined;
+    const rollover = g?.planned?.rep_rollover ?? g?.logged?.exercise?.rep_rollover ?? g?.previous?.exercise?.rep_rollover;
+    return typeof rollover === "number" && Number.isFinite(rollover) && rollover > 0 ? rollover : undefined;
 });
-const continueLabel = computed(() =>
-    session.loggedSets.length > 0 ? "Continue logging" : "Start logging",
+const loadType = computed<ExerciseLoadType>(
+    () => (exercise.value?.load_type ?? DEFAULT_EXERCISE_LOAD_TYPE) as ExerciseLoadType,
 );
-const navigationSteps: {
-    id: ExerciseLoggingFlowStep;
-    label: string;
-}[] = [
-    { id: "setup", label: "Setup" },
-    { id: "reps", label: "Log" },
-    { id: "rest", label: "Rest" },
-];
-const flowStorageKey = computed(
-    () => `gym-flow:v1:day:${dayId.value}:exercise:${exerciseId.value ?? 0}`,
+const plates = computed(() => {
+    if (!isPlateLoadedExercise(loadType.value)) return null;
+    const setup = session.currentWeightSetup.trim();
+    if (!setup) return "";
+    const parsed = parseWeightSetup(setup);
+    if (!parsed.parsed) return setup;
+    return formatExerciseWeightSetup(loadType.value, parsed.platesPerSide) || "No plates";
+});
+
+/* ---------- sets ---------- */
+const loggedCount = computed(() => session.loggedSets.length);
+const targetSets = computed(() => plannedSetCount(previousSets.value));
+const plannedDone = computed(() => loggedCount.value >= targetSets.value);
+const editing = computed(() => session.editingSetIndex != null);
+const overload = computed(() => overloadStatus(previousSets.value, repRollover.value, session.currentWeight));
+const verdict = computed(() => progressVerdict(session.loggedSets, repRollover.value, session.currentWeight));
+
+/* ---------- reps slider ---------- */
+const extraSetOpen = ref(false);
+const showSlider = computed(() => editing.value || !plannedDone.value || extraSetOpen.value);
+const previousRep = computed(() =>
+    previousRepsForSetAtWeight(previousSets.value, session.currentSetNumber - 1, session.currentWeight),
 );
-
-const transition = (
-    action: ExerciseLoggingFlowAction,
-    setNumber: number | null = null,
-) => {
-    if (action === "setLogged") restSetNumber.value = setNumber;
-    if (action === "nextSet") restSetNumber.value = null;
-    step.value = transitionExerciseLoggingFlow(step.value, action);
-};
-
-const clearFlowState = () => {
-    window.sessionStorage.removeItem(flowStorageKey.value);
-};
-
-const goBackToList = () => {
-    session.goBackToList();
-};
-
-const selectStep = (nextStep: ExerciseLoggingFlowStep) => {
-    if (nextStep === step.value) return;
-    if (step.value === "reps") session.cancelEditingSet();
-    if (nextStep === "rest") {
-        restSetNumber.value = Math.max(1, session.currentSetNumber - 1);
-    } else {
-        restSetNumber.value = null;
+const sliderMarkers = computed(() => {
+    const markers: { value: number; label: string; color?: "orange"; labelPosition?: "bottom" }[] = [];
+    if (previousRep.value != null) {
+        markers.push({ value: previousRep.value, label: "Last time", color: "orange", labelPosition: "bottom" });
     }
-    step.value = nextStep;
+    if (repRollover.value != null) markers.push({ value: repRollover.value, label: "Rollover" });
+    return markers;
+});
+
+/* ---------- view: logging, or "Up next" after finishing ---------- */
+const view = ref<"log" | "next">("log");
+const setupOpen = ref(false);
+const setupExpanded = computed(() => loggedCount.value === 0 || setupOpen.value);
+watch(exerciseId, () => {
+    view.value = "log";
+    setupOpen.value = false;
+    extraSetOpen.value = false;
+});
+
+const scrollToTop = () => window.scrollTo({ top: 0, behavior: "instant" });
+
+/* ---------- actions ---------- */
+const logging = ref(false);
+// No scrolling after a log: the clock is already at the top, and a jump on top of the setup card
+// collapsing read as a flicker on the phone.
+const logSet = async () => {
+    if (logging.value) return;
+    logging.value = true;
+    try {
+        if (await session.addNextSet()) extraSetOpen.value = false;
+    } finally {
+        logging.value = false;
+    }
+};
+
+// Tap a set in the list below to edit it with the slider; tap it again (or "Back to set N") to stop.
+// No scrolling: starting or stopping can show/hide the slider above the list, so the page is shifted
+// by the same amount and the tapped row stays under the finger (iOS Safari has no scroll anchoring).
+const selectSet = (index: number, row?: HTMLElement) => {
+    const before = row?.getBoundingClientRect().top;
+    if (session.editingSetIndex === index) session.cancelEditingSet();
+    else session.editSet(index);
+    if (row && before != null) {
+        void nextTick(() => {
+            const shift = row.getBoundingClientRect().top - before;
+            if (shift) window.scrollBy({ top: shift, behavior: "instant" });
+        });
+    }
 };
 
 const finishing = ref(false);
@@ -171,30 +149,22 @@ const finish = async () => {
     finishing.value = true;
     try {
         if (await session.finishLogging()) {
-            clearFlowState();
+            view.value = "next";
+            scrollToTop();
         }
     } finally {
         finishing.value = false;
     }
 };
 
-const editSet = (setIndex: number) => {
-    session.editSet(setIndex);
-    if (session.editingSetIndex != null) {
-        restSetNumber.value = null;
-        step.value = "reps";
-    }
-};
-
-const openWeightSetupDialog = async () => {
-    if (!tracksWeightSetup.value) return;
+const openPlatesDialog = async () => {
     const result = await dialogManager.custom<WeightSetupDialogResult>({
-        title: "Weight setup",
+        title: "Plates",
         component: WeightSetupDialog,
         componentProps: {
             currentSetup: session.currentWeightSetup,
             targetWeightLbs: session.currentWeight,
-            loadType: exerciseLoadType.value,
+            loadType: loadType.value,
         },
         wide: true,
     });
@@ -203,98 +173,188 @@ const openWeightSetupDialog = async () => {
     if (result.syncWeight) session.commitWeightFromInput(result.totalLbs);
 };
 
-const openProgressionDialog = () => {
+const openWeightSheet = async () => {
+    const progression = session.weightProgression;
+    const result = await dialogManager.custom<WeightSheetResult>({
+        title: `Weight & setup · ${exerciseName.value}`,
+        component: WeightSheet,
+        componentProps: {
+            weight: session.currentWeight,
+            step: session.weightIncrement,
+            overload: overload.value,
+            canUndoProgression: progression != null && session.currentWeight === progression.nextWeight,
+            plates: plates.value,
+            machineSettings: machineSettings.value,
+            cues: cues.value,
+        },
+    });
+    if (result == null) return;
+    if (result.action === "undo-progression") {
+        session.undoWeightProgression();
+        return;
+    }
+    session.commitWeightFromInput(result.weight);
+    if (result.action === "plates") await openPlatesDialog();
+};
+
+const openNotes = async () => {
+    const result = await dialogManager.custom<string>({
+        title: `Notes · ${exerciseName.value}`,
+        component: NotesSheet,
+        componentProps: { notes: session.notes },
+    });
+    if (result != null) session.updateNotes(result);
+};
+
+const openProgression = () => {
     const id = exerciseId.value;
     if (id == null) return;
     void dialogManager.custom<void>({
         title: `${exerciseName.value} Progression`,
         component: ExerciseProgressionChartPanel,
-        componentProps: {
-            exerciseId: id,
-            lastTimeSets: previousSets.value,
-            initialRange: "6m",
-        },
+        componentProps: { exerciseId: id, lastTimeSets: previousSets.value, initialRange: "6m" },
         wide: true,
     });
 };
 
-watch(
-    flowStorageKey,
-    (key) => {
-        const stored = parseStoredExerciseLoggingFlow(
-            window.sessionStorage.getItem(key),
-        );
-        step.value = stored.step;
-        restSetNumber.value = stored.setNumber;
-    },
-    { immediate: true },
-);
+/* ---------- up next ---------- */
 
-watch([step, restSetNumber], ([currentStep, setNumber]) => {
-    if (exerciseId.value == null || dayId.value <= 0) return;
-    window.sessionStorage.setItem(
-        flowStorageKey.value,
-        JSON.stringify({ step: currentStep, setNumber }),
-    );
-});
+const steps = computed(() =>
+    buildWorkoutSteps({
+        log: log.value,
+        plannedCardio: store.plannedCardio.value,
+        loggedCardio: store.loggedCardio.value,
+        plannedPreMobility: store.plannedPreMobility.value,
+        loggedPreMobility: store.loggedPreMobility.value,
+        plannedPostMobility: store.plannedPostMobility.value,
+        loggedPostMobility: store.loggedPostMobility.value,
+    }),
+);
+const upNext = computed(() => buildUpNext(steps.value, log.value, exerciseId.value));
+const doneCount = computed(() => steps.value.filter((s) => s.done).length);
+
+const goTo = (item: UpNextItem) => {
+    const query = route.query;
+    if (item.kind === "lift" && item.exerciseId != null) {
+        void router.push({ name: "logging-exercise", params: { id: String(item.exerciseId) }, query });
+    } else if (item.kind === "cardio") {
+        void router.push({ name: "logging-cardio", query });
+    } else if (item.kind === "warmup" || item.kind === "cooldown") {
+        void router.push({ name: "logging-mobility", params: { slot: item.kind === "warmup" ? "pre" : "post" }, query });
+    }
+};
 </script>
 
 <template>
-    <div class="pb-above-tabbar lg:pb-20">
-        <ExerciseSetupScreen
-            v-if="step === 'setup'"
-            :exercise-name="exerciseName"
-            :set-number="displayedSetNumber"
-            :weight="session.currentWeight"
-            :weight-step="session.weightIncrement"
-            :previous-sets="previousSets"
-            :notes="session.notes"
-            :cues="cues"
-            :weight-increase="session.weightProgression?.increase ?? null"
-            :tracks-weight-setup="tracksWeightSetup"
-            :weight-setup-summary="weightSetupSummary"
-            :continue-label="continueLabel"
-            @back="goBackToList"
-            @continue="transition('startLogging')"
-            @undo-weight-increase="session.undoWeightProgression()"
-            @edit-weight-setup="openWeightSetupDialog()"
-            @update:weight="session.commitWeightFromInput"
+    <div class="flex w-full flex-col gap-4 pb-6">
+        <LoggingHeader
+            :title="view === 'next' ? 'Up next' : exerciseName"
+            :subtitle="
+                view === 'next'
+                    ? `${doneCount} of ${steps.length} done`
+                    : editing
+                      ? `Editing set ${(session.editingSetIndex ?? 0) + 1}`
+                      : plannedDone
+                        ? `${loggedCount} of ${targetSets} sets · done`
+                        : `Set ${session.currentSetNumber} of ${targetSets}`
+            "
+            @back="goBackToLogging"
+        >
+            <template #right>
+                <IconButton label="Progression chart" @click="openProgression"><ChartLine /></IconButton>
+            </template>
+        </LoggingHeader>
+
+        <RestClock />
+
+        <UpNextView
+            v-if="view === 'next'"
+            :finished-name="exerciseName"
+            :finished-sets="formatSets(session.loggedSets)"
+            :verdict="verdict"
+            :items="upNext"
+            @go="goTo"
+            @list="goBackToLogging"
         />
-        <ExerciseRepsScreen
-            v-else-if="step === 'reps'"
-            :exercise-name="exerciseName"
-            :session="session"
-            :previous-rep="previousRepForCurrentSet"
-            :rep-rollover="repRollover"
-            @back="goBackToList"
-            @logged="(setNumber) => transition('setLogged', setNumber)"
-        />
-        <ExerciseRestScreen
-            v-else
-            :exercise-name="exerciseName"
-            :set-number="displayedSetNumber"
-            :current-weight="session.currentWeight"
-            :session="session"
-            :finishing="finishing"
-            @back="goBackToList"
-            @next="transition('nextSet')"
-            @finish="finish"
-            @progression="openProgressionDialog"
-            @edit="editSet"
-            @edit-setup="transition('backToSetup')"
-        />
-    </div>
-    <nav
-        aria-label="Exercise logging steps"
-        class="pointer-events-none fixed inset-x-0 bottom-above-tabbar z-nav px-4 lg:bottom-4"
-    >
-        <div class="pointer-events-auto mx-auto w-full max-w-md rounded-control bg-canvas shadow-raised">
-            <SegmentedControl
-                label="Logging step"
-                :model-value="step"
-                :options="navigationSteps.map((s) => ({ label: s.label, value: s.id }))"
-                @update:model-value="selectStep"
+
+        <template v-else>
+            <SetupPanel
+                :expanded="setupExpanded"
+                :weight="session.currentWeight"
+                :overload="overload"
+                :last-time="formatSets(previousSets)"
+                :machine-settings="machineSettings"
+                :plates="plates"
+                :cues="cues"
+                @edit="openWeightSheet"
             />
-        </div>
-    </nav>
+
+
+            <section v-if="showSlider" class="flex flex-col gap-1" aria-label="Reps">
+                <p class="m-0 text-xs font-semibold tracking-wide uppercase" :class="editing ? 'text-accent' : 'text-fg-muted'">
+                    {{ editing ? `Editing set ${(session.editingSetIndex ?? 0) + 1}` : `Reps · set ${session.currentSetNumber}` }}
+                </p>
+                <NumberSlider
+                    label=""
+                    :model-value="session.currentReps"
+                    :markers="sliderMarkers"
+                    integer-only
+                    :max="50"
+                    @update:model-value="session.commitRepsFromInput"
+                />
+            </section>
+
+            <div class="flex flex-col gap-2">
+                <Button v-if="showSlider" variant="primary" size="lg" block :loading="logging" @click="logSet">
+                    {{ editing ? `Save set ${(session.editingSetIndex ?? 0) + 1}` : `Log set ${session.currentSetNumber}` }}
+                    · {{ session.currentReps }} reps
+                </Button>
+                <Button v-if="plannedDone && !editing && !extraSetOpen" variant="primary" size="lg" block :loading="finishing" @click="finish">
+                    Finish {{ exerciseName }}
+                </Button>
+                <Button
+                    v-if="plannedDone && !editing && !extraSetOpen"
+                    variant="ghost"
+                    class="self-center"
+                    @click="extraSetOpen = true"
+                >
+                    + Add set {{ loggedCount + 1 }}
+                </Button>
+                <Button v-if="extraSetOpen && !editing" variant="ghost" class="self-center" @click="extraSetOpen = false">
+                    Cancel extra set
+                </Button>
+                <Button v-if="editing" variant="ghost" class="self-center" @click="session.cancelEditingSet()">
+                    {{ plannedDone ? "Stop editing" : `Back to set ${loggedCount + 1}` }}
+                </Button>
+            </div>
+
+            <div class="mt-4 flex flex-col gap-4 border-t border-dashed border-line pt-6">
+                <TodayVsLastList
+                    :sets="session.loggedSets"
+                    :previous="previousSets"
+                    :verdict="verdict"
+                    :weight="session.currentWeight"
+                    :editing-index="session.editingSetIndex"
+                    @select="selectSet"
+                    @delete="session.deleteSet"
+                    @retry="session.retrySet"
+                />
+                <div class="flex flex-wrap gap-x-2 gap-y-1">
+                    <Button
+                        v-if="loggedCount > 0 && !plannedDone && !editing"
+                        variant="ghost"
+                        size="sm"
+                        :loading="finishing"
+                        @click="finish"
+                    >
+                        Finish early
+                    </Button>
+                    <Button variant="ghost" size="sm" @click="openNotes">{{ session.notes ? "Edit notes" : "Add notes" }}</Button>
+                    <Button v-if="loggedCount > 0" variant="ghost" size="sm" @click="setupOpen = !setupOpen">
+                        {{ setupOpen ? "Hide setup" : "Show setup" }}
+                    </Button>
+                </div>
+            </div>
+        </template>
+    </div>
 </template>

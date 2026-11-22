@@ -58,6 +58,13 @@ export interface Exercise extends BaseModel {
     rep_rollover: number;
     cues: string;
     load_type?: ExerciseLoadType;
+    /** Machine positions (seat, pad, pulley). Not editable yet; null/absent means none. */
+    machine_settings?: MachineSetting[] | null;
+}
+
+export interface MachineSetting {
+    label: string;
+    value: string;
 }
 
 export type ExerciseLoadType =

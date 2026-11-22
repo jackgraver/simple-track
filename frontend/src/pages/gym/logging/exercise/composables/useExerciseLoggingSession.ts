@@ -194,8 +194,6 @@ export function useExerciseLoggingSession(options: {
         },
     });
 
-    const hasDraftSet = () => currentWeight.value > 0 || currentReps.value > 0;
-
     const initializeExercise = () => {
         if (pending.value) return;
 
@@ -322,6 +320,16 @@ export function useExerciseLoggingSession(options: {
         );
     };
 
+    /** Point the reps slider at last session's reps for the next set, when there is one at this weight. */
+    const resetRepsForCurrentSet = () => {
+        const previous = previousRepsForSetAtWeight(
+            exerciseGroup.value?.previous?.sets,
+            currentSetNumber.value - 1,
+            currentWeight.value,
+        );
+        if (previous != null) currentReps.value = normalizeReps(previous);
+    };
+
     const stepWeight = (direction: "plus" | "minus") => {
         if (direction === "plus") {
             updateWeightAndDefaultReps(
@@ -387,37 +395,35 @@ export function useExerciseLoggingSession(options: {
             draftDirty.value = false;
             editingSetIndex.value = null;
             currentSetNumber.value = loggedSets.value.length + 1;
-            globalTimer.start(exerciseDisplayName.value);
+            if (editingIndex == null) {
+                // A fix to an earlier set isn't a new set: the rest clock keeps running.
+                globalTimer.start(exerciseDisplayName.value);
+            }
+            resetRepsForCurrentSet();
         }
         return success;
     };
 
+    /**
+     * Sets are saved as they're logged, so finishing only re-saves (notes, any failed sets) and
+     * drops the draft. The slider position is never logged here. The caller decides where to go.
+     */
     const finishLogging = async (): Promise<boolean> => {
-        if (loggedSets.value.length === 0 && !hasDraftSet()) {
-            toast.push("Please log at least one set", "error");
+        if (loggedSets.value.length === 0) {
+            toast.push("Log at least one set first", "error");
             return false;
         }
 
-        if (currentWeight.value > 0 && currentReps.value === 0) {
-            toast.push(
-                "Add reps or clear the draft set before finishing",
-                "error",
-            );
-            return false;
-        }
-
-        const shouldIncludeDraft =
-            currentReps.value > 0 &&
-            (loggedSets.value.length === 0 || draftDirty.value);
-        const success = await saveCurrentExercise(shouldIncludeDraft);
+        editingSetIndex.value = null;
+        const success = await saveCurrentExercise(false);
 
         if (!success) {
             toast.push("Failed to save exercise. Please try again.", "error");
             return false;
         }
 
+        draftDirty.value = false;
         draftStorage.clear();
-        router.push(loggingRoute());
         return true;
     };
 
@@ -484,6 +490,9 @@ export function useExerciseLoggingSession(options: {
         if (editingSetIndex.value == null) return;
         editingSetIndex.value = null;
         currentSetNumber.value = loggedSets.value.length + 1;
+        const last = loggedSets.value[loggedSets.value.length - 1];
+        if (last) currentWeight.value = last.weight;
+        resetRepsForCurrentSet();
     };
 
     const goBackToList = () => {

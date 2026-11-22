@@ -60,11 +60,20 @@ func NormalizeExerciseLoadType(loadType ExerciseLoadType) ExerciseLoadType {
 // Can be associated with multiple workout plans via many-to-many relationship
 type Exercise struct {
 	gorm.Model
-	Name         string           `gorm:"uniqueIndex;not null" json:"name"`
-	RepRollover  uint             `json:"rep_rollover"`
-	Cues         string           `json:"cues"`
-	LoadType     ExerciseLoadType `gorm:"type:text;not null;default:plate_loaded_with_bar" json:"load_type"`
-	WorkoutPlans []WorkoutPlan    `gorm:"many2many:workout_plan_exercises;" json:"workout_plans"`
+	Name        string           `gorm:"uniqueIndex;not null" json:"name"`
+	RepRollover uint             `json:"rep_rollover"`
+	Cues        string           `json:"cues"`
+	LoadType    ExerciseLoadType `gorm:"type:text;not null;default:plate_loaded_with_bar" json:"load_type"`
+	// MachineSettings holds per-exercise machine positions (seat 4, pad 2, pulley top),
+	// shown on the logging screen. Read-only for now: no endpoint writes it yet.
+	MachineSettings []MachineSetting `gorm:"type:jsonb;serializer:json" json:"machine_settings"`
+	WorkoutPlans    []WorkoutPlan    `gorm:"many2many:workout_plan_exercises;" json:"workout_plans"`
+}
+
+// MachineSetting is one labelled machine position, e.g. {"label": "Seat", "value": "4"}.
+type MachineSetting struct {
+	Label string `json:"label"`
+	Value string `json:"value"`
 }
 
 func (e Exercise) GetID() uint        { return e.ID }

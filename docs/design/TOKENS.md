@@ -37,6 +37,7 @@ never class names. Don't use Tailwind's `dark:` variant: the tokens flip on thei
 | `accent-soft` | selected bg, accent chip | accent @ 16% | accent @ 12% (all `*-soft` use the same alphas) | (new) |
 | `success` / `success-soft` | done, +progress, positive money | `hsl(142 65% 48%)` | `hsl(142 70% 27%)` | `green-*`, `emerald-400`, `#28a745`, `#55db2c`, `rgb(34,139,34)` |
 | `warn` / `warn-soft` | stale, over target, caution | `hsl(38 92% 55%)` | `hsl(32 95% 31%)` | `amber-*`, `orange-400` |
+| `rest-wait` / `rest-near` | gym rest clock before 2:00 ("not yet" → "close"); past 2:00 it uses `success` | `hsl(24 92% 60%)` / `hsl(50 95% 55%)` | `hsl(22 90% 40%)` / `hsl(42 100% 29%)` | (new) |
 | `danger` / `danger-soft` | destructive, error, negative money | `hsl(0 80% 66%)` | `hsl(0 72% 44%)` | `cfRed`, `red-*`, `#ff2b2b`, `#dc3545`, `rgb(60,20,20)` |
 | `info` / `info-soft` | neutral notice | `hsl(199 89% 60%)` | `hsl(200 90% 32%)` | `sky-*`, `#007bff` |
 | `macro-calories` | | `#fb923c` | `#ea580c` | `orange`, `--macro-calories` |

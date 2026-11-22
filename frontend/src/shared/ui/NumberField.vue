@@ -44,6 +44,7 @@ const stepper =
         :max="max"
         :format-options="formatOptions"
         :disabled="disabled"
+        :focus-on-change="false"
         :aria-label="field ? undefined : label"
         class="flex items-center gap-2"
     >
