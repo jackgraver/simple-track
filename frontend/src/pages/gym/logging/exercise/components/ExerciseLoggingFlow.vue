@@ -323,9 +323,6 @@ const goTo = (item: UpNextItem) => {
                 <Button v-if="extraSetOpen && !editing" variant="ghost" class="self-center" @click="extraSetOpen = false">
                     Cancel extra set
                 </Button>
-                <Button v-if="editing" variant="ghost" class="self-center" @click="session.cancelEditingSet()">
-                    {{ plannedDone ? "Stop editing" : `Back to set ${loggedCount + 1}` }}
-                </Button>
             </div>
 
             <div class="mt-4 flex flex-col gap-4 border-t border-dashed border-line pt-6">
