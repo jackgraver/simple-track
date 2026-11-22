@@ -150,14 +150,24 @@ func seedGym(tx *gorm.DB) error {
 		if err := tx.Create(&log).Error; err != nil {
 			return err
 		}
-		for _, ei := range p.idx {
+		// Sets are stamped as if logged live (timing stats read created_at):
+		// start ~6pm, ~2-3.5 min between sets, ~3-5 min between exercises.
+		at := log.Date.Add(18*time.Hour + time.Duration(i*7)*time.Minute)
+		for n, ei := range p.idx {
 			le := workm.LoggedExercise{WorkoutLogID: log.ID, ExerciseID: exs[ei].ID}
 			if err := tx.Create(&le).Error; err != nil {
 				return err
 			}
+			if n > 0 {
+				at = at.Add(time.Duration(180+((i+ei)%5)*30) * time.Second)
+			}
 			base := float32(45 + ei*10 + (9-i)*2)
 			for s := 0; s < 3; s++ {
+				if s > 0 {
+					at = at.Add(time.Duration(120+((i*3+ei+s)%7)*15) * time.Second)
+				}
 				set := workm.LoggedSet{LoggedExerciseID: le.ID, Reps: uint(10 - s), Weight: base, WeightSetup: ""}
+				set.CreatedAt = at
 				if err := tx.Create(&set).Error; err != nil {
 					return err
 				}

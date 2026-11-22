@@ -26,6 +26,10 @@ export const liveworkoutKeys = {
             ] as const,
         activityPrefix: () =>
             [...liveworkoutKeysBase.all, 'workouts', 'activity'] as const,
+        timing: (days: number) =>
+            [...liveworkoutKeysBase.all, 'workouts', 'timing', days] as const,
+        timingPrefix: () =>
+            [...liveworkoutKeysBase.all, 'workouts', 'timing'] as const,
     },
     exercises: {
         all: [...liveworkoutKeysBase.all, 'exercises'] as const,

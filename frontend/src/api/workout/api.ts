@@ -61,6 +61,29 @@ export type WorkoutActivityResponse = {
     mode: string;
 };
 
+export type DurationStat = {
+    count: number;
+    avg_seconds: number;
+    median_seconds: number;
+};
+
+export type ExerciseTimingStat = {
+    exercise_id: number;
+    name: string;
+    set_interval: DurationStat;
+    transition: DurationStat;
+};
+
+export type WorkoutTimingStatsResponse = {
+    days: number;
+    start: string;
+    workout: DurationStat;
+    set_interval: DurationStat;
+    transition: DurationStat;
+    exercises: ExerciseTimingStat[];
+    excluded_workouts: number;
+};
+
 export type WorkoutLogsPreviousResponse = {
     day: WorkoutLog;
     planned_exercises: ExerciseGroup[];
