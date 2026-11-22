@@ -23,8 +23,7 @@ import {
     importWeightCsv,
     updateDrinkSizePreset,
 } from "~/api/tracking/api";
-<<<<<<< HEAD
-import type { BodyWeightLog, GroceryItem } from "~/api/tracking/types";
+import axios from "axios";
 import { getApiErrorMessage } from "~/api/httpError";
 import { useOptimisticMutation } from "~/api/optimistic";
 import {
@@ -34,10 +33,6 @@ import {
     removeGroceryItemByClientId,
     restoreGroceryItem,
 } from "~/api/tracking/groceryCache";
-=======
-import axios from "axios";
-import { getApiErrorMessage } from "~/api/httpError";
-import { useOptimisticMutation } from "~/api/optimistic";
 import {
     addWaterPatch,
     deleteWaterPatch,
@@ -51,8 +46,7 @@ import {
     type AddWaterVars,
     type DeleteWaterVars,
 } from "~/api/tracking/patches";
-import type { BodyWeightLog, StepLog, WaterLog } from "~/api/tracking/types";
->>>>>>> proj/opt-t1
+import type { BodyWeightLog, GroceryItem, StepLog, WaterLog } from "~/api/tracking/types";
 import { trackingKeys } from "~/api/tracking/keys";
 
 export function latestWeightLbs(logs: BodyWeightLog[] | undefined): number | null {
