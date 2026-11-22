@@ -611,12 +611,39 @@ func SetPlannedMealLogged(dayID uint, mealID uint) error {
 	return conn().Save(&pm).Error
 }
 
+// DeleteLoggedMeal removes a logged meal from a day. It is idempotent: a log that is already
+// gone is success, so a repeated (or retried) unlog does not fail.
+//
+// It does not reset planned_meals.logged: whether an unlogged planned meal returns to
+// "planned" is an open owner question (optimistic-ui README, Q1).
 func DeleteLoggedMeal(dayID uint, mealID uint) error {
-	var log models.DayLog
-	if err := conn().Where("day_id = ? AND meal_id = ?", dayID, mealID).First(&log).Error; err != nil {
-		return err
-	}
-	return conn().Delete(&log).Error
+	return conn().Where("day_id = ? AND meal_id = ?", dayID, mealID).Delete(&models.DayLog{}).Error
+}
+
+// LogPlannedMeal marks the day's planned meal as logged and ensures exactly one day log exists
+// for it. Repeating the call is a no-op. Returns gorm.ErrRecordNotFound when the day has no such
+// planned meal.
+func LogPlannedMeal(dayID uint, mealID uint) error {
+	return conn().Transaction(func(tx *gorm.DB) error {
+		var pm models.PlannedMeal
+		if err := tx.Where("day_id = ? AND meal_id = ?", dayID, mealID).First(&pm).Error; err != nil {
+			return err
+		}
+		if !pm.Logged {
+			if err := tx.Model(&pm).Update("logged", true).Error; err != nil {
+				return err
+			}
+		}
+		var count int64
+		if err := tx.Model(&models.DayLog{}).
+			Where("day_id = ? AND meal_id = ?", dayID, mealID).Count(&count).Error; err != nil {
+			return err
+		}
+		if count > 0 {
+			return nil
+		}
+		return tx.Create(&models.DayLog{DayID: dayID, MealID: mealID}).Error
+	})
 }
 
 func UpdateDayLogMeal(dayID uint, oldMealID uint, newMealID uint) error {
@@ -707,11 +734,29 @@ func DeleteSavedMeal(id uint) error {
 	})
 }
 
-func AddPlannedMealFromSavedMeal(offset int, savedMealID uint, meal *models.Meal) error {
+func nilIfEmpty(s string) *string {
+	if s == "" {
+		return nil
+	}
+	return &s
+}
+
+// AddPlannedMealFromSavedMeal appends a planned copy of a saved meal. A non-empty clientID makes it
+// idempotent: when a planned meal with that id exists, nothing is created.
+func AddPlannedMealFromSavedMeal(offset int, savedMealID uint, meal *models.Meal, clientID string) error {
 	return conn().Transaction(func(tx *gorm.DB) error {
 		day, err := findOrCreateDietDayForCalendarDateInTx(tx, utils.ZerodTime(offset))
 		if err != nil {
 			return err
+		}
+		if clientID != "" {
+			var existing int64
+			if err := tx.Model(&models.PlannedMeal{}).Where("client_id = ?", clientID).Count(&existing).Error; err != nil {
+				return err
+			}
+			if existing > 0 {
+				return nil
+			}
 		}
 		for i := range meal.Items {
 			meal.Items[i].ID = 0
@@ -733,6 +778,7 @@ func AddPlannedMealFromSavedMeal(offset int, savedMealID uint, meal *models.Meal
 			SavedMealID:  &sid,
 			Logged:       false,
 			DisplayOrder: next,
+			ClientID:     nilIfEmpty(clientID),
 		}
 		return tx.Create(&pm).Error
 	})
@@ -780,6 +826,8 @@ type QuickLogParams struct {
 	Fiber         float32
 	Offset        int
 	ReplaceMealID uint
+	// ClientID, when set, makes the call idempotent: if a meal with this id exists, nothing is created.
+	ClientID string
 }
 
 func QuickLogMeal(params QuickLogParams) (dayID uint, err error) {
@@ -789,6 +837,15 @@ func QuickLogMeal(params QuickLogParams) (dayID uint, err error) {
 			return derr
 		}
 		dayID = day.ID
+		if params.ClientID != "" {
+			var existing int64
+			if cerr := tx.Model(&models.Meal{}).Where("client_id = ?", params.ClientID).Count(&existing).Error; cerr != nil {
+				return cerr
+			}
+			if existing > 0 {
+				return nil
+			}
+		}
 		food := models.Food{
 			Name:          params.FoodRowName,
 			ServingType:   "",
@@ -804,7 +861,8 @@ func QuickLogMeal(params QuickLogParams) (dayID uint, err error) {
 			return err
 		}
 		meal := models.Meal{
-			Name: params.DisplayName,
+			Name:     params.DisplayName,
+			ClientID: nilIfEmpty(params.ClientID),
 			Items: []models.MealItem{{
 				FoodID: food.ID,
 				Amount: 1,

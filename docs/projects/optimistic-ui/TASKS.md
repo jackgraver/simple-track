@@ -50,7 +50,7 @@ References: AUDIT.md (findings), MUTATIONS.md (per-mutation plan), ID-STRATEGY.m
 - [ ] **G3 Gym rest of logging:** cardio, mobility, add/remove exercise optimistic, switch-plan uses the
   response (SQD). *Done:* each action updates instantly under throttling, and no follow-up GET appears
   in the network tab.
-- [ ] **D1 Diet backend fixes:** `log-planned` takes `day_id` (fixes the 500 off-today), unlog
+- [x] **D1 Diet backend fixes:** (done; migration 0005, see DECISIONS 2026-11-22) `log-planned` takes `day_id` (fixes the 500 off-today), unlog
   idempotent + planned reset (per the owner's answer), unique `day_logs(day_id, meal_id)`, `client_id` on
   `meals` and `planned_meals`. *Done:* Go tests, plus logging a planned meal on yesterday works.
 - [ ] **D2 Diet optimistic** (pairs with ui-overhaul diet): log/unlog planned, quick log, reorder,

@@ -251,7 +251,7 @@ func TestPlannedMealServices(t *testing.T) {
 	testutil.SeedDay(t, db, testutil.Today(), plan.ID)
 	food := testutil.SeedFood(t, db, "Chicken Breast", testutil.DefaultMacros())
 	sm := testutil.SeedSavedMeal(t, db, "Meal Prep", food.ID)
-	if err := services.AddPlannedMealFromSavedMeal(0, sm.ID); err != nil {
+	if err := services.AddPlannedMealFromSavedMeal(0, sm.ID, ""); err != nil {
 		t.Fatal(err)
 	}
 	day, err := services.FindMealPlanDay(testutil.Today())

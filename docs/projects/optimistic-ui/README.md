@@ -39,7 +39,7 @@
 - F4 (diet date keys, hooks in `api/diet/queries.ts`) done; mutations take `offset` in vars.
 - F3 (workout keys, date keys via `api/workout/dates.ts`) is done; mutation vars carry `date`, offset is derived at send time. Gym hooks no longer take an offset.
 - Next: F6 (helper), then G1 (gym backend) and G2. G1+G2 is the first user-visible slice.
-- `PostLogPlanned` ignores the day (500 off-today). Fixed in D1, and until then don't build optimistic log-planned on top of it.
+- D1 done (migration 0005): `log-planned` takes `day_id` (omit = today), log/unlog are idempotent, `client_id` accepted on quick-log and planned/from-saved. Unlog still leaves `planned_meals.logged` set (Q1). D2 should send `day_id` and `client_id`. Migration 0004 belongs to G1: the migrate no-gaps test fails until it is merged.
 - `crypto.randomUUID()` is undefined on plain-http LAN testing from a phone. Use `newClientId()` (F6).
 - TanStack v5 mutation `scope` is per `useMutation` instance, not per call. See DESIGN.md §2 "Concurrency".
 - Open questions for the owner are listed at the bottom of this README. Answers go into DECISIONS.md.

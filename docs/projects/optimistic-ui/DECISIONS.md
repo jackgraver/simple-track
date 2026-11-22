@@ -47,3 +47,11 @@ resolve the key date in `onMutate`, never at settle. All diet hooks live in `api
 `/workout/logs/previous` has one key; `useWorkoutLogToday` is `select: r => r.day` on it. Local-time dates assume the backend's "today" matches the device timezone (unverified).
 Deleted `useAllExercises`, `workouts.today` and `EditCuesDialog.vue`: all had zero references, so owner Q7 is moot for them (`useEditLoggedMeal`/`useDeleteGroceryItem` untouched, not my slice).
 Not verified in a browser (no dev stack allowed): the "one request gym index -> logging" check is by construction (shared key), not by network tab.
+
+## 2026-11-22: D1 diet backend fixes (migration 0005)
+`POST /diet/meals/meal/log-planned` takes optional `day_id` (diet day row id; 0 = today, so the current frontend keeps working), is idempotent (marks logged + one day log, in a tx) and returns 404 when the day has no such planned meal. This fixes the off-today 500.
+`DELETE /meal/logged` is idempotent: an already-missing log returns 200 with the full day (was 500).
+**Unlog does NOT reset `planned_meals.logged`** (owner Q1 unanswered; resetting would make meals reappear in the planned list, a visible behaviour change). `DeleteLoggedMeal` documents this. Revisit when answered.
+Migration `0005_diet_idempotency.sql`: partial unique `day_logs(day_id, meal_id) WHERE deleted_at IS NULL` (existing live duplicates soft-deleted first, oldest kept; soft-deleted rows are exempt so unlog + relog works), and nullable `client_id uuid` + partial unique index on `meals` and `planned_meals`.
+`client_id` is optional on `POST /quick-log` (stored on the meal) and `POST /planned/from-saved` (stored on the planned meal); a replay with a known id creates nothing and returns the current full day. Not wired to `meal/new` or `logedited` yet (D2 can, if needed).
+Numbering: G1 takes 0004, D1 takes 0005. `TestEmbeddedMigrationsParse` (no gaps) fails on this branch until G1 merges; it passes once both are in.

@@ -31,6 +31,7 @@ type QuickLogRequest struct {
 	Fiber         float32 `json:"fiber"`
 	Offset        int     `json:"offset"`
 	ReplaceMealID uint    `json:"replace_meal_id"`
+	ClientID      string  `json:"client_id"`
 }
 
 func dayWithTotalsResponse(result services.DayWithTotals) gin.H {
@@ -65,6 +66,7 @@ func PostQuickLog(c *gin.Context) {
 		Fiber:         req.Fiber,
 		Offset:        req.Offset,
 		ReplaceMealID: req.ReplaceMealID,
+		ClientID:      req.ClientID,
 	})
 	if err != nil {
 		apierr.Internal(c, err)
@@ -394,6 +396,8 @@ func PostNewMeal(c *gin.Context) {
 
 type LogPlannedMealRequest struct {
 	MealID uint `json:"meal_id"`
+	// DayID is the diet day row id to log on. 0 (legacy clients) means today.
+	DayID uint `json:"day_id"`
 }
 
 func PostLogPlanned(c *gin.Context) {
@@ -402,8 +406,12 @@ func PostLogPlanned(c *gin.Context) {
 		apierr.BadRequest(c, err.Error())
 		return
 	}
-	day, err := services.FindMealPlanDay(utils.ZerodTime(0))
+	day, err := services.FindMealPlanDayByRowIDOrToday(req.DayID)
 	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			apierr.NotFound(c, "Day not found")
+			return
+		}
 		apierr.Internal(c, err)
 		return
 	}
@@ -411,23 +419,13 @@ func PostLogPlanned(c *gin.Context) {
 		apierr.NotFound(c, "Day not found")
 		return
 	}
-	if err := services.SetPlannedMealLogged(day.ID, req.MealID); err != nil {
-		apierr.Internal(c, err)
-		return
-	}
-	exists, err := services.DayLogExistsForMeal(day.ID, req.MealID)
-	if err != nil {
-		apierr.Internal(c, err)
-		return
-	}
-	if !exists {
-		if err := services.CreateDayMeal(&models.DayLog{
-			DayID:  day.ID,
-			MealID: req.MealID,
-		}); err != nil {
-			apierr.Internal(c, err)
+	if err := services.LogPlannedMeal(day.ID, req.MealID); err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			apierr.NotFound(c, "Planned meal not found on this day")
 			return
 		}
+		apierr.Internal(c, err)
+		return
 	}
 	result, err := services.ReloadDayWithTotals(day)
 	if err != nil {
@@ -545,8 +543,9 @@ func DeleteLoggedMeal(c *gin.Context) {
 }
 
 type AddPlannedFromSavedRequest struct {
-	SavedMealID uint `json:"saved_meal_id"`
-	Offset      int  `json:"offset"`
+	SavedMealID uint   `json:"saved_meal_id"`
+	Offset      int    `json:"offset"`
+	ClientID    string `json:"client_id"`
 }
 
 func PostPlannedFromSaved(c *gin.Context) {
@@ -559,7 +558,7 @@ func PostPlannedFromSaved(c *gin.Context) {
 		apierr.BadRequest(c, "saved_meal_id is required")
 		return
 	}
-	if err := services.AddPlannedMealFromSavedMeal(req.Offset, req.SavedMealID); err != nil {
+	if err := services.AddPlannedMealFromSavedMeal(req.Offset, req.SavedMealID, req.ClientID); err != nil {
 		apierr.Internal(c, err)
 		return
 	}
