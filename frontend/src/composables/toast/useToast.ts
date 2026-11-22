@@ -14,10 +14,15 @@ let idCounter = 0;
 export function useToast() {
     /**
      * `push("Saved", "success")` or `push({ message, tone, action: { label: "Undo", onClick }, duration })`.
+     * Or `push("Couldn't save", "error", { action: { label: "Retry", onClick }, duration: 6000 })`.
      * Errors stay longer, and so do toasts with an action (time to hit Undo).
      */
-    function push(input: string | ToastOptions, type: ToastTone = "info") {
-        const o: ToastOptions = typeof input === "string" ? { message: input, tone: type } : input;
+    function push(
+        input: string | ToastOptions,
+        type: ToastTone = "info",
+        opts?: Pick<ToastOptions, "action" | "duration">,
+    ) {
+        const o: ToastOptions = typeof input === "string" ? { message: input, tone: type, ...opts } : input;
         const tone = o.tone ?? "info";
         const duration = o.duration ?? (o.action ? 6000 : tone === "error" ? 5000 : 3000);
         const id = ++idCounter;

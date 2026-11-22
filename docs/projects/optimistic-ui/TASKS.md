@@ -16,7 +16,7 @@ References: AUDIT.md (findings), MUTATIONS.md (per-mutation plan), ID-STRATEGY.m
   no 4xx retry), `QueryCache`/`MutationCache` `onError`, `isClientError`, `queryClient.clear()` on
   logout. *Done:* `main.ts` uses them, `vue-tsc` + tests pass, manual check that a 404 detail page makes
   one request.
-- [ ] **F2 Toast action + duration.** `toast.push(msg, type, { action, duration })`, styled via the
+- [x] **F2 Toast action + duration.** `toast.push(msg, type, { action, duration })`, styled via the
   ui-overhaul Toast primitive if it exists (otherwise minimal, restyled later). *Done:* a Retry button
   works in a dev-only demo.
 - [ ] **F3 Workout keys.** Fold `liveworkout` into `workoutKeys`. Absolute-date day keys.
