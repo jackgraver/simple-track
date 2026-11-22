@@ -5,15 +5,19 @@
  * Concurrency model:
  * - Each mutation records which cache keys it patches (via `meta`), so helpers can ask "is anybody
  *   else still writing to this key?" across different hooks (`siblingCount`).
- * - Rollback restores the snapshot only when nobody else patched the key since; otherwise it runs the
- *   patch's `revert`, or invalidates when there is none.
- * - Settle-time invalidation is skipped while siblings on the key are pending; the last one to settle
- *   invalidates for everyone.
+ * - Rollback restores the snapshot only when nobody else is writing the key and the cache still holds
+ *   exactly the value this mutation wrote (a sibling that already settled, failed or succeeded, may
+ *   have changed it since); otherwise it runs the patch's `revert`, or invalidates when there is none.
+ * - Settle-time invalidation is skipped while siblings on the key are pending and queued instead; the
+ *   last one to settle flushes the queue, whatever hook it belongs to.
+ * - A success that settles while siblings are pending may have skipped its reconcile, so the key is
+ *   remembered; if the last writer then fails and rolls back, it invalidates that key.
  * - Per-entity ordering (`scope`) is a promise chain per scope id, not TanStack's `scope` option,
  *   because TanStack's scope is fixed per `useMutation` instance (DECISIONS.md, F6). The cache patch
  *   still applies immediately; only the request waits for the previous same-scope mutation to settle.
  */
 import {
+    hashKey,
     partialMatchKey,
     useMutation,
     useMutationState,
@@ -96,7 +100,8 @@ export type ServerMutationOptions<TVars, TData> = BaseOptions<TVars, TData> & {
     errorMessage?: ((err: unknown, vars: TVars) => string) | false;
 };
 
-type Snapshot = { patch: CachePatch<unknown>; prev: unknown; applied: boolean };
+/** `next` is the value this mutation wrote, so rollback can tell whether anyone changed it since. */
+type Snapshot = { patch: CachePatch<unknown>; prev: unknown; next?: unknown; applied: boolean };
 
 /** onMutate result. Its identity marks "self" when counting siblings. */
 export type OptimisticContext = {
@@ -227,8 +232,9 @@ function useCoreMutation<TVars, TData>(opts: CoreOptions<TVars, TData>): Optimis
                     for (const patch of patches) {
                         const prev = qc.getQueryData(patch.queryKey);
                         const applied = prev !== undefined;
-                        if (applied) qc.setQueryData(patch.queryKey, patch.apply(prev, vars));
-                        ctx.snapshots.push({ patch, prev, applied });
+                        // What the cache stored (structural sharing may keep a different object than `apply` returned).
+                        const next = applied ? qc.setQueryData(patch.queryKey, patch.apply(prev, vars)) : undefined;
+                        ctx.snapshots.push({ patch, prev, next, applied });
                     }
                 } catch (err) {
                     ctx.release?.();
@@ -249,15 +255,34 @@ function useCoreMutation<TVars, TData>(opts: CoreOptions<TVars, TData>): Optimis
                     toast.push(message, "error");
                 }
             },
-            onSuccess: (data, vars, ctx) =>
-                opts.reconcile?.(data, vars, qc, { siblingsPending: (key) => siblingCount(qc, key, ctx) }),
-            onSettled: (data, _err, vars, ctx) => {
+            onSuccess: (data, vars, ctx) => {
+                // A reconcile with siblings pending may only merge (or skip); if the last writer then
+                // fails, nobody would write the server's answer, so remember the key for its rollback.
+                for (const { patch } of ctx?.snapshots ?? []) {
+                    if (siblingCount(qc, patch.queryKey, ctx) > 0) remember(unreconciled, qc, patch.queryKey);
+                }
+                opts.reconcile?.(data, vars, qc, { siblingsPending: (key) => siblingCount(qc, key, ctx) });
+            },
+            onSettled: (data, err, vars, ctx) => {
                 if (ctx) ctx.settled = true;
                 ctx?.release?.();
+                if (!err) {
+                    // The last writer succeeded: its reconcile ran with no siblings pending.
+                    for (const { patch } of ctx?.snapshots ?? []) {
+                        if (siblingCount(qc, patch.queryKey, ctx) === 0) forget(unreconciled, qc, patch.queryKey);
+                    }
+                }
                 for (const key of opts.invalidate?.(vars, data) ?? []) {
                     // Refetching while siblings are pending would briefly drop their optimistic rows.
-                    if (siblingCount(qc, key, ctx) === 0) void qc.invalidateQueries({ queryKey: key });
+                    if (siblingCount(qc, key, ctx) === 0) {
+                        forget(deferredInvalidations, qc, key);
+                        void qc.invalidateQueries({ queryKey: key });
+                    } else {
+                        remember(deferredInvalidations, qc, key);
+                    }
                 }
+                // Keys other hooks put off: the siblings may not invalidate them themselves.
+                for (const key of drain(deferredInvalidations, qc, ctx)) void qc.invalidateQueries({ queryKey: key });
             },
         },
         qc,
@@ -282,19 +307,58 @@ function useCoreMutation<TVars, TData>(opts: CoreOptions<TVars, TData>): Optimis
     return Object.assign(mutation, { retry, dismiss });
 }
 
+// ── Work put off while siblings were pending, per client ─────────────────────────────────────────
+
+type KeySet = WeakMap<QueryClient, Map<string, QueryKey>>;
+/** Patch keys where a success settled with siblings pending (its reconcile may have been skipped). */
+const unreconciled: KeySet = new WeakMap();
+/** Settle-time invalidations skipped because siblings were pending. */
+const deferredInvalidations: KeySet = new WeakMap();
+
+function remember(set: KeySet, qc: QueryClient, key: QueryKey) {
+    let m = set.get(qc);
+    if (!m) set.set(qc, (m = new Map()));
+    m.set(hashKey(key), key);
+}
+
+/** Removes `key`; reports whether it was there. */
+function forget(set: KeySet, qc: QueryClient, key: QueryKey): boolean {
+    return set.get(qc)?.delete(hashKey(key)) ?? false;
+}
+
+/** Removes and returns the keys nobody (other than `self`) is still writing. */
+function drain(set: KeySet, qc: QueryClient, self?: OptimisticContext): QueryKey[] {
+    const m = set.get(qc);
+    if (!m) return [];
+    const out: QueryKey[] = [];
+    for (const [h, key] of m) {
+        if (siblingCount(qc, key, self) > 0) continue;
+        m.delete(h);
+        out.push(key);
+    }
+    return out;
+}
+
 function rollback<TVars>(qc: QueryClient, ctx: OptimisticContext, vars: TVars) {
     // Undo in reverse order so multiple patches on related keys unwind cleanly.
-    for (const { patch, prev, applied } of [...ctx.snapshots].reverse()) {
+    for (const { patch, prev, next, applied } of [...ctx.snapshots].reverse()) {
         if (!applied) continue;
         const others = siblingCount(qc, patch.queryKey, ctx, { includeMarked: true });
-        if (others === 0) {
+        // A sibling that settled after our patch (reverted after its own failure, or reconciled) may
+        // have changed the entry: the snapshot is stale then, so only undo our own change.
+        const untouched = qc.getQueryData(patch.queryKey) === next;
+        // We are the last writer and a sibling's success may never have reached the cache: refetch.
+        const refetch = others === 0 && forget(unreconciled, qc, patch.queryKey);
+        if (others === 0 && untouched) {
             qc.setQueryData(patch.queryKey, prev);
         } else if (patch.revert) {
             const revert = patch.revert;
             qc.setQueryData(patch.queryKey, (cur: unknown) => (cur === undefined ? cur : revert(cur, vars, prev)));
         } else {
             void qc.invalidateQueries({ queryKey: patch.queryKey, exact: true });
+            continue;
         }
+        if (refetch) void qc.invalidateQueries({ queryKey: patch.queryKey, exact: true });
     }
 }
 

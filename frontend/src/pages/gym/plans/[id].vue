@@ -86,14 +86,30 @@ const refreshPrograms = () => queryClient.invalidateQueries({ queryKey: workoutK
 type StepKey = "warmup" | "cardio" | "stretch";
 const saveState = ref<Partial<Record<StepKey, "saving" | "saved">>>({});
 const savedTimers: Partial<Record<StepKey, ReturnType<typeof setTimeout>>> = {};
-/** The edit is already on screen (optimistic); flash "Saved". A failure rolls back with its own toast. */
-function saving(step: StepKey, run: () => void) {
+const saveSeq: Partial<Record<StepKey, number>> = {};
+const setStepState = (step: StepKey, state: "saving" | "saved" | undefined) => {
+    saveState.value = { ...saveState.value, [step]: state };
+};
+/**
+ * The edit is already on screen (optimistic). "Saving…" until the server answers, then "Saved" for a
+ * moment. A failure clears the label (the helper rolls back and toasts). Only the latest save per step
+ * drives the label.
+ */
+function saving(step: StepKey, run: () => Promise<unknown>) {
     clearTimeout(savedTimers[step]);
-    run();
-    saveState.value = { ...saveState.value, [step]: "saved" };
-    savedTimers[step] = setTimeout(() => {
-        saveState.value = { ...saveState.value, [step]: undefined };
-    }, 2000);
+    const seq = (saveSeq[step] ?? 0) + 1;
+    saveSeq[step] = seq;
+    setStepState(step, "saving");
+    run().then(
+        () => {
+            if (saveSeq[step] !== seq) return;
+            setStepState(step, "saved");
+            savedTimers[step] = setTimeout(() => setStepState(step, undefined), 2000);
+        },
+        () => {
+            if (saveSeq[step] === seq) setStepState(step, undefined);
+        },
+    );
 }
 const stepMeta = (step: StepKey, fallback: string) => {
     const s = saveState.value[step];
@@ -176,7 +192,7 @@ const saveMobility = (step: "warmup" | "stretch", items: string[]) => {
     if (!p) return;
     const pre = step === "warmup" ? items : (p.pre_mobility_items ?? []);
     const post = step === "stretch" ? items : (p.post_mobility_items ?? []);
-    saving(step, () => setMobility.mutate({ planId: p.ID, pre, post }));
+    saving(step, () => setMobility.mutateAsync({ planId: p.ID, pre, post }));
 };
 
 const stretchCount = (n: number) => `${n} ${n === 1 ? "stretch" : "stretches"}`;
@@ -199,7 +215,7 @@ const saveCardio = () => {
     if (!p) return;
     const next = normaliseCardio(cardioType.value, cardioMinutes.value);
     if (!cardioChanged(p, next)) return;
-    saving("cardio", () => setCardio.mutate({ planId: p.ID, ...next }));
+    saving("cardio", () => setCardio.mutateAsync({ planId: p.ID, ...next }));
 };
 const onCardioFocusOut = (e: FocusEvent) => {
     if (cardioBox.value?.contains(e.relatedTarget as Node | null)) return;

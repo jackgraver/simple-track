@@ -163,10 +163,17 @@ const unassign = useUnassignPlanDay();
 // Assign/unassign patch the programs cache at once and roll back with a Retry toast, so no pending state here.
 const putOnDay = (plan: WorkoutPlan, dow: number) => assign.mutate({ planId: plan.ID, dayOfWeek: dow });
 const makeRest = (plan: WorkoutPlan, dow: number) => unassign.mutate({ planId: plan.ID, dayOfWeek: dow });
-/** Drag from one day to another moves the routine (assign the new day, then clear the old one; same scope, so in order). */
+/**
+ * Drag from one day to another moves the routine: assign the new day, and clear the old one only once
+ * that succeeded, so a failed assign (rolled back, toasted) leaves the routine where it was.
+ */
 const moveDay = (plan: WorkoutPlan, from: number, to: number) => {
-    assign.mutate({ planId: plan.ID, dayOfWeek: to });
-    unassign.mutate({ planId: plan.ID, dayOfWeek: from });
+    assign
+        .mutateAsync({ planId: plan.ID, dayOfWeek: to })
+        .then(
+            () => unassign.mutate({ planId: plan.ID, dayOfWeek: from }),
+            () => {}, // the helper already rolled back and toasted
+        );
 };
 
 // Day picker (tap on mobile, click or Enter on desktop).

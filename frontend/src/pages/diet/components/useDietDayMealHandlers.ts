@@ -38,6 +38,12 @@ export function useDietDayMealHandlers(getOffset: () => number) {
         meal: Meal | null,
         type: typeof LOG_TYPE | typeof EDIT_TYPE | typeof EDIT_LOGGED_TYPE,
     ) => {
+        // A row still saving has a temp id: editing it would send a fresh entry without
+        // `replace_meal_id` and the server would keep both. Wait for the real id.
+        if (meal && type !== LOG_TYPE && isTempId(meal.ID)) {
+            toast.push("Still saving, try again in a moment");
+            return;
+        }
         if (type === LOG_TYPE) {
             router.push({
                 name: "diet-log",

@@ -169,6 +169,9 @@ export function useWorkoutPrograms() {
     });
 }
 
+/** The pages catch these and toast in context, so the global mutation toast stays quiet. */
+const CALLER_TOASTS = { handled: true } as const;
+
 function invalidateWorkoutPrograms(queryClient: ReturnType<typeof useQueryClient>) {
     queryClient.invalidateQueries({ queryKey: workoutKeys.programs });
     queryClient.invalidateQueries({ queryKey: workoutKeys.plans.all });
@@ -177,6 +180,7 @@ function invalidateWorkoutPrograms(queryClient: ReturnType<typeof useQueryClient
 export function useCreateWorkoutProgram() {
     const queryClient = useQueryClient();
     return useMutation({
+        meta: CALLER_TOASTS,
         mutationFn: (name: string) => createWorkoutProgram(name),
         onSuccess: () => invalidateWorkoutPrograms(queryClient),
     });
@@ -185,6 +189,7 @@ export function useCreateWorkoutProgram() {
 export function useRenameWorkoutProgram() {
     const queryClient = useQueryClient();
     return useMutation({
+        meta: CALLER_TOASTS,
         mutationFn: ({ id, name }: { id: number; name: string }) => renameWorkoutProgram(id, name),
         onSuccess: () => invalidateWorkoutPrograms(queryClient),
     });
@@ -193,6 +198,7 @@ export function useRenameWorkoutProgram() {
 export function useActivateWorkoutProgram() {
     const queryClient = useQueryClient();
     return useMutation({
+        meta: CALLER_TOASTS,
         mutationFn: (id: number) => activateWorkoutProgram(id),
         onSuccess: () => {
             invalidateWorkoutPrograms(queryClient);
@@ -204,6 +210,7 @@ export function useActivateWorkoutProgram() {
 export function useCreateWorkoutPlan() {
     const queryClient = useQueryClient();
     return useMutation({
+        meta: CALLER_TOASTS,
         mutationFn: ({ programId, name, dayOfWeek }: { programId: number; name: string; dayOfWeek: number | null }) =>
             createWorkoutPlan(programId, name, dayOfWeek),
         onSuccess: () => invalidateWorkoutPrograms(queryClient),
@@ -214,6 +221,7 @@ export function useSwitchWorkoutPlan() {
     const queryClient = useQueryClient();
 
     return useMutation({
+        meta: CALLER_TOASTS,
         mutationFn: ({ date, planId }: { date: string; planId: number | null }) =>
             switchWorkoutPlan(dateToOffset(date), planId),
         onSuccess: (_data, { date }) => {
