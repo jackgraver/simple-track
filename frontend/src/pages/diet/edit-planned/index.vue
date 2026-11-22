@@ -8,6 +8,7 @@ import {
     useDeletePlannedMealAt,
     useDietDays,
     useReorderPlannedMealsAt,
+    useSavedMeals,
 } from "~/api/diet/queries";
 import { dialogManager } from "~/composables/dialog/useDialog";
 import { toast } from "~/composables/toast/useToast";
@@ -37,7 +38,6 @@ import {
     weekSummary,
     type PlanDay,
 } from "./domain/planWeek";
-import { useSavedMeals } from "./useSavedMeals";
 
 const route = useRoute();
 const router = useRouter();

@@ -16,8 +16,7 @@ import {
     useDelayedFlag,
 } from "~/shared/ui";
 import { computed, nextTick, ref, watch } from "vue";
-import { useMeal } from "./queries/useMeal";
-import { useSavedMeal } from "./queries/useSavedMeal";
+import { useMeal, useSavedMeal } from "~/api/diet/queries";
 import { useDietLogsToday } from "~/api/diet/queries";
 import SavedMealDisplay from "./components/SavedMealDisplay.vue";
 import { savedMealToMeal } from "~/utils/savedMealToMeal";

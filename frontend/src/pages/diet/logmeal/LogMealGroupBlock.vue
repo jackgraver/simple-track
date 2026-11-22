@@ -8,7 +8,7 @@ import { toast } from "~/composables/toast/useToast";
 import LogMealItemRow from "./LogMealItemRow.vue";
 import { formatKcal, shareOfMeal } from "./domain/mealCard";
 import MacroValues from "./components/MacroValues.vue";
-import { useCreateCompositeFood } from "./queries/useMealMutations";
+import { useCreateCompositeFood } from "~/api/diet/queries";
 import { IconButton, Input, List, Menu } from "~/shared/ui";
 
 const props = defineProps<{

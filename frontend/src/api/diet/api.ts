@@ -181,26 +181,6 @@ export async function reorderPlannedMeals(
     return response.data;
 }
 
-export async function editLoggedMeal(
-    meal: Meal,
-    oldMealId: number,
-    options?: { dayId?: number },
-): Promise<DietLogsTodayResponse> {
-    const body: { meal: Meal; oldMealID: number; day_id?: number } = {
-        meal,
-        oldMealID: oldMealId,
-    };
-    const did = options?.dayId;
-    if (did != null && did > 0) {
-        body.day_id = did;
-    }
-    const response = await apiClient.post<DietLogsTodayResponse>(
-        "/diet/meals/meal/editlogged",
-        body,
-    );
-    return response.data;
-}
-
 export async function getMealById(id: number): Promise<MealResponse> {
     const response = await apiClient.get<Meal>(`/diet/meals/meal/${id}`);
     return { meal: response.data };
@@ -223,6 +203,13 @@ export async function createSavedMeal(payload: {
         payload,
     );
     return response.data;
+}
+
+export async function getSavedMeals(): Promise<SavedMeal[]> {
+    const response = await apiClient.get<{ saved_meals: SavedMeal[] }>(
+        "/diet/meals/saved-meal/all",
+    );
+    return response.data.saved_meals;
 }
 
 export async function getSavedMealById(id: number): Promise<SavedMeal> {

@@ -3,7 +3,8 @@ export const dietKeys = {
     days: {
         /** Prefix covering per-day logs and month planned summaries. */
         all: ['diet', 'days'] as const,
-        day: (offset: number) => ['diet', 'days', 'day', offset] as const,
+        /** Keyed by absolute local date (`YYYY-MM-DD`), never a relative offset. */
+        day: (date: string) => ['diet', 'days', 'day', date] as const,
         monthPlannedSummaryAll: ['diet', 'days', 'month-planned-summary'] as const,
         monthPlannedSummary: (monthOffset: number) =>
             ['diet', 'days', 'month-planned-summary', monthOffset] as const,

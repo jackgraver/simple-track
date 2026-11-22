@@ -3,7 +3,7 @@ import { ref } from "vue";
 import type { Food } from "~/types/diet";
 import SearchList from "~/shared/SearchList.vue";
 import FoodDisplay from "~/pages/diet/logmeal/components/FoodDisplay.vue";
-import { useCreateFood } from "../queries/useFoodMutations";
+import { useCreateFood } from "~/api/diet/queries";
 import { ChevronDown, ChevronUp } from "lucide-vue-next";
 import { getApiErrorMessage } from "~/api/httpError";
 import { toast } from "~/composables/toast/useToast";

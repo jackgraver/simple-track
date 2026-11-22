@@ -16,12 +16,12 @@ export function useDietDayMealHandlers(getOffset: () => number) {
     const router = useRouter();
     const { data } = useDietLogsToday(getOffset);
 
-    const logPlannedMealMutation = useLogPlannedMeal(getOffset);
-    const deleteLoggedMealMutation = useDeleteLoggedMeal(getOffset);
+    const logPlannedMealMutation = useLogPlannedMeal();
+    const deleteLoggedMealMutation = useDeleteLoggedMeal();
 
     const logPlannedMeal = async (meal: Meal) => {
         try {
-            await logPlannedMealMutation.mutateAsync(meal.ID);
+            await logPlannedMealMutation.mutateAsync({ mealId: meal.ID, offset: getOffset() });
             toast.push("Planned Meal Log Successfully!", "success");
         } catch {
             toast.push("Planned Meal Log Failed!", "error");
@@ -89,6 +89,7 @@ export function useDietDayMealHandlers(getOffset: () => number) {
             await deleteLoggedMealMutation.mutateAsync({
                 mealId: meal.ID,
                 dayId: data.value.day.ID,
+                offset: getOffset(),
             });
             toast.push("Delete Successfully!", "success");
         } catch {
