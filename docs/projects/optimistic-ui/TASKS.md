@@ -12,7 +12,7 @@ References: AUDIT.md (findings), MUTATIONS.md (per-mutation plan), ID-STRATEGY.m
 - [x] Helper / defaults / navigation design → DESIGN.md
 
 ## Stage 1: foundation (no visible behaviour change)
-- [ ] **F1 QueryClient defaults + error policy.** DESIGN.md §3 defaults (`gcTime` 24 h, focus refetch on,
+- [x] **F1 QueryClient defaults + error policy.** DESIGN.md §3 defaults (`gcTime` 24 h, focus refetch on,
   no 4xx retry), `QueryCache`/`MutationCache` `onError`, `isClientError`, `queryClient.clear()` on
   logout. *Done:* `main.ts` uses them, `vue-tsc` + tests pass, manual check that a 404 detail page makes
   one request.

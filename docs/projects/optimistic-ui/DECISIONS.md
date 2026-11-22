@@ -19,3 +19,8 @@ Hooks may take an offset but convert it to `YYYY-MM-DD` at the edge. Prerequisit
 ## 2026-11-19: Gym set failures stay visible ("mark"), everything else rolls back
 Losing a set mid-workout is worse than showing a failed one, so sets/water stay with an inline retry. Other optimistic writes roll back with a Retry toast.
 Pending state is derived from `useMutationState`, never stored in cache data. No spinners for optimistic actions.
+
+## 2026-11-22: F1 QueryClient lives in `api/queryClient.ts`; error policy details
+`createQueryClient(notify)` factory (testable) plus a `queryClient` singleton used by `main.ts` and `useAuth` (no injection needed, so logout works outside component setup). `isClientError` lives there, not in `httpError.ts`, to avoid conflicts with parallel slices.
+Cache `onError` skips 401 (the interceptor already redirects to sign-in) and `meta.silent` / `meta.handled` opt out. `queryClient.clear()` runs on logout and on the 401 redirect so the next user never sees stale data.
+The `STALE` tiers are exported but not yet applied per hook; the global default is 60 s, and tiering hooks happens in F3-F5 as keys are touched.

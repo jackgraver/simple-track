@@ -13,7 +13,7 @@
 - [DESIGN.md](DESIGN.md): `useOptimisticMutation` API, QueryClient defaults, prefetch plan
 
 ## Current state (audited 2026-11-19, see AUDIT.md)
-- `@tanstack/vue-query` v5, one QueryClient in `main.ts`: `staleTime` 5min, `gcTime` 10min, `retry: 1`, `refetchOnWindowFocus: false`. No global error handlers.
+- `@tanstack/vue-query` v5, one QueryClient in `api/queryClient.ts` (since F1; DESIGN.md §3 defaults and global error toasts).
 - 42 `useMutation` + 14 `useMoneyMutation` sites + ~20 writes outside TanStack (gym plans pages, media). **Zero `onMutate`.**
 - Media and gym plan editing bypass TanStack Query (axios in components). Diet keeps hooks under `pages/diet/logmeal/queries`.
 - Day keys use relative offsets, and mutations read the offset at settle time (wrong-day writes).
@@ -33,7 +33,8 @@
 - Every optimistic mutation defines: cache keys touched, rollback, and `onSettled` invalidation.
 
 ## Next up / gotchas
-- Next: **F1** (defaults + error policy), then F3/F4 (date keys) before any optimistic hook. G1+G2 (gym sets) is the first user-visible slice.
+- F1 done: `api/queryClient.ts` (defaults, `isClientError`, `STALE` tiers, cache `onError` toasts; cleared on logout/401). Hooks should pick `STALE.hot/catalog/static` explicitly where the 60 s default is wrong.
+- Next: F3/F4 (date keys) before any optimistic hook. G1+G2 (gym sets) is the first user-visible slice.
 - `PostLogPlanned` ignores the day (500 off-today). Fixed in D1, and until then don't build optimistic log-planned on top of it.
 - `crypto.randomUUID()` is undefined on plain-http LAN testing from a phone. Use `newClientId()` (F6).
 - TanStack v5 mutation `scope` is per `useMutation` instance, not per call. See DESIGN.md §2 "Concurrency".

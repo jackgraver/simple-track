@@ -1,5 +1,6 @@
 import { useRouter } from "vue-router";
 import { apiClient } from "~/api/client";
+import { queryClient } from "~/api/queryClient";
 import { getApiErrorMessage } from "~/api/httpError";
 import {
     authStatus,
@@ -93,6 +94,7 @@ export function useAuth() {
         } catch (error) {
             console.error("Logout error:", error);
         } finally {
+            queryClient.clear();
             markUnauthorized();
             void router.push({ name: "signin" });
         }
