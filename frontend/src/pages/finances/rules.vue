@@ -9,7 +9,6 @@ import {
 } from "~/api/money/api";
 import { useContributionTypes, useMoneyMutation } from "~/api/money/queries";
 import type { ContributionType } from "~/api/money/types";
-import { getApiErrorMessage } from "~/api/httpError";
 import { dialogManager } from "~/composables/dialog/useDialog";
 import { toast } from "~/composables/toast/useToast";
 import ModuleTitleBar, { type ModuleTitleLink } from "~/shared/ModuleTitleBar.vue";
@@ -89,12 +88,14 @@ function limitInput(id: number) {
 const limitMutation = useMoneyMutation(
     (args: { id: number; year: number; amount: number }) =>
         upsertContributionLimit(args.id, args.year, args.amount),
+    "Failed to save limit",
 );
 const removeLimitMutation = useMoneyMutation((args: { id: number; year: number }) =>
     deleteContributionLimit(args.id, args.year),
+    "Failed to remove limit",
 );
-const deleteTypeMutation = useMoneyMutation(deleteContributionType);
-const birthYearMutation = useMoneyMutation(saveBirthYear);
+const deleteTypeMutation = useMoneyMutation(deleteContributionType, "Failed to delete");
+const birthYearMutation = useMoneyMutation(saveBirthYear, "Failed to save birth year");
 
 async function saveLimit(type: ContributionType) {
     const input = limitInput(type.ID);
@@ -105,8 +106,8 @@ async function saveLimit(type: ContributionType) {
         await limitMutation.mutateAsync({ id: type.ID, year: Math.trunc(year), amount });
         input.amount = "";
         toast.push(`${type.name} limit for ${year} saved`, "success");
-    } catch (error) {
-        toast.push(getApiErrorMessage(error, "Failed to save limit"), "error");
+    } catch {
+        // useMoneyMutation already toasted the error.
     }
 }
 
@@ -120,8 +121,8 @@ async function removeLimit(type: ContributionType, year: number) {
     if (!confirmed) return;
     try {
         await removeLimitMutation.mutateAsync({ id: type.ID, year });
-    } catch (error) {
-        toast.push(getApiErrorMessage(error, "Failed to remove limit"), "error");
+    } catch {
+        // useMoneyMutation already toasted the error.
     }
 }
 
@@ -138,8 +139,8 @@ async function removeType(type: ContributionType) {
     try {
         await deleteTypeMutation.mutateAsync(type.ID);
         toast.push(`${type.name} deleted`, "success");
-    } catch (error) {
-        toast.push(getApiErrorMessage(error, "Failed to delete"), "error");
+    } catch {
+        // useMoneyMutation already toasted the error.
     }
 }
 
@@ -173,8 +174,8 @@ async function submitBirthYear() {
     try {
         await birthYearMutation.mutateAsync(Math.trunc(year));
         toast.push("Birth year saved", "success");
-    } catch (error) {
-        toast.push(getApiErrorMessage(error, "Failed to save birth year"), "error");
+    } catch {
+        // useMoneyMutation already toasted the error.
     }
 }
 

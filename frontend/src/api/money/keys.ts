@@ -9,4 +9,9 @@ export const moneyKeys = {
     netWorth: ["money", "net-worth"] as const,
     contributionTypes: ["money", "contribution-types"] as const,
     presets: ["money", "presets"] as const,
+    mutations: {
+        write: ["money", "mutation", "write"] as const,
+        deleteTransaction: ["money", "mutation", "delete-transaction"] as const,
+        deleteBalance: ["money", "mutation", "delete-balance"] as const,
+    },
 };

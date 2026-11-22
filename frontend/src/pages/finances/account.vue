@@ -7,8 +7,6 @@ import { AlertTriangle, ArrowDownLeft, ArrowUpRight, Trash2 } from "lucide-vue-n
 import {
     createTransaction,
     deleteAccount,
-    deleteBalance,
-    deleteTransaction,
     setBalance,
     updateAccount,
 } from "~/api/money/api";
@@ -16,6 +14,8 @@ import {
     useAccount,
     useBalances,
     useContributionTypes,
+    useDeleteBalance,
+    useDeleteTransaction,
     useMoneyMutation,
     useTransactions,
 } from "~/api/money/queries";
@@ -130,6 +130,7 @@ watch(
 
 const balanceMutation = useMoneyMutation((args: { balance: number; date: string }) =>
     setBalance(accountId.value, args),
+    "Failed to record balance",
 );
 
 async function saveBalance() {
@@ -138,14 +139,12 @@ async function saveBalance() {
     try {
         await balanceMutation.mutateAsync({ balance, date: balanceForm.date });
         toast.push("Balance recorded", "success");
-    } catch (error) {
-        toast.push(getApiErrorMessage(error, "Failed to record balance"), "error");
+    } catch {
+        // useMoneyMutation already toasted the error.
     }
 }
 
-const deleteBalanceMutation = useMoneyMutation((balanceId: number) =>
-    deleteBalance(accountId.value, balanceId),
-);
+const deleteBalanceMutation = useDeleteBalance();
 
 async function removeBalance(balanceId: number, date: string) {
     const confirmed = await dialogManager.confirm({
@@ -156,9 +155,9 @@ async function removeBalance(balanceId: number, date: string) {
     });
     if (!confirmed) return;
     try {
-        await deleteBalanceMutation.mutateAsync(balanceId);
-    } catch (error) {
-        toast.push(getApiErrorMessage(error, "Failed to delete balance"), "error");
+        await deleteBalanceMutation.mutateAsync({ accountId: accountId.value, id: balanceId });
+    } catch {
+        // useMoneyMutation already toasted the error.
     }
 }
 
@@ -189,7 +188,7 @@ const txMutation = useMoneyMutation(async () => {
             date: txForm.date,
         });
     }
-});
+}, "Failed to add transaction");
 
 /** Only offer to adjust the balance when the transaction is on/after the latest balance. */
 const canAdjustBalance = computed(
@@ -204,14 +203,12 @@ async function addTransaction() {
         txForm.amount = "";
         txForm.note = "";
         balanceForm.amount = "";
-    } catch (error) {
-        toast.push(getApiErrorMessage(error, "Failed to add transaction"), "error");
+    } catch {
+        // useMoneyMutation already toasted the error.
     }
 }
 
-const deleteTxMutation = useMoneyMutation((transactionId: number) =>
-    deleteTransaction(accountId.value, transactionId),
-);
+const deleteTxMutation = useDeleteTransaction();
 
 async function removeTransaction(transactionId: number) {
     const confirmed = await dialogManager.confirm({
@@ -222,9 +219,9 @@ async function removeTransaction(transactionId: number) {
     });
     if (!confirmed) return;
     try {
-        await deleteTxMutation.mutateAsync(transactionId);
-    } catch (error) {
-        toast.push(getApiErrorMessage(error, "Failed to delete transaction"), "error");
+        await deleteTxMutation.mutateAsync({ accountId: accountId.value, id: transactionId });
+    } catch {
+        // useMoneyMutation already toasted the error.
     }
 }
 
@@ -248,6 +245,7 @@ const archiveMutation = useMoneyMutation((a: Account) =>
         contribution_type_id: a.contribution_type_id,
         archived: !a.archived_at,
     }),
+    "Failed to update account",
 );
 
 async function toggleArchive() {
@@ -264,12 +262,12 @@ async function toggleArchive() {
     try {
         await archiveMutation.mutateAsync(a);
         toast.push(a.archived_at ? "Account restored" : "Account archived", "success");
-    } catch (error) {
-        toast.push(getApiErrorMessage(error, "Failed to update account"), "error");
+    } catch {
+        // useMoneyMutation already toasted the error.
     }
 }
 
-const deleteMutation = useMoneyMutation(deleteAccount);
+const deleteMutation = useMoneyMutation(deleteAccount, "Failed to delete account");
 
 async function removeAccount() {
     const a = account.value;
@@ -285,8 +283,8 @@ async function removeAccount() {
         await deleteMutation.mutateAsync(a.ID);
         toast.push("Account deleted", "success");
         void router.push({ name: "finances" });
-    } catch (error) {
-        toast.push(getApiErrorMessage(error, "Failed to delete account"), "error");
+    } catch {
+        // useMoneyMutation already toasted the error.
     }
 }
 
@@ -406,7 +404,6 @@ const navLinks = computed<ModuleTitleLink[]>(() => [
                         <ListRow
                             v-for="(balance, index) in visibleBalances"
                             :key="balance.ID"
-                            :pending="deleteBalanceMutation.isPending.value && deleteBalanceMutation.variables.value === balance.ID"
                         >
                             <span class="text-fg-muted">{{ formatDay(balance.date) }}</span>
                             <template #trailing>
@@ -480,7 +477,6 @@ const navLinks = computed<ModuleTitleLink[]>(() => [
                         <ListRow
                             v-for="tx in visibleTransactions"
                             :key="tx.ID"
-                            :pending="deleteTxMutation.isPending.value && deleteTxMutation.variables.value === tx.ID"
                         >
                             <template #leading>
                                 <component

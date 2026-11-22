@@ -2,7 +2,6 @@
 import { computed, reactive, watch } from "vue";
 import { createContributionTypeFromPreset } from "~/api/money/api";
 import { useContributionPresets, useMoneyMutation } from "~/api/money/queries";
-import { getApiErrorMessage } from "~/api/httpError";
 import { toast } from "~/composables/toast/useToast";
 import { Button, Field, Input, Skeleton } from "~/shared/ui";
 import { formatMoney, parseAmount } from "../format";
@@ -38,7 +37,7 @@ watch(
     { immediate: true },
 );
 
-const mutation = useMoneyMutation(createContributionTypeFromPreset);
+const mutation = useMoneyMutation(createContributionTypeFromPreset, "Failed to add account type");
 
 async function submit() {
     const preset = selected.value;
@@ -54,8 +53,8 @@ async function submit() {
         });
         toast.push(`${preset.name} added`, "success");
         props.onResolve?.(true);
-    } catch (error) {
-        toast.push(getApiErrorMessage(error, "Failed to add account type"), "error");
+    } catch {
+        // useMoneyMutation already toasted the error.
     }
 }
 </script>

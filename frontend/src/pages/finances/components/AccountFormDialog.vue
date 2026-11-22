@@ -3,7 +3,6 @@ import { computed, reactive } from "vue";
 import { createAccount, updateAccount } from "~/api/money/api";
 import { useMoneyMutation } from "~/api/money/queries";
 import type { Account, AccountKind, ContributionType } from "~/api/money/types";
-import { getApiErrorMessage } from "~/api/httpError";
 import { toast } from "~/composables/toast/useToast";
 import {
     accountKindLabels,
@@ -72,7 +71,7 @@ const mutation = useMoneyMutation(async () => {
         balance_date: form.balanceDate,
     });
     return created.ID;
-});
+}, "Failed to save account");
 
 async function submit() {
     if (!form.name.trim() || mutation.isPending.value) return;
@@ -80,8 +79,8 @@ async function submit() {
         const id = await mutation.mutateAsync(undefined);
         toast.push(isEdit.value ? "Account updated" : "Account added", "success");
         props.onResolve?.(id);
-    } catch (error) {
-        toast.push(getApiErrorMessage(error, "Failed to save account"), "error");
+    } catch {
+        // useMoneyMutation already toasted the error.
     }
 }
 </script>
