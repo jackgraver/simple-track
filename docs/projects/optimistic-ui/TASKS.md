@@ -23,7 +23,7 @@ References: AUDIT.md (findings), MUTATIONS.md (per-mutation plan), ID-STRATEGY.m
   `workoutQueries` via `queryOptions`. One key per endpoint (`select` for gym index). Mutation vars carry
   `date`. Delete `useAllExercises`, `workouts.today` and `EditCuesDialog` (if the owner agrees). *Done:* gym
   index → logging makes one `/workout/logs/previous` request (network tab), tests pass.
-- [ ] **F4 Diet keys.** The same for `dietKeys` (date keys, `dietQueries`). Move `pages/diet/logmeal/queries/*`
+- [x] **F4 Diet keys.** The same for `dietKeys` (date keys, `dietQueries`). Move `pages/diet/logmeal/queries/*`
   and the inline queries/mutations in `edit-planned`/`targets` into `api/diet/`. Delete `useEditLoggedMeal`
   and the duplicate `editLoggedMeal` API function. *Done:* no `useQuery`/`useMutation` imports under
   `pages/diet/`, and swiping days mid-request no longer writes to the wrong day (manual check with a

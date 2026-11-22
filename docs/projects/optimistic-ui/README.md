@@ -33,7 +33,7 @@
 - Every optimistic mutation defines: cache keys touched, rollback, and `onSettled` invalidation.
 
 ## Next up / gotchas
-- Next: **F1** (defaults + error policy), then F3/F4 (date keys) before any optimistic hook. G1+G2 (gym sets) is the first user-visible slice.
+- F4 (diet date keys, hooks in `api/diet/queries.ts`) done; mutations take `offset` in vars. Next: **F1** (defaults + error policy), then F3/F4 (date keys) before any optimistic hook. G1+G2 (gym sets) is the first user-visible slice.
 - `PostLogPlanned` ignores the day (500 off-today). Fixed in D1, and until then don't build optimistic log-planned on top of it.
 - `crypto.randomUUID()` is undefined on plain-http LAN testing from a phone. Use `newClientId()` (F6).
 - TanStack v5 mutation `scope` is per `useMutation` instance, not per call. See DESIGN.md §2 "Concurrency".

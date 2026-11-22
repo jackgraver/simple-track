@@ -19,3 +19,9 @@ Hooks may take an offset but convert it to `YYYY-MM-DD` at the edge. Prerequisit
 ## 2026-11-19: Gym set failures stay visible ("mark"), everything else rolls back
 Losing a set mid-workout is worse than showing a failed one, so sets/water stay with an inline retry. Other optimistic writes roll back with a Retry toast.
 Pending state is derived from `useMutationState`, never stored in cache data. No spinners for optimistic actions.
+
+## 2026-11-22: F4 diet keys
+`dietKeys.days.day` takes `YYYY-MM-DD`. `dietQueries` (`queryOptions`) resolves offset -> date at the edge, so key and request match. Day mutations carry `offset` in vars and
+resolve the key date in `onMutate`, never at settle. All diet hooks live in `api/diet/queries.ts`, none under `pages/diet/`.
+`useEditLoggedMeal` and `editLoggedMeal` were unreferenced, so deleted (owner Q7 still unanswered; only the diet part was touched). Unused offset-bound variants
+(`useDeletePlannedMeal`, `useAddPlannedFromSaved`, `useReorderPlannedMeals`) removed. Month-summary keys still use month offset (unused by any query today).

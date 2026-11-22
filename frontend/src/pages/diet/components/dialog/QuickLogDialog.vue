@@ -4,7 +4,7 @@ import type { Meal } from "~/types/diet";
 import { computed, ref, watch } from "vue";
 import { Button, Field, Input } from "~/shared/ui";
 import { toast } from "~/composables/toast/useToast";
-import { useQuickLog } from "~/pages/diet/logmeal/queries/useMealMutations";
+import { useQuickLog } from "~/api/diet/queries";
 
 const props = defineProps<{
     dateOffset: number;

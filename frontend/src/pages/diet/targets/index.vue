@@ -1,9 +1,6 @@
 <script setup lang="ts">
-import { useMutation, useQueryClient } from "@tanstack/vue-query";
 import { computed, ref, watch } from "vue";
-import { updatePlanMacros } from "~/api/diet/api";
-import { dietKeys } from "~/api/diet/keys";
-import { useDietLogsToday, usePlans, useRecentDietDays } from "~/api/diet/queries";
+import { useDietLogsToday, usePlans, useRecentDietDays, useSavePlanMacros } from "~/api/diet/queries";
 import { latestWeightLbs, useProfile, useSaveProfile, useWeightLogs } from "~/api/tracking/queries";
 import type { ActivityLevel } from "~/api/tracking/types";
 import { toast } from "~/composables/toast/useToast";
@@ -37,7 +34,6 @@ import {
 import { useMacroSliders } from "./useMacroSliders";
 import { useTDEE } from "./useTDEE";
 
-const queryClient = useQueryClient();
 const isDesktop = useIsDesktop();
 
 const { data: dayData, isPending: dayPending, error: loadError, refetch: refetchDay } = useDietLogsToday(0);
@@ -126,29 +122,28 @@ const observed = computed(() => (intake.value ? observedMaintenance(intake.value
 const plans = computed(() => planHistory(plansQuery.data.value ?? []));
 
 // ---- save: stays on the page; the refetched plan becomes the new baseline.
-const saveMutation = useMutation({
-    mutationFn: () => {
-        if (planId.value == null) throw new Error("No diet plan loaded");
-        return updatePlanMacros(planId.value, {
-            calories: current.value.calories,
-            protein: current.value.protein,
-            carbs: current.value.carbs,
-            fat: current.value.fat,
-            fiber: current.value.fiber,
-        });
-    },
-    onSuccess: async () => {
-        await Promise.all([
-            queryClient.invalidateQueries({ queryKey: dietKeys.days.all }),
-            queryClient.invalidateQueries({ queryKey: dietKeys.plans.all }),
-        ]);
-        toast.push("Targets saved", "success");
-    },
-    onError: () => toast.push("Could not save targets", "error"),
-});
+const saveMutation = useSavePlanMacros();
 const saving = computed(() => saveMutation.isPending.value);
 const canSave = computed(() => dirty.value && valid.value && planId.value != null);
-const save = () => saveMutation.mutate();
+const save = () => {
+    if (planId.value == null) return;
+    saveMutation.mutate(
+        {
+            planId: planId.value,
+            macros: {
+                calories: current.value.calories,
+                protein: current.value.protein,
+                carbs: current.value.carbs,
+                fat: current.value.fat,
+                fiber: current.value.fiber,
+            },
+        },
+        {
+            onSuccess: () => toast.push("Targets saved", "success"),
+            onError: () => toast.push("Could not save targets", "error"),
+        },
+    );
+};
 
 const isPending = computed(() => dayPending.value || profilePending.value || weightPending.value);
 const showSkeleton = useDelayedFlag(isPending);
