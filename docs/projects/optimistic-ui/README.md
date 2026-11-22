@@ -38,7 +38,11 @@
 - F5 done (tracking/money/media/searchList keys). Remaining literal `queryKey: [` sites, if any, belong to F3/F4. `api/media/queries.ts` has read hooks only; M1 migrates the pages.
 - F4 (diet date keys, hooks in `api/diet/queries.ts`) done; mutations take `offset` in vars.
 - F3 (workout keys, date keys via `api/workout/dates.ts`) is done; mutation vars carry `date`, offset is derived at send time. Gym hooks no longer take an offset.
-- Next: F6 (helper), then G1 (gym backend) and G2. G1+G2 is the first user-visible slice.
+- G1 done (backend only): `POST /workout/sets`, `PATCH|DELETE /workout/sets/:id` (`:id` = id or client_id), migration 0004. Contract in DECISIONS 2026-11-22 "G1".
+  G2 should send `date` (YYYY-MM-DD) in the body, reconcile from `exercise`, and invalidate activity only when `first_set_of_day`. DELETE of the last set removes the parent (`exercise_removed: true`): drop `group.logged`.
+  `first_set_of_day` can be true for more than one racing create (never zero). Legacy full-replace still deletes sets missing from its payload, so G2 must stop using `/exercises/log` for sets (notes only).
+  Postgres-only behaviour (real concurrency, the 0004 merge) is covered by `services/pg_sets_test.go`, which skips without `TEST_DATABASE_URL` (`dev test` sets it).
+- Next: F6 (helper), then G2. G1+G2 is the first user-visible slice.
 - `PostLogPlanned` ignores the day (500 off-today). Fixed in D1, and until then don't build optimistic log-planned on top of it.
 - `crypto.randomUUID()` is undefined on plain-http LAN testing from a phone. Use `newClientId()` (F6).
 - TanStack v5 mutation `scope` is per `useMutation` instance, not per call. See DESIGN.md §2 "Concurrency".

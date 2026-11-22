@@ -46,6 +46,12 @@ func RegisterRoutes(router *gin.Engine, authMiddleware gin.HandlerFunc) {
 			exercises.DELETE("/sets/:id", controller.DeleteLoggedSet)
 			exercises.GET("/progression/:id", controller.GetExerciseProgression)
 		}
+		sets := group.Group("/sets")
+		{
+			sets.POST("", dayOffsetMiddleware, controller.LogSet)
+			sets.PATCH("/:id", controller.UpdateSet)
+			sets.DELETE("/:id", controller.DeleteSet)
+		}
 		logs := group.Group("/logs", dayOffsetMiddleware)
 		{
 			logs.GET("/today", controller.GetWorkoutToday)
