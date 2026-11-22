@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/vue-query";
 import { apiDELETE, apiPATCH, apiPOST, apiPUT } from "~/api/client";
-import { liveworkoutKeys, workoutKeys } from "~/api/workout/keys";
+import { workoutKeys } from "~/api/workout/keys";
 import type { WorkoutPlan, WorkoutProgram } from "~/types/workout";
 
 /**
@@ -15,7 +15,7 @@ type QueryClient = ReturnType<typeof useQueryClient>;
 function invalidate(qc: QueryClient, today = false) {
     void qc.invalidateQueries({ queryKey: workoutKeys.programs });
     void qc.invalidateQueries({ queryKey: workoutKeys.plans.all });
-    if (today) void qc.invalidateQueries({ queryKey: liveworkoutKeys.workouts.all });
+    if (today) void qc.invalidateQueries({ queryKey: workoutKeys.days.all });
 }
 
 /** Apply `patch` to the routine in the cached programs list; returns a rollback. */

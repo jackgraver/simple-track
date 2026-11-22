@@ -19,7 +19,7 @@ References: AUDIT.md (findings), MUTATIONS.md (per-mutation plan), ID-STRATEGY.m
 - [x] **F2 Toast action + duration.** `toast.push(msg, type, { action, duration })`, styled via the
   ui-overhaul Toast primitive if it exists (otherwise minimal, restyled later). *Done:* a Retry button
   works in a dev-only demo.
-- [ ] **F3 Workout keys.** Fold `liveworkout` into `workoutKeys`. Absolute-date day keys.
+- [x] **F3 Workout keys.** (done; see DECISIONS 2026-11-22) Fold `liveworkout` into `workoutKeys`. Absolute-date day keys.
   `workoutQueries` via `queryOptions`. One key per endpoint (`select` for gym index). Mutation vars carry
   `date`. Delete `useAllExercises`, `workouts.today` and `EditCuesDialog` (if the owner agrees). *Done:* gym
   index → logging makes one `/workout/logs/previous` request (network tab), tests pass.

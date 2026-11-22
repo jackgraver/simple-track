@@ -40,3 +40,10 @@ Media gets `mediaKeys` plus read hooks only; pages keep calling `api.ts` until M
 resolve the key date in `onMutate`, never at settle. All diet hooks live in `api/diet/queries.ts`, none under `pages/diet/`.
 `useEditLoggedMeal` and `editLoggedMeal` were unreferenced, so deleted (owner Q7 still unanswered; only the diet part was touched). Unused offset-bound variants
 (`useDeletePlannedMeal`, `useAddPlannedFromSaved`, `useReorderPlannedMeals`) removed. Month-summary keys still use month offset (unused by any query today).
+
+## 2026-11-22: F3 workout keys (date keys, one key per endpoint)
+`liveworkout` folded into `workoutKeys` (`['workout', ...]`, `days.day(date)`, `activity`, `exercises`). `workoutQueries` via `queryOptions`.
+`api/workout/dates.ts` converts offset <-> local `YYYY-MM-DD`; the offset is recomputed from the date when a request is sent. Mutation hooks take no offset, vars carry `date`.
+`/workout/logs/previous` has one key; `useWorkoutLogToday` is `select: r => r.day` on it. Local-time dates assume the backend's "today" matches the device timezone (unverified).
+Deleted `useAllExercises`, `workouts.today` and `EditCuesDialog.vue`: all had zero references, so owner Q7 is moot for them (`useEditLoggedMeal`/`useDeleteGroceryItem` untouched, not my slice).
+Not verified in a browser (no dev stack allowed): the "one request gym index -> logging" check is by construction (shared key), not by network tab.

@@ -37,7 +37,8 @@
 - F2 done: `toast.push(msg, tone, { action: { label, onClick }, duration })` (key is `onClick`, not `run`). Dev demo: Settings > Appearance.
 - F5 done (tracking/money/media/searchList keys). Remaining literal `queryKey: [` sites, if any, belong to F3/F4. `api/media/queries.ts` has read hooks only; M1 migrates the pages.
 - F4 (diet date keys, hooks in `api/diet/queries.ts`) done; mutations take `offset` in vars.
-- Next: F3 (workout keys), then F6. G1+G2 (gym sets) is the first user-visible slice.
+- F3 (workout keys, date keys via `api/workout/dates.ts`) is done; mutation vars carry `date`, offset is derived at send time. Gym hooks no longer take an offset.
+- Next: F6 (helper), then G1 (gym backend) and G2. G1+G2 is the first user-visible slice.
 - `PostLogPlanned` ignores the day (500 off-today). Fixed in D1, and until then don't build optimistic log-planned on top of it.
 - `crypto.randomUUID()` is undefined on plain-http LAN testing from a phone. Use `newClientId()` (F6).
 - TanStack v5 mutation `scope` is per `useMutation` instance, not per call. See DESIGN.md §2 "Concurrency".

@@ -12,7 +12,8 @@ import {
 import axios from "axios";
 import { useWebStorageJsonSync } from "~/composables/useWebStorageJsonSync";
 import { sortExerciseGroupsByLogOrder } from "./sortExerciseGroupsByLogOrder";
-import { computed, ref, watch, type MaybeRefOrGetter } from "vue";
+import { computed, ref, toValue, watch, type MaybeRefOrGetter } from "vue";
+import { offsetToDate } from "~/api/workout/dates";
 
 const HIDDEN_EXERCISES_STORAGE_PREFIX = "simpletracker:workout:hidden-exercises:";
 
@@ -37,13 +38,16 @@ export type LoggedSetWithStatus = {
 
 export function useWorkoutStore(offset: MaybeRefOrGetter<number> = 0) {
     const workoutLogsQuery = useWorkoutLogsPrevious(offset);
-    const logExerciseMutation = useLogExercise(offset);
-    const addExerciseMutation = useAddExerciseToWorkout(offset);
-    const removeExerciseMutation = useRemoveExerciseFromWorkout(offset);
-    const deleteLoggedSetMutation = useDeleteLoggedSet(offset);
-    const upsertCardioMutation = useUpsertCardio(offset);
-    const upsertMobilityPreMutation = useUpsertMobilityPre(offset);
-    const upsertMobilityPostMutation = useUpsertMobilityPost(offset);
+    /** The day a write targets, fixed when the action starts (not when it settles). */
+    const currentDate = () => offsetToDate(toValue(offset));
+
+    const logExerciseMutation = useLogExercise();
+    const addExerciseMutation = useAddExerciseToWorkout();
+    const removeExerciseMutation = useRemoveExerciseFromWorkout();
+    const deleteLoggedSetMutation = useDeleteLoggedSet();
+    const upsertCardioMutation = useUpsertCardio();
+    const upsertMobilityPreMutation = useUpsertMobilityPre();
+    const upsertMobilityPostMutation = useUpsertMobilityPost();
 
     /** Catalog exercise IDs hidden from the log list; persisted per workout log in localStorage. */
     const skippedExerciseIds = ref<Set<number>>(new Set());
@@ -154,6 +158,7 @@ export function useWorkoutStore(offset: MaybeRefOrGetter<number> = 0) {
     ): Promise<LoggedExercise | null> => {
         try {
             const result = await logExerciseMutation.mutateAsync({
+                date: currentDate(),
                 exercise,
                 type,
             });
@@ -166,7 +171,7 @@ export function useWorkoutStore(offset: MaybeRefOrGetter<number> = 0) {
 
     const addExerciseToWorkout = async (exerciseId: number): Promise<void> => {
         try {
-            await addExerciseMutation.mutateAsync(exerciseId);
+            await addExerciseMutation.mutateAsync({ date: currentDate(), exerciseId });
             unhideExerciseFromSession(exerciseId);
         } catch (error) {
             console.error("Error adding exercise:", error);
@@ -176,7 +181,7 @@ export function useWorkoutStore(offset: MaybeRefOrGetter<number> = 0) {
 
     const removeExerciseFromLog = async (exerciseId: number): Promise<void> => {
         try {
-            await removeExerciseMutation.mutateAsync(exerciseId);
+            await removeExerciseMutation.mutateAsync({ date: currentDate(), exerciseId });
             unhideExerciseFromSession(exerciseId);
         } catch (err: unknown) {
             if (axios.isAxiosError(err) && err.response?.status === 404) {
@@ -190,7 +195,7 @@ export function useWorkoutStore(offset: MaybeRefOrGetter<number> = 0) {
 
     const deleteLoggedSet = async (setId: number): Promise<void> => {
         try {
-            await deleteLoggedSetMutation.mutateAsync(setId);
+            await deleteLoggedSetMutation.mutateAsync({ date: currentDate(), setId });
         } catch (error) {
             console.error("Error deleting logged set:", error);
             throw error;
@@ -198,15 +203,15 @@ export function useWorkoutStore(offset: MaybeRefOrGetter<number> = 0) {
     };
 
     const saveCardio = async (minutes: number, type?: string, notes?: string): Promise<void> => {
-        await upsertCardioMutation.mutateAsync({ minutes, type, notes });
+        await upsertCardioMutation.mutateAsync({ date: currentDate(), minutes, type, notes });
     };
 
     const savePreMobility = async (checked: string[]): Promise<void> => {
-        await upsertMobilityPreMutation.mutateAsync(checked);
+        await upsertMobilityPreMutation.mutateAsync({ date: currentDate(), checked });
     };
 
     const savePostMobility = async (checked: string[]): Promise<void> => {
-        await upsertMobilityPostMutation.mutateAsync(checked);
+        await upsertMobilityPostMutation.mutateAsync({ date: currentDate(), checked });
     };
 
     const getExerciseByIndex = (index: number): ExerciseGroup | null => {

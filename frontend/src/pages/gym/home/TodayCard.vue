@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { offsetToDate } from "~/api/workout/dates";
 import { computed } from "vue";
 import { ArrowLeftRight, Check, Moon, Plus } from "lucide-vue-next";
 import { useSwitchWorkoutPlan } from "~/api/workout/queries";
@@ -17,7 +18,7 @@ const props = defineProps<{ offset: number; week: ReturnType<typeof useGymWeek> 
 
 // The same query and store the logging page uses, so opening it after this is instant.
 const store = useWorkoutStore(() => props.offset);
-const switchPlan = useSwitchWorkoutPlan(() => props.offset);
+const switchPlan = useSwitchWorkoutPlan();
 const showSkeleton = useDelayedFlag(() => store.pending.value);
 
 const plan = computed(() => store.data.value?.day?.workout_plan ?? null);
@@ -114,7 +115,7 @@ const onMenu = async (key: string) => {
     }
     const planId = key === "none" ? null : Number(key.slice("plan:".length));
     try {
-        await switchPlan.mutateAsync(planId);
+        await switchPlan.mutateAsync({ date: offsetToDate(props.offset), planId });
         toast.push(planId == null ? "Marked as a rest day" : "Workout plan updated", "success");
     } catch (err: unknown) {
         toast.push(getApiErrorMessage(err, "Couldn't switch the plan"), "error");
