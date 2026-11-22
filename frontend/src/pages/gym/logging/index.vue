@@ -2,10 +2,9 @@
 import { useWorkoutStore } from "./store/useWorkoutStore";
 import ExerciseListView from "./components/ExerciseListView.vue";
 import { useRoute, useRouter } from "vue-router";
-import { computed, ref } from "vue";
+import { computed } from "vue";
+import type { Exercise } from "~/types/workout";
 import { ErrorState, SkeletonList, useDelayedFlag } from "~/shared/ui";
-import { getApiErrorMessage } from "~/api/httpError";
-import { toast } from "~/composables/toast/useToast";
 import { useLoggingRouteContext } from "./composables/useLoggingRouteContext";
 import { buildWorkoutSteps, type WorkoutStep } from "./domain/workoutSteps";
 
@@ -30,7 +29,6 @@ const {
 
 // Fast loads show nothing instead of flashing a skeleton.
 const showSkeleton = useDelayedFlag(() => pending.value);
-const removingId = ref<number | null>(null);
 
 const workoutName = computed(() => data.value?.day?.workout_plan?.name || "");
 
@@ -80,14 +78,8 @@ const selectExercise = (index: number) => {
     });
 };
 
-const handleAddExercise = async (exerciseId: number) => {
-    try {
-        await addExerciseToWorkout(exerciseId);
-        toast.push("Exercise added", "success");
-    } catch (err: unknown) {
-        console.error(err);
-        toast.push(getApiErrorMessage(err, "Failed to add exercise"), "error");
-    }
+const handleAddExercise = (exerciseId: number, exercise?: Exercise) => {
+    addExerciseToWorkout(exerciseId, exercise);
 };
 
 const selectCardio = () => {
@@ -113,27 +105,14 @@ const selectPostMobility = () => {
     });
 };
 
-const handleRemoveExercise = async (index: number) => {
+const handleRemoveExercise = (index: number) => {
     const exerciseGroup = log.value[index];
     if (!exerciseGroup) return;
 
     const exerciseId =
         exerciseGroup.logged?.exercise_id || exerciseGroup.planned?.ID;
-    if (!exerciseId) {
-        toast.push("Cannot remove exercise: ID not found", "error");
-        return;
-    }
-
-    removingId.value = exerciseId;
-    try {
-        await removeExerciseFromLog(exerciseId);
-        toast.push("Exercise removed", "success");
-    } catch (err: unknown) {
-        console.error(err);
-        toast.push(getApiErrorMessage(err, "Failed to remove exercise"), "error");
-    } finally {
-        removingId.value = null;
-    }
+    if (!exerciseId) return;
+    removeExerciseFromLog(exerciseId);
 };
 </script>
 
@@ -152,7 +131,6 @@ const handleRemoveExercise = async (index: number) => {
             :date-label="dateLabel"
             :steps="steps"
             :exercises="log"
-            :removing-id="removingId"
             @select-step="selectStep"
             @add-exercise="handleAddExercise"
             @remove-exercise="handleRemoveExercise"

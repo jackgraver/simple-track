@@ -1,19 +1,17 @@
 <script setup lang="ts">
-import { getApiErrorMessage } from "~/api/httpError";
 import type { MobilityLogged } from "~/types/workout";
 import { ListChecks } from "lucide-vue-next";
 import { Button, Card, Checkbox, EmptyState, List } from "~/shared/ui";
 import LoggingHeader from "./LoggingHeader.vue";
 import { ref, watch, computed } from "vue";
 import { useLoggingRouteContext } from "../../composables/useLoggingRouteContext";
-import { toast } from "~/composables/toast/useToast";
 import { useRoute } from "vue-router";
 
 const props = defineProps<{
     loggedPreMobility: MobilityLogged | null;
     loggedPostMobility: MobilityLogged | null;
-    savePreMobility: (checked: string[]) => Promise<void>;
-    savePostMobility: (checked: string[]) => Promise<void>;
+    savePreMobility: (checked: string[]) => void;
+    savePostMobility: (checked: string[]) => void;
 }>();
 
 const route = useRoute();
@@ -54,25 +52,17 @@ const headerProgress = computed(() => {
     return n ? `${doneCount.value}/${n}` : "";
 });
 
-const toggle = async (name: string) => {
+const toggle = (name: string) => {
     const next = new Set(localChecked.value);
     if (next.has(name)) {
         next.delete(name);
     } else {
         next.add(name);
     }
-    const previous = new Set(localChecked.value);
     localChecked.value = next;
-    try {
-        if (mobilitySlot.value === "post") {
-            await props.savePostMobility([...next]);
-        } else {
-            await props.savePreMobility([...next]);
-        }
-    } catch (err) {
-        localChecked.value = previous;
-        toast.push(getApiErrorMessage(err, "Failed to save"), "error");
-    }
+    // The cache updates at once; a failed save rolls it back and `effectiveLogged` resets the ticks.
+    if (mobilitySlot.value === "post") props.savePostMobility([...next]);
+    else props.savePreMobility([...next]);
 };
 
 const isChecked = (name: string) => localChecked.value.has(name);

@@ -34,5 +34,11 @@ export const workoutKeys = {
         updateSet: () => ['workout', 'mutations', 'sets', 'update'] as const,
         deleteSet: () => ['workout', 'mutations', 'sets', 'delete'] as const,
         notes: () => ['workout', 'mutations', 'sets', 'notes'] as const,
+        addExercise: () => ['workout', 'mutations', 'exercise', 'add'] as const,
+        removeExercise: () => ['workout', 'mutations', 'exercise', 'remove'] as const,
+        cardio: () => ['workout', 'mutations', 'cardio'] as const,
+        mobilityPre: () => ['workout', 'mutations', 'mobility', 'pre'] as const,
+        mobilityPost: () => ['workout', 'mutations', 'mobility', 'post'] as const,
+        switchPlan: () => ['workout', 'mutations', 'switch-plan'] as const,
     },
 } as const;

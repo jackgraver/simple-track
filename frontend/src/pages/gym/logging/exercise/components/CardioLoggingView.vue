@@ -1,11 +1,9 @@
 <script setup lang="ts">
-import { getApiErrorMessage } from "~/api/httpError";
 import type { Cardio, PlannedCardio } from "~/types/workout";
 import LoggingHeader from "./LoggingHeader.vue";
 import { ref, watch, computed } from "vue";
 import { useWorkoutStore } from "../../store/useWorkoutStore";
 import { useLoggingRouteContext } from "../../composables/useLoggingRouteContext";
-import { toast } from "~/composables/toast/useToast";
 import { Badge, Button, Field, Textarea } from "~/shared/ui";
 import NumberSlider from "./NumberSlider.vue";
 
@@ -33,7 +31,6 @@ const currentMinutes = ref(25);
 const notes = ref("");
 
 const error = ref("");
-const saving = ref(false);
 
 watch(
     () => [props.loggedCardio, props.plannedCardio] as const,
@@ -49,22 +46,14 @@ const onMinutesUpdate = (v: number) => {
     error.value = "";
 };
 
-const finish = async () => {
+const finish = () => {
     if (currentMinutes.value <= 0) {
         error.value = "Enter minutes before saving.";
         return;
     }
-    if (saving.value) return;
-    saving.value = true;
-    try {
-        await saveCardio(currentMinutes.value, undefined, notes.value);
-        toast.push("Cardio saved", "success");
-        goBackToLogging();
-    } catch (err) {
-        toast.push(getApiErrorMessage(err, "Failed to save cardio"), "error");
-    } finally {
-        saving.value = false;
-    }
+    // Shows as logged at once; a failed save rolls back with a Retry toast.
+    saveCardio(currentMinutes.value, undefined, notes.value);
+    goBackToLogging();
 };
 </script>
 
@@ -88,6 +77,6 @@ const finish = async () => {
         <Field label="Notes">
             <Textarea v-model="notes" placeholder="What did you watch? Any thoughts..." :rows="3" />
         </Field>
-        <Button variant="primary" size="lg" block :loading="saving" @click="finish">Finish cardio</Button>
+        <Button variant="primary" size="lg" block @click="finish">Finish cardio</Button>
     </div>
 </template>

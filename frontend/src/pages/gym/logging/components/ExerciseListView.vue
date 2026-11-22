@@ -2,6 +2,7 @@
 import type { ExerciseGroup } from "~/api/workout/api";
 import type { ComboboxOption, MenuItem } from "~/shared/ui";
 import { ref, computed } from "vue";
+import type { Exercise } from "~/types/workout";
 import { ChevronRight, Dumbbell, MoreVertical, PartyPopper, Trash2 } from "lucide-vue-next";
 import { Button, Card, Combobox, EmptyState, IconButton, List, ListRow, Menu } from "~/shared/ui";
 import { useExercisesPaginated } from "~/api/workout/queries";
@@ -16,12 +17,11 @@ const props = defineProps<{
     dateLabel: string;
     steps: WorkoutStep[];
     exercises: ExerciseGroup[];
-    removingId?: number | null;
 }>();
 
 const emit = defineEmits<{
     (e: "select-step", step: WorkoutStep): void;
-    (e: "add-exercise", exerciseId: number): void;
+    (e: "add-exercise", exerciseId: number, exercise?: Exercise): void;
     (e: "remove-exercise", index: number): void;
     (e: "finish"): void;
 }>();
@@ -42,20 +42,16 @@ const startLabel = (s: WorkoutStep) =>
 // Add exercise (catalog search, skipping what's already in today's log)
 const exerciseSearch = ref("");
 const { data: exercisesPages, fetchNextPage, hasNextPage, isFetching } = useExercisesPaginated(exerciseSearch);
+const catalog = computed(() => exercisesPages.value?.pages.flatMap((p) => p.exercises) ?? []);
+const addExercise = (id: number) => emit("add-exercise", id, catalog.value.find((ex) => ex.ID === id));
 const exerciseOptions = computed<ComboboxOption[]>(() => {
-    const all = exercisesPages.value?.pages.flatMap((p) => p.exercises) ?? [];
+    const all = catalog.value;
     const existing = new Set(
         props.exercises.map((g) => g.planned?.ID ?? g.logged?.exercise_id).filter((id): id is number => id != null),
     );
     return all.filter((ex) => !existing.has(ex.ID)).map((ex) => ({ label: ex.name, value: ex.ID }));
 });
 
-const exerciseIdAt = (index: number | undefined) => {
-    if (index == null) return null;
-    const g = props.exercises[index];
-    return g?.logged?.exercise_id ?? g?.planned?.ID ?? null;
-};
-const isRemoving = (s: WorkoutStep) => props.removingId != null && exerciseIdAt(s.exerciseIndex) === props.removingId;
 
 const rowMenu: MenuItem[] = [{ key: "remove", label: "Remove from this workout", icon: Trash2, tone: "danger" }];
 const onRowMenu = (s: WorkoutStep, key: string) => {
@@ -124,7 +120,6 @@ const onRowMenu = (s: WorkoutStep, key: string) => {
                         v-for="(s, i) in steps"
                         :key="s.key"
                         :selected="stateOf(i) === 'next'"
-                        :pending="isRemoving(s)"
                         @click="emit('select-step', s)"
                     >
                         <template #leading><StepMarker :n="i + 1" :state="stateOf(i)" /></template>
@@ -135,7 +130,7 @@ const onRowMenu = (s: WorkoutStep, key: string) => {
                         </template>
                         <template #end>
                             <Menu v-if="s.kind === 'lift'" :items="rowMenu" @select="onRowMenu(s, $event)">
-                                <IconButton :label="`More actions for ${s.name}`" :disabled="isRemoving(s)">
+                                <IconButton :label="`More actions for ${s.name}`">
                                     <MoreVertical />
                                 </IconButton>
                             </Menu>
@@ -155,7 +150,7 @@ const onRowMenu = (s: WorkoutStep, key: string) => {
                 :has-more="hasNextPage ?? false"
                 :loading="isFetching"
                 placeholder="Add an exercise…"
-                @select="(o: ComboboxOption) => emit('add-exercise', o.value as number)"
+                @select="(o: ComboboxOption) => addExercise(o.value as number)"
                 @load-more="() => hasNextPage && fetchNextPage()"
                 @search="(q: string) => (exerciseSearch = q)"
             />

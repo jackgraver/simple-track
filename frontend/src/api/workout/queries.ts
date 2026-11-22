@@ -1,10 +1,28 @@
 import { infiniteQueryOptions, queryOptions, useInfiniteQuery, useMutation, useMutationState, useQuery, useQueryClient, type QueryClient } from '@tanstack/vue-query';
 import { computed, toValue, type MaybeRefOrGetter } from 'vue';
+import axios from 'axios';
 import { apiDELETE, apiGET, apiPATCH, apiPOST } from '~/api/client';
-import { useOptimisticMutation, usePendingIds } from '~/api/optimistic';
+import { useOptimisticMutation, usePendingIds, useServerMutation } from '~/api/optimistic';
 import { activateWorkoutProgram, createWorkoutPlan, createWorkoutProgram, getWorkoutPrograms, renameWorkoutProgram, switchWorkoutPlan, type WorkoutActivityResponse, WorkoutLogsPreviousResponse } from '~/api/workout/api';
 import { dateToOffset, offsetToDate } from '~/api/workout/dates';
 import { workoutKeys } from '~/api/workout/keys';
+import {
+    addExerciseGroup,
+    applyAddedExercise,
+    applyCardioResponse,
+    applyMobilityResponse,
+    removeExerciseGroup,
+    restoreCardio,
+    restoreExerciseGroup,
+    restoreMobility,
+    setCardio,
+    setMobilityChecked,
+    type AddExerciseVars,
+    type CardioVars,
+    type MobilitySlot,
+    type MobilityVars,
+    type RemoveExerciseVars,
+} from '~/api/workout/dayCache';
 import {
     appendSet,
     dropRemovedExercise,
@@ -120,16 +138,6 @@ export function useWorkoutExercisesAllQuery(enabled: MaybeRefOrGetter<boolean> =
     );
 }
 
-function invalidateWorkoutActivityQueries(queryClient: ReturnType<typeof useQueryClient>) {
-    queryClient.invalidateQueries({ queryKey: workoutKeys.activity.all });
-}
-
-/** After a write to one day: that day's view plus the activity heatmap. */
-function invalidateDay(queryClient: ReturnType<typeof useQueryClient>, date: string) {
-    queryClient.invalidateQueries({ queryKey: workoutKeys.days.day(date) });
-    invalidateWorkoutActivityQueries(queryClient);
-}
-
 export function useWorkoutActivity(opts: MaybeRefOrGetter<WorkoutActivityQueryOpts>) {
     return useQuery(computed(() => workoutQueries.activity(toValue(opts))));
 }
@@ -210,104 +218,8 @@ export function useCreateWorkoutPlan() {
     });
 }
 
-export function useSwitchWorkoutPlan() {
-    const queryClient = useQueryClient();
-
-    return useMutation({
-        mutationFn: ({ date, planId }: { date: string; planId: number | null }) =>
-            switchWorkoutPlan(dateToOffset(date), planId),
-        onSuccess: (_data, { date }) => {
-            queryClient.invalidateQueries({ queryKey: workoutKeys.days.day(date) });
-        },
-    });
-}
-
 export function useExercisesPaginated(search: MaybeRefOrGetter<string> = '', pageSize = 10) {
     return useInfiniteQuery(computed(() => workoutQueries.exercisesPaginated(toValue(search), pageSize)));
-}
-
-export function useAddExerciseToWorkout() {
-    const queryClient = useQueryClient();
-
-    return useMutation({
-        mutationFn: async ({ date, exerciseId }: { date: string; exerciseId: number }) => {
-            const body = await apiPOST<{ exercise: LoggedExercise }>(
-                '/workout/exercises/add',
-                { exercise_id: exerciseId },
-                { params: { offset: dateToOffset(date) } },
-            );
-            return body.exercise;
-        },
-        onSuccess: (_data, { date }) => invalidateDay(queryClient, date),
-    });
-}
-
-export function useRemoveExerciseFromWorkout() {
-    const queryClient = useQueryClient();
-
-    return useMutation({
-        mutationFn: async ({ date, exerciseId }: { date: string; exerciseId: number }) => {
-            return apiDELETE<{ success?: boolean }>('/workout/exercises/remove', {
-                data: { exercise_id: exerciseId },
-                params: { offset: dateToOffset(date) },
-            });
-        },
-        onSuccess: (_data, { date }) => invalidateDay(queryClient, date),
-    });
-}
-
-export function useUpsertMobilityPre() {
-    const queryClient = useQueryClient();
-
-    return useMutation({
-        mutationFn: async ({ date, checked }: { date: string; checked: string[] }) => {
-            const body = await apiPOST<{ mobility: MobilityLogged }>(
-                '/workout/logs/mobility/pre',
-                { checked },
-                { params: { offset: dateToOffset(date) } },
-            );
-            return body.mobility;
-        },
-        onSuccess: (_data, { date }) => invalidateDay(queryClient, date),
-    });
-}
-
-export function useUpsertMobilityPost() {
-    const queryClient = useQueryClient();
-
-    return useMutation({
-        mutationFn: async ({ date, checked }: { date: string; checked: string[] }) => {
-            const body = await apiPOST<{ mobility: MobilityLogged }>(
-                '/workout/logs/mobility/post',
-                { checked },
-                { params: { offset: dateToOffset(date) } },
-            );
-            return body.mobility;
-        },
-        onSuccess: (_data, { date }) => invalidateDay(queryClient, date),
-    });
-}
-
-export function useUpsertCardio() {
-    const queryClient = useQueryClient();
-
-    return useMutation({
-        mutationFn: async (payload: { date: string; minutes: number; type?: string; notes?: string }) => {
-            const body = await apiPOST<{ cardio: Cardio }>(
-                '/workout/logs/cardio',
-                {
-                    minutes: payload.minutes,
-                    ...(payload.type !== undefined && payload.type !== ''
-                        ? { type: payload.type }
-                        : {}),
-                    ...(payload.notes !== undefined ? { notes: payload.notes } : {}),
-                },
-                { params: { offset: dateToOffset(payload.date) } },
-            );
-            return body.cardio;
-        },
-        onSuccess: (_data, { date }) => invalidateDay(queryClient, date),
-    });
 }
 
 // ── Per-set logging (optimistic-ui G2, endpoints from G1) ─────────────────────────────────────────
@@ -540,4 +452,189 @@ export function notesSavePending(qc: QueryClient, v: SaveNotesVars): boolean {
             const mv = m.state.variables as SaveNotesVars | undefined;
             return mv?.date === v.date && mv.exercise_id === v.exercise_id && mv.notes === v.notes;
         });
+}
+
+// ── Rest of logging (optimistic-ui G3): add/remove exercise, cardio, mobility, switch plan ───────
+
+type Day = WorkoutLogsPreviousResponse;
+
+/** Heatmap membership can change with any of these writes; it is a different key from the day. */
+const activityKeys = () => [workoutKeys.activity.all];
+
+/**
+ * Add an exercise to the day. The group appears at once (needs `exercise` for its name; without it the
+ * day is refetched on settle). Shares the exercise's set scope so a first set can't overtake it. The
+ * response's saved row replaces the temporary one; `previous`/`max` are server-computed, so the day is
+ * refetched once after settle (the single GET this slice keeps).
+ */
+export function useAddExerciseToWorkout() {
+    const qc = useQueryClient();
+    return useOptimisticMutation<AddExerciseVars, LoggedExercise>({
+        mutationKey: workoutKeys.mutations.addExercise(),
+        mutationFn: async (v) => {
+            const body = await apiPOST<{ exercise: LoggedExercise }>(
+                '/workout/exercises/add',
+                { exercise_id: v.exerciseId },
+                { params: { offset: dateToOffset(v.date) } },
+            );
+            return body.exercise;
+        },
+        optimistic: (v) => [
+            {
+                queryKey: workoutKeys.days.day(v.date),
+                apply: (day: Day, vars: AddExerciseVars) => addExerciseGroup(day, vars),
+                revert: (day: Day, vars: AddExerciseVars, snapshot: Day) => removeAddedGroup(day, snapshot, vars),
+            },
+        ],
+        reconcile: (logged, v) =>
+            qc.setQueryData<Day>(workoutKeys.days.day(v.date), (day) => (day ? applyAddedExercise(day, v.exerciseId, logged) : day)),
+        invalidate: (v) => [workoutKeys.days.day(v.date), ...activityKeys()],
+        scope: (v) => setsScope({ date: v.date, exercise_id: v.exerciseId }),
+        errorMessage: () => 'Couldn’t add the exercise',
+        queryClient: qc,
+    });
+}
+
+/** Undo an add when siblings changed the day: drop the group again unless it was already there. */
+function removeAddedGroup(day: Day, snapshot: Day, v: AddExerciseVars): Day {
+    return findGroup(snapshot, v.exerciseId)?.logged ? day : removeExerciseGroup(day, v.exerciseId);
+}
+
+/**
+ * Remove an exercise's log from the day. It disappears at once; a 404 (nothing was logged) counts as
+ * success, as before. Rollback restores the row; the day is refetched on settle.
+ */
+export function useRemoveExerciseFromWorkout() {
+    const qc = useQueryClient();
+    return useOptimisticMutation<RemoveExerciseVars, { success?: boolean }>({
+        mutationKey: workoutKeys.mutations.removeExercise(),
+        mutationFn: async (v) => {
+            try {
+                return await apiDELETE<{ success?: boolean }>('/workout/exercises/remove', {
+                    data: { exercise_id: v.exerciseId },
+                    params: { offset: dateToOffset(v.date) },
+                });
+            } catch (err) {
+                if (axios.isAxiosError(err) && err.response?.status === 404) return { success: true };
+                throw err;
+            }
+        },
+        optimistic: (v) => [
+            {
+                queryKey: workoutKeys.days.day(v.date),
+                apply: (day: Day, vars: RemoveExerciseVars) => removeExerciseGroup(day, vars.exerciseId),
+                revert: (day: Day, vars: RemoveExerciseVars, snapshot: Day) => restoreExerciseGroup(day, snapshot, vars.exerciseId),
+            },
+        ],
+        // Removing a planned exercise's log makes the server rebuild it (previous/max), so refetch the day.
+        invalidate: (v) => [workoutKeys.days.day(v.date), ...activityKeys()],
+        scope: (v) => setsScope({ date: v.date, exercise_id: v.exerciseId }),
+        errorMessage: () => 'Couldn’t remove the exercise',
+        retry: 1,
+        queryClient: qc,
+    });
+}
+
+function useUpsertMobility(slot: MobilitySlot) {
+    const qc = useQueryClient();
+    const key = slot === 'pre' ? workoutKeys.mutations.mobilityPre() : workoutKeys.mutations.mobilityPost();
+    return useOptimisticMutation<Omit<MobilityVars, 'slot'>, MobilityLogged>({
+        mutationKey: key,
+        mutationFn: async (v) => {
+            const body = await apiPOST<{ mobility: MobilityLogged }>(
+                `/workout/logs/mobility/${slot}`,
+                { checked: v.checked },
+                { params: { offset: dateToOffset(v.date) } },
+            );
+            return body.mobility;
+        },
+        optimistic: (v) => [
+            {
+                queryKey: workoutKeys.days.day(v.date),
+                apply: (day: Day) => setMobilityChecked(day, slot, v.checked),
+                revert: (day: Day, _v, snapshot: Day) => restoreMobility(day, snapshot, slot),
+            },
+        ],
+        // The next tick has already patched the cache while an earlier call is in flight; let the last one win.
+        reconcile: (mobility, v, client, { siblingsPending }) => {
+            const dayKey = workoutKeys.days.day(v.date);
+            if (siblingsPending(dayKey) > 0) return;
+            client.setQueryData<Day>(dayKey, (day) => (day ? applyMobilityResponse(day, slot, mobility) : day));
+        },
+        invalidate: () => activityKeys(),
+        scope: (v) => ({ id: `mobility:${v.date}:${slot}` }),
+        errorMessage: () => 'Couldn’t save mobility',
+        retry: 2,
+        queryClient: qc,
+    });
+}
+
+/** Tick pre-workout mobility items. Upsert by workout log, so retries are safe. */
+export function useUpsertMobilityPre() {
+    return useUpsertMobility('pre');
+}
+
+export function useUpsertMobilityPost() {
+    return useUpsertMobility('post');
+}
+
+/** Save cardio. The logged cardio shows at once; the server upserts by workout log, so retries are safe. */
+export function useUpsertCardio() {
+    const qc = useQueryClient();
+    return useOptimisticMutation<CardioVars, Cardio>({
+        mutationKey: workoutKeys.mutations.cardio(),
+        mutationFn: async (v) => {
+            const body = await apiPOST<{ cardio: Cardio }>(
+                '/workout/logs/cardio',
+                {
+                    minutes: v.minutes,
+                    ...(v.type !== undefined && v.type !== '' ? { type: v.type } : {}),
+                    ...(v.notes !== undefined ? { notes: v.notes } : {}),
+                },
+                { params: { offset: dateToOffset(v.date) } },
+            );
+            return body.cardio;
+        },
+        optimistic: (v) => [
+            {
+                queryKey: workoutKeys.days.day(v.date),
+                apply: (day: Day) => setCardio(day, v),
+                revert: (day: Day, _v, snapshot: Day) => restoreCardio(day, snapshot),
+            },
+        ],
+        reconcile: (cardio, v, client, { siblingsPending }) => {
+            const dayKey = workoutKeys.days.day(v.date);
+            if (siblingsPending(dayKey) > 0) return;
+            client.setQueryData<Day>(dayKey, (day) => (day ? applyCardioResponse(day, cardio) : day));
+        },
+        invalidate: () => activityKeys(),
+        scope: (v) => ({ id: `cardio:${v.date}` }),
+        errorMessage: () => 'Couldn’t save cardio',
+        retry: 2,
+        queryClient: qc,
+    });
+}
+
+/**
+ * Switch the day's plan. Waits for the server (it rebuilds the planned exercises) and writes the full
+ * day it returns into the cache, so no follow-up GET. If another write to the day is still pending the
+ * response would erase its optimistic rows, so the day is only marked stale then (no refetch now).
+ */
+export function useSwitchWorkoutPlan() {
+    const qc = useQueryClient();
+    return useServerMutation<{ date: string; planId: number | null }, Day>({
+        mutationKey: workoutKeys.mutations.switchPlan(),
+        mutationFn: ({ date, planId }) => switchWorkoutPlan(dateToOffset(date), planId),
+        reconcile: (res, v, client, { siblingsPending }) => {
+            const dayKey = workoutKeys.days.day(v.date);
+            if (siblingsPending(dayKey) > 0) {
+                void client.invalidateQueries({ queryKey: dayKey, exact: true, refetchType: 'none' });
+                return;
+            }
+            client.setQueryData<Day>(dayKey, res);
+        },
+        invalidate: () => activityKeys(),
+        errorMessage: () => 'Couldn’t switch the plan',
+        queryClient: qc,
+    });
 }

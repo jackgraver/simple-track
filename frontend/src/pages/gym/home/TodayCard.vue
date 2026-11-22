@@ -3,7 +3,6 @@ import { offsetToDate } from "~/api/workout/dates";
 import { computed } from "vue";
 import { ArrowLeftRight, Check, Moon, Plus } from "lucide-vue-next";
 import { useSwitchWorkoutPlan } from "~/api/workout/queries";
-import { getApiErrorMessage } from "~/api/httpError";
 import { dialogManager } from "~/composables/dialog/useDialog";
 import { toast } from "~/composables/toast/useToast";
 import SwitchWorkoutPlanDialog from "~/pages/gym/components/SwitchWorkoutPlanDialog.vue";
@@ -117,8 +116,8 @@ const onMenu = async (key: string) => {
     try {
         await switchPlan.mutateAsync({ date: offsetToDate(props.offset), planId });
         toast.push(planId == null ? "Marked as a rest day" : "Workout plan updated", "success");
-    } catch (err: unknown) {
-        toast.push(getApiErrorMessage(err, "Couldn't switch the plan"), "error");
+    } catch {
+        // The mutation already showed the error toast.
     }
 };
 </script>
