@@ -177,3 +177,36 @@ Not verified in a browser (no dev stack allowed): vue-tsc, vitest, eslint, and `
 8. N2 placeholderData note and N1 child-route note corrected above.
 Not verified in a browser (no dev stack allowed): vue-tsc, vitest (repros for 2, 3, 4, 6, 7 fail on the old code; prefetch/router tests for 1, 5), eslint only. Set logging (`setsCache`, `useExerciseLoggingSession`, `useDeleteSet`) untouched (GFIX owns it).
 
+
+## 2026-11-22: POLISH offline / slow-network rough edges (owner's browser test, bugs 1-8 + scan)
+Offline model (the root of most reports): TanStack pauses mutations while `onlineManager` is offline; they don't fail. Decided:
+optimistic writes keep that (an in-memory queue, sent on reconnect; a reload drops it), wait-for-server writes don't.
+The QueryClient default is now `mutations.networkMode: 'always'`. `useOptimisticMutation` sets `'online'`. A server write
+offline fails at once with `OFFLINE_MESSAGE` (`getApiErrorMessage` maps a no-response axios error while
+`navigator.onLine` is false), and it never waits at a scope gate behind paused writes. `api/online.ts` (`useOnline`,
+`usePausedMutationCount`) drives an app-wide `shared/OfflineNotice.vue` ("N changes will be sent when you reconnect")
+and per-row "Waiting for connection" labels (gym sets, routine step labels) instead of an endless pending or "Saving…".
+Pending rows stay interactive. An action on a row that is still being created goes to the server by `client_id`, in the
+create's scope, so it is sent after the create. Backend: `PATCH /tracking/grocery/items/:id/complete`,
+`DELETE /tracking/grocery/items/:id` and `DELETE /tracking/water/:id` accept the row's client_id. A create's reconcile no
+longer re-adds a row the user removed meanwhile (grocery, water). A failed complete does not restore a grocery row whose
+create failed.
+1. Week strip: not a frontend bug. Two programs were `is_active` (baseline "Default" + devseed's PPL), and
+   `GetPlanByDay` took the empty one, so future days were created as rest days. `FindActiveWorkoutProgram` now prefers
+   the first active program with plans (the frontend's rule), and devseed deactivates the others. Day rows created before
+   this keep their stored plan (dev DB: Mon 23 / Fri 27 Nov). See "left for later".
+3. Grocery tick: the row leaves after the strike-through whether or not the request is done, and comes back with Retry on
+   failure (rollback). No `hiddenIds`; the cache is the source.
+4/5. Gym sets: any row can be tapped to edit. A pending row gets a PATCH queued behind its create. A failed row re-sends
+   the failed write with the new values (`planSetRetry`: a failed create wins over the edit queued behind it, takes its
+   values, and dismisses it). With a server error, Retry was already reachable. Offline it never fails, which is now
+   explained instead.
+6/7. Plans: `useAddRoutineExercise` is optimistic (the picker has the row) and folds Undo's position into one call
+   (add, then a reorder from the cache order at send time; "already in plan" counts as done). Undo of a remove is
+   offered at once. Creating a new exercise offline says it needs a connection.
+8. Diet: the server only returns planned meals not yet logged, and unlog does not re-plan (open question Q1). So
+   `applyLogPlanned` moves the meal out of `plannedMeals` (revert re-plans it from the snapshot). Logged rows still
+   saving are tinted pending and can be deleted. A quick log's temp id is swapped for the real one, recorded in its
+   reconcile (TanStack marks the mutation `success` only after `onSettled`, i.e. after the scope gate released the
+   delete).
+Verified in Chromium (Playwright, 390 px, `context.setOffline` / CDP latency / routed 500s): every flow above.

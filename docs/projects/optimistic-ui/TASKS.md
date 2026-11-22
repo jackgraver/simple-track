@@ -74,5 +74,16 @@ References: AUDIT.md (findings), MUTATIONS.md (per-mutation plan), ID-STRATEGY.m
   `isPending && !data` across pages. App-start prefetch of today's diet + gym. (done; see DECISIONS 2026-11-22 "N2"; narrowed by "NFIX":
   past/today neighbours only, app start warms the landing route only)
 
+## Polish
+- [x] **POLISH offline/slow-network pass** (done 2026-11-22, see DECISIONS "POLISH"): owner bugs 1-8 + scan. Offline model
+  (optimistic = queued, server writes fail fast), pending rows interactive, offline notice, browser-verified.
+- [ ] **Left from POLISH:** day rows created before a schedule change keep the old plan (re-sync untouched future days?);
+  diet plan editor (`edit-planned`) ignores remove/reorder on rows still saving (needs delete-planned by client_id);
+  editing a logged meal / quick log still saving says "Still saving" (needs replace by client_id); a plan drag between
+  days (`moveDay`) shows the routine on both days until the assign is answered (offline: until reconnect); raw
+  `useMutation` hooks (profile/targets, presets, imports, log-meal submits) lack `meta.handled` and can double-toast;
+  per-call `mutate(vars, { onError })` in media quick status / targets only fires for the latest call; the offline
+  queue is in memory (stage 4).
+
 ## Stage 4 (deferred)
 - [ ] Cache persistence (IndexedDB) and offline mutation queue. Needs F3/F4 date keys and `client_id` everywhere.
