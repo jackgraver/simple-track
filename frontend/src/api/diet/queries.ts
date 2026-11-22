@@ -51,8 +51,8 @@ import {
 } from './dayPatches';
 import { createFood } from './food';
 import { dietKeys } from './keys';
-import { getApiErrorMessage } from '~/api/httpError';
 import { newClientId } from '~/api/ids';
+import { dateToOffset } from '~/api/workout/dates';
 import { useOptimisticMutation, type CachePatch, type ReconcileHelpers } from '~/api/optimistic';
 import { toast } from '~/composables/toast/useToast';
 import { searchListKeys } from '~/shared/searchListKeys';
@@ -64,17 +64,23 @@ const DETAIL_STALE_MS = 1000 * 60 * 5;
 
 // ---- Queries ----
 
+/** The API's day offset for an absolute date, computed when the request is sent (not when it was queued). */
+const apiOffset = (date: string) => dateToOffset(date);
+
 /**
- * Query options for one day. The offset is the API argument; the cache key is the absolute
- * date it resolves to *now*, so the key and the request always describe the same day.
+ * Query options for one day. The cache key is the absolute date the offset resolves to now, and the
+ * request derives its offset from that date when it runs, so a refetch after midnight (page left open,
+ * PWA resumed) still fetches the day under that key rather than the new "today".
  */
 export const dietQueries = {
-    day: (offset: number) =>
-        queryOptions({
-            queryKey: dietKeys.days.day(ymdForDayOffset(offset)),
-            queryFn: () => getDietLogsToday(offset),
+    day: (offset: number) => {
+        const date = ymdForDayOffset(offset);
+        return queryOptions({
+            queryKey: dietKeys.days.day(date),
+            queryFn: () => getDietLogsToday(apiOffset(date)),
             staleTime: DAY_STALE_MS,
-        }),
+        });
+    },
     plans: () => queryOptions({ queryKey: dietKeys.plans.all, queryFn: getAllPlans }),
     savedMeals: () =>
         queryOptions({ queryKey: dietKeys.savedMeals.list(), queryFn: getSavedMeals }),
@@ -223,7 +229,7 @@ export function useAddPlannedFromSavedAt() {
     return useOptimisticMutation({
         mutationKey: dietKeys.mutations.addPlanned(),
         mutationFn: (v: AddPlannedVars) =>
-            addPlannedMealFromSaved(v.savedMeal.ID, v.offset, v.client_id),
+            addPlannedMealFromSaved(v.savedMeal.ID, apiOffset(v.date), v.client_id),
         optimistic: (v: AddPlannedVars): DayPatch<AddPlannedVars>[] => [
             {
                 queryKey: dayKey(v),
@@ -243,7 +249,7 @@ export function useDeletePlannedMealAt() {
     return useOptimisticMutation({
         mutationKey: dietKeys.mutations.deletePlanned(),
         mutationFn: (v: DeletePlannedVars) =>
-            deletePlannedMeal(v.plannedMealId, v.offset),
+            deletePlannedMeal(v.plannedMealId, apiOffset(v.date)),
         optimistic: (v: DeletePlannedVars): DayPatch<DeletePlannedVars>[] => [
             {
                 queryKey: dayKey(v),
@@ -261,7 +267,7 @@ export function useDeletePlannedMealAt() {
 export function useReorderPlannedMealsAt() {
     return useOptimisticMutation({
         mutationKey: dietKeys.mutations.reorderPlanned(),
-        mutationFn: (v: ReorderVars) => reorderPlannedMeals(v.ids, v.offset),
+        mutationFn: (v: ReorderVars) => reorderPlannedMeals(v.ids, apiOffset(v.date)),
         optimistic: (v: ReorderVars): DayPatch<ReorderVars>[] => [
             {
                 queryKey: dayKey(v),
@@ -279,6 +285,7 @@ export function useReorderPlannedMealsAt() {
 export function useCopyPlannedDay() {
     const queryClient = useQueryClient();
     return useMutation({
+        meta: { handled: true }, // the page toasts the error
         mutationFn: ({ from, to }: { from: number; to: number[] }) => copyPlannedDay(from, to),
         onMutate: ({ to }) => ({ dates: to.map(ymdForDayOffset) }),
         onSuccess: (_d, _vars, ctx) => {
@@ -349,7 +356,7 @@ export function quickLogVars(payload: Omit<QuickLogPayload, 'offset' | 'client_i
 export function useQuickLog() {
     return useOptimisticMutation({
         mutationKey: dietKeys.mutations.quickLog(),
-        mutationFn: (v: QuickLogVars) => quickLog(v),
+        mutationFn: (v: QuickLogVars) => quickLog({ ...v, offset: apiOffset(v.date) }),
         optimistic: (v: QuickLogVars): DayPatch<QuickLogVars>[] => [
             {
                 queryKey: dayKey(v),
@@ -494,14 +501,12 @@ export function useUpdateSavedMeal() {
 export function useCreateFood() {
     const queryClient = useQueryClient();
     return useMutation({
+        meta: { handled: true }, // CreateFoodDialog toasts the error
         mutationFn: (vars: { food: Food; relatedFoodId?: number }) =>
             createFood(vars.food, vars.relatedFoodId),
         onSuccess: () => {
             void queryClient.invalidateQueries({ queryKey: searchListKeys.all });
             toast.push("Food Created Successfully!", "success");
-        },
-        onError: (error) => {
-            toast.push(getApiErrorMessage(error, "Create food failed"), "error");
         },
     });
 }

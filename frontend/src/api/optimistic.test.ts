@@ -208,7 +208,19 @@ describe("rollback with a sibling pending", () => {
         expect(rows().map((r) => r.client_id)).toEqual(["s", "a", "b"]);
     });
 
-    it("restores the snapshot once the sibling has settled", async () => {
+    it("restores the snapshot once the sibling has settled, if the cache still holds our value", async () => {
+        seed();
+        const srv = server();
+        const m = useAdd(srv, { reconcile: () => {} }); // b's success leaves the cache untouched
+        m.mutate({ client_id: "a", name: "A" });
+        await flush();
+        srv.calls[0].d.reject(new Error("x"));
+        await flush();
+        expect(rows().map((r) => r.client_id)).toEqual(["s"]);
+    });
+
+    // Review finding 2: a later sibling that already succeeded must survive the earlier one failing last.
+    it("keeps a sibling's saved row when an earlier mutation fails after it", async () => {
         seed();
         const srv = server();
         const m = useAdd(srv);
@@ -218,13 +230,112 @@ describe("rollback with a sibling pending", () => {
         await flush();
         srv.calls[1].d.resolve({ client_id: "b", ID: 7, name: "B" });
         await flush();
-        const revertSpy = vi.spyOn(addRow, "revert");
         srv.calls[0].d.reject(new Error("x"));
         await flush();
-        // "a" snapshotted ["s"] and nobody is pending: plain restore (the settled "b" refetches on invalidate).
-        expect(revertSpy).not.toHaveBeenCalled();
+        // "a" snapshotted ["s"]; restoring it would wipe the saved "b".
+        expect(rows()).toEqual([
+            { client_id: "s", ID: 1, name: "seed" },
+            { client_id: "b", ID: 7, name: "B" },
+        ]);
+    });
+
+    // Review finding 1: the last failure must not restore a snapshot holding an earlier, failed row.
+    it("does not bring back a row that already failed when the next one fails too", async () => {
+        seed();
+        const srv = server();
+        const m = useAdd(srv);
+        m.mutate({ client_id: "a", name: "A" });
+        m.mutate({ client_id: "b", name: "B" });
+        await flush();
+        srv.calls[0].d.reject(new Error("x"));
+        await flush();
+        expect(rows().map((r) => r.client_id)).toEqual(["s", "b"]);
+        srv.calls[1].d.reject(new Error("x"));
+        await flush();
+        // b's snapshot was ["s", "a"]; "a" was never saved.
         expect(rows().map((r) => r.client_id)).toEqual(["s"]);
-        revertSpy.mockRestore();
+    });
+
+    it("still restores the snapshot when patches have no revert and nobody changed the entry", async () => {
+        seed();
+        const srv = server();
+        const { revert: _drop, ...noRevert } = addRow;
+        const m = useAdd(srv, {}, noRevert);
+        m.mutate({ client_id: "a", name: "A" });
+        await flush();
+        srv.calls[0].d.reject(new Error("x"));
+        await flush();
+        expect(rows().map((r) => r.client_id)).toEqual(["s"]);
+    });
+});
+
+// Review finding 4: work skipped while siblings were pending must happen when the last one settles.
+describe("deferred work when the last writer fails", () => {
+    /** Like diet's reconcileDay: replace the entry only when nobody else is writing it, else skip. */
+    const skipWhileSiblings: Partial<OptimisticMutationOptions<Vars, Row>> = {
+        reconcile: (saved, v, client, h) => {
+            if (h.siblingsPending(LIST) > 0) return;
+            client.setQueryData<Row[]>(LIST, (r) => r?.map((x) => (x.client_id === v.client_id ? saved : x)));
+        },
+    };
+
+    it("refetches the entry when a sibling's reconcile was skipped and the last writer rolls back", async () => {
+        seed();
+        const srv = server();
+        const m = useAdd(srv, skipWhileSiblings);
+        const inv = vi.spyOn(qc, "invalidateQueries");
+        m.mutate({ client_id: "a", name: "A" });
+        m.mutate({ client_id: "b", name: "B" });
+        await flush();
+        srv.calls[0].d.resolve({ client_id: "a", ID: 10, name: "A" });
+        await flush();
+        // a's reconcile skipped: its row is still the optimistic one.
+        expect(rows().map((r) => r.ID)).toEqual([1, 0, 0]);
+        expect(inv).not.toHaveBeenCalled();
+
+        srv.calls[1].d.reject(new Error("x"));
+        await flush();
+        expect(rows().map((r) => r.client_id)).toEqual(["s", "a"]);
+        expect(inv).toHaveBeenCalledWith({ queryKey: LIST, exact: true });
+    });
+
+    it("does not refetch when the last writer succeeds (its reconcile replaced the entry)", async () => {
+        seed();
+        const srv = server();
+        const m = useAdd(srv, skipWhileSiblings);
+        m.mutate({ client_id: "a", name: "A" });
+        m.mutate({ client_id: "b", name: "B" });
+        await flush();
+        srv.calls[0].d.resolve({ client_id: "a", ID: 10, name: "A" });
+        await flush();
+        srv.calls[1].d.resolve({ client_id: "b", ID: 20, name: "B" });
+        await flush();
+        const inv = vi.spyOn(qc, "invalidateQueries");
+        // A later lone failure has nothing pending to catch up on.
+        m.mutate({ client_id: "c", name: "C" });
+        await flush();
+        srv.calls[2].d.reject(new Error("x"));
+        await flush();
+        expect(inv).not.toHaveBeenCalled();
+    });
+
+    it("runs a sibling hook's skipped invalidation when another hook settles last", async () => {
+        seed();
+        const srvA = server();
+        const srvB = server();
+        const a = useAdd(srvA, { invalidate: () => [LIST] });
+        const b = useAdd(srvB, { mutationKey: ["rows", "other"] }); // invalidates nothing itself
+        const inv = vi.spyOn(qc, "invalidateQueries");
+        a.mutate({ client_id: "a", name: "A" });
+        b.mutate({ client_id: "b", name: "B" });
+        await flush();
+        srvA.calls[0].d.resolve({ client_id: "a", ID: 10, name: "A" });
+        await flush();
+        expect(inv).not.toHaveBeenCalled();
+        srvB.calls[0].d.resolve({ client_id: "b", ID: 20, name: "B" });
+        await flush();
+        expect(inv).toHaveBeenCalledTimes(1);
+        expect(inv).toHaveBeenCalledWith({ queryKey: LIST });
     });
 });
 
