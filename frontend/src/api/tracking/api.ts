@@ -1,5 +1,6 @@
 import { apiDELETE, apiGET, apiPATCH, apiPOST, apiPUT } from '~/api/client';
 import type {
+    ActivityLevel,
     BodyWeightLog,
     WeightImportResult,
     DrinkSizePreset,
@@ -19,10 +20,11 @@ export async function saveProfile(body: {
     height_in: number;
     age: number;
     sex: 'male' | 'female';
+    activity_level?: ActivityLevel;
 }): Promise<UserProfile> {
     const res = await apiPUT<{ profile: UserProfile }>('/tracking/profile', {
         ...body,
-        activity_level: 'moderately_active',
+        activity_level: body.activity_level ?? 'moderately_active',
     });
     return res.profile;
 }
@@ -56,8 +58,11 @@ export async function fetchGroceryItems(): Promise<GroceryItem[]> {
     return res.items ?? [];
 }
 
-export async function createGroceryItem(name: string): Promise<GroceryItem> {
-    const res = await apiPOST<{ item: GroceryItem }>('/tracking/grocery/items', { name });
+export async function createGroceryItem(name: string, clientId: string): Promise<GroceryItem> {
+    const res = await apiPOST<{ item: GroceryItem }>('/tracking/grocery/items', {
+        name,
+        client_id: clientId,
+    });
     return res.item;
 }
 
@@ -79,9 +84,10 @@ export async function createGroceryItems(
     return { items: res.items ?? [], skipped: res.skipped ?? [] };
 }
 
-export async function completeGroceryItem(id: number): Promise<GroceryItem> {
+/** `ref` is the numeric id or the item's client_id (the server accepts either). */
+export async function completeGroceryItem(ref: number | string): Promise<GroceryItem> {
     const res = await apiPATCH<{ item: GroceryItem }>(
-        `/tracking/grocery/items/${id}/complete`,
+        `/tracking/grocery/items/${ref}/complete`,
         {},
     );
     return res.item;
@@ -116,18 +122,21 @@ export async function saveWater(
     date: string,
     amountOz: number,
     presetId?: number,
+    clientId?: string,
 ): Promise<WaterLog> {
     const body: Record<string, unknown> = {
         date: date || undefined,
         amount_oz: amountOz,
     };
+    if (clientId) body.client_id = clientId;
     if (presetId != null) body.preset_id = presetId;
     const res = await apiPOST<{ log: WaterLog }>('/tracking/water', body);
     return res.log;
 }
 
-export async function deleteWater(id: number): Promise<void> {
-    await apiDELETE(`/tracking/water/${id}`);
+/** `ref` is the numeric id or the entry's client_id. */
+export async function deleteWater(ref: number | string): Promise<void> {
+    await apiDELETE(`/tracking/water/${ref}`);
 }
 
 export async function fetchDrinkSizePresets(): Promise<DrinkSizePreset[]> {

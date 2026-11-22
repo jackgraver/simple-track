@@ -1,156 +1,252 @@
 <script setup lang="ts">
-import { useMutation, useQueryClient } from "@tanstack/vue-query";
-import { computed, watch } from "vue";
-import { useRouter } from "vue-router";
-import { updatePlanMacros } from "~/api/diet/api";
-import {
-    latestWeightLbs,
-    useProfile,
-    useWeightLogs,
-} from "~/api/tracking/queries";
+import { computed, ref, watch } from "vue";
+import { useDietLogsToday, usePlans, useRecentDietDays, useSavePlanMacros } from "~/api/diet/queries";
+import { latestWeightLbs, useProfile, useSaveProfile, useWeightLogs } from "~/api/tracking/queries";
+import type { ActivityLevel } from "~/api/tracking/types";
 import { toast } from "~/composables/toast/useToast";
-import { dietKeys } from "~/api/diet/keys";
-import { useDietLogsToday } from "~/api/diet/queries";
-import MacroSlidersPanel from "./components/MacroSlidersPanel.vue";
-import TDEECalculator from "./components/TDEECalculator.vue";
+import {
+    Badge,
+    Button,
+    Card,
+    EmptyState,
+    ErrorState,
+    List,
+    ListRow,
+    PageHeader,
+    Section,
+    Skeleton,
+    SkeletonList,
+    useDelayedFlag,
+    useIsDesktop,
+} from "~/shared/ui";
+import CaloriesStep from "./components/CaloriesStep.vue";
+import SplitStep from "./components/SplitStep.vue";
+import {
+    fmtInt,
+    fmtSince,
+    intakeSummary,
+    observedMaintenance,
+    planHistory,
+    type Targets,
+    targetsEqual,
+    weightTrendLbPerWeek,
+} from "./domain/targets";
 import { useMacroSliders } from "./useMacroSliders";
 import { useTDEE } from "./useTDEE";
 
-const router = useRouter();
-const queryClient = useQueryClient();
-const {
-    data: dayData,
-    isPending: dayPending,
-    error: loadError,
-} = useDietLogsToday(0);
+const isDesktop = useIsDesktop();
+
+const { data: dayData, isPending: dayPending, error: loadError, refetch: refetchDay } = useDietLogsToday(0);
 const { data: profile, isPending: profilePending } = useProfile();
 const { data: weightLogs, isPending: weightPending } = useWeightLogs();
-const latestLogWeightLbs = computed(() => latestWeightLbs(weightLogs.value));
-const weightLbs = computed(() => latestLogWeightLbs.value ?? 0);
-const heightIn = computed(() => profile.value?.height_in ?? 0);
-const heightFtIn = computed(() => {
-    const total = Math.round(heightIn.value);
-    return `${Math.floor(total / 12)}'${total % 12}"`;
-});
-const age = computed(() => profile.value?.age ?? 0);
-const sex = computed(() => profile.value?.sex ?? "male");
+const recentDays = useRecentDietDays(7);
+const plansQuery = usePlans();
 
+const plan = computed(() => dayData.value?.day.plan ?? null);
+const planId = computed(() => plan.value?.ID || null);
+const weightLbs = computed(() => latestWeightLbs(weightLogs.value) ?? 0);
+
+// ---- editor state: sliders start from the saved plan; "dirty" compares against it.
 const sliders = useMacroSliders();
+const baseline = computed<Targets | null>(() =>
+    plan.value
+        ? {
+              calories: plan.value.calories,
+              protein: plan.value.protein,
+              carbs: plan.value.carbs,
+              fat: plan.value.fat ?? 0,
+              fiber: plan.value.fiber,
+          }
+        : null,
+);
+function resetToSaved() {
+    if (baseline.value) sliders.setMacroTargets(baseline.value);
+}
+watch(baseline, resetToSaved, { immediate: true });
+
+const current = computed<Targets>(() => ({
+    calories: sliders.calorieTarget.value,
+    protein: sliders.proteinG.value,
+    carbs: sliders.carbsG.value,
+    fat: sliders.fatG.value,
+    fiber: sliders.fiberG.value,
+}));
+const dirty = computed(() => baseline.value != null && !targetsEqual(current.value, baseline.value));
+const valid = computed(() => Object.values(current.value).every((n) => Number.isFinite(n) && n >= 0));
+
+// ---- calories evidence: formula (profile + weight), recent intake, weight trend.
+const activity = ref<ActivityLevel>("moderately_active");
 watch(
-    () => dayData.value?.day.plan,
-    (plan) => {
-        if (!plan) return;
-        sliders.setMacroTargets({
-            calories: plan.calories,
-            protein: plan.protein,
-            carbs: plan.carbs,
-            fat: plan.fat ?? 0,
-            fiber: plan.fiber,
-        });
+    () => profile.value?.activity_level,
+    (a) => {
+        if (a) activity.value = a;
     },
     { immediate: true },
 );
-const { bmr, tdee, multiplier } = useTDEE({
-    weightLbs: () => weightLbs.value,
-    heightIn: () => heightIn.value,
-    age: () => age.value,
-    sex: () => sex.value,
-    activity: () => "moderately_active",
-});
-const planId = computed(() => dayData.value?.day.plan.ID);
-const macrosValid = computed(() => {
-    const nums = [
-        sliders.calorieTarget.value,
-        sliders.proteinG.value,
-        sliders.carbsG.value,
-        sliders.fatG.value,
-        sliders.fiberG.value,
-    ];
-    return nums.every(
-        (n) => typeof n === "number" && !Number.isNaN(n) && n >= 0,
+const saveProfile = useSaveProfile();
+watch(activity, (a) => {
+    const p = profile.value;
+    if (!p || p.activity_level === a) return;
+    saveProfile.mutate(
+        { height_in: p.height_in, age: p.age, sex: p.sex, activity_level: a },
+        {
+            onError: () => {
+                toast.push("Could not save activity level", "error");
+                activity.value = p.activity_level;
+            },
+        },
     );
 });
-const saveMutation = useMutation({
-    mutationFn: async () => {
-        const id = planId.value;
-        if (id == null) throw new Error("No diet plan loaded");
-        return updatePlanMacros(id, {
-            calories: sliders.calorieTarget.value,
-            protein: sliders.proteinG.value,
-            fiber: sliders.fiberG.value,
-            carbs: sliders.carbsG.value,
-            fat: sliders.fatG.value,
-        });
-    },
-    onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: dietKeys.days.all });
-        toast.push("Macro targets saved", "success");
-        router.push({ name: "diet" });
-    },
-    onError: () => {
-        toast.push("Could not save macro targets", "error");
-    },
+
+const { bmr, tdee } = useTDEE({
+    weightLbs: () => weightLbs.value,
+    heightIn: () => profile.value?.height_in ?? 0,
+    age: () => profile.value?.age ?? 0,
+    sex: () => profile.value?.sex ?? "male",
+    activity: () => activity.value,
 });
-const saving = computed(() => saveMutation.isPending.value);
-const isPending = computed(
-    () => dayPending.value || profilePending.value || weightPending.value,
-);
-const submit = () => saveMutation.mutate();
-function applyTdeeCalories(n: number) {
-    sliders.setCalorieTarget(n);
+
+const intakeError = computed(() => recentDays.value.some((q) => q.isError));
+const intake = computed(() => {
+    const qs = recentDays.value;
+    if (qs.some((q) => !q.data)) return null;
+    return intakeSummary(qs.map((q) => q.data!));
+});
+function retryIntake() {
+    for (const q of recentDays.value) if (q.isError) void q.refetch();
 }
+const trend = computed(() => weightTrendLbPerWeek(weightLogs.value));
+const observed = computed(() => (intake.value ? observedMaintenance(intake.value, trend.value) : null));
+
+// ---- history
+const plans = computed(() => planHistory(plansQuery.data.value ?? []));
+
+// ---- save: stays on the page; the refetched plan becomes the new baseline.
+const saveMutation = useSavePlanMacros();
+const saving = computed(() => saveMutation.isPending.value);
+const canSave = computed(() => dirty.value && valid.value && planId.value != null);
+const save = () => {
+    if (planId.value == null) return;
+    saveMutation.mutate(
+        {
+            planId: planId.value,
+            macros: {
+                calories: current.value.calories,
+                protein: current.value.protein,
+                carbs: current.value.carbs,
+                fat: current.value.fat,
+                fiber: current.value.fiber,
+            },
+        },
+        {
+            onSuccess: () => toast.push("Targets saved", "success"),
+            onError: () => toast.push("Could not save targets", "error"),
+        },
+    );
+};
+
+const isPending = computed(() => dayPending.value || profilePending.value || weightPending.value);
+const showSkeleton = useDelayedFlag(isPending);
 </script>
 
 <template>
-    <div class="flex flex-col gap-5 pb-8 pt-2">
-        <div class="flex items-baseline gap-3">
-            <h1 class="m-0 text-lg font-semibold text-textPrimary">
-                Macro Targets
-            </h1>
-            <span v-if="dayData?.day.plan?.name" class="text-sm text-zinc-500">
-                {{ dayData.day.plan.name }}
-            </span>
+    <div class="mx-auto flex w-full max-w-4xl flex-col gap-6 pt-2 pb-above-tabbar lg:pb-10">
+        <PageHeader title="Macro targets">
+            <template v-if="plan" #meta>
+                {{ plan.name }}<template v-if="plan.effective_from"> · since {{ fmtSince(plan.effective_from) }}</template>
+            </template>
+            <template v-if="plan && (dirty || isDesktop)" #actions>
+                <Badge v-if="dirty" tone="warn">Unsaved changes</Badge>
+                <Button v-if="dirty" variant="ghost" size="sm" :disabled="saving" @click="resetToSaved">Reset</Button>
+                <Button v-if="isDesktop" variant="primary" :loading="saving" :disabled="!canSave" @click="save">
+                    Save targets
+                </Button>
+            </template>
+        </PageHeader>
+
+        <ErrorState v-if="loadError" title="Couldn't load your targets" :error="loadError" @retry="refetchDay()" />
+        <div v-else-if="isPending" class="grid grid-cols-1 gap-6 lg:grid-cols-2">
+            <template v-if="showSkeleton">
+                <Skeleton shape="block" height="20rem" />
+                <Skeleton shape="block" height="28rem" />
+            </template>
         </div>
-        <div v-if="isPending" class="text-zinc-500">Loading…</div>
-        <div v-else-if="loadError" class="text-red-400">
-            {{ loadError.message }}
-        </div>
+        <Card v-else-if="!plan || planId == null">
+            <EmptyState title="No diet plan yet" description="Targets belong to a diet plan. Log a meal to create today's plan." />
+        </Card>
         <template v-else>
-            <section
-                class="flex flex-col gap-3 rounded-lg border border-zinc-700 bg-zinc-950/40 p-4"
-            >
-                <div
-                    class="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1"
-                >
-                    <h2 class="m-0 text-sm font-medium text-zinc-200">
-                        TDEE estimate
-                    </h2>
-                    <span class="text-xs text-zinc-500"
-                        >{{ weightLbs }} lb · {{ heightFtIn }} · {{ age }} yr ·
-                        {{ sex }}</span
-                    >
-                </div>
-                <TDEECalculator
-                    :bmr="bmr"
-                    :tdee="tdee"
-                    :multiplier="multiplier"
-                    @apply-calories="applyTdeeCalories"
+            <div class="grid grid-cols-1 items-start gap-6 lg:grid-cols-2">
+                <Section title="1 · Calories">
+                    <template #actions>
+                        <span class="text-base font-semibold text-fg tabular-nums">
+                            {{ fmtInt(sliders.calorieTarget.value) }} kcal
+                        </span>
+                    </template>
+                    <CaloriesStep
+                        v-model:activity="activity"
+                        :sliders="sliders"
+                        :bmr="bmr"
+                        :formula-tdee="tdee"
+                        :observed="observed"
+                        :intake="intake"
+                        :intake-error="intakeError"
+                        :trend="trend"
+                        :weight-lbs="weightLbs"
+                        :has-profile="!!profile"
+                        :activity-saving="saveProfile.isPending.value"
+                        @retry-intake="retryIntake"
+                    />
+                </Section>
+                <Section title="2 · Split">
+                    <SplitStep :sliders="sliders" :weight-lbs="weightLbs" />
+                </Section>
+            </div>
+
+            <Section title="History">
+                <ErrorState
+                    v-if="plansQuery.error.value"
+                    title="Couldn't load plan history"
+                    :error="plansQuery.error.value"
+                    @retry="plansQuery.refetch()"
                 />
-            </section>
-            <section
-                class="flex flex-col gap-3 rounded-lg border border-zinc-700 bg-zinc-950/40 p-4"
+                <Card v-else-if="plansQuery.isPending.value" padding="none">
+                    <SkeletonList :rows="2" />
+                </Card>
+                <Card v-else-if="plans.length === 0">
+                    <EmptyState title="No saved plans yet" />
+                </Card>
+                <Card v-else padding="none">
+                    <List>
+                        <ListRow v-for="p in plans" :key="p.ID">
+                            {{ p.name }}
+                            <template #subtitle>
+                                {{ p.effective_from ? `since ${fmtSince(p.effective_from)}` : "no start date" }}
+                            </template>
+                            <template #trailing>
+                                <Badge v-if="p.ID === planId" tone="accent">Current</Badge>
+                                <span>
+                                    {{ fmtInt(p.calories) }} kcal · P{{ Math.round(p.protein) }} C{{
+                                        Math.round(p.carbs)
+                                    }}
+                                    F{{ Math.round(p.fat ?? 0) }}
+                                </span>
+                            </template>
+                        </ListRow>
+                    </List>
+                </Card>
+            </Section>
+
+            <Button
+                v-if="!isDesktop"
+                variant="primary"
+                size="lg"
+                block
+                :loading="saving"
+                :disabled="!canSave"
+                @click="save"
             >
-                <h2 class="m-0 text-sm font-medium text-zinc-200">Macros</h2>
-                <MacroSlidersPanel :sliders="sliders" :weight-lbs="weightLbs" />
-            </section>
-            <button
-                type="button"
-                class="w-full rounded-md border border-amber-700/50 bg-amber-950/40 px-4 py-2.5 text-sm font-semibold text-amber-100 transition-colors hover:bg-amber-950/70 disabled:opacity-50"
-                :disabled="saving || planId == null || !macrosValid"
-                @click="submit"
-            >
-                {{ saving ? "Saving…" : "Save targets" }}
-            </button>
+                {{ dirty ? "Save targets" : "Targets saved" }}
+            </Button>
         </template>
     </div>
 </template>

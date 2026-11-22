@@ -1,22 +1,27 @@
 import type { ComputedRef, Ref } from "vue";
 import { computed, reactive, ref, watch } from "vue";
 import type { Router } from "vue-router";
+import { useQueryClient } from "@tanstack/vue-query";
 import { buildLoggingListQuery } from "../../composables/useLoggingRouteContext";
 import type {
     ExerciseGroup,
     LoggedSetWithStatus,
 } from "../../store/useWorkoutStore";
-import type { LoggedExercise } from "~/types/workout";
 import { toast } from "~/composables/toast/useToast";
 import { useGlobalRestTimer } from "~/composables/useGlobalRestTimer";
 import { useWebStorageJsonSync } from "~/composables/useWebStorageJsonSync";
+import { newClientId } from "~/api/ids";
+import { offsetToDate } from "~/api/workout/dates";
 import {
-    buildAllSetsForSave,
-    buildExerciseToLog,
-    loggedSetsFromServer,
-    mergeSavedExerciseIntoLoggedSets,
-    markPendingSetsAsExerciseError,
-} from "../domain/exerciseLoggingPayload";
+    findFailedSetWrites,
+    notesSavePending,
+    useDeleteSet,
+    useLogSet,
+    useSaveExerciseNotes,
+    useSetIntents,
+    useUpdateSet,
+} from "~/api/workout/queries";
+import { deriveSetRows, planSetRetry, type SetFields } from "~/api/workout/setsCache";
 import {
     DEFAULT_REPS_AFTER_WEIGHT_CHANGE,
     initializeWeightAndReps,
@@ -43,6 +48,7 @@ type StoredDraft = {
 export type ExerciseLoggingSessionViewModel = {
     exerciseGroup: ExerciseGroup | null;
     currentSetNumber: number;
+    /** Derived from the query cache + pending/failed set mutations; never a local copy. */
     loggedSets: LoggedSetWithStatus[];
     currentWeight: number;
     currentReps: number;
@@ -55,10 +61,10 @@ export type ExerciseLoggingSessionViewModel = {
     stepReps: (direction: "plus" | "minus") => void;
     commitWeightFromInput: (value: number) => void;
     commitRepsFromInput: (value: number) => void;
-    addNextSet: () => Promise<boolean>;
-    finishLogging: () => Promise<boolean>;
-    retrySet: (setIndex: number) => Promise<void>;
-    deleteSet: (setIndex: number) => Promise<void>;
+    addNextSet: () => boolean;
+    finishLogging: () => boolean;
+    retrySet: (setIndex: number) => void;
+    deleteSet: (setIndex: number) => void;
     editSet: (setIndex: number) => void;
     cancelEditingSet: () => void;
     goBackToList: () => void;
@@ -68,45 +74,44 @@ export type ExerciseLoggingSessionViewModel = {
     setWeightIncrement: (value: number) => void;
 };
 
-type LogExerciseFn = (
-    exercise: LoggedExercise,
-    type: "logged" | "previous",
-) => Promise<LoggedExercise | null>;
-type DeleteLoggedSetFn = (setId: number) => Promise<void>;
-
+/**
+ * The lift → log → rest loop for one exercise. Sets are written per set and optimistically
+ * (optimistic-ui G2): the row appears on tap, the rest clock starts on tap, and a failed save stays
+ * in the list marked "Didn't save" with an inline retry. The only local state is the draft (weight,
+ * reps, setup, notes, which set is being edited).
+ */
 export function useExerciseLoggingSession(options: {
     exerciseGroup: ComputedRef<ExerciseGroup | null>;
     pending: Ref<boolean>;
-    dayId: ComputedRef<number>;
     offset: ComputedRef<number>;
-    logExercise: LogExerciseFn;
-    deleteLoggedSet: DeleteLoggedSetFn;
     router: Router;
 }): ExerciseLoggingSessionViewModel {
-    const {
-        exerciseGroup,
-        pending,
-        dayId,
-        offset,
-        logExercise,
-        deleteLoggedSet,
-        router,
-    } = options;
+    const { exerciseGroup, pending, offset, router } = options;
     const loggingRoute = () => ({
         name: "logging" as const,
         query: buildLoggingListQuery(offset.value),
     });
 
+    const qc = useQueryClient();
+    const logSet = useLogSet();
+    const updateSet = useUpdateSet();
+    const deleteSetMutation = useDeleteSet();
+    const saveNotes = useSaveExerciseNotes();
+    const intents = useSetIntents();
+
+    /**
+     * The day this page reads and writes. A computed over the route offset only, so it is fixed when
+     * the page opens (it stays on that day past midnight, like the day query's key). Each action
+     * copies it into its mutation variables, and the server reads it as its own local calendar day.
+     */
+    const date = computed(() => offsetToDate(offset.value));
+
     const currentWeight = ref(0);
     const currentReps = ref(0);
     const currentWeightSetup = ref("");
-    const currentSetNumber = ref(1);
     const weightProgression = ref<WeightProgression | null>(null);
     const editingSetIndex = ref<number | null>(null);
     const { weightIncrement, setWeightIncrement } = useGymWeightPrefs();
-
-    const loggedSets = ref<LoggedSetWithStatus[]>([]);
-    let tempIdCounter = 0;
 
     const draftDirty = ref(false);
     const notes = ref("");
@@ -128,6 +133,19 @@ export function useExerciseLoggingSession(options: {
         );
     });
 
+    const loggedSets = computed<LoggedSetWithStatus[]>(() =>
+        deriveSetRows(exerciseGroup.value?.logged?.sets, intents.value, {
+            date: date.value,
+            exercise_id: exerciseIdentity.value,
+        }),
+    );
+
+    const currentSetNumber = computed(() =>
+        editingSetIndex.value != null
+            ? editingSetIndex.value + 1
+            : loggedSets.value.length + 1,
+    );
+
     const exerciseDisplayName = computed(() => {
         const group = exerciseGroup.value;
         return group?.planned?.name ?? group?.logged?.exercise?.name ?? "";
@@ -148,7 +166,7 @@ export function useExerciseLoggingSession(options: {
 
     const draftStorageKey = computed(
         () =>
-            `gym-draft:v1:day:${dayId.value}:exercise:${exerciseIdentity.value}`,
+            `gym-draft:v2:date:${date.value}:exercise:${exerciseIdentity.value}`,
     );
 
     const draftStorage = useWebStorageJsonSync<StoredDraft>({
@@ -194,20 +212,13 @@ export function useExerciseLoggingSession(options: {
         },
     });
 
-    const hasDraftSet = () => currentWeight.value > 0 || currentReps.value > 0;
-
+    /** Fill the draft for a newly opened exercise. Cache updates afterwards (optimistic patches,
+     *  reconciles, refetches) only change the rows, never the draft. */
     const initializeExercise = () => {
-        if (pending.value) return;
-
         const group = exerciseGroup.value;
-        if (!group) {
-            router.push(loggingRoute());
-            return;
-        }
+        if (!group) return;
 
-        loggedSets.value = loggedSetsFromServer(group.logged?.sets);
         notes.value = group.logged?.notes ?? group.previous?.notes ?? "";
-        currentSetNumber.value = loggedSets.value.length + 1;
         editingSetIndex.value = null;
 
         const { weight, reps, weightSetup } = initializeWeightAndReps(
@@ -234,79 +245,50 @@ export function useExerciseLoggingSession(options: {
 
         if (draftStorage.restore()) {
             weightProgression.value = null;
-            if (
-                editingSetIndex.value == null ||
-                editingSetIndex.value >= loggedSets.value.length
-            ) {
+            if (editingSetIndex.value != null && !loggedSets.value[editingSetIndex.value]) {
                 editingSetIndex.value = null;
-            } else {
-                currentSetNumber.value = editingSetIndex.value + 1;
             }
         }
         draftStorage.setSaveEnabled(true);
     };
 
-    // React to async load + route param resolution: pending until data arrives;
-    // exerciseGroup null when id is invalid or missing from the log. Then hydrate
-    // or send the user back to the day’s exercise list.
+    // Once the day has loaded, a missing group means a bad id (or the exercise left the log):
+    // back to the list.
     watch(
         [() => exerciseGroup.value, () => pending.value],
         ([group, isPending]) => {
-            if (isPending) return;
-            if (group) {
-                initializeExercise();
-            } else {
-                router.push(loggingRoute());
-            }
+            if (!isPending && !group) router.push(loggingRoute());
         },
         { immediate: true },
     );
 
-    const saveCurrentExercise = async (
-        includeDraft: boolean,
-    ): Promise<boolean> => {
-        const group = exerciseGroup.value;
-        if (!group) return false;
+    // Initialise once per (day, exercise), not on every cache change.
+    const sessionKey = computed(() =>
+        pending.value || !exerciseGroup.value
+            ? null
+            : `${date.value}:${exerciseIdentity.value}`,
+    );
+    watch(
+        sessionKey,
+        (key) => {
+            if (key) initializeExercise();
+        },
+        { immediate: true },
+    );
 
-        const draftTempId = `temp-current-${Date.now()}`;
-        const draft =
-            includeDraft && currentReps.value > 0
-                ? {
-                      weight: currentWeight.value,
-                      reps: currentReps.value,
-                      weight_setup: weightSetupForSave(),
-                      tempId: draftTempId,
-                  }
-                : null;
-
-        const allSets = buildAllSetsForSave(loggedSets.value, draft);
-        if (allSets.length === 0) return false;
-
-        const payload = buildExerciseToLog(
-            group,
-            allSets,
-            notes.value,
-            dayId.value,
-        );
-        if (!payload) return false;
-
-        const savedExercise = await logExercise(
-            payload.exercise,
-            payload.logType,
-        );
-
-        if (
-            savedExercise &&
-            savedExercise.sets &&
-            Array.isArray(savedExercise.sets)
-        ) {
-            mergeSavedExerciseIntoLoggedSets(loggedSets.value, savedExercise);
-            group.logged = savedExercise;
-            return true;
-        }
-
-        markPendingSetsAsExerciseError(loggedSets.value);
-        return false;
+    /**
+     * Save the notes when they differ from the cached exercise's (no-op otherwise). `afterSet`: a set
+     * was just logged, so the save may go out even though the cache doesn't show a logged exercise
+     * yet (the create's patch lands a tick later). It queues behind that create in the exercise's
+     * scope, and reads the saved exercise when it is sent.
+     */
+    const syncNotes = (day: string, exerciseId: number, afterSet = false) => {
+        const saved = exerciseGroup.value?.logged?.notes ?? "";
+        const vars = { date: day, exercise_id: exerciseId, notes: notes.value };
+        if (notes.value === saved || notesSavePending(qc, vars)) return;
+        // Without a logged exercise there is nothing to attach notes to yet; the first set does it.
+        if (!afterSet && !exerciseGroup.value?.logged && loggedSets.value.length === 0) return;
+        saveNotes.mutate(vars);
     };
 
     const updateWeightAndDefaultReps = (value: number) => {
@@ -320,6 +302,16 @@ export function useExerciseLoggingSession(options: {
                 value,
             ) ?? DEFAULT_REPS_AFTER_WEIGHT_CHANGE,
         );
+    };
+
+    /** Point the reps slider at last session's reps for set `index` (0-based), when there is one. */
+    const resetRepsForSet = (index: number) => {
+        const previous = previousRepsForSetAtWeight(
+            exerciseGroup.value?.previous?.sets,
+            index,
+            currentWeight.value,
+        );
+        if (previous != null) currentReps.value = normalizeReps(previous);
     };
 
     const stepWeight = (direction: "plus" | "minus") => {
@@ -352,124 +344,126 @@ export function useExerciseLoggingSession(options: {
         currentReps.value = normalizeReps(value);
     };
 
-    const addNextSet = async (): Promise<boolean> => {
+    /**
+     * Log the next set, or save the set being edited. Returns at once: the row is in the list
+     * before the request leaves, and the rest clock starts on tap (not on save).
+     */
+    const addNextSet = (): boolean => {
         const reps = normalizeReps(currentReps.value);
         currentReps.value = reps;
         if (reps <= 0) {
             toast.push("Enter reps before logging the set", "error");
             return false;
         }
+        const exerciseId = exerciseIdentity.value;
+        if (!exerciseId) return false;
+        const day = date.value;
+        const fields = {
+            weight: currentWeight.value,
+            reps,
+            weight_setup: weightSetupForSave(),
+        };
+        const count = loggedSets.value.length;
+
         const editingIndex = editingSetIndex.value;
         if (editingIndex != null) {
-            const set = loggedSets.value[editingIndex];
-            if (!set) return false;
-            set.weight = currentWeight.value;
-            set.reps = currentReps.value;
-            set.weight_setup = weightSetupForSave();
-            set.status = "pending";
-            set.error = null;
+            const row = loggedSets.value[editingIndex];
+            if (!row) return false;
+            saveEditedSet(row, day, exerciseId, fields);
+            // A fix to an earlier set isn't a new set: the rest clock keeps running.
         } else {
-            const tempId = `temp-${Date.now()}-${tempIdCounter++}`;
-            loggedSets.value.push({
-                weight: currentWeight.value,
-                reps: currentReps.value,
-                weight_setup: weightSetupForSave(),
-                status: "pending",
-                id: null,
-                error: null,
-                tempId,
+            logSet.mutate({
+                client_id: newClientId(),
+                date: day,
+                exercise_id: exerciseId,
+                created_at: new Date().toISOString(),
+                ...fields,
             });
-            currentSetNumber.value++;
-        }
-
-        const success = await saveCurrentExercise(false);
-        if (success) {
-            draftDirty.value = false;
-            editingSetIndex.value = null;
-            currentSetNumber.value = loggedSets.value.length + 1;
             globalTimer.start(exerciseDisplayName.value);
         }
-        return success;
+        syncNotes(day, exerciseId, true);
+
+        draftDirty.value = false;
+        editingSetIndex.value = null;
+        // The next set is index `count` (+1 if we just added one); the rows update a tick later.
+        resetRepsForSet(editingIndex != null ? count : count + 1);
+        return true;
     };
 
-    const finishLogging = async (): Promise<boolean> => {
-        if (loggedSets.value.length === 0 && !hasDraftSet()) {
-            toast.push("Please log at least one set", "error");
+    /**
+     * Sets are saved as they're logged, so finishing only saves changed notes and drops the draft.
+     * The slider position is never logged here. The caller decides where to go.
+     */
+    const finishLogging = (): boolean => {
+        const rows = loggedSets.value;
+        if (rows.length === 0) {
+            toast.push("Log at least one set first", "error");
             return false;
         }
-
-        if (currentWeight.value > 0 && currentReps.value === 0) {
+        const unsaved = rows.filter((r) => r.status === "error").length;
+        if (unsaved > 0) {
             toast.push(
-                "Add reps or clear the draft set before finishing",
+                unsaved === 1
+                    ? "One set didn't save. Retry or delete it first."
+                    : `${unsaved} sets didn't save. Retry or delete them first.`,
                 "error",
             );
             return false;
         }
 
-        const shouldIncludeDraft =
-            currentReps.value > 0 &&
-            (loggedSets.value.length === 0 || draftDirty.value);
-        const success = await saveCurrentExercise(shouldIncludeDraft);
-
-        if (!success) {
-            toast.push("Failed to save exercise. Please try again.", "error");
-            return false;
-        }
-
+        editingSetIndex.value = null;
+        if (exerciseIdentity.value) syncNotes(date.value, exerciseIdentity.value);
+        draftDirty.value = false;
         draftStorage.clear();
-        router.push(loggingRoute());
         return true;
     };
 
-    const retrySet = async (setIndex: number) => {
-        const set = loggedSets.value[setIndex];
-        if (!set || set.status !== "error") return;
-
-        set.status = "pending";
-        set.error = null;
-        await saveCurrentExercise(false);
+    /** Re-send a failed row: its create (with the newest values) if that failed, else its edit. */
+    const runRetry = (key: string, fields?: SetFields): boolean => {
+        const plan = planSetRetry(findFailedSetWrites(qc, key), fields);
+        if (plan?.kind === "create") {
+            if (plan.dismissUpdate) updateSet.dismiss(plan.dismissUpdate);
+            logSet.retry(plan.vars);
+        } else if (plan?.kind === "update") {
+            updateSet.retry(plan.vars);
+        }
+        return plan != null;
     };
 
-    const deleteSet = async (setIndex: number) => {
-        const set = loggedSets.value[setIndex];
-        if (!set) return;
+    /**
+     * Save an edit to any row. Saved or still being created: a PATCH by client_id, which waits in the
+     * exercise's scope for the create (offline, both wait for the connection). Failed: re-send the
+     * failed write with the new values instead, since an edit behind a failed create would fail too.
+     */
+    const saveEditedSet = (row: LoggedSetWithStatus, day: string, exerciseId: number, fields: SetFields) => {
+        if (row.status === "error" && runRetry(row.key, fields)) return;
+        updateSet.mutate({ client_id: row.key, date: day, exercise_id: exerciseId, ...fields });
+    };
 
-        if (set.status !== "success" || !set.id) {
-            toast.push("Can only delete sets that have been saved", "error");
-            return;
-        }
+    const retrySet = (setIndex: number) => {
+        const row = loggedSets.value[setIndex];
+        if (!row || row.status !== "error") return;
+        runRetry(row.key);
+    };
 
-        const setId = set.id;
-        set.status = "pending";
-
-        try {
-            await deleteLoggedSet(setId);
-            const updatedIndex = loggedSets.value.findIndex(
-                (loggedSet) => loggedSet.id === setId,
-            );
-            if (updatedIndex !== -1) {
-                loggedSets.value.splice(updatedIndex, 1);
-            }
-            currentSetNumber.value = loggedSets.value.length + 1;
-        } catch {
-            const currentSet = loggedSets.value.find(
-                (loggedSet) => loggedSet.id === setId,
-            );
-            if (currentSet) {
-                currentSet.status = "success";
-            }
-            toast.push("Failed to delete set. Please try again.", "error");
-        }
+    /**
+     * Delete any row, saved or not. The server delete is idempotent (by client_id), so it is safe
+     * even if a failed create did reach the server. `useDeleteSet` dismisses the row's failed writes
+     * only once the delete succeeds: that also covers a create that fails while the delete waits
+     * behind it, and a failed delete leaves an unsaved row marked "Didn't save".
+     */
+    const deleteSet = (setIndex: number) => {
+        const row = loggedSets.value[setIndex];
+        const exerciseId = exerciseIdentity.value;
+        if (!row || !exerciseId) return;
+        if (editingSetIndex.value === setIndex) editingSetIndex.value = null;
+        else if (editingSetIndex.value != null && editingSetIndex.value > setIndex) editingSetIndex.value--;
+        deleteSetMutation.mutate({ client_id: row.key, date: date.value, exercise_id: exerciseId });
     };
 
     const editSet = (setIndex: number) => {
         const set = loggedSets.value[setIndex];
         if (!set) return;
-
-        if (set.status !== "success") {
-            toast.push("Can only edit sets that have been saved", "error");
-            return;
-        }
 
         currentWeight.value = set.weight;
         currentReps.value = normalizeReps(set.reps);
@@ -477,13 +471,14 @@ export function useExerciseLoggingSession(options: {
         draftDirty.value = true;
 
         editingSetIndex.value = setIndex;
-        currentSetNumber.value = setIndex + 1;
     };
 
     const cancelEditingSet = () => {
         if (editingSetIndex.value == null) return;
         editingSetIndex.value = null;
-        currentSetNumber.value = loggedSets.value.length + 1;
+        const last = loggedSets.value[loggedSets.value.length - 1];
+        if (last) currentWeight.value = last.weight;
+        resetRepsForSet(loggedSets.value.length);
     };
 
     const goBackToList = () => {
@@ -493,6 +488,7 @@ export function useExerciseLoggingSession(options: {
     const updateNotes = (value: string) => {
         notes.value = value;
         draftDirty.value = true;
+        if (exerciseIdentity.value) syncNotes(date.value, exerciseIdentity.value);
     };
 
     const updateWeightSetup = (value: string) => {

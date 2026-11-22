@@ -3,9 +3,10 @@ import { useWorkoutStore } from "./store/useWorkoutStore";
 import ExerciseListView from "./components/ExerciseListView.vue";
 import { useRoute, useRouter } from "vue-router";
 import { computed } from "vue";
-import { getApiErrorMessage } from "~/api/httpError";
-import { toast } from "~/composables/toast/useToast";
+import type { Exercise } from "~/types/workout";
+import { ErrorState, SkeletonList, useDelayedFlag } from "~/shared/ui";
 import { useLoggingRouteContext } from "./composables/useLoggingRouteContext";
+import { buildWorkoutSteps, type WorkoutStep } from "./domain/workoutSteps";
 
 const router = useRouter();
 const route = useRoute();
@@ -14,16 +15,53 @@ const {
     log,
     plannedCardio,
     loggedCardio,
+    plannedPreMobility,
     loggedPreMobility,
+    plannedPostMobility,
     loggedPostMobility,
     pending,
     error,
     data,
     addExerciseToWorkout,
     removeExerciseFromLog,
+    refetch,
 } = useWorkoutStore(offset);
 
+// Fast loads show nothing instead of flashing a skeleton.
+const showSkeleton = useDelayedFlag(() => pending.value);
+
 const workoutName = computed(() => data.value?.day?.workout_plan?.name || "");
+
+const steps = computed(() =>
+    buildWorkoutSteps({
+        log: log.value,
+        plannedCardio: plannedCardio.value,
+        loggedCardio: loggedCardio.value,
+        plannedPreMobility: plannedPreMobility.value,
+        loggedPreMobility: loggedPreMobility.value,
+        plannedPostMobility: plannedPostMobility.value,
+        loggedPostMobility: loggedPostMobility.value,
+    }),
+);
+
+const dateLabel = computed(() => {
+    if (offset.value === 0) return "Today";
+    if (offset.value === 1) return "Yesterday";
+    const d = new Date();
+    d.setDate(d.getDate() - offset.value);
+    return d.toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" });
+});
+
+const selectStep = (step: WorkoutStep) => {
+    if (step.kind === "lift" && step.exerciseIndex != null) selectExercise(step.exerciseIndex);
+    else if (step.kind === "cardio") selectCardio();
+    else if (step.kind === "warmup") selectPreMobility();
+    else if (step.kind === "cooldown") selectPostMobility();
+};
+
+const finish = () => {
+    router.push({ name: "gym", query: route.query });
+};
 
 const selectExercise = (index: number) => {
     const exerciseGroup = log.value[index];
@@ -40,14 +78,8 @@ const selectExercise = (index: number) => {
     });
 };
 
-const handleAddExercise = async (exerciseId: number) => {
-    try {
-        await addExerciseToWorkout(exerciseId);
-        toast.push("Exercise added", "success");
-    } catch (err: unknown) {
-        console.error(err);
-        toast.push(getApiErrorMessage(err, "Failed to add exercise"), "error");
-    }
+const handleAddExercise = (exerciseId: number, exercise?: Exercise) => {
+    addExerciseToWorkout(exerciseId, exercise);
 };
 
 const selectCardio = () => {
@@ -73,64 +105,36 @@ const selectPostMobility = () => {
     });
 };
 
-const handleRemoveExercise = async (index: number) => {
+const handleRemoveExercise = (index: number) => {
     const exerciseGroup = log.value[index];
     if (!exerciseGroup) return;
 
     const exerciseId =
         exerciseGroup.logged?.exercise_id || exerciseGroup.planned?.ID;
-    if (!exerciseId) {
-        toast.push("Cannot remove exercise: ID not found", "error");
-        return;
-    }
-
-    try {
-        await removeExerciseFromLog(exerciseId);
-        toast.push("Exercise removed", "success");
-    } catch (err: unknown) {
-        console.error(err);
-        toast.push(getApiErrorMessage(err, "Failed to remove exercise"), "error");
-    }
+    if (!exerciseId) return;
+    removeExerciseFromLog(exerciseId);
 };
 </script>
 
 <template>
-    <div v-if="pending" class="container">
-        <div>Loading...</div>
-    </div>
-    <div v-else-if="error" class="container">
-        <div>Error: {{ error.message }}</div>
-    </div>
-    <div v-else class="container">
+    <div class="mx-auto flex w-full max-w-md flex-col gap-4 py-2 lg:py-0">
+        <ErrorState
+            v-if="error"
+            :error="error"
+            title="Couldn't load today's workout"
+            @retry="refetch()"
+        />
+        <SkeletonList v-else-if="pending && showSkeleton" :rows="5" :leading="false" />
         <ExerciseListView
+            v-else-if="!pending"
+            :workout-name="workoutName"
+            :date-label="dateLabel"
+            :steps="steps"
             :exercises="log"
-            :planned-cardio="plannedCardio"
-            :logged-cardio="loggedCardio"
-            :logged-pre-mobility="loggedPreMobility"
-            :logged-post-mobility="loggedPostMobility"
-            :workoutName="workoutName"
-            @select-exercise="selectExercise"
+            @select-step="selectStep"
             @add-exercise="handleAddExercise"
             @remove-exercise="handleRemoveExercise"
-            @select-cardio="selectCardio"
-            @select-pre-mobility="selectPreMobility"
-            @select-post-mobility="selectPostMobility"
+            @finish="finish"
         />
     </div>
 </template>
-
-<style scoped>
-.container {
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-    width: 100%;
-    align-self: stretch;
-}
-
-@media (max-width: 767px) {
-    .container {
-        padding: 0.5rem 0;
-    }
-}
-</style>

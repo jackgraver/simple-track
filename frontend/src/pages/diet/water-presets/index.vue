@@ -11,13 +11,26 @@ import {
 import { dialogManager } from "~/composables/dialog/useDialog";
 import { toast } from "~/composables/toast/useToast";
 import { useWaterPrefs } from "~/composables/water/useWaterPrefs";
+import { Pencil, Trash2 } from "lucide-vue-next";
+import {
+    Button,
+    Card,
+    EmptyState,
+    ErrorState,
+    Field,
+    IconButton,
+    Input,
+    List,
+    ListRow,
+    PageHeader,
+    Section,
+    Select,
+    SkeletonList,
+    useDelayedFlag,
+} from "~/shared/ui";
 
-const {
-    goalOz,
-    displayUnit,
-    ozFromDisplayAmount,
-    formatVolumeFromOz,
-} = useWaterPrefs();
+const { goalOz, displayUnit, ozFromDisplayAmount, formatVolumeFromOz } =
+    useWaterPrefs();
 
 const goalInput = ref("");
 
@@ -28,12 +41,23 @@ const editingId = ref<number | null>(null);
 const editName = ref("");
 const editAmount = ref("");
 
-const { data: presets, isPending, isError, error } = useDrinkSizePresets();
+const {
+    data: presets,
+    isPending,
+    isError,
+    error,
+    refetch,
+} = useDrinkSizePresets();
 const createMut = useCreateDrinkSizePreset();
 const updateMut = useUpdateDrinkSizePreset();
 const deleteMut = useDeleteDrinkSizePreset();
 
 const rows = computed(() => presets.value ?? []);
+const showSkeleton = useDelayedFlag(isPending);
+const unitOptions = [
+    { label: "oz", value: "oz" as const },
+    { label: "ml", value: "ml" as const },
+];
 
 function syncGoalInputFromPrefs() {
     const f = formatVolumeFromOz(goalOz.value);
@@ -119,6 +143,7 @@ async function saveEdit() {
 async function removePreset(id: number) {
     const ok = await dialogManager.confirm({
         title: "Delete drink size?",
+        tone: "danger",
         message: "Quick-add buttons will no longer include this size.",
         confirmText: "Delete",
         cancelText: "Cancel",
@@ -154,198 +179,155 @@ function displayAmountLabel(amountOz: number): string {
 </script>
 
 <template>
-    <div class="mx-auto flex w-full max-w-3xl flex-col gap-6 pb-10 pt-2">
-        <div
-            class="flex items-center justify-between gap-4 border-b border-zinc-700 pb-3"
-        >
-            <h1 class="m-0 text-lg font-semibold text-zinc-100">
-                Water sizes & goal
-            </h1>
-            <router-link
-                :to="{ name: 'diet' }"
-                class="text-sm text-zinc-400 hover:text-zinc-200"
-                >Back to diet</router-link
-            >
-        </div>
-        <section
-            class="flex flex-col gap-3 rounded-md border border-zinc-700 bg-zinc-900/50 p-4"
-        >
-            <h2 class="m-0 text-sm font-semibold text-zinc-200">
-                Display & daily goal
-            </h2>
-            <label class="flex flex-col gap-1 text-xs text-zinc-400">
-                Unit
-                <select
-                    v-model="displayUnit"
-                    class="rounded-md border border-zinc-600 bg-zinc-900 px-3 py-2 text-sm text-zinc-100"
+    <div class="mx-auto flex w-full max-w-3xl flex-col gap-6 pt-2 pb-10">
+        <PageHeader title="Water sizes & goal">
+            <template #actions>
+                <Button variant="ghost" size="sm" :to="{ name: 'diet' }"
+                    >Back to diet</Button
                 >
-                    <option value="oz">oz</option>
-                    <option value="ml">ml</option>
-                </select>
-            </label>
-            <label class="flex flex-col gap-1 text-xs text-zinc-400">
-                Daily goal ({{ displayUnit }})
-                <input
-                    v-model="goalInput"
-                    type="text"
-                    inputmode="decimal"
-                    class="rounded-md border border-zinc-600 bg-zinc-900 px-3 py-2 text-sm text-zinc-100"
-                    @change="applyGoalFromInput"
-                    @keyup.enter.prevent="applyGoalFromInput"
-                />
-            </label>
-            <button
-                type="button"
-                class="self-start rounded-md bg-zinc-700 px-4 py-2 text-sm font-semibold text-zinc-100 hover:bg-zinc-600"
-                @click="applyGoalFromInput"
-            >
-                Save goal
-            </button>
-            <p class="m-0 text-xs text-zinc-500">
-                Amounts are stored in oz; switching units only changes how numbers are shown.
-            </p>
-        </section>
-        <section
-            class="flex flex-col gap-3 rounded-md border border-zinc-700 bg-zinc-900/50 p-4"
-        >
-            <h2 class="m-0 text-sm font-semibold text-zinc-200">
-                New drink size
-            </h2>
-            <label class="flex flex-col gap-1 text-xs text-zinc-400">
-                Label
-                <input
-                    v-model="newName"
-                    type="text"
-                    autocomplete="off"
-                    placeholder="e.g. Large bottle"
-                    class="rounded-md border border-zinc-600 bg-zinc-900 px-3 py-2 text-sm text-zinc-100"
-                />
-            </label>
-            <label class="flex flex-col gap-1 text-xs text-zinc-400">
-                Amount ({{ displayUnit }})
-                <input
-                    v-model="newAmount"
-                    type="text"
-                    inputmode="decimal"
-                    placeholder="e.g. 24"
-                    class="rounded-md border border-zinc-600 bg-zinc-900 px-3 py-2 text-sm text-zinc-100"
-                    @keyup.enter.prevent="createPreset"
-                />
-            </label>
-            <button
-                type="button"
-                class="rounded-md border border-sky-700/60 bg-sky-950/40 px-4 py-2 text-sm font-semibold text-sky-100 hover:bg-sky-950/70 disabled:opacity-50"
-                :disabled="createMut.isPending.value"
-                @click="createPreset"
-            >
-                {{ createMut.isPending.value ? "Saving…" : "Add size" }}
-            </button>
-        </section>
-        <section class="flex flex-col gap-2">
-            <h2 class="m-0 text-sm font-semibold text-zinc-200">
-                Saved sizes
-            </h2>
-            <div v-if="isError" class="text-sm text-red-400">
-                {{ error?.message ?? "Failed to load" }}
-            </div>
-            <p v-else-if="isPending" class="m-0 text-sm text-zinc-500">
-                Loading…
-            </p>
-            <div
-                v-else
-                class="overflow-x-auto rounded-md border border-zinc-700"
-            >
-                <table class="w-full border-collapse text-left text-sm">
-                    <thead>
-                        <tr class="border-b border-zinc-700 bg-zinc-900">
-                            <th class="px-3 py-2 font-medium text-zinc-400">
-                                Name
-                            </th>
-                            <th class="px-3 py-2 font-medium text-zinc-400">
-                                Amount
-                            </th>
-                            <th class="px-3 py-2 font-medium text-zinc-400" />
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr
-                            v-for="p in rows"
-                            :key="p.ID"
-                            class="border-b border-zinc-800"
+            </template>
+        </PageHeader>
+
+        <Section title="Display & daily goal">
+            <Card>
+                <div class="flex flex-col gap-4">
+                    <Field label="Unit">
+                        <Select v-model="displayUnit" :options="unitOptions" />
+                    </Field>
+                    <Field
+                        label="Daily goal"
+                        :hint="`In ${displayUnit}. Amounts are stored in oz; switching units only changes how numbers are shown.`"
+                    >
+                        <Input
+                            v-model="goalInput"
+                            inputmode="decimal"
+                            @change="applyGoalFromInput"
+                            @keyup.enter.prevent="applyGoalFromInput"
                         >
-                            <template v-if="editingId === p.ID">
-                                <td class="px-3 py-2 align-top">
-                                    <input
-                                        v-model="editName"
-                                        type="text"
-                                        class="w-full min-w-[8rem] rounded border border-zinc-600 bg-zinc-950 px-2 py-1 text-zinc-100"
-                                    />
-                                </td>
-                                <td class="px-3 py-2 align-top">
-                                    <input
-                                        v-model="editAmount"
-                                        type="text"
-                                        inputmode="decimal"
-                                        class="w-full min-w-[6rem] rounded border border-zinc-600 bg-zinc-950 px-2 py-1 text-zinc-100"
-                                    />
-                                </td>
-                                <td class="px-3 py-2 align-top">
-                                    <div class="flex flex-wrap gap-2">
-                                        <button
-                                            type="button"
-                                            class="rounded bg-zinc-700 px-2 py-1 text-xs text-white hover:bg-zinc-600 disabled:opacity-50"
-                                            :disabled="updateMut.isPending.value"
-                                            @click="saveEdit"
-                                        >
-                                            Save
-                                        </button>
-                                        <button
-                                            type="button"
-                                            class="rounded bg-zinc-800 px-2 py-1 text-xs text-zinc-300 hover:bg-zinc-700"
-                                            @click="cancelEdit"
-                                        >
-                                            Cancel
-                                        </button>
-                                    </div>
-                                </td>
+                            <template #suffix>{{ displayUnit }}</template>
+                        </Input>
+                    </Field>
+                    <div>
+                        <Button variant="secondary" @click="applyGoalFromInput"
+                            >Save goal</Button
+                        >
+                    </div>
+                </div>
+            </Card>
+        </Section>
+
+        <Section title="New drink size">
+            <Card>
+                <div class="flex flex-col gap-4">
+                    <Field label="Label">
+                        <Input
+                            v-model="newName"
+                            autocomplete="off"
+                            placeholder="e.g. Large bottle"
+                        />
+                    </Field>
+                    <Field label="Amount">
+                        <Input
+                            v-model="newAmount"
+                            inputmode="decimal"
+                            placeholder="e.g. 24"
+                            @keyup.enter.prevent="createPreset"
+                        >
+                            <template #suffix>{{ displayUnit }}</template>
+                        </Input>
+                    </Field>
+                    <div>
+                        <Button
+                            variant="primary"
+                            :loading="createMut.isPending.value"
+                            @click="createPreset"
+                            >Add size</Button
+                        >
+                    </div>
+                </div>
+            </Card>
+        </Section>
+
+        <Section title="Saved sizes">
+            <Card padding="none">
+                <ErrorState
+                    v-if="isError"
+                    :error="error"
+                    title="Couldn't load drink sizes"
+                    @retry="refetch()"
+                />
+                <SkeletonList
+                    v-else-if="showSkeleton"
+                    :rows="3"
+                    :leading="false"
+                />
+                <EmptyState
+                    v-else-if="!isPending && !rows.length"
+                    title="No sizes yet"
+                    description="Add one above and it appears in the quick-add buttons."
+                />
+                <List v-else-if="rows.length">
+                    <template v-for="p in rows" :key="p.ID">
+                        <li
+                            v-if="editingId === p.ID"
+                            class="flex flex-col gap-3 px-3 py-3 lg:px-4"
+                        >
+                            <Field label="Label"
+                                ><Input v-model="editName"
+                            /></Field>
+                            <Field label="Amount">
+                                <Input v-model="editAmount" inputmode="decimal"
+                                    ><template #suffix>{{
+                                        displayUnit
+                                    }}</template></Input
+                                >
+                            </Field>
+                            <div class="flex gap-2">
+                                <Button
+                                    variant="primary"
+                                    size="sm"
+                                    :loading="updateMut.isPending.value"
+                                    @click="saveEdit"
+                                    >Save</Button
+                                >
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    @click="cancelEdit"
+                                    >Cancel</Button
+                                >
+                            </div>
+                        </li>
+                        <ListRow
+                            v-else
+                            :pending="
+                                deleteMut.isPending.value &&
+                                deleteMut.variables.value === p.ID
+                            "
+                        >
+                            {{ p.name }}
+                            <template #trailing>
+                                <span class="mr-1">{{
+                                    displayAmountLabel(p.amount_oz)
+                                }}</span>
+                                <IconButton
+                                    label="Edit size"
+                                    size="sm"
+                                    @click="startEdit(p)"
+                                    ><Pencil
+                                /></IconButton>
+                                <IconButton
+                                    label="Delete size"
+                                    size="sm"
+                                    variant="danger"
+                                    @click="removePreset(p.ID)"
+                                    ><Trash2
+                                /></IconButton>
                             </template>
-                            <template v-else>
-                                <td class="px-3 py-2 text-zinc-100">
-                                    {{ p.name }}
-                                </td>
-                                <td class="px-3 py-2 text-zinc-300">
-                                    {{ displayAmountLabel(p.amount_oz) }}
-                                </td>
-                                <td class="px-3 py-2">
-                                    <div class="flex flex-wrap gap-2">
-                                        <button
-                                            type="button"
-                                            class="text-xs text-sky-400 hover:text-sky-300"
-                                            @click="startEdit(p)"
-                                        >
-                                            Edit
-                                        </button>
-                                        <button
-                                            type="button"
-                                            class="text-xs text-red-400 hover:text-red-300 disabled:opacity-50"
-                                            :disabled="deleteMut.isPending.value"
-                                            @click="removePreset(p.ID)"
-                                        >
-                                            Delete
-                                        </button>
-                                    </div>
-                                </td>
-                            </template>
-                        </tr>
-                    </tbody>
-                </table>
-                <p
-                    v-if="!rows.length"
-                    class="m-0 px-3 py-4 text-sm text-zinc-500"
-                >
-                    No sizes yet — add one above.
-                </p>
-            </div>
-        </section>
+                        </ListRow>
+                    </template>
+                </List>
+            </Card>
+        </Section>
     </div>
 </template>

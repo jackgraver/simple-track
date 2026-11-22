@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/vue-query";
+import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/vue-query";
 import { computed, type MaybeRefOrGetter, toValue } from "vue";
 import {
     completeGroceryItem,
@@ -23,7 +23,33 @@ import {
     importWeightCsv,
     updateDrinkSizePreset,
 } from "~/api/tracking/api";
-import type { BodyWeightLog } from "~/api/tracking/types";
+import axios from "axios";
+import { getApiErrorMessage } from "~/api/httpError";
+import { useOptimisticMutation } from "~/api/optimistic";
+import {
+    addGroceryItem,
+    completeGroceryItemInList,
+    groceryPathRef,
+    reconcileGroceryItem,
+    removeGroceryItemByClientId,
+    restoreGroceryItem,
+    type GroceryItemRef,
+} from "~/api/tracking/groceryCache";
+import {
+    addWaterPatch,
+    deleteWaterPatch,
+    waterPathRef,
+    reconcileByDay,
+    reconcileWater,
+    revertAddWater,
+    revertDeleteWater,
+    revertUpsertByDay,
+    saveStepsPatch,
+    saveWeightPatch,
+    type AddWaterVars,
+    type DeleteWaterVars,
+} from "~/api/tracking/patches";
+import type { BodyWeightLog, GroceryItem, StepLog, WaterLog } from "~/api/tracking/types";
 import { trackingKeys } from "~/api/tracking/keys";
 
 export function latestWeightLbs(logs: BodyWeightLog[] | undefined): number | null {
@@ -56,18 +82,24 @@ export function useWeightLogs() {
 }
 
 export function useSaveWeight() {
-    const queryClient = useQueryClient();
-    return useMutation({
-        mutationFn: ({
-            date,
-            weightLbs,
-        }: {
-            date: string;
-            weightLbs: number;
-        }) => saveWeight(date, weightLbs),
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: trackingKeys.weight });
+    return useOptimisticMutation<{ date: string; weightLbs: number }, BodyWeightLog>({
+        mutationKey: trackingKeys.mutations.saveWeight,
+        mutationFn: ({ date, weightLbs }) => saveWeight(date, weightLbs),
+        // Upsert by date: same-day saves must reach the server in order.
+        scope: (v) => ({ id: `weight:${v.date}` }),
+        optimistic: () => [
+            {
+                queryKey: trackingKeys.weight,
+                apply: (old: BodyWeightLog[], vars) => saveWeightPatch(old, vars),
+                revert: (cur: BodyWeightLog[], vars, snap: BodyWeightLog[]) => revertUpsertByDay(cur, vars.date, snap),
+            },
+        ],
+        reconcile: (saved, _v, qc, { siblingsPending }) => {
+            if (siblingsPending(trackingKeys.weight) > 0) return;
+            qc.setQueryData<BodyWeightLog[]>(trackingKeys.weight, (cur) => cur && reconcileByDay(cur, saved));
         },
+        invalidate: () => [trackingKeys.weight],
+        errorMessage: (err) => getApiErrorMessage(err, "Couldn't save weight"),
     });
 }
 
@@ -89,21 +121,37 @@ export function useStepLogs() {
 }
 
 export function useSaveSteps() {
-    const queryClient = useQueryClient();
-    return useMutation({
-        mutationFn: ({ date, steps }: { date: string; steps: number }) =>
-            saveSteps(date, steps),
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: trackingKeys.steps });
+    return useOptimisticMutation<{ date: string; steps: number }, StepLog>({
+        mutationKey: trackingKeys.mutations.saveSteps,
+        mutationFn: ({ date, steps }) => saveSteps(date, steps),
+        scope: (v) => ({ id: `steps:${v.date}` }),
+        optimistic: () => [
+            {
+                queryKey: trackingKeys.steps,
+                apply: (old: StepLog[], vars) => saveStepsPatch(old, vars),
+                revert: (cur: StepLog[], vars, snap: StepLog[]) => revertUpsertByDay(cur, vars.date, snap),
+            },
+        ],
+        reconcile: (saved, _v, qc, { siblingsPending }) => {
+            if (siblingsPending(trackingKeys.steps) > 0) return;
+            qc.setQueryData<StepLog[]>(trackingKeys.steps, (cur) => cur && reconcileByDay(cur, saved));
         },
+        invalidate: () => [trackingKeys.steps],
+        errorMessage: (err) => getApiErrorMessage(err, "Couldn't save steps"),
     });
 }
 
+/** Single source for hooks and route prefetch. */
+export const trackingQueries = {
+    groceryItems: () =>
+        queryOptions({
+            queryKey: trackingKeys.groceryItems,
+            queryFn: fetchGroceryItems,
+        }),
+};
+
 export function useGroceryItems() {
-    return useQuery({
-        queryKey: trackingKeys.groceryItems,
-        queryFn: fetchGroceryItems,
-    });
+    return useQuery(trackingQueries.groceryItems());
 }
 
 export function useGrocerySuggestions(query: MaybeRefOrGetter<string>) {
@@ -118,13 +166,31 @@ export function useGrocerySuggestions(query: MaybeRefOrGetter<string>) {
     });
 }
 
+/** Optimistic add: appends a temp row (client_id), swaps in the server row on success. */
+const GROCERY_CREATE_KEY = ["tracking", "grocery", "create"] as const;
+const groceryScope = (clientId: string) => "grocery:" + clientId;
+
 export function useCreateGroceryItem() {
-    const queryClient = useQueryClient();
-    return useMutation({
-        mutationFn: ({ name }: { name: string }) => createGroceryItem(name),
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: trackingKeys.groceryItems });
-        },
+    return useOptimisticMutation<{ client_id: string; name: string }, GroceryItem>({
+        mutationKey: GROCERY_CREATE_KEY,
+        mutationFn: ({ client_id, name }) => createGroceryItem(name, client_id),
+        // Safe to retry: the server de-duplicates by client_id.
+        retry: 2,
+        // A tick on the row waits for its create (same scope), then completes it by client_id.
+        scope: (v) => ({ id: groceryScope(v.client_id) }),
+        optimistic: () => [
+            {
+                queryKey: trackingKeys.groceryItems,
+                apply: (old: GroceryItem[], vars) => addGroceryItem(old, vars),
+                revert: (cur: GroceryItem[], vars) => removeGroceryItemByClientId(cur, vars),
+            },
+        ],
+        reconcile: (item, v, qc) =>
+            qc.setQueryData<GroceryItem[]>(trackingKeys.groceryItems, (cur) =>
+                cur ? reconcileGroceryItem(cur, item, v.client_id) : cur,
+            ),
+        invalidate: () => [trackingKeys.groceryItems],
+        errorMessage: (err) => getApiErrorMessage(err, "Couldn’t add item"),
     });
 }
 
@@ -144,16 +210,34 @@ export function useCreateGroceryItems() {
     });
 }
 
+/** Optimistic complete: the row leaves the list now. Suggestions (built from completed items) refetch on settle. */
 export function useCompleteGroceryItem() {
-    const queryClient = useQueryClient();
-    return useMutation({
-        mutationFn: (id: number) => completeGroceryItem(id),
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: trackingKeys.groceryItems });
-            queryClient.invalidateQueries({
-                queryKey: ["tracking", "grocery", "suggestions"],
-            });
-        },
+    const qc = useQueryClient();
+    /** Its create failed: the row never reached the server, so a failed complete must not bring it back. */
+    const createFailed = (clientId: string | null | undefined) =>
+        !!clientId &&
+        qc
+            .getMutationCache()
+            .findAll({ mutationKey: GROCERY_CREATE_KEY, exact: true, status: "error" })
+            .some((m) => (m.state.variables as { client_id?: string } | undefined)?.client_id === clientId);
+    return useOptimisticMutation<GroceryItemRef, GroceryItem>({
+        mutationKey: ["tracking", "grocery", "complete"],
+        mutationFn: (v) => completeGroceryItem(groceryPathRef(v)),
+        // PATCH complete is idempotent on the server.
+        retry: 2,
+        // Rows added in this session have a client_id: wait for their create before completing.
+        scope: (v) => ({ id: v.client_id ? groceryScope(v.client_id) : "grocery:id:" + v.id }),
+        optimistic: () => [
+            {
+                queryKey: trackingKeys.groceryItems,
+                apply: (old: GroceryItem[], v) => completeGroceryItemInList(old, v),
+                revert: (cur: GroceryItem[], v, snapshot) =>
+                    createFailed(v.client_id) ? cur : restoreGroceryItem(cur, v, snapshot),
+                alwaysRevert: true,
+            },
+        ],
+        invalidate: () => [trackingKeys.groceryItems, trackingKeys.grocerySuggestionsAll],
+        errorMessage: (err) => getApiErrorMessage(err, "Couldn’t complete item"),
     });
 }
 
@@ -174,38 +258,52 @@ export function useWaterLogs(dateStr: MaybeRefOrGetter<string>) {
     });
 }
 
+/** Log water. Vars need a `client_id` from `newClientId()` (the backend dedupes retries by it). */
 export function useSaveWater() {
-    const queryClient = useQueryClient();
-    return useMutation({
-        mutationFn: ({
-            date,
-            amountOz,
-            presetId,
-        }: {
-            date: string;
-            amountOz: number;
-            presetId?: number;
-        }) => saveWater(date, amountOz, presetId),
-        onSuccess: (_data, vars) => {
-            queryClient.invalidateQueries({
-                queryKey: trackingKeys.water(vars.date),
-            });
-        },
+    return useOptimisticMutation<AddWaterVars, WaterLog>({
+        mutationKey: trackingKeys.mutations.addWater,
+        mutationFn: ({ date, amountOz, presetId, client_id }) => saveWater(date, amountOz, presetId, client_id),
+        // Idempotent through client_id, so a transient failure may be retried safely.
+        retry: 1,
+        retryDelay: 800,
+        scope: (v) => ({ id: `water:${v.client_id}` }),
+        optimistic: (v) => [
+            {
+                queryKey: trackingKeys.water(v.date),
+                apply: (old: WaterLog[], vars) => addWaterPatch(old, vars),
+                revert: (cur: WaterLog[], vars) => revertAddWater(cur, vars),
+            },
+        ],
+        reconcile: (saved, v, qc) =>
+            qc.setQueryData<WaterLog[]>(trackingKeys.water(v.date), (cur) => cur && reconcileWater(cur, v, saved)),
+        invalidate: (v) => [trackingKeys.water(v.date)],
+        errorMessage: (err) => getApiErrorMessage(err, "Couldn't log water"),
     });
 }
 
 export function useDeleteWater() {
-    const queryClient = useQueryClient();
-    return useMutation({
-        mutationFn: async ({ id, date }: { id: number; date: string }) => {
-            await deleteWater(id);
-            return date;
+    return useOptimisticMutation<DeleteWaterVars, void>({
+        mutationKey: trackingKeys.mutations.deleteWater,
+        // Already gone (404) is the state we wanted.
+        // Never-saved entries (create failed) answer 404 too, which is right: nothing to delete.
+        mutationFn: async (v) => {
+            try {
+                await deleteWater(waterPathRef(v));
+            } catch (err) {
+                if (!(axios.isAxiosError(err) && err.response?.status === 404)) throw err;
+            }
         },
-        onSuccess: (date) => {
-            queryClient.invalidateQueries({
-                queryKey: trackingKeys.water(date),
-            });
-        },
+        // Same scope as the entry's create, so deleting an entry still being saved waits for it.
+        scope: (v) => ({ id: v.client_id ? `water:${v.client_id}` : `water:id:${v.id}` }),
+        optimistic: (v) => [
+            {
+                queryKey: trackingKeys.water(v.date),
+                apply: (old: WaterLog[], vars) => deleteWaterPatch(old, vars),
+                revert: (cur: WaterLog[], vars, snap: WaterLog[]) => revertDeleteWater(cur, vars, snap),
+            },
+        ],
+        invalidate: (v) => [trackingKeys.water(v.date)],
+        errorMessage: (err) => getApiErrorMessage(err, "Couldn't delete water entry"),
     });
 }
 
@@ -250,7 +348,7 @@ export function useUpdateDrinkSizePreset() {
             queryClient.invalidateQueries({
                 queryKey: trackingKeys.waterPresets,
             });
-            queryClient.invalidateQueries({ queryKey: ["tracking", "water"] });
+            queryClient.invalidateQueries({ queryKey: trackingKeys.waterLogsAll });
         },
     });
 }
@@ -263,7 +361,7 @@ export function useDeleteDrinkSizePreset() {
             queryClient.invalidateQueries({
                 queryKey: trackingKeys.waterPresets,
             });
-            queryClient.invalidateQueries({ queryKey: ["tracking", "water"] });
+            queryClient.invalidateQueries({ queryKey: trackingKeys.waterLogsAll });
         },
     });
 }

@@ -1,400 +1,165 @@
 <script setup lang="ts">
-import type {
-    Cardio,
-    Exercise,
-    LoggedExercise,
-    PlannedCardio,
-    MobilityLogged,
-} from "~/types/workout";
-import type { DropdownOption } from "~/shared/input/Dropdown.vue";
-import Dropdown from "~/shared/input/Dropdown.vue";
+import type { ExerciseGroup } from "~/api/workout/api";
+import type { ComboboxOption, MenuItem } from "~/shared/ui";
 import { ref, computed } from "vue";
-import { Trash2 } from "lucide-vue-next";
-import { useRouter } from "vue-router";
+import type { Exercise } from "~/types/workout";
+import { ChevronRight, Dumbbell, MoreVertical, PartyPopper, Trash2 } from "lucide-vue-next";
+import { Button, Card, Combobox, EmptyState, IconButton, List, ListRow, Menu } from "~/shared/ui";
 import { useExercisesPaginated } from "~/api/workout/queries";
-
-type ExerciseGroup = {
-    planned?: Exercise;
-    logged?: LoggedExercise;
-    previous?: LoggedExercise;
-};
+import StepMarker from "~/pages/gym/components/StepMarker.vue";
+import StepProgress from "~/pages/gym/components/StepProgress.vue";
+import { nextStepIndex, stepKindLabel, type WorkoutStep } from "../domain/workoutSteps";
+import { buildSessionSummary } from "../domain/sessionSummary";
+import SessionSummary from "./SessionSummary.vue";
 
 const props = defineProps<{
     workoutName: string;
+    dateLabel: string;
+    steps: WorkoutStep[];
     exercises: ExerciseGroup[];
-    plannedCardio?: PlannedCardio | null;
-    loggedCardio?: Cardio | null;
-    loggedPreMobility?: MobilityLogged | null;
-    loggedPostMobility?: MobilityLogged | null;
 }>();
 
-const workoutName = computed(() => props.workoutName);
 const emit = defineEmits<{
-    (e: "select-exercise", index: number): void;
-    (e: "add-exercise", exerciseId: number): void;
+    (e: "select-step", step: WorkoutStep): void;
+    (e: "add-exercise", exerciseId: number, exercise?: Exercise): void;
     (e: "remove-exercise", index: number): void;
-    (e: "select-cardio"): void;
-    (e: "select-pre-mobility"): void;
-    (e: "select-post-mobility"): void;
+    (e: "finish"): void;
 }>();
 
-const showCardioRow = computed(
-    () => props.plannedCardio != null || props.loggedCardio != null,
-);
+const next = computed(() => nextStepIndex(props.steps));
+const nextStep = computed(() => (next.value >= 0 ? props.steps[next.value] : null));
+const doneCount = computed(() => props.steps.filter((s) => s.done).length);
+const allDone = computed(() => props.steps.length > 0 && next.value === -1);
 
-const cardioName = computed(
-    () => props.plannedCardio?.type ?? props.loggedCardio?.type ?? "Cardio",
-);
+const summary = computed(() => buildSessionSummary(props.exercises));
+const hasGains = computed(() => summary.value.lifts.length > 0);
 
-const cardioIsLogged = computed(() => (props.loggedCardio?.minutes ?? 0) > 0);
+const stateOf = (i: number) => (props.steps[i]?.done ? "done" : i === next.value ? "next" : "todo");
 
-const showPreMobilityRow = computed(() => {
-    const l = props.loggedPreMobility;
-    return l != null && l.items.length > 0;
-});
+const startLabel = (s: WorkoutStep) =>
+    s.kind === "lift" ? "Start" : s.kind === "cardio" ? "Log cardio" : `Start ${stepKindLabel[s.kind].toLowerCase()}`;
 
-const showPostMobilityRow = computed(() => {
-    const l = props.loggedPostMobility;
-    return l != null && l.items.length > 0;
-});
-
-const preMobilityComplete = computed(() => {
-    const l = props.loggedPreMobility;
-    if (!l?.items.length) return false;
-    return l.items.every((name) => l.checked.includes(name));
-});
-
-const postMobilityComplete = computed(() => {
-    const l = props.loggedPostMobility;
-    if (!l?.items.length) return false;
-    return l.items.every((name) => l.checked.includes(name));
-});
-
-const router = useRouter();
-
+// Add exercise (catalog search, skipping what's already in today's log)
 const exerciseSearch = ref("");
-const {
-    data: exercisesPages,
-    fetchNextPage,
-    hasNextPage,
-    isFetching,
-} = useExercisesPaginated(exerciseSearch);
-
-const exerciseOptions = computed<DropdownOption[]>(() => {
-    const all = exercisesPages.value?.pages.flatMap((p) => p.exercises) ?? [];
-    const existingIds = new Set(
-        props.exercises
-            .map((eg) => eg.planned?.ID ?? eg.logged?.exercise_id)
-            .filter((id): id is number => id != null),
+const { data: exercisesPages, fetchNextPage, hasNextPage, isFetching } = useExercisesPaginated(exerciseSearch);
+const catalog = computed(() => exercisesPages.value?.pages.flatMap((p) => p.exercises) ?? []);
+const addExercise = (id: number) => emit("add-exercise", id, catalog.value.find((ex) => ex.ID === id));
+const exerciseOptions = computed<ComboboxOption[]>(() => {
+    const all = catalog.value;
+    const existing = new Set(
+        props.exercises.map((g) => g.planned?.ID ?? g.logged?.exercise_id).filter((id): id is number => id != null),
     );
-    return all
-        .filter((ex) => !existingIds.has(ex.ID))
-        .map((ex) => ({ label: ex.name, value: ex.ID }));
+    return all.filter((ex) => !existing.has(ex.ID)).map((ex) => ({ label: ex.name, value: ex.ID }));
 });
 
-const handleExerciseSelect = (option: DropdownOption) => {
-    emit("add-exercise", option.value as number);
-};
 
-const handleExerciseSearch = (query: string) => {
-    exerciseSearch.value = query;
-};
-
-const handleLoadMore = () => {
-    if (hasNextPage.value) fetchNextPage();
-};
-
-// Handle remove exercise
-const removeExercise = (index: number, event: Event) => {
-    event.stopPropagation();
-    emit("remove-exercise", index);
-};
-
-// Get maximum weight from previous exercise
-const getMaxWeight = (exerciseGroup: ExerciseGroup): number | null => {
-    if (
-        !exerciseGroup.previous ||
-        !exerciseGroup.previous.sets ||
-        exerciseGroup.previous.sets.length === 0
-    ) {
-        return null;
-    }
-    return Math.max(...exerciseGroup.previous.sets.map((set) => set.weight));
-};
-
-// Get last set from logged exercise
-const getLastSet = (
-    exerciseGroup: ExerciseGroup,
-): { weight: number; reps: number } | null => {
-    if (
-        !exerciseGroup.logged ||
-        !exerciseGroup.logged.sets ||
-        exerciseGroup.logged.sets.length === 0
-    ) {
-        return null;
-    }
-    const lastSet =
-        exerciseGroup.logged.sets[exerciseGroup.logged.sets.length - 1];
-    if (!lastSet) {
-        return null;
-    }
-    return {
-        weight: lastSet.weight,
-        reps: lastSet.reps,
-    };
-};
-
-// Check if exercise is logged
-const isLogged = (exerciseGroup: ExerciseGroup): boolean => {
-    return (
-        !!exerciseGroup.logged &&
-        exerciseGroup.logged.sets &&
-        exerciseGroup.logged.sets.length > 0
-    );
+const rowMenu: MenuItem[] = [{ key: "remove", label: "Remove from this workout", icon: Trash2, tone: "danger" }];
+const onRowMenu = (s: WorkoutStep, key: string) => {
+    if (key === "remove" && s.exerciseIndex != null) emit("remove-exercise", s.exerciseIndex);
 };
 </script>
 
 <template>
-    <div class="list-view">
-        <header>
-            <h1 v-if="workoutName">{{ workoutName }} Day</h1>
+    <div class="flex w-full flex-col gap-6">
+        <!-- Where you are in the session -->
+        <header class="flex flex-col gap-3">
+            <div class="flex items-end justify-between gap-3">
+                <div class="flex min-w-0 flex-col">
+                    <p class="m-0 text-xs font-semibold uppercase tracking-wide text-fg-muted">{{ dateLabel }}</p>
+                    <h1 class="m-0 truncate text-xl font-semibold tracking-tight text-fg">
+                        {{ workoutName || "Workout" }}
+                    </h1>
+                </div>
+                <p v-if="steps.length" class="m-0 shrink-0 text-sm text-fg-muted tabular-nums">
+                    <span class="font-semibold text-fg">{{ doneCount }}</span> / {{ steps.length }} done
+                </p>
+            </div>
+            <StepProgress v-if="steps.length" :steps="steps" :next="next" />
         </header>
-        <div class="mb-2">
-            <Dropdown
+
+        <!-- Up next: the one thing to do now -->
+        <Card v-if="nextStep">
+            <div class="flex flex-col gap-4">
+                <div class="flex flex-col gap-1">
+                    <p class="m-0 text-xs font-semibold uppercase tracking-wide text-accent">
+                        Up next · {{ stepKindLabel[nextStep.kind] }}
+                    </p>
+                    <h2 class="m-0 text-xl font-semibold tracking-tight text-fg">{{ nextStep.name }}</h2>
+                    <p v-if="nextStep.detail" class="m-0 text-sm text-fg-muted tabular-nums">{{ nextStep.detail }}</p>
+                </div>
+                <Button variant="primary" size="lg" block @click="emit('select-step', nextStep)">
+                    {{ startLabel(nextStep) }}
+                    <ChevronRight aria-hidden="true" class="size-5" />
+                </Button>
+            </div>
+        </Card>
+        <Card v-else-if="allDone">
+            <div class="flex flex-col gap-4">
+                <div class="flex items-center gap-3">
+                    <span class="flex size-10 shrink-0 items-center justify-center rounded-full bg-success-soft text-success">
+                        <PartyPopper aria-hidden="true" class="size-5" />
+                    </span>
+                    <div class="flex min-w-0 flex-col">
+                        <h2 class="m-0 text-lg font-semibold text-fg">Workout complete</h2>
+                        <p class="m-0 text-sm text-fg-muted tabular-nums">All {{ steps.length }} steps logged</p>
+                    </div>
+                </div>
+                <Button variant="primary" size="lg" block @click="emit('finish')">Finish workout</Button>
+            </div>
+        </Card>
+
+        <!-- After the workout, the payoff comes first; mid-session it sits below the list -->
+        <SessionSummary v-if="allDone && hasGains" :summary="summary" complete />
+
+        <!-- The whole session, in order -->
+        <section aria-labelledby="session-plan" class="flex flex-col gap-3">
+            <h2 id="session-plan" class="m-0 text-xs font-semibold uppercase tracking-wide text-fg-muted">Session</h2>
+            <Card padding="none">
+                <List v-if="steps.length">
+                    <ListRow
+                        v-for="(s, i) in steps"
+                        :key="s.key"
+                        :selected="stateOf(i) === 'next'"
+                        @click="emit('select-step', s)"
+                    >
+                        <template #leading><StepMarker :n="i + 1" :state="stateOf(i)" /></template>
+                        <span :class="s.done ? 'text-fg-muted' : 'text-fg'">{{ s.name }}</span>
+                        <span class="sr-only">{{ s.done ? ", done" : stateOf(i) === "next" ? ", up next" : "" }}</span>
+                        <template v-if="s.detail" #subtitle>
+                            <span class="tabular-nums" :class="s.done ? 'text-fg' : ''">{{ s.detail }}</span>
+                        </template>
+                        <template #end>
+                            <Menu v-if="s.kind === 'lift'" :items="rowMenu" @select="onRowMenu(s, $event)">
+                                <IconButton :label="`More actions for ${s.name}`">
+                                    <MoreVertical />
+                                </IconButton>
+                            </Menu>
+                            <span v-else aria-hidden="true" class="size-touch lg:size-row" />
+                        </template>
+                    </ListRow>
+                </List>
+                <EmptyState
+                    v-else
+                    :icon="Dumbbell"
+                    title="Nothing planned"
+                    description="Add an exercise below, or pick a plan for this day on the Gym page."
+                />
+            </Card>
+            <Combobox
                 :options="exerciseOptions"
-                :on-select="handleExerciseSelect"
                 :has-more="hasNextPage ?? false"
                 :loading="isFetching"
-                placeholder="Add exercise..."
-                @load-more="handleLoadMore"
-                @search="handleExerciseSearch"
+                placeholder="Add an exercise…"
+                @select="(o: ComboboxOption) => addExercise(o.value as number)"
+                @load-more="() => hasNextPage && fetchNextPage()"
+                @search="(q: string) => (exerciseSearch = q)"
             />
-        </div>
-        <ul class="exercise-list">
-            <li
-                v-if="showPreMobilityRow"
-                key="pre-mobility"
-                @click="emit('select-pre-mobility')"
-                :class="['exercise-item', { logged: preMobilityComplete }]"
-            >
-                <div class="exercise-content">
-                    <div class="exercise-title-section">
-                        <span class="exercise-name">{{
-                            loggedPreMobility?.title ?? "Dynamic warmup"
-                        }}</span>
-                    </div>
-                </div>
-            </li>
-            <li
-                v-for="(exerciseGroup, index) in exercises"
-                :key="
-                    exerciseGroup.planned?.ID ??
-                    exerciseGroup.logged?.exercise_id ??
-                    exerciseGroup.logged?.ID ??
-                    index
-                "
-                @click="emit('select-exercise', index)"
-                :class="['exercise-item', { logged: isLogged(exerciseGroup) }]"
-            >
-                <div class="exercise-content">
-                    <div class="exercise-title-section">
-                        <span class="exercise-name">{{
-                            exerciseGroup.planned?.name ||
-                            exerciseGroup.logged?.exercise?.name
-                        }}</span>
-                        <span
-                            v-if="
-                                isLogged(exerciseGroup) &&
-                                getLastSet(exerciseGroup)
-                            "
-                            class="exercise-subtitle"
-                        >
-                            <p v-for="set in exerciseGroup.logged?.sets">
-                                {{ set.weight }}lbs × {{ set.reps }}
-                            </p>
-                        </span>
-                        <span
-                            v-else-if="
-                                !isLogged(exerciseGroup) &&
-                                getMaxWeight(exerciseGroup) !== null
-                            "
-                            class="exercise-subtitle"
-                        >
-                            Prev {{ getMaxWeight(exerciseGroup) }}lbs
-                        </span>
-                    </div>
-                </div>
-                <button
-                    @click="removeExercise(index, $event)"
-                    class="remove-button"
-                    type="button"
-                >
-                    <Trash2 :size="18" />
-                </button>
-            </li>
-            <li
-                v-if="showCardioRow"
-                key="cardio"
-                @click="emit('select-cardio')"
-                :class="['exercise-item', { logged: cardioIsLogged }]"
-            >
-                <div class="exercise-content">
-                    <div class="exercise-title-section">
-                        <span class="exercise-name">{{ cardioName }}</span>
-                        <span v-if="cardioIsLogged" class="exercise-subtitle">
-                            {{ loggedCardio?.minutes }} min
-                        </span>
-                    </div>
-                </div>
-            </li>
-            <li
-                v-if="showPostMobilityRow"
-                key="post-mobility"
-                @click="emit('select-post-mobility')"
-                :class="['exercise-item', { logged: postMobilityComplete }]"
-            >
-                <div class="exercise-content">
-                    <div class="exercise-title-section">
-                        <span class="exercise-name">{{
-                            loggedPostMobility?.title ?? "Static stretching"
-                        }}</span>
-                    </div>
-                </div>
-            </li>
-        </ul>
-        <button
-            @click="router.push('/')"
-            type="button"
-            class="finish-button bg-green-600 hover:bg-green-500"
-        >
-            <span>Finish Workout</span>
-        </button>
+        </section>
+
+        <SessionSummary v-if="!allDone && hasGains" :summary="summary" :complete="false" />
+
+        <Button v-if="!allDone" variant="secondary" size="lg" block @click="emit('finish')">
+            {{ doneCount > 0 ? "Finish workout" : "Back to Gym" }}
+        </Button>
     </div>
 </template>
-
-<style scoped>
-.list-view {
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-    width: 100%;
-    max-width: 100%;
-}
-
-.exercise-list {
-    list-style: none;
-    padding: 0;
-    margin: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-    width: 100%;
-}
-
-.exercise-item {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 1rem;
-    border: 1px solid rgb(56, 56, 56);
-    border-radius: 5px;
-    background: rgb(27, 27, 27);
-    cursor: pointer;
-    transition:
-        background-color 0.2s,
-        opacity 0.2s;
-    width: 100%;
-    box-sizing: border-box;
-    gap: 1rem;
-}
-
-.exercise-item:hover {
-    background: rgb(40, 40, 40);
-}
-
-.exercise-item.logged {
-    opacity: 0.6;
-    background: rgb(20, 20, 20);
-    border: 1px solid rgb(19, 128, 42);
-}
-
-.exercise-item.logged:hover {
-    background: rgb(30, 30, 30);
-    opacity: 0.8;
-}
-
-.exercise-content {
-    flex: 1;
-    display: flex;
-    align-items: center;
-    min-width: 0;
-}
-
-.exercise-title-section {
-    display: flex;
-    flex-direction: column;
-    gap: 0.25rem;
-    min-width: 0;
-}
-
-.exercise-name {
-    font-weight: 500;
-    font-size: 1.1rem;
-}
-
-.exercise-subtitle {
-    color: rgb(150, 150, 150);
-    font-size: 0.9rem;
-    display: flex;
-    flex-direction: row;
-}
-
-.exercise-subtitle p {
-    margin: 0;
-}
-
-.exercise-subtitle p:not(:last-child)::after {
-    content: "•";
-    margin: 0 0.5rem;
-    color: rgb(150, 150, 150);
-}
-
-.exercise-item.logged .exercise-subtitle {
-    color: rgb(200, 200, 200);
-    font-weight: 500;
-}
-
-.remove-button {
-    width: 2rem;
-    height: 2rem;
-    border: 1px solid rgb(80, 40, 40);
-    border-radius: 3px;
-    background: rgb(40, 20, 20);
-    color: rgb(200, 100, 100);
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition:
-        background-color 0.2s,
-        border-color 0.2s;
-    padding: 0;
-    flex-shrink: 0;
-}
-
-.remove-button:hover {
-    background: rgb(60, 30, 30);
-    border-color: rgb(120, 60, 60);
-}
-
-.finish-button {
-    margin-top: 1rem;
-    padding: 0.75rem 1.5rem;
-    border: 1px solid rgb(56, 56, 56);
-    border-radius: 5px;
-    color: inherit;
-    font-size: 1rem;
-    cursor: pointer;
-    transition: background-color 0.2s;
-}
-</style>

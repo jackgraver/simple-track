@@ -200,12 +200,17 @@ func mealFromSaved(sm *models.SavedMeal) *models.Meal {
 	return m
 }
 
-func AddPlannedMealFromSavedMeal(offset int, savedMealID uint) error {
+func AddPlannedMealFromSavedMeal(offset int, savedMealID uint, clientID string) error {
 	sm, err := dietrepo.SavedMealByID(savedMealID)
 	if err != nil {
 		return err
 	}
-	return dietrepo.AddPlannedMealFromSavedMeal(offset, savedMealID, mealFromSaved(sm))
+	return dietrepo.AddPlannedMealFromSavedMeal(offset, savedMealID, mealFromSaved(sm), clientID)
+}
+
+// CopyPlannedMeals copies one day's planned meals onto other days. See dietrepo.CopyPlannedMeals.
+func CopyPlannedMeals(fromOffset int, toOffsets []int) (int, error) {
+	return dietrepo.CopyPlannedMeals(fromOffset, toOffsets)
 }
 
 func ReorderPlannedMeals(offset int, orderedIDs []uint) error {
@@ -222,6 +227,11 @@ func DeletePlannedMeal(offset int, plannedMealID uint) error {
 		return err
 	}
 	return dietrepo.PlannedMealDelete(plannedMealID, day.ID)
+}
+
+// LogPlannedMeal logs a planned meal on the given day (idempotent). See dietrepo.LogPlannedMeal.
+func LogPlannedMeal(dayID uint, mealID uint) error {
+	return dietrepo.LogPlannedMeal(dayID, mealID)
 }
 
 func DeleteLoggedMeal(dayID uint, mealID uint) error {

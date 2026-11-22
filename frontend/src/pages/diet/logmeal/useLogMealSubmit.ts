@@ -8,7 +8,7 @@ import {
     useLogEditedMeal,
     useUpdateLoggedMeal,
     useUpdateSavedMeal,
-} from "./queries/useMealMutations";
+} from "~/api/diet/queries";
 import { EDIT_VARIANT } from "./logmealMode";
 import type { EditMealVariant } from "./logmealMode";
 import { emptyMeal } from "./useEditableMeal";

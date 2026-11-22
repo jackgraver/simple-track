@@ -2,6 +2,8 @@
 import { computed } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { activeGroup, itemLocation, navGroups, type NavGroup } from "../nav";
+import { queryClient } from "~/api/queryClient";
+import { prefetchRoute } from "~/router/prefetch";
 import { useNavMemory } from "./useNavMemory";
 
 const route = useRoute();
@@ -10,30 +12,42 @@ const { lastPath } = useNavMemory();
 
 const current = computed(() => activeGroup(route));
 
-function openGroup(group: NavGroup) {
+function targetOf(group: NavGroup) {
     const home = itemLocation(group.items[0]!, route);
     // Re-tapping the active tab returns to that section's home, like native apps.
-    if (current.value?.key === group.key) {
-        void router.push(home);
-        return;
+    if (current.value?.key === group.key) return home;
+    return lastPath.value[group.key] ?? home;
+}
+
+function openGroup(group: NavGroup) {
+    void router.push(targetOf(group));
+}
+
+function warm(group: NavGroup) {
+    try {
+        prefetchRoute(queryClient, router.resolve(targetOf(group)));
+    } catch {
+        // unresolvable remembered path: nothing to warm
     }
-    void router.push(lastPath.value[group.key] ?? home);
 }
 </script>
 
 <template>
     <nav
         aria-label="Main"
-        class="fixed inset-x-0 bottom-0 z-40 border-t border-(--color-border) bg-mainBg/95 pb-[env(safe-area-inset-bottom)] backdrop-blur"
+        class="fixed inset-x-0 bottom-0 z-nav border-t border-line bg-surface/95 pb-safe backdrop-blur-sm"
     >
-        <div class="mx-auto flex h-16 max-w-md items-stretch">
+        <div class="mx-auto flex h-tabbar max-w-md items-stretch">
+            <!-- eslint-disable-next-line vue/no-restricted-html-elements -- tab bar item (icon over label), not a button style -->
             <button
                 v-for="group in navGroups"
                 :key="group.key"
                 type="button"
-                class="m-0! flex flex-1 flex-col items-center justify-center gap-0.5 rounded-none! bg-transparent p-0! text-[11px] shadow-none! transition-colors"
-                :class="current?.key === group.key ? 'text-textPrimary' : 'text-textSecondary'"
+                class="flex flex-1 flex-col items-center justify-center gap-0.5 bg-transparent text-2xs transition-colors"
+                :class="current?.key === group.key ? 'text-fg' : 'text-fg-muted'"
                 :aria-current="current?.key === group.key ? 'page' : undefined"
+                @pointerenter="warm(group)"
+                @touchstart.passive="warm(group)"
                 @click="openGroup(group)"
             >
                 <component

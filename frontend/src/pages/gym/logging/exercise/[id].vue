@@ -25,6 +25,7 @@ const {
     loggedPostMobility,
     savePreMobility,
     savePostMobility,
+    refetch,
 } = useWorkoutStore(offset);
 
 const loggingKind = computed<"exercise" | "cardio" | "mobility">(() => {
@@ -81,6 +82,7 @@ const isEmpty = computed(() => {
         :empty="isEmpty"
         :empty-message="emptyMessage"
         @back="goBackToLogging"
+        @retry="refetch()"
     >
         <ExerciseLoggingFlow />
     </LoggingPageShell>
@@ -91,8 +93,9 @@ const isEmpty = computed(() => {
         :empty="isEmpty"
         :empty-message="emptyMessage"
         @back="goBackToLogging"
+        @retry="refetch()"
     >
-        <div class="flex w-full flex-col gap-4 self-stretch md:px-2">
+        <div class="flex w-full flex-col gap-4 self-stretch">
             <CardioLoggingView
                 v-if="loggingKind === 'cardio'"
                 :planned-cardio="plannedCardio"

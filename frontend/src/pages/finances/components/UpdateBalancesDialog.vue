@@ -3,7 +3,6 @@ import { computed, reactive, ref } from "vue";
 import { setBalances } from "~/api/money/api";
 import { useMoneyMutation } from "~/api/money/queries";
 import type { Account } from "~/api/money/types";
-import { getApiErrorMessage } from "~/api/httpError";
 import { toast } from "~/composables/toast/useToast";
 import {
     accountKindLabels,
@@ -11,8 +10,9 @@ import {
     formatMoney,
     parseAmount,
     todayKey,
-    ui,
+    changeClass,
 } from "../format";
+import { Button, Field, Input, List, ListRow } from "~/shared/ui";
 
 const props = defineProps<{
     accounts: Account[];
@@ -39,7 +39,7 @@ function change(account: Account) {
     return diff === 0 ? null : diff;
 }
 
-const mutation = useMoneyMutation(setBalances);
+const mutation = useMoneyMutation(setBalances, "Failed to save balances");
 
 async function submit() {
     if (entries.value.length === 0 || mutation.isPending.value) return;
@@ -47,54 +47,55 @@ async function submit() {
         await mutation.mutateAsync({ date: date.value, balances: entries.value });
         toast.push(`Recorded ${entries.value.length} balance(s)`, "success");
         props.onResolve?.(true);
-    } catch (error) {
-        toast.push(getApiErrorMessage(error, "Failed to save balances"), "error");
+    } catch {
+        // useMoneyMutation already toasted the error.
     }
 }
 </script>
 
 <template>
-    <form class="flex w-full min-w-72 flex-col gap-4 sm:min-w-[28rem]" @submit.prevent="submit">
-        <p class="m-0 text-sm text-textSecondary">
+    <form class="flex w-full flex-col gap-4" @submit.prevent="submit">
+        <p class="m-0 text-sm text-fg-muted">
             Confirm or update every balance in one go. Unchanged values are still recorded so you know they're current.
         </p>
-        <label :class="ui.label">
-            Balances as of
-            <input v-model="date" type="date" required :class="ui.input" />
-        </label>
-        <div class="flex max-h-[55vh] flex-col divide-y divide-(--color-border) overflow-y-auto [scrollbar-color:var(--color-third-bg)_transparent] [scrollbar-width:thin]">
-            <div
-                v-for="account in accounts"
-                :key="account.ID"
-                class="grid grid-cols-[1fr_9rem] items-center gap-3 py-2"
+        <Field label="Balances as of" required>
+            <Input v-model="date" type="date" required />
+        </Field>
+        <List class="max-h-[55vh] overflow-y-auto">
+            <ListRow v-for="account in accounts" :key="account.ID">
+                {{ account.name }}
+                <template #subtitle>
+                    {{ accountKindLabels[account.kind] }}
+                    <template v-if="account.balance_date"> · updated {{ formatAge(account.balance_date) }}</template>
+                    <template v-if="change(account) !== null">
+                        ·
+                        <span :class="changeClass((change(account) ?? 0) > 0 !== account.is_liability)">
+                            {{ (change(account) ?? 0) > 0 ? "+" : "−" }}{{ formatMoney(Math.abs(change(account) ?? 0)) }}
+                        </span>
+                    </template>
+                </template>
+                <template #trailing>
+                    <div class="w-36">
+                        <Input
+                            v-model="values[account.ID]"
+                            inputmode="decimal"
+                            :aria-label="`${account.name} balance`"
+                            class="text-right"
+                        />
+                    </div>
+                </template>
+            </ListRow>
+        </List>
+        <div class="flex flex-col-reverse gap-2 lg:flex-row lg:justify-end">
+            <Button variant="ghost" @click="props.onCancel?.()">Cancel</Button>
+            <Button
+                type="submit"
+                variant="primary"
+                :disabled="entries.length === 0"
+                :loading="mutation.isPending.value"
             >
-                <div class="min-w-0">
-                    <p class="m-0 truncate text-sm font-medium text-textPrimary">{{ account.name }}</p>
-                    <p class="m-0 text-xs text-textSecondary">
-                        {{ accountKindLabels[account.kind] }}
-                        <template v-if="account.balance_date"> · updated {{ formatAge(account.balance_date) }}</template>
-                        <template v-if="change(account) !== null">
-                            ·
-                            <span :class="(change(account) ?? 0) > 0 !== account.is_liability ? ui.positive : ui.negative">
-                                {{ (change(account) ?? 0) > 0 ? "+" : "" }}{{ formatMoney(change(account) ?? 0) }}
-                            </span>
-                        </template>
-                    </p>
-                </div>
-                <input
-                    v-model="values[account.ID]"
-                    inputmode="decimal"
-                    :aria-label="`${account.name} balance`"
-                    @focus="($event.target as HTMLInputElement).select()"
-                    :class="[ui.input, 'text-right tabular-nums']"
-                />
-            </div>
-        </div>
-        <div class="flex justify-end gap-2">
-            <button type="button" :class="ui.btnSecondary" @click="props.onCancel?.()">Cancel</button>
-            <button type="submit" :class="ui.btnPrimary" :disabled="mutation.isPending.value || entries.length === 0">
                 Record {{ entries.length }} balance{{ entries.length === 1 ? "" : "s" }}
-            </button>
+            </Button>
         </div>
     </form>
 </template>

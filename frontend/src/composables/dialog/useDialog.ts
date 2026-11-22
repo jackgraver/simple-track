@@ -5,6 +5,8 @@ export type DialogOptions = {
     message?: string;
     confirmText?: string;
     cancelText?: string;
+    /** "danger" renders the confirm button as a destructive solid. */
+    tone?: "danger";
 };
 
 export type CustomDialogOptions = {
@@ -29,6 +31,7 @@ export function useDialog() {
      * - message: The message to display in the dialog
      * - confirmText: The text of the confirm button
      * - cancelText: The text of the cancel button
+     * - tone: "danger" for destructive confirms
      * @returns Promise that resolves to the result of the confirm dialog
      */
     function confirm(options: DialogOptions): Promise<boolean | null> {

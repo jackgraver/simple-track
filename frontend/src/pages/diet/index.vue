@@ -1,17 +1,10 @@
 <script setup lang="ts">
-import "./macro-colors.css";
 import { computed } from "vue";
 import { useRoute } from "vue-router";
 import DietDayView from "./components/DietDayView.vue";
-import { CREATE_TYPE, LOG_TYPE } from "~/pages/diet/logmeal/logmealMode";
-import {
-    parseDietDayOffsetQuery,
-    withDietDayOffsetQuery,
-    ymdForDayOffset,
-} from "~/utils/dateUtil";
-import { dialogManager } from "~/composables/dialog/useDialog";
-import LogWaterDialog from "./components/dialog/LogWaterDialog.vue";
-import QuickLogDialog from "./components/dialog/QuickLogDialog.vue";
+import { CREATE_TYPE } from "~/pages/diet/logmeal/logmealMode";
+import { parseDietDayOffsetQuery, withDietDayOffsetQuery } from "~/utils/dateUtil";
+import { dietDayOptions, useAdjacentDayPrefetch } from "~/api/prefetchDays";
 import ModuleTitleBar from "~/shared/ModuleTitleBar.vue";
 import type { ModuleTitleLink } from "~/shared/ModuleTitleBar.vue";
 
@@ -19,46 +12,22 @@ const route = useRoute();
 const isDietHome = computed(() => route.name === "diet");
 
 const dateOffset = computed(() => parseDietDayOffsetQuery(route.query.offset));
-const dateStr = computed(() => ymdForDayOffset(dateOffset.value ?? 0));
+useAdjacentDayPrefetch(dateOffset, dietDayOptions, isDietHome);
 
-const logMealLinkQuery = computed(() =>
-    withDietDayOffsetQuery(dateOffset.value ?? 0, { type: LOG_TYPE }),
-);
-const createSavedMealLinkQuery = computed(() =>
-    withDietDayOffsetQuery(dateOffset.value ?? 0, { type: CREATE_TYPE }),
-);
-
-async function openWaterLog() {
-    await dialogManager.custom<boolean>({
-        title: "Log water",
-        component: LogWaterDialog,
-        componentProps: { dateStr: dateStr.value },
-    });
-}
-async function openQuickLog() {
-    await dialogManager.custom<boolean>({
-        title: "Quick log",
-        component: QuickLogDialog,
-        componentProps: {
-            dateOffset: dateOffset.value ?? 0,
-        },
-    });
-}
-
+// Logging (meal, quick log, water) lives on the page itself; the title bar is for planning.
 const dietNavLinks = computed<ModuleTitleLink[]>(() => [
-    { name: "Log meal", to: "diet-log", query: logMealLinkQuery.value },
+    { name: "Plan meals", to: "diet-edit-planned", query: { offset: String(dateOffset.value) } },
+    { name: "Targets", to: "diet-targets" },
     {
         name: "New saved meal",
         to: "diet-log",
-        query: createSavedMealLinkQuery.value,
+        query: withDietDayOffsetQuery(dateOffset.value, { type: CREATE_TYPE }),
     },
-    { name: "Quick log", onClick: openQuickLog },
-    { name: "Log Water", onClick: openWaterLog },
 ]);
 </script>
 
 <template>
-    <div class="diet-module flex w-full flex-col gap-6">
+    <div class="flex w-full flex-col gap-6">
         <template v-if="isDietHome">
             <ModuleTitleBar title="Diet" :links="dietNavLinks" />
             <DietDayView :date-offset="dateOffset" />

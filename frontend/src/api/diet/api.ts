@@ -52,6 +52,8 @@ export type QuickLogPayload = {
     fiber: number;
     offset?: number;
     replace_meal_id?: number;
+    /** Retry-safe: the server creates nothing for a known id and returns the current day. */
+    client_id?: string;
 };
 
 export async function quickLog(payload: QuickLogPayload): Promise<DietLogsTodayResponse> {
@@ -64,6 +66,7 @@ export async function quickLog(payload: QuickLogPayload): Promise<DietLogsTodayR
         fiber: payload.fiber,
         offset: payload.offset ?? 0,
     };
+    if (payload.client_id) body.client_id = payload.client_id;
     if (
         payload.replace_meal_id != null &&
         payload.replace_meal_id > 0
@@ -99,12 +102,14 @@ export async function getMonthPlannedSummary(
     return response.data.planned_counts;
 }
 
+/** `dayId` is the diet day row id (`day.ID`); 0 or omitted means today. */
 export async function logPlannedMeal(
     mealId: number,
+    dayId = 0,
 ): Promise<DietLogsTodayResponse> {
     const response = await apiClient.post<DietLogsTodayResponse>(
         "/diet/meals/meal/log-planned",
-        { meal_id: mealId },
+        dayId > 0 ? { meal_id: mealId, day_id: dayId } : { meal_id: mealId },
     );
     return response.data;
 }
@@ -144,13 +149,27 @@ export async function deletePlannedMeal(
 export async function addPlannedMealFromSaved(
     savedMealId: number,
     offset = 0,
+    clientId?: string,
 ): Promise<DietLogsTodayResponse> {
     const response = await apiClient.post<DietLogsTodayResponse>(
         "/diet/meals/planned/from-saved",
         {
             saved_meal_id: savedMealId,
             offset,
+            ...(clientId && { client_id: clientId }),
         },
+    );
+    return response.data;
+}
+
+/** Appends every planned meal of `fromOffset` to each day in `toOffsets` (after what's there). */
+export async function copyPlannedDay(
+    fromOffset: number,
+    toOffsets: number[],
+): Promise<{ copied_meals: number; days: number }> {
+    const response = await apiClient.post<{ copied_meals: number; days: number }>(
+        "/diet/meals/planned/copy-day",
+        { from_offset: fromOffset, to_offsets: toOffsets },
     );
     return response.data;
 }
@@ -165,26 +184,6 @@ export async function reorderPlannedMeals(
             planned_meal_ids: plannedMealIds,
             offset,
         },
-    );
-    return response.data;
-}
-
-export async function editLoggedMeal(
-    meal: Meal,
-    oldMealId: number,
-    options?: { dayId?: number },
-): Promise<DietLogsTodayResponse> {
-    const body: { meal: Meal; oldMealID: number; day_id?: number } = {
-        meal,
-        oldMealID: oldMealId,
-    };
-    const did = options?.dayId;
-    if (did != null && did > 0) {
-        body.day_id = did;
-    }
-    const response = await apiClient.post<DietLogsTodayResponse>(
-        "/diet/meals/meal/editlogged",
-        body,
     );
     return response.data;
 }
@@ -211,6 +210,13 @@ export async function createSavedMeal(payload: {
         payload,
     );
     return response.data;
+}
+
+export async function getSavedMeals(): Promise<SavedMeal[]> {
+    const response = await apiClient.get<{ saved_meals: SavedMeal[] }>(
+        "/diet/meals/saved-meal/all",
+    );
+    return response.data.saved_meals;
 }
 
 export async function getSavedMealById(id: number): Promise<SavedMeal> {
@@ -340,4 +346,9 @@ export async function updatePlanMacros(
         payload,
     );
     return response.data;
+}
+
+export async function getAllPlans(): Promise<Plan[]> {
+    const response = await apiClient.get<{ plans: Plan[] | null }>("/diet/plans/plan/all");
+    return response.data.plans ?? [];
 }

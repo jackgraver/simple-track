@@ -1,13 +1,6 @@
 import type { ChartData, ChartOptions } from "chart.js";
+import { chartTheme, withAlpha } from "~/shared/chart/theme";
 import { formatCompactMoney, formatDay, formatMoney } from "./format";
-
-function themeColor(name: string, fallback: string) {
-    if (typeof document === "undefined") return fallback;
-    return (
-        getComputedStyle(document.documentElement).getPropertyValue(name).trim() ||
-        fallback
-    );
-}
 
 export type MoneyPoint = { date: string; value: number };
 
@@ -15,18 +8,20 @@ export type MoneyPoint = { date: string; value: number };
 export function buildMoneyLineChart(
     points: MoneyPoint[],
     label: string,
-    color = "rgb(52, 211, 153)",
+    color?: string,
 ): { data: ChartData<"line">; options: ChartOptions<"line"> } {
-    const muted = themeColor("--color-text-secondary", "hsl(0, 0%, 70%)");
-    const grid = themeColor("--color-border", "hsl(0, 0%, 30%)");
+    const t = chartTheme();
+    const muted = t.muted;
+    const grid = t.grid;
+    const line = color ?? t.success;
     const data: ChartData<"line"> = {
         labels: points.map((p) => formatDay(p.date)),
         datasets: [
             {
                 label,
                 data: points.map((p) => p.value),
-                borderColor: color,
-                backgroundColor: color.replace("rgb(", "rgba(").replace(")", ", 0.12)"),
+                borderColor: line,
+                backgroundColor: withAlpha(line, 0.12),
                 fill: true,
                 tension: 0.25,
                 borderWidth: 2,

@@ -148,7 +148,7 @@ func TestAddPlannedMealFromSavedMeal(t *testing.T) {
 			Amount: 1,
 		}},
 	}
-	if err := dietrepo.AddPlannedMealFromSavedMeal(0, sm.ID, meal); err != nil {
+	if err := dietrepo.AddPlannedMealFromSavedMeal(0, sm.ID, meal, ""); err != nil {
 		t.Fatal(err)
 	}
 	count, err := dietrepo.CountUnloggedPlannedBySavedMealID(sm.ID)

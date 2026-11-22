@@ -2,6 +2,7 @@ package controller
 
 import (
 	"be-simpletracker/internal/core/workout/models"
+	workoutrepo "be-simpletracker/internal/core/workout/repository"
 	"be-simpletracker/internal/core/workout/services"
 	"be-simpletracker/internal/utils"
 	"be-simpletracker/internal/utils/apierr"
@@ -66,6 +67,12 @@ func LogExercise(c *gin.Context) {
 		return
 	}
 
+	// client_id belongs to the per-set endpoints (POST /workout/sets). This full-replace path
+	// ignores it so a replayed id can't hit the unique index here.
+	for i := range request.Log.Sets {
+		request.Log.Sets[i].ClientID = nil
+	}
+
 	switch request.Type {
 	case "previous":
 		request.Log.ID = 0
@@ -74,6 +81,11 @@ func LogExercise(c *gin.Context) {
 			request.Log.Sets[i].ID = 0
 		}
 		err := services.LogExercise(&request.Log)
+		if errors.Is(err, workoutrepo.ErrLoggedExerciseExists) {
+			// A double tap or retry already created the row (request.Log.ID now points at it).
+			// Treat this request as the full replace it describes instead of adding a duplicate.
+			err = services.UpdateLoggedExercise(request.Log)
+		}
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
@@ -134,6 +146,10 @@ func AddExerciseToWorkout(c *gin.Context) {
 		Notes:        "",
 	}
 	err := services.LogExercise(&newExercise)
+	if errors.Is(err, workoutrepo.ErrLoggedExerciseExists) {
+		apierr.Conflict(c, "Exercise already in workout")
+		return
+	}
 	if err != nil {
 		apierr.Internal(c, err)
 		return

@@ -1,4 +1,5 @@
 import { apiGET, apiPATCH, apiPOST } from "~/api/client";
+import { dayParams } from "~/api/workout/dates";
 import type {
     WorkoutLog,
     Exercise,
@@ -73,12 +74,12 @@ export type WorkoutLogsPreviousResponse = {
 };
 
 export async function switchWorkoutPlan(
-    offset: number,
+    date: string,
     planId: number | null,
 ): Promise<WorkoutLogsPreviousResponse> {
     return apiPATCH<WorkoutLogsPreviousResponse>(
         "/workout/logs/switch-plan",
         { plan_id: planId },
-        { params: { offset } },
+        { params: dayParams(date) },
     );
 }

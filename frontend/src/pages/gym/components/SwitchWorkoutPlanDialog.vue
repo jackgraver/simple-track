@@ -1,11 +1,12 @@
 <script setup lang="ts">
+import { offsetToDate } from "~/api/workout/dates";
 import { computed } from "vue";
-import axios from "axios";
 import {
     useWorkoutPlansAll,
     useWorkoutPrograms,
     useSwitchWorkoutPlan,
 } from "~/api/workout/queries";
+import { Field, Select } from "~/shared/ui";
 import { toast } from "~/composables/toast/useToast";
 
 const props = defineProps<{
@@ -16,7 +17,7 @@ const props = defineProps<{
 
 const plansQuery = useWorkoutPlansAll();
 const programsQuery = useWorkoutPrograms();
-const switchPlanMutation = useSwitchWorkoutPlan(() => props.dayOffset);
+const switchPlanMutation = useSwitchWorkoutPlan();
 
 const planGroups = computed(() => {
     const plans = plansQuery.data.value?.plans ?? [];
@@ -45,68 +46,38 @@ const planSelectValue = computed(() => {
 
 const switchingPlan = computed(() => switchPlanMutation.isPending.value);
 
-const handleSwitchPlan = async (e: Event) => {
-    const v = (e.target as HTMLSelectElement).value;
+const planOptions = computed(() => [
+    { label: "No plan", value: "" },
+    ...planGroups.value.flatMap((group) =>
+        group.plans.map((plan) => ({ label: plan.name, value: String(plan.ID), group: group.name })),
+    ),
+]);
+
+const handleSwitchPlan = async (v: string) => {
     const planId = v === "" ? null : Number(v);
     if (planId === props.currentPlanId) return;
     try {
-        await switchPlanMutation.mutateAsync(planId);
+        await switchPlanMutation.mutateAsync({ date: offsetToDate(props.dayOffset), planId });
         toast.push("Workout plan updated", "success");
         props.onResolve?.(true);
-    } catch (err: unknown) {
-        let msg = "Failed to switch plan";
-        if (
-            axios.isAxiosError(err) &&
-            err.response?.data &&
-            typeof err.response.data === "object" &&
-            "error" in err.response.data
-        ) {
-            const e0 = (err.response.data as { error?: string }).error;
-            if (e0) msg = e0;
-        } else if (err instanceof Error) {
-            msg = err.message;
-        }
-        toast.push(msg, "error");
+    } catch {
+        // The mutation already showed the error toast.
     }
 };
 </script>
 <template>
     <div class="flex flex-col gap-2">
-        <label
-            for="gym-plan-switch"
-            class="text-xs font-medium uppercase tracking-wide text-textSecondary"
-            >Today's plan</label
-        >
-        <select
-            v-if="planGroups.length"
-            id="gym-plan-switch"
-            class="w-full rounded-md border border-(--color-border) bg-firstBg px-3 py-2 text-sm text-textPrimary transition-colors hover:bg-secondBg disabled:opacity-50"
-            :value="planSelectValue"
-            :disabled="switchingPlan"
-            @change="handleSwitchPlan"
-        >
-            <option value="">No plan</option>
-            <optgroup
-                v-for="group in planGroups"
-                :key="group.id"
-                :label="group.name"
-            >
-                <option
-                    v-for="plan in group.plans"
-                    :key="plan.ID"
-                    :value="String(plan.ID)"
-                >
-                    {{ plan.name }}
-                </option>
-            </optgroup>
-        </select>
-        <p v-else class="m-0 text-sm text-textSecondary">
+        <Field v-if="planGroups.length" label="Today's plan">
+            <Select
+                :model-value="planSelectValue"
+                :options="planOptions"
+                :disabled="switchingPlan"
+                @update:model-value="handleSwitchPlan"
+            />
+        </Field>
+        <p v-else class="m-0 text-sm text-fg-muted">
             No plans yet.
-            <router-link
-                :to="{ name: 'gym-plans' }"
-                class="text-textPrimary underline underline-offset-2 hover:no-underline"
-                >Create one</router-link
-            >
+            <router-link :to="{ name: 'gym-plans' }" class="text-fg underline underline-offset-2 hover:no-underline">Create one</router-link>
         </p>
     </div>
 </template>

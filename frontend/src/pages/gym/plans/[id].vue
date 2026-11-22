@@ -1,526 +1,467 @@
 <script setup lang="ts">
-import { getApiErrorMessage } from "~/api/httpError";
-import type { WorkoutPlan, Exercise } from "~/types/workout";
-import { toast } from "~/composables/toast/useToast";
-import { dialogManager } from "~/composables/dialog/useDialog";
-import AddExerciseDialog from "~/pages/gym/plans/components/AddExerciseDialog.vue";
-import CreateExerciseForPlanDialog from "~/pages/gym/plans/components/CreateExerciseForPlanDialog.vue";
-import EditExerciseDialog from "~/pages/gym/plans/components/EditExerciseDialog.vue";
-import MobilityItemEditor from "~/pages/gym/plans/components/MobilityItemEditor.vue";
-import { X, Plus, ChevronUp, ChevronDown, Pencil } from "lucide-vue-next";
 import { computed, ref, watch } from "vue";
-import { useRoute } from "vue-router";
-import { apiClient, apiPUT } from "~/api/client";
-import { useWorkoutPlansAll } from "~/api/workout/queries";
+import { useRoute, useRouter } from "vue-router";
+import { useQueryClient } from "@tanstack/vue-query";
+import { ArrowDown, ArrowUp, Dumbbell, Ellipsis, GripVertical, Pencil, Plus, SearchX, Trash2, X } from "lucide-vue-next";
+import { getApiErrorMessage } from "~/api/httpError";
+import { workoutKeys } from "~/api/workout/keys";
+import { useOnline } from "~/api/online";
+import { useWorkoutPrograms } from "~/api/workout/queries";
+import {
+    useAddRoutineExercise,
+    useAssignPlanDay,
+    useUnassignPlanDay,
+    useDeleteRoutine,
+    useRemoveRoutineExercise,
+    useReorderRoutineExercises,
+    useRenameRoutine,
+    useRestoreRoutine,
+    useSetRoutineCardio,
+    useSetRoutineMobility,
+} from "~/api/workout/routines";
+import { dialogManager } from "~/composables/dialog/useDialog";
+import { toast } from "~/composables/toast/useToast";
+import type { Exercise } from "~/types/workout";
+import {
+    Button,
+    Card,
+    EmptyState,
+    ErrorState,
+    IconButton,
+    Input,
+    List,
+    ListRow,
+    Menu,
+    NumberField,
+    PageHeader,
+    Skeleton,
+    SkeletonList,
+    useDelayedFlag,
+    useIsDesktop,
+} from "~/shared/ui";
+import type { MenuItem } from "~/shared/ui";
+import AddExerciseDialog from "./components/AddExerciseDialog.vue";
+import EditExerciseDialog from "./components/EditExerciseDialog.vue";
+import NameDialog from "./components/NameDialog.vue";
+import RoutineItemList from "./components/RoutineItemList.vue";
+import RoutineStep from "./components/RoutineStep.vue";
+import {
+    type DayToggle,
+    cardioChanged,
+    dayToggles,
+    findRoutine,
+    formatDays,
+    moveItem,
+    normaliseCardio,
+    otherDaysLine,
+    parseId,
+    routineMeta,
+} from "./domain/routine";
+import { plural } from "./domain/week";
+
+// One routine (a day of a program), laid out in session order: warmup, lifts, cardio, stretch.
+// Everything saves as you go; deleting the routine can be undone from the toast.
 
 const route = useRoute();
+const router = useRouter();
+const queryClient = useQueryClient();
+const isDesktop = useIsDesktop();
 
-const { data, isPending, refetch } = useWorkoutPlansAll();
+// --- data -------------------------------------------------------------------------------------
+const { data, isPending, isError, error, refetch } = useWorkoutPrograms();
+const showSkeleton = useDelayedFlag(() => isPending.value);
 
-const plans = computed(() => data.value?.plans || []);
-const refresh = () => refetch();
+const planId = computed(() => parseId(route.params.id));
+const programId = computed(() => parseId(route.params.programId));
+const found = computed(() => findRoutine(data.value?.programs ?? [], programId.value, planId.value));
+const plan = computed(() => found.value?.plan ?? null);
+const program = computed(() => found.value?.program ?? null);
+const toggles = computed(() => (plan.value && program.value ? dayToggles(plan.value, program.value.plans) : []));
+const otherDays = computed(() => otherDaysLine(toggles.value));
 
-const planIdParam = computed(() => {
-    const raw = route.params.id;
-    const n = typeof raw === "string" ? Number.parseInt(raw, 10) : NaN;
-    return Number.isFinite(n) ? n : null;
-});
+const failToast = (what: string, err: unknown) =>
+    toast.push(`${what}: ${getApiErrorMessage(err, "Something went wrong")}`, "error");
+const refreshPrograms = () => queryClient.invalidateQueries({ queryKey: workoutKeys.programs });
 
-const plan = computed(() => {
-    const id = planIdParam.value;
-    if (id === null) return null;
-    return plans.value.find((p) => p.ID === id) ?? null;
-});
-
-const dayNames = [
-    "Sunday",
-    "Monday",
-    "Tuesday",
-    "Wednesday",
-    "Thursday",
-    "Friday",
-    "Saturday",
-];
-
-const getDayName = (dayOfWeek: number | null): string => {
-    if (dayOfWeek === null) return "Unassigned";
-    return dayNames[dayOfWeek] ?? "Unknown";
+// Quiet per-step save state ("Saving…" then "Saved" for a moment), shown in the step heading.
+type StepKey = "warmup" | "cardio" | "stretch";
+const saveState = ref<Partial<Record<StepKey, "saving" | "saved">>>({});
+const savedTimers: Partial<Record<StepKey, ReturnType<typeof setTimeout>>> = {};
+const saveSeq: Partial<Record<StepKey, number>> = {};
+const setStepState = (step: StepKey, state: "saving" | "saved" | undefined) => {
+    saveState.value = { ...saveState.value, [step]: state };
+};
+/**
+ * The edit is already on screen (optimistic). "Saving…" until the server answers, then "Saved" for a
+ * moment. A failure clears the label (the helper rolls back and toasts). Only the latest save per step
+ * drives the label.
+ */
+function saving(step: StepKey, run: () => Promise<unknown>) {
+    clearTimeout(savedTimers[step]);
+    const seq = (saveSeq[step] ?? 0) + 1;
+    saveSeq[step] = seq;
+    setStepState(step, "saving");
+    run().then(
+        () => {
+            if (saveSeq[step] !== seq) return;
+            setStepState(step, "saved");
+            savedTimers[step] = setTimeout(() => setStepState(step, undefined), 2000);
+        },
+        () => {
+            if (saveSeq[step] === seq) setStepState(step, undefined);
+        },
+    );
+}
+// Offline the save is queued (paused), not slow: say so instead of an endless "Saving…".
+const online = useOnline();
+const stepMeta = (step: StepKey, fallback: string) => {
+    const s = saveState.value[step];
+    if (s === "saving") return online.value ? "Saving…" : "Waiting for connection";
+    return s === "saved" ? "Saved" : fallback;
 };
 
-const assignedDays = (p: WorkoutPlan): number[] =>
-    p.assigned_days ?? (p.day_of_week === null ? [] : [p.day_of_week]);
+// --- header: rename / delete --------------------------------------------------------------------
+const renameRoutine = useRenameRoutine();
+const deleteRoutine = useDeleteRoutine();
+const restoreRoutine = useRestoreRoutine();
+const renameOpen = ref(false);
 
-const plannedCardioInput = ref("");
-const plannedCardioMinutesInput = ref<number | null>(null);
-const dynamicWarmupItems = ref<string[]>([]);
-const staticStretchingItems = ref<string[]>([]);
-const mobilitySaving = ref(false);
+const routineMenu: MenuItem[] = [
+    { key: "rename", label: "Rename", icon: Pencil },
+    { key: "delete", label: "Delete routine", icon: Trash2, tone: "danger" },
+];
+const onRoutineMenu = (key: string) => {
+    if (key === "rename") renameOpen.value = true;
+    if (key === "delete") void removeRoutine();
+};
+
+const onRename = (name: string) => {
+    const p = plan.value;
+    if (!p) return;
+    renameRoutine.mutate({ planId: p.ID, name });
+    renameOpen.value = false;
+};
+
+/** Soft delete, leave for the schedule, and offer Undo (restore, then come back here). */
+const removeRoutine = async () => {
+    const p = plan.value;
+    const prog = program.value;
+    if (!p || !prog) return;
+    const back = { name: "gym-program-day-detail", params: { programId: String(prog.ID), id: String(p.ID) } };
+    try {
+        await deleteRoutine.mutateAsync(p.ID);
+    } catch (err) {
+        failToast("Couldn't delete the routine", err);
+        return;
+    }
+    await router.push({ name: "gym-plans", query: { program: String(prog.ID) } });
+    toast.push({
+        message: `Deleted ${p.name}`,
+        action: {
+            label: "Undo",
+            onClick: () => {
+                restoreRoutine
+                    .mutateAsync(p.ID)
+                    .then(() => router.push(back))
+                    .catch((err: unknown) => failToast(`Couldn't restore ${p.name}`, err));
+            },
+        },
+    });
+};
+
+// --- days ---------------------------------------------------------------------------------------
+const assign = useAssignPlanDay();
+const unassign = useUnassignPlanDay();
+
+const toggleDay = async (t: DayToggle) => {
+    const p = plan.value;
+    if (!p) return;
+    if (!t.on && t.takenBy) {
+        const ok = await dialogManager.confirm({
+            title: `Move ${t.name} to ${p.name}?`,
+            message: `${t.name} is ${t.takenBy.name} now. ${t.takenBy.name} keeps its other days.`,
+            confirmText: `Move to ${p.name}`,
+            cancelText: "Cancel",
+        });
+        if (!ok) return;
+    }
+    if (t.on) unassign.mutate({ planId: p.ID, dayOfWeek: t.dow });
+    else assign.mutate({ planId: p.ID, dayOfWeek: t.dow });
+};
+
+// --- warmup / stretch ---------------------------------------------------------------------------
+const setMobility = useSetRoutineMobility();
+const saveMobility = (step: "warmup" | "stretch", items: string[]) => {
+    const p = plan.value;
+    if (!p) return;
+    const pre = step === "warmup" ? items : (p.pre_mobility_items ?? []);
+    const post = step === "stretch" ? items : (p.post_mobility_items ?? []);
+    saving(step, () => setMobility.mutateAsync({ planId: p.ID, pre, post }));
+};
+
+const stretchCount = (n: number) => `${n} ${n === 1 ? "stretch" : "stretches"}`;
+
+// --- cardio (saved when focus leaves the fields, or on Enter) ----------------------------------
+const setCardio = useSetRoutineCardio();
+const cardioType = ref("");
+const cardioMinutes = ref<number | null>(null);
 watch(
-    plan,
-    (p) => {
-        plannedCardioInput.value = p?.planned_cardio_type?.trim() ?? "";
-        plannedCardioMinutesInput.value = p?.planned_cardio_minutes ?? null;
-        dynamicWarmupItems.value = [...(p?.pre_mobility_items ?? [])];
-        staticStretchingItems.value = [...(p?.post_mobility_items ?? [])];
+    () => [plan.value?.ID, plan.value?.planned_cardio_type, plan.value?.planned_cardio_minutes] as const,
+    ([, type, minutes]) => {
+        cardioType.value = type?.trim() ?? "";
+        cardioMinutes.value = minutes || null;
     },
     { immediate: true },
 );
-
-const savePlannedCardio = async () => {
+const cardioBox = ref<HTMLElement | null>(null);
+const saveCardio = () => {
     const p = plan.value;
     if (!p) return;
-    try {
-        await apiPUT(`workout/plans/${p.ID}/planned-cardio`, {
-            type: plannedCardioInput.value.trim(),
-            minutes: Math.max(
-                0,
-                Math.round(Number(plannedCardioMinutesInput.value) || 0),
-            ),
-        });
-        toast.push("Planned cardio saved", "success");
-        await refresh();
-    } catch (err: unknown) {
-        const message = getApiErrorMessage(err, "Something went wrong");
-        toast.push("Failed to save planned cardio: " + message, "error");
-    }
+    const next = normaliseCardio(cardioType.value, cardioMinutes.value);
+    if (!cardioChanged(p, next)) return;
+    saving("cardio", () => setCardio.mutateAsync({ planId: p.ID, ...next }));
+};
+const onCardioFocusOut = (e: FocusEvent) => {
+    if (cardioBox.value?.contains(e.relatedTarget as Node | null)) return;
+    saveCardio();
 };
 
-const savePlannedMobility = async () => {
-    const p = plan.value;
-    if (!p || mobilitySaving.value) return;
-    mobilitySaving.value = true;
-    try {
-        await apiPUT(`workout/plans/${p.ID}/planned-mobility`, {
-            pre_mobility_items: dynamicWarmupItems.value,
-            post_mobility_items: staticStretchingItems.value,
-        });
-        toast.push("Mobility plan saved", "success");
-        await refresh();
-    } catch (err: unknown) {
-        const message = getApiErrorMessage(err, "Something went wrong");
-        toast.push("Failed to save mobility plan: " + message, "error");
-    } finally {
-        mobilitySaving.value = false;
-    }
-};
+// --- exercises ------------------------------------------------------------------------------------
+const reorder = useReorderRoutineExercises();
+const removeExercise = useRemoveRoutineExercise();
+const addExercise = useAddRoutineExercise();
+const exercises = computed(() => plan.value?.exercises ?? []);
 
-const isDayAssigned = (
-    dayOfWeek: number,
-    currentPlan: WorkoutPlan,
-): boolean => {
-    return plans.value.some(
-        (p) => p.ID !== currentPlan.ID && assignedDays(p).includes(dayOfWeek),
-    );
-};
-
-const getAssignedPlanName = (
-    dayOfWeek: number,
-    currentPlan: WorkoutPlan,
-): string => {
-    const assignedPlan = plans.value.find(
-        (p) => p.ID !== currentPlan.ID && assignedDays(p).includes(dayOfWeek),
-    );
-    return assignedPlan?.name || "Assigned";
-};
-
-const removeExerciseFromPlan = async (p: WorkoutPlan, exercise: Exercise) => {
-    try {
-        await apiClient.delete(`workout/plans/${p.ID}/exercises/remove`, {
-            data: { exercise_id: exercise.ID },
-        });
-        toast.push(`Removed ${exercise.name} from ${p.name}`, "success");
-        await refresh();
-    } catch (err: unknown) {
-        const message = getApiErrorMessage(err, "Something went wrong");
-        toast.push("Failed to remove exercise: " + message, "error");
-    }
-};
-
-const openAddExerciseToPlanDialog = () => {
+const move = (from: number, to: number) => {
     const p = plan.value;
     if (!p) return;
-    dialogManager
-        .custom<boolean>({
-            title: `Add exercise to ${p.name}`,
-            component: AddExerciseDialog,
-            componentProps: {
-                plan: p,
-            },
-        })
-        .then((result) => {
-            if (result !== null) {
-                refresh();
-            }
+    const next = moveItem(p.exercises, from, to);
+    if (next === p.exercises) return;
+    reorder.mutate({ planId: p.ID, exerciseIds: next.map((e) => e.ID) });
+};
+
+/**
+ * Remove now, with Undo straight away (not on success: offline the request waits, and per-call
+ * callbacks only fire for the latest call). Undo queues behind the remove (same routine scope) and
+ * puts the exercise back in its place. A failed remove rolls back with its own toast.
+ */
+const remove = (exercise: Exercise) => {
+    const p = plan.value;
+    if (!p) return;
+    const index = p.exercises.findIndex((e) => e.ID === exercise.ID);
+    removeExercise.mutate({ planId: p.ID, exerciseId: exercise.ID });
+    toast.push({
+        message: `Removed ${exercise.name}`,
+        action: {
+            label: "Undo",
+            onClick: () => addExercise.mutate({ planId: p.ID, exercise, index }),
+        },
+    });
+};
+
+const openAdd = () => {
+    const p = plan.value;
+    if (!p) return;
+    void dialogManager
+        .custom<boolean>({ title: `Add to ${p.name}`, component: AddExerciseDialog, componentProps: { plan: p } });
+};
+const openEdit = (exercise: Exercise) => {
+    void dialogManager
+        .custom<boolean>({ title: `Edit ${exercise.name}`, component: EditExerciseDialog, componentProps: { exercise } })
+        .then((ok) => {
+            if (ok) void refreshPrograms();
         });
 };
 
-const openCreateExerciseDialog = () => {
-    dialogManager
-        .custom<boolean>({
-            title: "Create exercise",
-            component: CreateExerciseForPlanDialog,
-        })
-        .then((result) => {
-            if (result !== null) {
-                refresh();
-            }
-        });
+const rowMenu = (index: number): MenuItem[] => [
+    { key: "edit", label: "Edit exercise", icon: Pencil },
+    { key: "up", label: "Move up", icon: ArrowUp, disabled: index === 0 },
+    { key: "down", label: "Move down", icon: ArrowDown, disabled: index === exercises.value.length - 1 },
+    { key: "remove", label: "Remove from routine", icon: X, tone: "danger" },
+];
+const onRowMenu = (key: string, exercise: Exercise, index: number) => {
+    if (key === "edit") openEdit(exercise);
+    if (key === "up") void move(index, index - 1);
+    if (key === "down") void move(index, index + 1);
+    if (key === "remove") void remove(exercise);
 };
 
-const openEditExerciseDialog = (exercise: Exercise) => {
-    dialogManager
-        .custom<boolean>({
-            title: `Edit ${exercise.name}`,
-            component: EditExerciseDialog,
-            componentProps: { exercise },
-        })
-        .then((result) => {
-            if (result !== null) {
-                refresh();
-            }
-        });
-};
-
-const handleDayChange = async (p: WorkoutPlan, event: Event) => {
-    const select = event.target as HTMLSelectElement;
-    const day = parseInt(select.value);
-    const currentDays = assignedDays(p);
-
-    if (isNaN(day)) {
-        select.value = "";
-        return;
-    }
-    if (currentDays.includes(day)) {
-        select.value = "";
-        return;
-    }
-
-    const currentlyAssignedPlan = plans.value.find(
-        (x) => x.ID !== p.ID && assignedDays(x).includes(day),
-    );
-
-    if (currentlyAssignedPlan) {
-        const confirmed = await dialogManager.confirm({
-            title: "Day Already Assigned",
-            message:
-                dayNames[day] +
-                ' is currently assigned to "' +
-                currentlyAssignedPlan.name +
-                '". Assigning "' +
-                p.name +
-                '" will unassign "' +
-                currentlyAssignedPlan.name +
-                '". Continue?',
-            confirmText: "Yes, Reassign",
-            cancelText: "Cancel",
-        });
-
-        if (!confirmed) {
-            select.value = "";
-            return;
-        }
-    }
-
-    await assignPlanToDay(p, day);
-    select.value = "";
-};
-
-const assignPlanToDay = async (p: WorkoutPlan, dayOfWeek: number) => {
-    try {
-        await apiClient.post<{ plan: WorkoutPlan }>(
-            `workout/plans/${p.ID}/assign-day`,
-            {
-                day_of_week: dayOfWeek,
-            },
-        );
-        toast.push(`Assigned ${p.name} to ${dayNames[dayOfWeek]}`, "success");
-        await refresh();
-    } catch (err: unknown) {
-        const message = getApiErrorMessage(err, "Something went wrong");
-        toast.push("Failed to assign day: " + message, "error");
+// Drag to reorder (desktop; the row menu covers keyboard and touch).
+const dragFrom = ref<number | null>(null);
+const dragOver = ref<number | null>(null);
+const onDragStart = (e: DragEvent, index: number) => {
+    dragFrom.value = index;
+    if (e.dataTransfer) {
+        e.dataTransfer.effectAllowed = "move";
+        e.dataTransfer.setData("text/plain", String(index));
     }
 };
-
-const unassignPlanFromDay = async (p: WorkoutPlan, dayOfWeek: number) => {
-    try {
-        await apiClient.delete<{ plan: WorkoutPlan }>(
-            `workout/plans/${p.ID}/assign-day`,
-            { params: { day_of_week: dayOfWeek } },
-        );
-        toast.push(
-            `Unassigned ${p.name} from ${getDayName(dayOfWeek)}`,
-            "success",
-        );
-        await refresh();
-    } catch (err: unknown) {
-        const message = getApiErrorMessage(err, "Something went wrong");
-        toast.push("Failed to unassign day: " + message, "error");
-    }
+const onDragOver = (e: DragEvent, index: number) => {
+    if (dragFrom.value === null) return;
+    e.preventDefault();
+    dragOver.value = index;
 };
-
-const moveExerciseInPlan = async (
-    p: WorkoutPlan,
-    index: number,
-    delta: number,
-) => {
-    const list = p.exercises;
-    const next = index + delta;
-    if (next < 0 || next >= list.length) return;
-    const reordered = [...list];
-    const a = reordered[index];
-    const b = reordered[next];
-    if (a === undefined || b === undefined) return;
-    reordered[index] = b;
-    reordered[next] = a;
-    try {
-        await apiPUT(`workout/plans/${p.ID}/exercises/reorder`, {
-            exercise_ids: reordered.map((e) => e.ID),
-        });
-        toast.push("Exercise order updated", "success");
-        await refresh();
-    } catch (err: unknown) {
-        const message = getApiErrorMessage(err, "Something went wrong");
-        toast.push("Failed to reorder: " + message, "error");
-    }
+const onDragEnd = () => {
+    dragFrom.value = null;
+    dragOver.value = null;
+};
+const onDrop = (index: number) => {
+    const from = dragFrom.value;
+    onDragEnd();
+    if (from !== null) void move(from, index);
 };
 </script>
 
 <template>
-    <div class="flex w-full max-w-3xl flex-col gap-4 pb-8 pt-2">
-        <div class="flex flex-wrap items-center gap-3">
-            <span
-                v-if="plan"
-                class="text-xs font-medium uppercase tracking-wide text-textSecondary"
-                >Configure plan</span
-            >
-        </div>
-        <div v-if="isPending" class="text-center text-sm text-textSecondary">
-            Loading…
-        </div>
-        <div
-            v-else-if="planIdParam === null"
-            class="rounded-lg border border-(--color-border) bg-firstBg p-6 text-center text-sm text-textSecondary"
+    <div class="flex w-full max-w-3xl flex-col gap-6 pb-8 pt-2">
+        <ErrorState v-if="isError" :error="error" title="Couldn't load this routine" @retry="refetch()" />
+
+        <template v-else-if="isPending">
+            <div v-if="showSkeleton" class="flex flex-col gap-6" role="status" aria-busy="true">
+                <Skeleton height="2.5rem" width="12rem" />
+                <Skeleton height="2.75rem" />
+                <SkeletonList :rows="4" :leading="false" />
+            </div>
+        </template>
+
+        <EmptyState
+            v-else-if="!plan || !program"
+            :icon="SearchX"
+            :title="planId === null ? 'Invalid routine link' : 'Routine not found'"
+            description="It may have been deleted."
         >
-            Invalid plan link.
-            <router-link
-                :to="{ name: 'gym-plans' }"
-                class="text-textPrimary underline underline-offset-2 hover:no-underline"
-                >Back to schedule</router-link
-            >
-        </div>
-        <div
-            v-else-if="!plan"
-            class="rounded-lg border border-(--color-border) bg-firstBg p-6 text-center text-sm text-textSecondary"
-        >
-            Plan not found.
-            <router-link
-                :to="{ name: 'gym-plans' }"
-                class="text-textPrimary underline underline-offset-2 hover:no-underline"
-                >Back to schedule</router-link
-            >
-        </div>
+            <template #action>
+                <Button :to="{ name: 'gym-plans' }">Back to schedule</Button>
+            </template>
+        </EmptyState>
+
         <template v-else>
-            <div
-                class="flex flex-col gap-2 border-b border-(--color-border) pb-3"
-            >
-                <h1
-                    class="m-0 text-xl font-semibold tracking-tight text-textPrimary"
-                >
-                    {{ plan.name }}
-                </h1>
-                <div class="flex flex-wrap items-center gap-2">
-                    <span
-                        v-if="assignedDays(plan).length"
-                        class="rounded-md bg-secondBg px-2 py-0.5 text-xs font-medium text-textPrimary"
-                        >{{
-                            assignedDays(plan).map(getDayName).join(", ")
-                        }}</span
-                    >
-                    <span
-                        v-else
-                        class="rounded-md bg-thirdBg/60 px-2 py-0.5 text-xs font-medium text-textSecondary"
-                        >Not Assigned to a Day</span
-                    >
+            <PageHeader :title="plan.name" inline>
+                <template #meta>{{ routineMeta(program, plan) }}</template>
+                <template #actions>
+                    <Menu :items="routineMenu" align="end" @select="onRoutineMenu">
+                        <IconButton label="Routine actions"><Ellipsis /></IconButton>
+                    </Menu>
+                </template>
+            </PageHeader>
+
+            <!-- Days: which weekdays this routine is on. -->
+            <section aria-labelledby="routine-days" class="flex flex-col gap-2">
+                <div class="flex items-baseline justify-between gap-3">
+                    <h2 id="routine-days" class="m-0 text-sm font-medium text-fg-muted">Days</h2>
+                    <span class="text-sm text-fg-muted">{{ formatDays(toggles) }}</span>
                 </div>
-            </div>
-            <div class="flex flex-wrap gap-2">
-                <button
-                    type="button"
-                    class="inline-flex items-center gap-1.5 rounded-md bg-secondBg px-3 py-2 text-sm font-medium text-textPrimary transition-colors hover:bg-thirdBg disabled:opacity-50"
-                    @click="openAddExerciseToPlanDialog"
-                >
-                    <Plus class="size-4 shrink-0" />
-                    Add Exercise to plan
-                </button>
-                <button
-                    type="button"
-                    class="inline-flex items-center gap-1.5 rounded-md border border-(--color-border) bg-firstBg px-3 py-2 text-sm font-medium text-textPrimary transition-colors hover:bg-secondBg disabled:opacity-50"
-                    @click="openCreateExerciseDialog"
-                >
-                    <Plus class="size-4 shrink-0" />
-                    Create exercise
-                </button>
-            </div>
-            <section
-                class="rounded-lg border border-(--color-border) bg-firstBg p-4"
-            >
-                <label
-                    class="mb-2 block text-xs font-medium uppercase tracking-wide text-textSecondary"
-                    >Assign to day</label
-                >
-                <div class="flex flex-wrap gap-2">
-                    <select
-                        value=""
-                        class="min-w-48 flex-1 rounded-md border border-(--color-border) bg-firstBg px-3 py-2 text-sm text-textPrimary transition-colors hover:bg-secondBg focus:outline-none focus:ring-2 focus:ring-(--color-cf-red)/40"
-                        @change="handleDayChange(plan, $event)"
+                <div class="grid grid-cols-7 gap-1 lg:flex lg:gap-2">
+                    <Button
+                        v-for="t in toggles"
+                        :key="t.dow"
+                        size="sm"
+                        :variant="t.on ? 'secondary' : 'ghost'"
+                        :aria-pressed="t.on"
+                        :aria-label="t.takenBy && !t.on ? `${t.name} (${t.takenBy.name})` : t.name"
+                        :title="t.takenBy && !t.on ? `${t.name}: ${t.takenBy.name}` : t.name"
+                        class="px-0 aria-pressed:border-accent aria-pressed:text-accent lg:w-14"
+                        @click="toggleDay(t)"
                     >
-                        <option value="">— Select day —</option>
-                        <option
-                            v-for="(dayName, index) in dayNames"
-                            :key="index"
-                            :value="index"
-                        >
-                            {{ dayName
-                            }}{{
-                                isDayAssigned(index, plan)
-                                    ? ` (${getAssignedPlanName(index, plan)})`
-                                    : ""
-                            }}
-                        </option>
-                    </select>
-                    <button
-                        v-for="day in assignedDays(plan)"
-                        :key="day"
-                        type="button"
-                        class="inline-flex items-center gap-1 rounded-md border border-(--color-border) bg-secondBg px-3 py-2 text-sm font-medium text-textPrimary transition-colors hover:bg-thirdBg"
-                        @click="unassignPlanFromDay(plan, day)"
-                    >
-                        {{ getDayName(day) }}
-                        <X class="size-3.5" />
-                    </button>
+                        {{ t.short }}
+                    </Button>
                 </div>
+                <p v-if="otherDays" class="m-0 text-xs text-fg-subtle">Other routines: {{ otherDays }}</p>
             </section>
-            <section
-                class="rounded-lg border border-(--color-border) bg-firstBg p-4"
-            >
-                <label
-                    class="mb-2 block text-xs font-medium uppercase tracking-wide text-textSecondary"
-                    >Planned cardio</label
+
+            <!-- The session, in order. -->
+            <div class="flex flex-col">
+                <RoutineStep
+                    :step="1"
+                    title="Warmup"
+                    :meta="stepMeta('warmup', plural((plan.pre_mobility_items ?? []).length, 'move'))"
                 >
-                <div class="flex flex-wrap gap-2">
-                    <input
-                        v-model="plannedCardioInput"
-                        type="text"
-                        class="min-w-0 flex-1 rounded-md border border-(--color-border) bg-firstBg px-3 py-2 text-sm text-textPrimary placeholder:text-textSecondary/60 hover:bg-secondBg focus:outline-none focus:ring-2 focus:ring-(--color-cf-red)/40"
-                        placeholder="e.g. Bike, Run"
+                    <RoutineItemList
+                        :items="plan.pre_mobility_items ?? []"
+                        label="warmup"
+                        placeholder="Add a warmup move…"
+                        @change="saveMobility('warmup', $event)"
                     />
-                    <input
-                        v-model.number="plannedCardioMinutesInput"
-                        type="number"
-                        min="0"
-                        step="1"
-                        class="w-28 rounded-md border border-(--color-border) bg-firstBg px-3 py-2 text-sm text-textPrimary placeholder:text-textSecondary/60 hover:bg-secondBg focus:outline-none focus:ring-2 focus:ring-(--color-cf-red)/40"
-                        placeholder="Minutes"
-                        aria-label="Planned cardio minutes"
-                    />
-                    <button
-                        type="button"
-                        class="rounded-md bg-secondBg px-3 py-2 text-sm font-medium text-textPrimary transition-colors hover:bg-thirdBg"
-                        @click="savePlannedCardio"
-                    >
-                        Save
-                    </button>
-                </div>
-            </section>
-            <div class="flex flex-col gap-3">
-                <MobilityItemEditor
-                    v-model="dynamicWarmupItems"
-                    title="Dynamic warmup"
-                    description="Movements to complete before the workout."
-                    placeholder="Add a warmup movement…"
-                />
-                <MobilityItemEditor
-                    v-model="staticStretchingItems"
-                    title="Static stretching"
-                    description="Stretches to complete after the workout."
-                    placeholder="Add a stretch…"
-                />
-                <button
-                    type="button"
-                    class="self-end rounded-md bg-secondBg px-4 py-2 text-sm font-medium text-textPrimary transition-colors hover:bg-thirdBg disabled:cursor-not-allowed disabled:opacity-50"
-                    :disabled="mobilitySaving"
-                    @click="savePlannedMobility"
+                </RoutineStep>
+
+                <RoutineStep :step="2" title="Lifts" :meta="plural(exercises.length, 'exercise')">
+                    <template #actions>
+                        <Button variant="primary" size="sm" class="max-lg:hidden" @click="openAdd">
+                            <template #icon-left><Plus class="size-4" /></template>
+                            Add exercise
+                        </Button>
+                    </template>
+                    <Card padding="none">
+                        <List v-if="exercises.length">
+                            <ListRow
+                                v-for="(exercise, index) in exercises"
+                                :key="exercise.ID"
+                                :draggable="isDesktop ? 'true' : 'false'"
+                                :class="[
+                                    dragFrom === index ? 'opacity-60' : '',
+                                    dragOver === index && dragFrom !== index ? 'bg-surface-2' : '',
+                                ]"
+                                @click="openEdit(exercise)"
+                                @dragstart="onDragStart($event, index)"
+                                @dragover="onDragOver($event, index)"
+                                @drop.prevent="onDrop(index)"
+                                @dragend="onDragEnd"
+                            >
+                                <template #leading>
+                                    <GripVertical class="hidden size-4 cursor-grab text-fg-subtle lg:block" aria-hidden="true" />
+                                    <span class="w-5 text-right text-sm text-fg-muted tabular-nums">{{ index + 1 }}</span>
+                                </template>
+                                {{ exercise.name }}
+                                <template #end>
+                                    <Menu :items="rowMenu(index)" align="end" @select="onRowMenu($event, exercise, index)">
+                                        <IconButton :label="`${exercise.name} actions`" size="sm"><Ellipsis /></IconButton>
+                                    </Menu>
+                                </template>
+                            </ListRow>
+                        </List>
+                        <EmptyState v-else :icon="Dumbbell" title="No lifts yet" description="Add the exercises for this routine, in the order you do them." />
+                    </Card>
+                    <Button variant="primary" block class="lg:hidden" @click="openAdd">
+                        <template #icon-left><Plus class="size-4" /></template>
+                        Add exercise
+                    </Button>
+                </RoutineStep>
+
+                <RoutineStep :step="3" title="Cardio" :meta="stepMeta('cardio', 'Optional')">
+                    <form ref="cardioBox" class="flex gap-2" @submit.prevent="saveCardio" @focusout="onCardioFocusOut">
+                        <div class="min-w-0 flex-1">
+                            <Input v-model="cardioType" aria-label="Cardio type" placeholder="e.g. Bike, Run" autocomplete="off" />
+                        </div>
+                        <div class="w-36">
+                            <NumberField v-model="cardioMinutes" label="cardio minutes" unit="min" :min="0" :step="5" :decimals="0" />
+                        </div>
+                    </form>
+                </RoutineStep>
+
+                <RoutineStep
+                    :step="4"
+                    title="Stretch"
+                    :meta="stepMeta('stretch', stretchCount(plan.post_mobility_items?.length ?? 0))"
+                    last
                 >
-                    {{ mobilitySaving ? "Saving…" : "Save mobility" }}
-                </button>
+                    <RoutineItemList
+                        :items="plan.post_mobility_items ?? []"
+                        label="stretch"
+                        placeholder="Add a stretch…"
+                        @change="saveMobility('stretch', $event)"
+                    />
+                </RoutineStep>
             </div>
-            <section class="flex flex-col gap-2">
-                <h2 class="m-0 text-sm font-semibold text-textPrimary">
-                    Exercises
-                </h2>
-                <div class="flex flex-col gap-2">
-                    <div
-                        v-for="(exercise, exerciseIndex) in plan.exercises"
-                        :key="exercise.ID"
-                        class="flex items-center justify-between gap-2 rounded-md border border-(--color-border) bg-secondBg px-3 py-2"
-                    >
-                        <div class="flex min-w-0 flex-1 items-center gap-2">
-                            <button
-                                type="button"
-                                class="shrink-0 rounded p-1 text-textSecondary transition-colors hover:bg-firstBg hover:text-textPrimary"
-                                title="Edit exercise"
-                                @click="openEditExerciseDialog(exercise)"
-                            >
-                                <Pencil class="size-3.5" />
-                            </button>
-                            <span
-                                class="min-w-0 truncate text-sm text-textPrimary"
-                                >{{ exercise.name }}</span
-                            >
-                        </div>
-                        <div class="flex shrink-0 items-center gap-0.5">
-                            <button
-                                type="button"
-                                class="rounded p-1 text-textSecondary transition-colors hover:bg-firstBg hover:text-textPrimary disabled:opacity-25"
-                                :disabled="exerciseIndex === 0"
-                                title="Move up"
-                                @click="
-                                    moveExerciseInPlan(plan, exerciseIndex, -1)
-                                "
-                            >
-                                <ChevronUp class="size-4" />
-                            </button>
-                            <button
-                                type="button"
-                                class="rounded p-1 text-textSecondary transition-colors hover:bg-firstBg hover:text-textPrimary disabled:opacity-25"
-                                :disabled="
-                                    exerciseIndex === plan.exercises.length - 1
-                                "
-                                title="Move down"
-                                @click="
-                                    moveExerciseInPlan(plan, exerciseIndex, 1)
-                                "
-                            >
-                                <ChevronDown class="size-4" />
-                            </button>
-                            <button
-                                type="button"
-                                class="rounded p-1 text-(--color-cf-red) transition-colors hover:bg-(--color-cf-red)/10"
-                                title="Remove"
-                                @click="removeExerciseFromPlan(plan, exercise)"
-                            >
-                                <X class="size-4" />
-                            </button>
-                        </div>
-                    </div>
-                    <div
-                        v-if="plan.exercises.length === 0"
-                        class="rounded-md border border-dashed border-(--color-border) py-6 text-center text-sm italic text-textSecondary"
-                    >
-                        No exercises in this plan
-                    </div>
-                </div>
-            </section>
+
+            <NameDialog
+                v-model:open="renameOpen"
+                title="Rename routine"
+                label="Routine name"
+                :initial="plan.name"
+                confirm-text="Rename"
+                :loading="renameRoutine.isPending.value"
+                @submit="onRename"
+            />
         </template>
     </div>
 </template>

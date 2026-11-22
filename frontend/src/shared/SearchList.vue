@@ -1,16 +1,19 @@
 <script setup lang="ts">
 import { searchListKeys } from "~/shared/searchListKeys";
-import { Plus, Loader } from "lucide-vue-next";
+import { Plus } from "lucide-vue-next";
 import { computed, nextTick, onMounted, ref, watch } from "vue";
 import type { Component } from "vue";
 import { useQuery } from "@tanstack/vue-query";
 import { apiClient } from "~/api/client";
 import { useListNavigation } from "~/composables/useListNavigation";
+import { EmptyState, ErrorState, Input, List, ListRow, SkeletonList, useDelayedFlag } from "~/shared/ui";
 
 const props = defineProps<{
     route: string;
     onSelect: (item: any) => Promise<boolean>;
     onCreate?: (name: string) => Promise<boolean>;
+    /** Verb for the create row, e.g. "Create and add". Defaults to "Create". */
+    createLabel?: string;
     displayComponent?: Component;
     prefilter?: any[];
     autoFocus?: boolean;
@@ -19,7 +22,7 @@ const props = defineProps<{
 }>();
 
 const search = ref("");
-const searchInput = ref<HTMLInputElement | null>(null);
+const searchInput = ref<{ $el: HTMLElement } | null>(null);
 const hasAutoFocused = ref(false);
 const itemsContainer = ref<HTMLElement | null>(null);
 const isHovering = ref(false);
@@ -27,18 +30,11 @@ const isFocused = ref(false);
 
 const excludedIds = computed(() => new Set(props.prefilter ?? []));
 
-const querySuffix = computed(() =>
-    props.prefilter?.length
-        ? "?" + props.prefilter.map((id) => `exclude=${id}`).join("&")
-        : "",
+const requestPath = computed(() =>
+    props.route.startsWith("/") ? props.route : `/${props.route}`,
 );
 
-const requestPath = computed(() => {
-    const base = props.route.startsWith("/") ? props.route : `/${props.route}`;
-    return `${base}${querySuffix.value}`;
-});
-
-const { data, isPending, error, refetch } = useQuery({
+const { data, isPending, isError, error, refetch } = useQuery({
     queryKey: computed(() =>
         props.queryKey !== undefined
             ? [...props.queryKey]
@@ -147,26 +143,19 @@ function onInputKeydown(e: KeyboardEvent) {
     }
     handleKey(e);
     nextTick(() => {
-        const el = itemsContainer.value?.querySelector(".item.active");
+        const el = itemsContainer.value?.querySelector("[aria-current=true]");
         el?.scrollIntoView({ block: "nearest" });
     });
 }
 
-const refresh = () => {
-    refetch();
-};
+const showSkeleton = useDelayedFlag(isPending);
 
 const focusSearchInput = () => {
-    if (
-        !props.autoFocus ||
-        hasAutoFocused.value ||
-        isPending.value ||
-        !searchInput.value
-    ) {
+    if (!props.autoFocus || hasAutoFocused.value || isPending.value || !searchInput.value) {
         return;
     }
     hasAutoFocused.value = true;
-    nextTick(() => searchInput.value?.focus());
+    nextTick(() => searchInput.value?.$el.querySelector("input")?.focus());
 };
 
 onMounted(focusSearchInput);
@@ -176,170 +165,48 @@ watch(isPending, (pending) => {
 </script>
 
 <template>
-    <div v-if="error" class="search-container">
-        <span class="error-message">Failed to Load Saved Meals</span>
-        <button @click="refresh">Try again</button>
-    </div>
+    <ErrorState v-if="isError" :error="error" title="Couldn't load the list" class="m-2" @retry="refetch()" />
     <div
         v-else
-        class="search-container"
+        class="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden p-2"
         @mouseenter="isHovering = true"
         @mouseleave="isHovering = false"
     >
-        <div class="search-input-wrapper">
-            <input
-                ref="searchInput"
-                type="text"
-                v-model="search"
-                placeholder="Search"
-                :disabled="isPending"
-                @keydown="onInputKeydown"
-                @focus="isFocused = true"
-                @blur="isFocused = false"
-            />
-        </div>
-        <div
-            class="items-container min-h-0 max-md:max-h-[min(45dvh,20rem)] md:flex-1"
-            ref="itemsContainer"
-        >
-            <template v-if="isPending">
-                <Loader class="spinner" :size="32" />
-            </template>
-            <template v-else>
-                <button
+        <Input
+            ref="searchInput"
+            v-model="search"
+            placeholder="Search"
+            aria-label="Search"
+            autocomplete="off"
+            :disabled="isPending"
+            @keydown="onInputKeydown"
+            @focusin="isFocused = true"
+            @focusout="isFocused = false"
+        />
+        <div ref="itemsContainer" class="min-h-0 overflow-auto max-lg:max-h-[min(45dvh,20rem)] lg:flex-1">
+            <SkeletonList v-if="isPending && showSkeleton" :rows="4" :leading="false" />
+            <List v-else-if="!isPending">
+                <ListRow
                     v-for="(item, index) in filteredList"
                     :key="`${item.entry_kind ?? 'food'}-${item.id ?? item.ID ?? index}`"
+                    :selected="activeIndex === index"
                     @click="handleFunctionCall(onSelect, item)"
-                    class="item"
-                    :class="{ active: activeIndex === index }"
-                    role="option"
                 >
-                    <component
-                        v-if="props.displayComponent"
-                        :is="props.displayComponent"
-                        :item="item"
-                    />
-                    <template v-else>
-                        {{ item.name || `#${item.id ?? item.ID}` }}
-                    </template>
-                    <Plus :size="18" />
-                </button>
-                <div
+                    <component :is="props.displayComponent" v-if="props.displayComponent" :item="item" />
+                    <template v-else>{{ item.name || `#${item.id ?? item.ID}` }}</template>
+                    <template #trailing><Plus aria-hidden="true" class="size-4" /></template>
+                </ListRow>
+                <ListRow
                     v-if="showCreate"
-                    class="item empty-option"
-                    :class="{ active: activeIndex === filteredList.length }"
+                    :selected="activeIndex === filteredList.length"
                     @click="handleFunctionCall(onCreate, search)"
                 >
-                    <Plus :size="18" />
-                    <span>Create "{{ search }}"</span>
-                </div>
-                <div
-                    v-if="
-                        !isPending &&
-                        search &&
-                        !filteredList.length &&
-                        !onCreate
-                    "
-                    class="item empty-option"
-                >
-                    <span class="no-hover-empty-option"
-                        >{{ search }} does not exist</span
-                    >
-                </div>
-            </template>
+                    <template #leading><Plus aria-hidden="true" class="size-4" /></template>
+                    {{ createLabel ?? "Create" }} "{{ search }}"
+                </ListRow>
+            </List>
+            <EmptyState v-if="!isPending && !search && !list.length" title="Nothing here yet" />
+            <EmptyState v-else-if="!isPending && search && !filteredList.length && !onCreate" :title="`${search} does not exist`" />
         </div>
     </div>
 </template>
-
-<style scoped>
-.search-container {
-    display: flex;
-    flex-direction: column;
-    flex: 1 1 auto;
-    min-height: 0;
-    gap: 1rem;
-    padding: 0.5rem;
-    overflow: hidden;
-}
-
-.search-input-wrapper {
-    position: relative;
-    display: flex;
-    align-items: center;
-    width: 100%;
-}
-
-.search-input-wrapper input {
-    width: 100%;
-}
-
-.search-input-wrapper input:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-}
-
-.spinner {
-    position: absolute;
-    animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-    from {
-        transform: rotate(0deg);
-    }
-    to {
-        transform: rotate(360deg);
-    }
-}
-
-.error-message {
-    color: #ff6b6b;
-    padding: 1rem;
-    text-align: center;
-}
-
-.loading-state {
-    justify-content: center;
-    opacity: 0.6;
-    cursor: default;
-}
-
-.items-container {
-    display: flex;
-    flex-direction: column;
-    gap: 0.6rem;
-    width: 100%;
-    overflow: auto;
-}
-
-.item {
-    display: flex;
-    flex-direction: row;
-    justify-content: space-between;
-    align-items: center;
-    padding: 1rem;
-    border: 1px solid rgb(82, 82, 82);
-    border-radius: 5px;
-    background-color: rgb(48, 48, 48);
-    cursor: pointer;
-    transition: background-color 0.2s ease-in-out;
-}
-
-.item:hover:not(:has(.no-hover-empty-option)),
-.item.active:not(:has(.no-hover-empty-option)) {
-    background-color: rgb(82, 82, 82);
-}
-
-.empty-option {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    justify-content: center;
-    padding: 0.6rem 0.8rem;
-    cursor: pointer;
-}
-
-.no-hover-empty-option {
-    cursor: default;
-}
-</style>

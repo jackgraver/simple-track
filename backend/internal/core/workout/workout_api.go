@@ -23,6 +23,9 @@ func RegisterRoutes(router *gin.Engine, authMiddleware gin.HandlerFunc) {
 		plans := group.Group("/plans")
 		{
 			plans.GET("/all", controller.GetAllWorkoutPlans)
+			plans.PATCH("/:id", controller.RenameWorkoutPlan)
+			plans.DELETE("/:id", controller.DeleteWorkoutPlan)
+			plans.POST("/:id/restore", controller.RestoreWorkoutPlan)
 			plans.POST("/:id/exercises/add", controller.AddExerciseToPlan)
 			plans.DELETE("/:id/exercises/remove", controller.RemoveExerciseFromPlan)
 			plans.PUT("/:id/exercises/reorder", controller.ReorderPlanExercises)
@@ -42,6 +45,12 @@ func RegisterRoutes(router *gin.Engine, authMiddleware gin.HandlerFunc) {
 			exercises.DELETE("/remove", dayOffsetMiddleware, controller.RemoveExerciseFromWorkout)
 			exercises.DELETE("/sets/:id", controller.DeleteLoggedSet)
 			exercises.GET("/progression/:id", controller.GetExerciseProgression)
+		}
+		sets := group.Group("/sets")
+		{
+			sets.POST("", dayOffsetMiddleware, controller.LogSet)
+			sets.PATCH("/:id", controller.UpdateSet)
+			sets.DELETE("/:id", controller.DeleteSet)
 		}
 		logs := group.Group("/logs", dayOffsetMiddleware)
 		{

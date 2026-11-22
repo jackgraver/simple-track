@@ -9,7 +9,6 @@ import {
 } from "~/api/money/api";
 import { useContributionTypes, useMoneyMutation } from "~/api/money/queries";
 import type { ContributionType } from "~/api/money/types";
-import { getApiErrorMessage } from "~/api/httpError";
 import { dialogManager } from "~/composables/dialog/useDialog";
 import { toast } from "~/composables/toast/useToast";
 import ModuleTitleBar, { type ModuleTitleLink } from "~/shared/ModuleTitleBar.vue";
@@ -17,11 +16,26 @@ import ContributionTypeDialog from "./components/ContributionTypeDialog.vue";
 import PresetDialog from "./components/PresetDialog.vue";
 import RoomBreakdown from "./components/RoomBreakdown.vue";
 import RoomCard from "./components/RoomCard.vue";
-import { formatMoney, parseAmount, ui } from "./format";
+import { formatMoney, parseAmount } from "./format";
+import {
+    Button,
+    Badge,
+    Card,
+    EmptyState,
+    ErrorState,
+    Field,
+    IconButton,
+    Input,
+    List,
+    ListRow,
+    Skeleton,
+    useDelayedFlag,
+} from "~/shared/ui";
 
 const typesQuery = useContributionTypes();
 const types = computed(() => typesQuery.data.value?.contribution_types ?? []);
 const birthYear = computed(() => typesQuery.data.value?.birth_year ?? null);
+const showSkeleton = useDelayedFlag(typesQuery.isPending);
 const needsBirthYear = computed(
     () => birthYear.value === null && types.value.some((t) => t.eligibility_age !== null),
 );
@@ -74,12 +88,14 @@ function limitInput(id: number) {
 const limitMutation = useMoneyMutation(
     (args: { id: number; year: number; amount: number }) =>
         upsertContributionLimit(args.id, args.year, args.amount),
+    "Failed to save limit",
 );
 const removeLimitMutation = useMoneyMutation((args: { id: number; year: number }) =>
     deleteContributionLimit(args.id, args.year),
+    "Failed to remove limit",
 );
-const deleteTypeMutation = useMoneyMutation(deleteContributionType);
-const birthYearMutation = useMoneyMutation(saveBirthYear);
+const deleteTypeMutation = useMoneyMutation(deleteContributionType, "Failed to delete");
+const birthYearMutation = useMoneyMutation(saveBirthYear, "Failed to save birth year");
 
 async function saveLimit(type: ContributionType) {
     const input = limitInput(type.ID);
@@ -90,28 +106,30 @@ async function saveLimit(type: ContributionType) {
         await limitMutation.mutateAsync({ id: type.ID, year: Math.trunc(year), amount });
         input.amount = "";
         toast.push(`${type.name} limit for ${year} saved`, "success");
-    } catch (error) {
-        toast.push(getApiErrorMessage(error, "Failed to save limit"), "error");
+    } catch {
+        // useMoneyMutation already toasted the error.
     }
 }
 
 async function removeLimit(type: ContributionType, year: number) {
     const confirmed = await dialogManager.confirm({
         title: "Remove annual limit?",
+        tone: "danger",
         message: `The ${type.name} limit starting ${year} will be removed; earlier limits extend to cover those years.`,
         confirmText: "Remove",
     });
     if (!confirmed) return;
     try {
         await removeLimitMutation.mutateAsync({ id: type.ID, year });
-    } catch (error) {
-        toast.push(getApiErrorMessage(error, "Failed to remove limit"), "error");
+    } catch {
+        // useMoneyMutation already toasted the error.
     }
 }
 
 async function removeType(type: ContributionType) {
     const confirmed = await dialogManager.confirm({
         title: `Delete ${type.name}?`,
+        tone: "danger",
         message: type.accounts.length
             ? `Unlink ${type.accounts.map((a) => a.name).join(", ")} first.`
             : "Its rules and limits will be deleted. Accounts and deposits are not affected.",
@@ -121,8 +139,8 @@ async function removeType(type: ContributionType) {
     try {
         await deleteTypeMutation.mutateAsync(type.ID);
         toast.push(`${type.name} deleted`, "success");
-    } catch (error) {
-        toast.push(getApiErrorMessage(error, "Failed to delete"), "error");
+    } catch {
+        // useMoneyMutation already toasted the error.
     }
 }
 
@@ -156,8 +174,8 @@ async function submitBirthYear() {
     try {
         await birthYearMutation.mutateAsync(Math.trunc(year));
         toast.push("Birth year saved", "success");
-    } catch (error) {
-        toast.push(getApiErrorMessage(error, "Failed to save birth year"), "error");
+    } catch {
+        // useMoneyMutation already toasted the error.
     }
 }
 
@@ -171,113 +189,138 @@ const navLinks: ModuleTitleLink[] = [
     <div class="mx-auto flex w-full max-w-5xl flex-col gap-6">
         <ModuleTitleBar title="Contribution room" :links="navLinks" />
 
-        <p v-if="typesQuery.error.value" class="m-0 text-sm text-(--color-cf-red)">
-            {{ typesQuery.error.value.message || "Failed to load contribution room" }}
-        </p>
-        <p v-else-if="typesQuery.isPending.value" class="m-0 text-sm text-textSecondary">Loading…</p>
+        <Card v-if="typesQuery.error.value" padding="none">
+            <ErrorState
+                :error="typesQuery.error.value"
+                title="Couldn't load contribution room"
+                @retry="typesQuery.refetch()"
+            />
+        </Card>
+        <div v-else-if="typesQuery.isPending.value" class="flex flex-col gap-6" aria-busy="true">
+            <template v-if="showSkeleton">
+                <Skeleton shape="block" height="14rem" />
+            </template>
+        </div>
 
         <template v-else>
-            <form
-                v-if="needsBirthYear"
-                class="flex flex-wrap items-end gap-3 rounded-lg border border-amber-700/50 bg-amber-950/30 p-4"
-                @submit.prevent="submitBirthYear"
-            >
-                <label :class="[ui.label, 'flex-1 text-amber-100']">
-                    Your birth year is needed to know when room started accruing
-                    <input v-model="birthYearInput" inputmode="numeric" required placeholder="e.g. 1998" :class="[ui.input, 'max-w-40']" />
-                </label>
-                <button type="submit" :class="ui.btnPrimary" :disabled="birthYearMutation.isPending.value">Save</button>
-            </form>
+            <Card v-if="needsBirthYear">
+                <form class="flex flex-col gap-3 lg:flex-row lg:items-end" @submit.prevent="submitBirthYear">
+                    <div class="lg:max-w-md lg:flex-1">
+                        <Field label="Your birth year is needed to know when room started accruing" required>
+                            <Input v-model="birthYearInput" inputmode="numeric" required placeholder="e.g. 1998" />
+                        </Field>
+                    </div>
+                    <Button type="submit" variant="primary" :loading="birthYearMutation.isPending.value">Save</Button>
+                </form>
+            </Card>
 
-            <section v-if="types.length === 0" :class="[ui.card, 'flex flex-col items-start gap-3']">
-                <h2 class="m-0 text-base font-semibold">No registered accounts yet</h2>
-                <p class="m-0 text-sm text-textSecondary">
-                    Add a TFSA, RRSP or FHSA with CRA's rules and limits filled in, then link your accounts to it. Every
-                    deposit and withdrawal in a linked account counts against the shared room.
-                </p>
-                <div class="flex flex-wrap gap-2">
-                    <button type="button" :class="ui.btnPrimary" @click="openPreset">Add TFSA / RRSP / FHSA</button>
-                    <button type="button" :class="ui.btnSecondary" @click="openCustom">Custom type</button>
-                </div>
-            </section>
+            <Card v-if="types.length === 0" padding="none">
+                <EmptyState
+                    title="No registered accounts yet"
+                    description="Add a TFSA, RRSP or FHSA with CRA's rules and limits filled in, then link your accounts to it. Every deposit and withdrawal in a linked account counts against the shared room."
+                >
+                    <template #action>
+                        <div class="flex flex-wrap items-center justify-center gap-2">
+                            <Button variant="primary" @click="openPreset">Add TFSA / RRSP / FHSA</Button>
+                            <Button @click="openCustom">Custom type</Button>
+                        </div>
+                    </template>
+                </EmptyState>
+            </Card>
 
-            <section v-for="type in types" :key="type.ID" :class="[ui.card, 'flex flex-col gap-4']">
+            <Card v-for="type in types" :key="type.ID">
+              <div class="flex flex-col gap-4">
                 <header class="flex flex-col gap-2">
                     <div class="flex items-center justify-between gap-3">
-                        <h2 class="m-0 min-w-0 truncate text-lg font-semibold text-textPrimary">{{ type.name }}</h2>
-                        <div class="flex shrink-0 gap-1">
-                            <button type="button" :class="[ui.btnSecondary, 'flex items-center gap-1']" @click="editType(type)">
-                                <Pencil :size="14" /> Rules
-                            </button>
-                            <button type="button" :class="ui.btnDanger" aria-label="Delete type" @click="removeType(type)">
-                                <Trash2 :size="16" />
-                            </button>
+                        <h2 class="m-0 min-w-0 truncate text-lg font-semibold text-fg">{{ type.name }}</h2>
+                        <div class="flex shrink-0 items-center gap-1">
+                            <Button size="sm" @click="editType(type)">
+                                <template #icon-left><Pencil aria-hidden="true" class="size-4" /></template>
+                                Rules
+                            </Button>
+                            <IconButton label="Delete type" variant="danger" size="sm" @click="removeType(type)">
+                                <Trash2 />
+                            </IconButton>
                         </div>
                     </div>
                     <ul class="m-0 flex list-none flex-wrap gap-1.5 p-0">
-                        <li v-for="chip in ruleChips(type)" :key="chip" class="rounded bg-secondBg px-2 py-0.5 text-xs text-textSecondary">
-                            {{ chip }}
-                        </li>
+                        <li v-for="chip in ruleChips(type)" :key="chip"><Badge>{{ chip }}</Badge></li>
                     </ul>
                 </header>
 
-                <div class="grid gap-4 md:grid-cols-[minmax(0,18rem)_1fr]">
+                <div class="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,18rem)_1fr]">
                     <RoomCard :contribution-type="type" bare class="self-start" />
 
                     <div class="flex flex-col gap-3">
                         <div>
-                            <h3 class="m-0 text-sm font-semibold text-textPrimary">Annual limits</h3>
-                            <p class="m-0 text-xs text-textSecondary">Each limit applies from its year until a newer one replaces it.</p>
+                            <h3 class="m-0 text-sm font-semibold text-fg">Annual limits</h3>
+                            <p class="m-0 text-xs text-fg-muted">Each limit applies from its year until a newer one replaces it.</p>
                         </div>
-                        <p v-if="type.limits.length === 0" class="m-0 text-sm text-textSecondary">
-                            No annual limits{{ type.opening_room !== null ? " — only the opening room counts." : "." }}
+                        <p v-if="type.limits.length === 0" class="m-0 text-sm text-fg-muted">
+                            No annual limits{{ type.opening_room !== null ? ", only the opening room counts." : "." }}
                         </p>
-                        <ul v-else class="m-0 flex list-none flex-col divide-y divide-(--color-border) p-0">
-                            <li v-for="(limit, index) in type.limits" :key="limit.ID" class="flex items-center justify-between gap-2 py-1.5 text-sm">
-                                <span class="text-textSecondary">{{ limitRange(type, index) }}</span>
-                                <span class="flex items-center gap-2">
-                                    <span class="tabular-nums text-textPrimary">{{ formatMoney(limit.annual_limit) }} / yr</span>
-                                    <button type="button" class="rounded p-1 text-textSecondary hover:bg-secondBg hover:text-(--color-cf-red)" :aria-label="`Remove ${limit.year} limit`" @click="removeLimit(type, limit.year)">
-                                        <Trash2 :size="14" />
-                                    </button>
-                                </span>
-                            </li>
-                        </ul>
-                        <form class="grid grid-cols-[5.5rem_1fr_auto] gap-2" @submit.prevent="saveLimit(type)">
-                            <input v-model="limitInput(type.ID).year" inputmode="numeric" required aria-label="Year" :class="ui.input" />
-                            <input v-model="limitInput(type.ID).amount" inputmode="decimal" required placeholder="Annual limit" :class="ui.input" />
-                            <button type="submit" :class="ui.btnSecondary" :disabled="limitMutation.isPending.value">Set</button>
+                        <List v-else>
+                            <ListRow
+                                v-for="(limit, index) in type.limits"
+                                :key="limit.ID"
+                                :pending="removeLimitMutation.isPending.value && removeLimitMutation.variables.value?.year === limit.year && removeLimitMutation.variables.value?.id === type.ID"
+                            >
+                                <span class="text-fg-muted">{{ limitRange(type, index) }}</span>
+                                <template #trailing>
+                                    <span class="text-fg">{{ formatMoney(limit.annual_limit) }} / yr</span>
+                                    <IconButton
+                                        :label="`Remove ${limit.year} limit`"
+                                        size="sm"
+                                        variant="danger"
+                                        @click="removeLimit(type, limit.year)"
+                                    >
+                                        <Trash2 />
+                                    </IconButton>
+                                </template>
+                            </ListRow>
+                        </List>
+                        <form class="grid grid-cols-[6rem_minmax(0,1fr)_auto] items-end gap-2" @submit.prevent="saveLimit(type)">
+                            <Field label="Year" required>
+                                <Input v-model="limitInput(type.ID).year" inputmode="numeric" required />
+                            </Field>
+                            <Field label="Annual limit" required>
+                                <Input v-model="limitInput(type.ID).amount" inputmode="decimal" required placeholder="0.00" />
+                            </Field>
+                            <Button type="submit" :loading="limitMutation.isPending.value">Set</Button>
                         </form>
 
                         <div v-if="type.accounts.length" class="text-sm">
-                            <h3 class="m-0 text-sm font-semibold text-textPrimary">Linked accounts</h3>
+                            <h3 class="m-0 text-sm font-semibold text-fg">Linked accounts</h3>
                             <div class="mt-1 flex flex-wrap gap-2">
-                                <router-link
+                                <Button
                                     v-for="account in type.accounts"
                                     :key="account.id"
+                                    size="sm"
                                     :to="{ name: 'finance-account', params: { id: account.id } }"
-                                    class="rounded bg-secondBg px-2 py-1 text-xs hover:bg-thirdBg"
                                 >
                                     {{ account.name }}
-                                </router-link>
+                                </Button>
                             </div>
                         </div>
-                        <p v-else class="m-0 text-xs text-textSecondary">
-                            No accounts linked — edit an account and choose {{ type.name }} as its registered account.
+                        <p v-else class="m-0 text-xs text-fg-muted">
+                            No accounts linked. Edit an account and choose {{ type.name }} as its registered account.
                         </p>
                     </div>
                 </div>
 
                 <div v-if="type.room && type.room.years.length">
-                    <button type="button" class="flex items-center gap-1 p-0 text-sm text-textSecondary hover:text-textPrimary" @click="toggleBreakdown(type.ID)">
-                        <component :is="expanded.has(type.ID) ? ChevronDown : ChevronRight" :size="16" />
+                    <Button variant="ghost" size="sm" :aria-expanded="expanded.has(type.ID)" @click="toggleBreakdown(type.ID)">
+                        <template #icon-left>
+                            <component :is="expanded.has(type.ID) ? ChevronDown : ChevronRight" aria-hidden="true" class="size-4" />
+                        </template>
                         Year-by-year breakdown
-                    </button>
+                    </Button>
                     <div v-if="expanded.has(type.ID)" class="mt-3">
                         <RoomBreakdown :room="type.room" />
                     </div>
                 </div>
-            </section>
+              </div>
+            </Card>
         </template>
     </div>
 </template>

@@ -1,782 +1,290 @@
 <script setup lang="ts">
-import {
-    ChevronDown,
-    ChevronLeft,
-    ChevronRight,
-    ChevronUp,
-    SquarePen,
-    Trash2,
-} from "lucide-vue-next";
-import { computed, ref, watch } from "vue";
+import { ChevronLeft, ChevronRight, X } from "lucide-vue-next";
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import { useQuery, useQueryClient } from "@tanstack/vue-query";
-import { dialogManager } from "~/composables/dialog/useDialog";
-import { apiClient } from "~/api/client";
 import {
-    addPlannedMealFromSaved,
-    getMonthPlannedSummary,
-    previewSavedMealDelete,
-    type SavedMealDeleteDependentsInfo,
-} from "~/api/diet/api";
-import type {
-    MealItem,
-    PlannedMeal,
-    SavedMeal,
-    SavedMealItem,
-} from "~/types/diet";
-import {
-    useDietLogsToday,
-    useAddPlannedFromSaved,
-    useDeletePlannedMeal,
-    useReorderPlannedMeals,
+    dayRef,
+    useAddPlannedFromSavedAt,
+    useCopyPlannedDay,
+    useDeletePlannedMealAt,
+    useDietDays,
+    useReorderPlannedMealsAt,
+    useSavedMeals,
 } from "~/api/diet/queries";
-import { useDeleteSavedMeal } from "~/pages/diet/logmeal/queries/useMealMutations";
+import { isTempId } from "~/api/diet/dayPatches";
+import { newClientId } from "~/api/ids";
+import { dialogManager } from "~/composables/dialog/useDialog";
 import { toast } from "~/composables/toast/useToast";
-import SimpleMacros from "~/shared/SimpleMacros.vue";
-import { dietKeys } from "~/api/diet/keys";
+import { dietWeek, formatInt } from "~/pages/diet/home/dietDay";
+import { CREATE_TYPE } from "~/pages/diet/logmeal/logmealMode";
+import type { SavedMeal } from "~/types/diet";
+import { parseDietDayOffsetQuery, withDietDayOffsetQuery } from "~/utils/dateUtil";
 import {
-    dateAtDietDayOffset,
-    dietDayOffsetFromLocalDate,
-    formatDateLong,
-    parseDietDayOffsetQuery,
-    withDietDayOffsetQuery,
-} from "~/utils/dateUtil";
-import { EDIT_SAVED_TYPE } from "~/pages/diet/logmeal/logmealMode";
-
-type MacroSummary = {
-    calories: number;
-    protein: number;
-    carbs: number;
-    fat: number;
-    fiber: number;
-};
-const ZERO_MACROS: MacroSummary = {
-    calories: 0,
-    protein: 0,
-    fat: 0,
-    carbs: 0,
-    fiber: 0,
-};
-
-function macroTotals(
-    items: (MealItem | SavedMealItem)[] | undefined,
-): MacroSummary {
-    if (!items?.length) return ZERO_MACROS;
-    return items.reduce(
-        (acc, i) => ({
-            calories: acc.calories + (i.food?.calories ?? 0) * i.amount,
-            protein: acc.protein + (i.food?.protein ?? 0) * i.amount,
-            carbs: acc.carbs + (i.food?.carbs ?? 0) * i.amount,
-            fat: acc.fat + (i.food?.fat ?? 0) * i.amount,
-            fiber: acc.fiber + (i.food?.fiber ?? 0) * i.amount,
-        }),
-        { ...ZERO_MACROS },
-    );
-}
-
-function daysInMonth(year: number, month: number): number {
-    return new Date(year, month + 1, 0).getDate();
-}
-
-function parseIsoLocal(
-    iso: string,
-): { y: number; m: number; d: number } | null {
-    const [y, mo, day] = iso.split("-").map(Number);
-    if (!y || !mo || !day) return null;
-    return { y, m: mo - 1, d: day };
-}
-
-function enumerateOffsetsInclusive(
-    fromIso: string,
-    toIso: string,
-): number[] | null {
-    const a = parseIsoLocal(fromIso);
-    const b = parseIsoLocal(toIso);
-    if (!a || !b) return null;
-    let t1 = new Date(a.y, a.m, a.d);
-    let t2 = new Date(b.y, b.m, b.d);
-    if (t1.getTime() > t2.getTime()) [t1, t2] = [t2, t1];
-    const out: number[] = [];
-    const cur = new Date(t1);
-    while (cur.getTime() <= t2.getTime()) {
-        out.push(
-            dietDayOffsetFromLocalDate(
-                cur.getFullYear(),
-                cur.getMonth(),
-                cur.getDate(),
-            ),
-        );
-        cur.setDate(cur.getDate() + 1);
-    }
-    return out;
-}
-
-function offsetToHeadingLabel(offset: number): string {
-    const d = dateAtDietDayOffset(offset);
-    const ymd = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}T12:00:00`;
-    return formatDateLong(ymd);
-}
+    Button,
+    ErrorState,
+    IconButton,
+    PageHeader,
+    Skeleton,
+    useDelayedFlag,
+    useIsDesktop,
+} from "~/shared/ui";
+import AddMealOverlay from "./AddMealOverlay.vue";
+import CopyDayOverlay from "./CopyDayOverlay.vue";
+import PlanDayCard from "./PlanDayCard.vue";
+import {
+    buildPlanDay,
+    formatWeekSummary,
+    moveId,
+    savedMealMacros,
+    shortDayLabel,
+    weekRangeLabel,
+    weekSummary,
+    type PlanDay,
+} from "./domain/planWeek";
 
 const route = useRoute();
 const router = useRouter();
-const queryClient = useQueryClient();
 
-const dateOffset = computed(() => parseDietDayOffsetQuery(route.query.offset));
+// `?offset=` is any day in the week to show (0 = today, positive = past), as on /diet.
+const offset = computed(() => parseDietDayOffsetQuery(route.query.offset));
+const week = computed(() => dietWeek(offset.value));
+const queries = useDietDays(() => week.value.map((d) => d.offset));
 
-const calendarYear = ref(new Date().getFullYear());
-const calendarMonth = ref(new Date().getMonth());
+const loading = computed(() => queries.value.some((q) => q.isPending));
+const failed = computed(() => queries.value.find((q) => q.isError));
+const showSkeleton = useDelayedFlag(loading);
 
-watch(
-    dateOffset,
-    (off) => {
-        const d = dateAtDietDayOffset(off);
-        calendarYear.value = d.getFullYear();
-        calendarMonth.value = d.getMonth();
-    },
-    { immediate: true },
-);
+const days = computed<PlanDay[]>(() => week.value.map((d, i) => buildPlanDay(d, queries.value[i]?.data)));
+const summary = computed(() => formatWeekSummary(weekSummary(days.value)));
+const isCurrentWeek = computed(() => week.value.some((d) => d.isToday));
+const rangeLabel = computed(() => weekRangeLabel(week.value[0]!.date, week.value[6]!.date));
 
-const monthLabel = computed(() =>
-    new Intl.DateTimeFormat(undefined, {
-        month: "long",
-        year: "numeric",
-    }).format(new Date(calendarYear.value, calendarMonth.value, 1)),
-);
-
-function prevMonth() {
-    if (calendarMonth.value === 0) {
-        calendarYear.value -= 1;
-        calendarMonth.value = 11;
-    } else {
-        calendarMonth.value -= 1;
-    }
+function shiftWeek(delta: number) {
+    router.replace({ query: { ...route.query, offset: String(offset.value + delta) } });
+}
+function thisWeek() {
+    router.replace({ query: { ...route.query, offset: "0" } });
 }
 
-function nextMonth() {
-    if (calendarMonth.value === 11) {
-        calendarYear.value += 1;
-        calendarMonth.value = 0;
-    } else {
-        calendarMonth.value += 1;
-    }
+// ---- Saved meals: the desktop tray and the add overlay ----------------------------------------
+const { savedMeals, isPending: savedPending, error: savedError, refetch: refetchSaved } = useSavedMeals();
+const createSavedTo = computed(() => ({ name: "diet-log", query: withDietDayOffsetQuery(0, { type: CREATE_TYPE }) }));
+
+// Desktop: pick a meal in the tray, then each day's add button adds it. Esc or ✕ drops the pick.
+const isDesktop = useIsDesktop();
+const armed = ref<SavedMeal | null>(null);
+watch(isDesktop, (d) => {
+    if (!d) armed.value = null;
+});
+watch(savedMeals, (list) => {
+    if (armed.value && !list.some((s) => s.ID === armed.value?.ID)) armed.value = null;
+});
+function toggleArmed(sm: SavedMeal) {
+    armed.value = armed.value?.ID === sm.ID ? null : sm;
+}
+function onKey(e: KeyboardEvent) {
+    if (e.key === "Escape" && armed.value && !addOpen.value && !copyOpen.value) armed.value = null;
+}
+onMounted(() => window.addEventListener("keydown", onKey));
+onBeforeUnmount(() => window.removeEventListener("keydown", onKey));
+
+// ---- Mutations -------------------------------------------------------------------------------
+const addMeal = useAddPlannedFromSavedAt();
+const removeMeal = useDeletePlannedMealAt();
+const reorder = useReorderPlannedMealsAt();
+const copyDay = useCopyPlannedDay();
+
+// Day edits are optimistic (instant, rollback + Retry toast on failure), so only copy shows a busy state.
+const busyDays = reactive(new Set<number>());
+const busyMeals = reactive(new Set<number>());
+const addingSaved = reactive(new Set<number>());
+
+function addTo(day: PlanDay, sm: SavedMeal) {
+    // No success toast: the day's totals and chips update, and rapid adds would stack toasts.
+    addMeal.mutate({ savedMeal: sm, ...dayRef(day.offset), client_id: newClientId() });
 }
 
-const dietMonthOffset = computed(() => {
-    const now = new Date();
-    return (
-        (calendarYear.value - now.getFullYear()) * 12 +
-        (calendarMonth.value - now.getMonth())
+function remove(day: PlanDay, mealId: number) {
+    if (isTempId(mealId)) return; // still saving
+    removeMeal.mutate({ plannedMealId: mealId, ...dayRef(day.offset), client_id: newClientId() });
+}
+
+function move(day: PlanDay, index: number, dir: -1 | 1) {
+    if (day.meals.some((m) => isTempId(m.id))) return; // reorder needs the server ids
+    const ids = moveId(
+        day.meals.map((m) => m.id),
+        index,
+        dir,
     );
-});
-const { data: monthPlannedCounts, isPending: monthPlannedPending } = useQuery({
-    queryKey: computed(() =>
-        dietKeys.days.monthPlannedSummary(dietMonthOffset.value),
-    ),
-    queryFn: () => getMonthPlannedSummary(dietMonthOffset.value),
-    staleTime: 1000 * 60 * 2,
-});
-function plannedCountForMonthDay(index: number): number {
-    return monthPlannedCounts.value?.[index] ?? 0;
-}
-function monthDayPending(_index: number): boolean {
-    return monthPlannedPending.value;
+    if (!ids) return;
+    reorder.mutate({ ids, ...dayRef(day.offset), client_id: newClientId() });
 }
 
-type CalendarCell =
-    | { kind: "pad" }
-    | { kind: "day"; day: number; offset: number; index: number };
-
-const calendarCells = computed((): CalendarCell[] => {
-    const y = calendarYear.value;
-    const m = calendarMonth.value;
-    const firstWd = new Date(y, m, 1).getDay();
-    const dim = daysInMonth(y, m);
-    const pads: CalendarCell[] = Array.from({ length: firstWd }, () => ({
-        kind: "pad",
-    }));
-    const days: CalendarCell[] = Array.from({ length: dim }, (_, i) => ({
-        kind: "day",
-        day: i + 1,
-        offset: dietDayOffsetFromLocalDate(y, m, i + 1),
-        index: i,
-    }));
-    return [...pads, ...days];
-});
-
-const WEEKDAY_LABELS = [
-    "Sun",
-    "Mon",
-    "Tue",
-    "Wed",
-    "Thu",
-    "Fri",
-    "Sat",
-] as const;
-
-const selectedOutsideVisibleMonth = computed(() => {
-    const d = dateAtDietDayOffset(dateOffset.value);
-    return (
-        d.getFullYear() !== calendarYear.value ||
-        d.getMonth() !== calendarMonth.value
-    );
-});
-
-function setOffset(offset: number) {
-    router.replace({ query: { ...route.query, offset: String(offset) } });
-}
-
-const {
-    data: dayData,
-    isPending: dayPending,
-    error: dayError,
-} = useDietLogsToday(dateOffset);
-const plannedMeals = computed(
-    (): PlannedMeal[] => dayData.value?.day.plannedMeals ?? [],
-);
-const sortedPlannedMeals = computed(() =>
-    [...plannedMeals.value].sort(
-        (a, b) =>
-            (a.display_order ?? 0) - (b.display_order ?? 0) || a.ID - b.ID,
-    ),
-);
-
-const {
-    data: savedRaw,
-    isPending: savedPending,
-    error: savedError,
-} = useQuery({
-    queryKey: dietKeys.savedMeals.list(),
-    queryFn: () =>
-        apiClient
-            .get<{ saved_meals: SavedMeal[] }>("/diet/meals/saved-meal/all")
-            .then((r) => r.data.saved_meals),
-});
-
-const savedMeals = computed((): SavedMeal[] => savedRaw.value ?? []);
-
-const deletePlanned = useDeletePlannedMeal(dateOffset);
-const reorderPlanned = useReorderPlannedMeals(dateOffset);
-const addFromSaved = useAddPlannedFromSaved(dateOffset);
-const deleteSavedTemplate = useDeleteSavedMeal();
-const savedMealDeletePreviewBusy = ref(false);
-const isRemoving = computed(() => deletePlanned.isPending.value);
-const isReordering = computed(() => reorderPlanned.isPending.value);
-const savedMealActionsBusy = computed(
-    () =>
-        addFromSaved.isPending.value ||
-        deleteSavedTemplate.isPending.value ||
-        savedMealDeletePreviewBusy.value,
-);
-
-async function removePlanned(pm: PlannedMeal) {
-    try {
-        await deletePlanned.mutateAsync(pm.ID);
-        toast.push("Removed from planned", "success");
-    } catch {
-        toast.push("Could not remove planned meal", "error");
-    }
-}
-
-async function movePlanned(index: number, dir: -1 | 1) {
-    const ordered = sortedPlannedMeals.value.map((p) => p.ID);
-    const j = index + dir;
-    if (j < 0 || j >= ordered.length) return;
-    const next = [...ordered];
-    const t = next[index];
-    next[index] = next[j];
-    next[j] = t;
-    try {
-        await reorderPlanned.mutateAsync(next);
-    } catch {
-        toast.push("Could not update order", "error");
-    }
-}
-
-async function addSavedToSelectedDay(sm: SavedMeal) {
-    try {
-        await addFromSaved.mutateAsync(sm.ID);
-        toast.push(`Added "${sm.name}" to planned`, "success");
-    } catch {
-        toast.push("Could not add to planned", "error");
-    }
-}
-
-async function deleteSavedMealTemplate(sm: SavedMeal) {
-    savedMealDeletePreviewBusy.value = true;
-    let preview: SavedMealDeleteDependentsInfo;
-    try {
-        preview = await previewSavedMealDelete(sm.ID);
-    } catch {
-        toast.push("Could not load saved meal", "error");
-        return;
-    } finally {
-        savedMealDeletePreviewBusy.value = false;
-    }
-    const ok =
-        preview.reference_count > 0
-            ? await dialogManager.confirm({
-                  title: "Saved meal is on your plan",
-                  message: `This meal is referenced ${preview.reference_count} times in your plan. Deleting removes those planned meals. Delete “${sm.name}”?`,
-                  confirmText: "Delete",
-                  cancelText: "Cancel",
-              })
-            : await dialogManager.confirm({
-                  title: "Delete saved meal",
-                  message: `Delete “${sm.name}”?`,
-                  confirmText: "Delete",
-                  cancelText: "Cancel",
-              });
-    if (!ok) return;
-    try {
-        await deleteSavedTemplate.mutateAsync({
-            savedMealId: sm.ID,
-            force: true,
-        });
-        bulkSavedOrder.value = bulkSavedOrder.value.filter((id) => id !== sm.ID);
-        toast.push("Saved meal deleted", "success");
-    } catch {
-        toast.push("Could not delete saved meal", "error");
-    }
-}
-
-function openEditSavedMeal(sm: SavedMeal) {
-    router.push({
-        name: "diet-log",
-        query: withDietDayOffsetQuery(dateOffset.value, {
-            type: EDIT_SAVED_TYPE,
-            id: String(sm.ID),
-        }),
+async function clear(day: PlanDay) {
+    const n = day.meals.length;
+    const ok = await dialogManager.confirm({
+        title: `Clear ${shortDayLabel(day.date)}?`,
+        message: `Removes ${n} planned ${n === 1 ? "meal" : "meals"} (${formatInt(day.planned.calories)} kcal). Logged meals stay.`,
+        confirmText: "Clear day",
+        cancelText: "Cancel",
+        tone: "danger",
     });
+    if (!ok) return;
+    // Each removal is its own optimistic mutation; requests for one day run in order.
+    for (const m of day.meals) remove(day, m.id);
 }
 
-const bulkFrom = ref("");
-const bulkTo = ref("");
-const bulkSavedOrder = ref<number[]>([]);
-const bulkSaving = ref(false);
-
-const bulkSavedMealsOrdered = computed((): SavedMeal[] => {
-    const byId = new Map(savedMeals.value.map((s) => [s.ID, s]));
-    return bulkSavedOrder.value
-        .map((id) => byId.get(id))
-        .filter((s): s is SavedMeal => s != null);
-});
-
-function toggleBulkSaved(id: number) {
-    const cur = bulkSavedOrder.value;
-    const i = cur.indexOf(id);
-    if (i >= 0) {
-        bulkSavedOrder.value = cur.filter((x) => x !== id);
-    } else {
-        bulkSavedOrder.value = [...cur, id];
-    }
-}
-
-function moveBulkSaved(index: number, dir: -1 | 1) {
-    const j = index + dir;
-    const cur = bulkSavedOrder.value;
-    if (j < 0 || j >= cur.length) return;
-    const next = [...cur];
-    const t = next[index];
-    next[index] = next[j];
-    next[j] = t;
-    bulkSavedOrder.value = next;
-}
-
-async function saveBulkRange() {
-    const from = bulkFrom.value.trim();
-    const to = bulkTo.value.trim();
-    if (!from || !to) {
-        toast.push("Choose both start and end dates", "error");
-        return;
-    }
-    const offsets = enumerateOffsetsInclusive(from, to);
-    if (!offsets?.length) {
-        toast.push("Invalid date range", "error");
-        return;
-    }
-    const mealIds = [...bulkSavedOrder.value];
-    if (mealIds.length === 0) {
-        toast.push("Select at least one saved meal", "error");
-        return;
-    }
-    bulkSaving.value = true;
+async function copy(from: PlanDay, to: number[]) {
+    if (!to.length) return;
+    for (const o of to) busyDays.add(o);
     try {
-        // Days are independent, so run them in parallel; meals within a day
-        // stay sequential to preserve the chosen order.
-        const results = await Promise.allSettled(
-            offsets.map(async (off) => {
-                for (const mealId of mealIds) {
-                    await addPlannedMealFromSaved(mealId, off);
-                }
-            }),
+        await copyDay.mutateAsync({ from: from.offset, to });
+        toast.push(
+            `Copied ${shortDayLabel(from.date)} to ${to.length} ${to.length === 1 ? "day" : "days"}`,
+            "success",
         );
-        const failedDays = results.filter((r) => r.status === "rejected").length;
-        if (failedDays === 0) {
-            toast.push(
-                `Added ${mealIds.length} meal(s) across ${offsets.length} day(s)`,
-                "success",
-            );
-        } else {
-            toast.push(
-                `Could not apply range (${failedDays} of ${offsets.length} day(s) failed)`,
-                "error",
-            );
-        }
+        copyOpen.value = false;
+    } catch {
+        toast.push("Couldn't copy that day", "error");
     } finally {
-        await queryClient.invalidateQueries({ queryKey: dietKeys.days.all });
-        bulkSaving.value = false;
+        for (const o of to) busyDays.delete(o);
     }
+}
+
+// ---- Overlays --------------------------------------------------------------------------------
+const addOpen = ref(false);
+const addOffset = ref<number | null>(null);
+// Read the day live from the week, so the overlay's totals follow each add.
+const addDay = computed(() => days.value.find((d) => d.offset === addOffset.value) ?? null);
+
+function onAdd(day: PlanDay) {
+    if (armed.value) {
+        void addTo(day, armed.value);
+        return;
+    }
+    addOffset.value = day.offset;
+    addOpen.value = true;
+}
+
+const copyOpen = ref(false);
+const copySource = ref<PlanDay | null>(null);
+function onCopyTo(day: PlanDay) {
+    copySource.value = day;
+    copyOpen.value = true;
 }
 </script>
 
 <template>
-    <div class="flex flex-col gap-8 pb-8 pt-2">
-        <h1 class="m-0 text-xl font-semibold tracking-tight text-zinc-100">
-            Edit planned meals
-        </h1>
-        <section
-            class="flex flex-col gap-3 rounded-lg border border-zinc-700 bg-zinc-900/40 px-3 py-4"
-        >
-            <div class="flex items-center justify-between gap-2">
-                <h2 class="m-0 text-base font-semibold text-zinc-200">
-                    Calendar
-                </h2>
-                <div class="flex items-center gap-1">
-                    <button
-                        type="button"
-                        class="rounded-md border border-zinc-600 p-1.5 text-zinc-300 hover:bg-zinc-800"
-                        aria-label="Previous month"
-                        @click="prevMonth"
-                    >
-                        <ChevronLeft class="size-5" />
-                    </button>
-                    <span
-                        class="min-w-48 text-center text-sm font-medium text-zinc-100"
-                        >{{ monthLabel }}</span
-                    >
-                    <button
-                        type="button"
-                        class="rounded-md border border-zinc-600 p-1.5 text-zinc-300 hover:bg-zinc-800"
-                        aria-label="Next month"
-                        @click="nextMonth"
-                    >
-                        <ChevronRight class="size-5" />
-                    </button>
-                </div>
-            </div>
-            <div
-                class="grid grid-cols-7 gap-1 text-center text-xs font-medium text-zinc-500"
-            >
-                <div v-for="w in WEEKDAY_LABELS" :key="w">{{ w }}</div>
-            </div>
-            <div class="grid grid-cols-7 gap-1">
-                <template v-for="(cell, idx) in calendarCells" :key="idx">
-                    <div v-if="cell.kind === 'pad'" />
-                    <button
-                        v-else
-                        type="button"
-                        class="flex min-h-12 flex-col items-center justify-center rounded-lg border py-1 text-sm transition-colors"
-                        :class="
-                            cell.offset === dateOffset
-                                ? 'border-amber-600/80 bg-amber-950/40 text-amber-50'
-                                : cell.offset === 0
-                                  ? 'border-zinc-500 bg-zinc-800/90 text-zinc-100'
-                                  : 'border-zinc-700 bg-zinc-900/60 text-zinc-200 hover:bg-zinc-800'
-                        "
-                        @click="setOffset(cell.offset)"
-                    >
-                        <span class="font-semibold leading-none">{{
-                            cell.day
-                        }}</span>
-                        <span
-                            v-if="monthDayPending(cell.index)"
-                            class="mt-0.5 text-[10px] text-zinc-600"
-                            >…</span
-                        >
-                        <span
-                            v-else-if="plannedCountForMonthDay(cell.index) > 0"
-                            class="mt-0.5 text-[10px] leading-none text-zinc-500"
-                        >
-                            {{ plannedCountForMonthDay(cell.index) }} planned
-                        </span>
-                    </button>
+    <div class="flex w-full flex-col gap-6 pt-2 pb-above-tabbar lg:pb-10">
+        <PageHeader title="Plan meals">
+            <template #meta>
+                <span class="tabular-nums">{{ isCurrentWeek ? "This week" : rangeLabel }}</span>
+                <template v-if="summary && !loading">
+                    ·
+                    <span :class="summary.tone === 'warn' ? 'text-warn' : summary.tone === 'success' ? 'text-success' : ''">{{
+                        summary.text
+                    }}</span>
                 </template>
-            </div>
-            <p
-                v-if="selectedOutsideVisibleMonth"
-                class="m-0 text-xs text-zinc-500"
-            >
-                Selected day is not in this month.
-            </p>
-        </section>
-        <section class="flex flex-col gap-4">
-            <h2 class="m-0 text-sm text-zinc-400">
-                Editing:
-                <span class="font-medium text-zinc-200">{{
-                    offsetToHeadingLabel(dateOffset)
-                }}</span>
-            </h2>
-            <div v-if="dayPending" class="text-sm text-zinc-500">
-                Loading day…
-            </div>
-            <div v-else-if="dayError" class="text-sm text-red-400">
-                {{ dayError.message }}
-            </div>
-            <template v-else>
-                <div class="flex flex-col gap-3">
-                    <h3 class="m-0 text-sm font-semibold text-zinc-200">
-                        Currently planned
-                    </h3>
-                    <p
-                        v-if="sortedPlannedMeals.length === 0"
-                        class="m-0 text-sm text-zinc-500"
-                    >
-                        Nothing planned yet. Add a saved meal below.
-                    </p>
-                    <ul v-else class="m-0 flex list-none flex-col gap-2 p-0">
-                        <li
-                            v-for="(pm, index) in sortedPlannedMeals"
-                            :key="pm.ID"
-                            class="flex items-center justify-between gap-2 rounded-lg border border-zinc-700 bg-zinc-900/50 px-3 py-2"
-                        >
-                            <div class="min-w-0 flex-1">
-                                <p class="m-0 font-medium text-zinc-100">
-                                    {{ pm.meal.name }}
-                                </p>
-                                <SimpleMacros
-                                    v-if="pm.meal.items?.length"
-                                    class="mt-1"
-                                    font-size="0.8rem"
-                                    v-bind="macroTotals(pm.meal.items)"
-                                />
-                            </div>
-                            <div
-                                class="flex shrink-0 flex-col items-center gap-0.5"
-                            >
-                                <button
-                                    type="button"
-                                    class="rounded border border-zinc-600 p-0.5 text-zinc-300 hover:bg-zinc-800 disabled:opacity-40"
-                                    :disabled="
-                                        index === 0 ||
-                                        isReordering ||
-                                        isRemoving
-                                    "
-                                    aria-label="Move up"
-                                    @click="movePlanned(index, -1)"
-                                >
-                                    <ChevronUp class="size-4" />
-                                </button>
-                                <button
-                                    type="button"
-                                    class="rounded border border-zinc-600 p-0.5 text-zinc-300 hover:bg-zinc-800 disabled:opacity-40"
-                                    :disabled="
-                                        index ===
-                                            sortedPlannedMeals.length - 1 ||
-                                        isReordering ||
-                                        isRemoving
-                                    "
-                                    aria-label="Move down"
-                                    @click="movePlanned(index, 1)"
-                                >
-                                    <ChevronDown class="size-4" />
-                                </button>
-                            </div>
-                            <button
-                                type="button"
-                                class="shrink-0 rounded-md border border-red-900/60 bg-red-950/40 px-2 py-1 text-sm font-medium text-red-200 hover:bg-red-950/70 disabled:opacity-50"
-                                :disabled="isRemoving || isReordering"
-                                @click="removePlanned(pm)"
-                            >
-                                Remove
-                            </button>
-                        </li>
-                    </ul>
-                </div>
-                <div class="flex flex-col gap-3">
-                    <h3 class="m-0 text-sm font-semibold text-zinc-200">
-                        Add from saved meals
-                    </h3>
-                    <p v-if="savedError" class="m-0 text-sm text-red-400">
-                        Could not load saved meals.
-                    </p>
-                    <p
-                        v-else-if="savedPending"
-                        class="m-0 text-sm text-zinc-500"
-                    >
-                        Loading saved meals…
-                    </p>
-                    <p
-                        v-else-if="savedMeals.length === 0"
-                        class="m-0 text-sm text-zinc-500"
-                    >
-                        No saved meals yet. Create one from the Diet page.
-                    </p>
-                    <div v-else class="flex flex-wrap gap-2">
-                        <div
-                            v-for="sm in savedMeals"
-                            :key="sm.ID"
-                            class="flex max-w-full items-stretch overflow-hidden rounded-md border border-zinc-600 bg-zinc-800"
-                        >
-                            <button
-                                type="button"
-                                class="flex min-w-0 flex-1 flex-col items-start gap-1 px-3 py-2 text-left hover:bg-zinc-700 disabled:opacity-50"
-                                :disabled="savedMealActionsBusy"
-                                @click="addSavedToSelectedDay(sm)"
-                            >
-                                <span class="font-medium text-zinc-100">{{
-                                    sm.name
-                                }}</span>
-                                <SimpleMacros
-                                    v-if="sm.items?.length"
-                                    font-size="0.8rem"
-                                    v-bind="macroTotals(sm.items)"
-                                />
-                            </button>
-                            <button
-                                type="button"
-                                class="shrink-0 border-l border-zinc-600 px-2 text-zinc-300 hover:bg-zinc-700 disabled:opacity-50"
-                                :disabled="savedMealActionsBusy"
-                                aria-label="Edit saved meal"
-                                @click.stop="openEditSavedMeal(sm)"
-                            >
-                                <SquarePen class="size-4" />
-                            </button>
-                            <button
-                                type="button"
-                                class="shrink-0 border-l border-zinc-600 px-2 text-red-300 hover:bg-red-950/40 disabled:opacity-50"
-                                :disabled="savedMealActionsBusy"
-                                aria-label="Delete saved meal"
-                                @click="deleteSavedMealTemplate(sm)"
-                            >
-                                <Trash2 class="size-4" />
-                            </button>
-                        </div>
-                    </div>
-                </div>
             </template>
-        </section>
-        <section
-            class="flex flex-col gap-4 rounded-lg border border-zinc-700 bg-zinc-900/40 px-3 py-4"
-        >
-            <h2 class="m-0 text-base font-semibold text-zinc-200">
-                Plan a date range
-            </h2>
-            <p class="m-0 text-xs text-zinc-500">
-                Pick dates and saved meals. Order below is first → last on each
-                day.
+            <template #actions>
+                <IconButton label="Previous week" variant="secondary" @click="shiftWeek(7)">
+                    <ChevronLeft class="size-5" />
+                </IconButton>
+                <Button v-if="!isCurrentWeek" size="sm" variant="ghost" @click="thisWeek">This week</Button>
+                <span v-else class="min-w-28 text-center text-sm text-fg-muted tabular-nums">{{ rangeLabel }}</span>
+                <IconButton label="Next week" variant="secondary" @click="shiftWeek(-7)">
+                    <ChevronRight class="size-5" />
+                </IconButton>
+            </template>
+        </PageHeader>
+
+        <!-- Desktop tray: pick a saved meal, then add it to days with one click each. -->
+        <div class="hidden flex-col gap-2 lg:flex">
+            <div class="flex items-center gap-2">
+                <h2 class="m-0 text-xs font-semibold tracking-wide text-fg-muted uppercase">Saved meals</h2>
+                <span class="text-xs text-fg-muted">
+                    {{ armed ? `Click a day's button to add ${armed.name}. Esc to stop.` : "Pick one to add it to several days." }}
+                </span>
+            </div>
+            <ErrorState
+                v-if="savedError"
+                compact
+                title="Couldn't load saved meals"
+                :error="savedError"
+                @retry="refetchSaved()"
+            />
+            <div v-else-if="savedPending" class="flex gap-2">
+                <Skeleton v-for="i in 3" :key="i" shape="block" width="9rem" height="2.5rem" />
+            </div>
+            <p v-else-if="!savedMeals.length" class="m-0 text-sm text-fg-muted">
+                No saved meals yet.
+                <Button :to="createSavedTo" size="sm" variant="ghost">New saved meal</Button>
             </p>
-            <div class="flex flex-wrap items-end gap-3">
-                <label
-                    class="flex flex-col gap-1 text-xs font-medium text-zinc-400"
+            <div v-else class="flex flex-wrap items-center gap-2" role="group" aria-label="Saved meals">
+                <Button
+                    v-for="sm in savedMeals"
+                    :key="sm.ID"
+                    size="sm"
+                    :variant="armed?.ID === sm.ID ? 'primary' : 'secondary'"
+                    :aria-pressed="armed?.ID === sm.ID"
+                    @click="toggleArmed(sm)"
                 >
-                    Start
-                    <input
-                        v-model="bulkFrom"
-                        type="date"
-                        class="rounded-md border border-zinc-600 bg-zinc-950 px-2 py-1.5 text-sm text-zinc-100"
-                    />
-                </label>
-                <label
-                    class="flex flex-col gap-1 text-xs font-medium text-zinc-400"
-                >
-                    End
-                    <input
-                        v-model="bulkTo"
-                        type="date"
-                        class="rounded-md border border-zinc-600 bg-zinc-950 px-2 py-1.5 text-sm text-zinc-100"
-                    />
-                </label>
-            </div>
-            <div class="flex flex-col gap-2">
-                <span class="text-xs font-medium text-zinc-400"
-                    >Saved meals to add on each day</span
-                >
-                <p
-                    v-if="savedPending || savedError || savedMeals.length === 0"
-                    class="m-0 text-sm text-zinc-500"
-                >
-                    <template v-if="savedPending">Loading…</template>
-                    <template v-else-if="savedError"
-                        >Could not load saved meals.</template
+                    {{ sm.name }}
+                    <span class="text-xs tabular-nums opacity-70"
+                        >{{ formatInt(savedMealMacros(sm).calories) }} kcal</span
                     >
-                    <template v-else>No saved meals.</template>
-                </p>
-                <div v-else class="flex flex-col gap-2">
-                    <label
-                        v-for="sm in savedMeals"
-                        :key="'bulk-' + sm.ID"
-                        class="flex cursor-pointer items-start gap-2 rounded-md border border-zinc-700 bg-zinc-900/60 px-3 py-2 hover:bg-zinc-900"
-                    >
-                        <input
-                            type="checkbox"
-                            class="mt-1 accent-amber-600"
-                            :checked="bulkSavedOrder.includes(sm.ID)"
-                            @change="toggleBulkSaved(sm.ID)"
-                        />
-                        <span class="min-w-0 flex-1">
-                            <span class="font-medium text-zinc-100">{{
-                                sm.name
-                            }}</span>
-                            <SimpleMacros
-                                v-if="sm.items?.length"
-                                class="mt-1 block"
-                                font-size="0.75rem"
-                                v-bind="macroTotals(sm.items)"
-                            />
-                        </span>
-                    </label>
-                </div>
+                </Button>
+                <IconButton v-if="armed" label="Stop adding" size="sm" @click="armed = null">
+                    <X class="size-4" />
+                </IconButton>
             </div>
-            <div v-if="bulkSavedOrder.length > 0" class="flex flex-col gap-2">
-                <span class="text-xs font-medium text-zinc-400"
-                    >Order on each day</span
-                >
-                <ul class="m-0 flex list-none flex-col gap-1.5 p-0">
-                    <li
-                        v-for="(sm, index) in bulkSavedMealsOrdered"
-                        :key="'bulk-order-' + sm.ID"
-                        class="flex items-center gap-2 rounded-md border border-zinc-700 bg-zinc-900/60 px-2 py-1.5"
-                    >
-                        <span class="min-w-0 flex-1 text-sm text-zinc-100">{{
-                            sm.name
-                        }}</span>
-                        <div class="flex shrink-0 flex-col gap-0.5">
-                            <button
-                                type="button"
-                                class="rounded border border-zinc-600 p-0.5 text-zinc-300 hover:bg-zinc-800 disabled:opacity-40"
-                                :disabled="index === 0 || bulkSaving"
-                                aria-label="Move up in bulk order"
-                                @click="moveBulkSaved(index, -1)"
-                            >
-                                <ChevronUp class="size-4" />
-                            </button>
-                            <button
-                                type="button"
-                                class="rounded border border-zinc-600 p-0.5 text-zinc-300 hover:bg-zinc-800 disabled:opacity-40"
-                                :disabled="
-                                    index ===
-                                        bulkSavedMealsOrdered.length - 1 ||
-                                    bulkSaving
-                                "
-                                aria-label="Move down in bulk order"
-                                @click="moveBulkSaved(index, 1)"
-                            >
-                                <ChevronDown class="size-4" />
-                            </button>
-                        </div>
-                    </li>
-                </ul>
+        </div>
+
+        <ErrorState
+            v-if="failed"
+            title="Couldn't load this week"
+            :error="failed.error"
+            @retry="queries.forEach((q) => q.isError && q.refetch())"
+        />
+        <template v-else-if="loading">
+            <div v-if="showSkeleton" class="flex flex-col gap-3" role="status" aria-busy="true">
+                <span class="sr-only">Loading the week</span>
+                <Skeleton v-for="i in 7" :key="i" shape="block" height="6rem" />
             </div>
-            <button
-                type="button"
-                class="self-start rounded-md border border-emerald-800/60 bg-emerald-950/50 px-4 py-2 text-sm font-medium text-emerald-100 hover:bg-emerald-950/80 disabled:opacity-50"
-                :disabled="
-                    bulkSaving || savedPending || savedMeals.length === 0
-                "
-                @click="saveBulkRange"
-            >
-                {{ bulkSaving ? "Saving…" : "Save to range" }}
-            </button>
-        </section>
+        </template>
+        <ol v-else class="m-0 flex list-none flex-col gap-3 p-0" :aria-label="`Week of ${rangeLabel}`">
+            <li v-for="(day, i) in days" :key="day.key" class="min-w-0">
+                <PlanDayCard
+                    :day="day"
+                    :previous="days[i - 1]"
+                    :armed-name="armed?.name ?? null"
+                    :busy="busyDays.has(day.offset)"
+                    :busy-meal-ids="busyMeals"
+                    @add="onAdd(day)"
+                    @copy-to="onCopyTo(day)"
+                    @copy-from-previous="days[i - 1] && copy(days[i - 1]!, [day.offset])"
+                    @clear="clear(day)"
+                    @move="(idx, dir) => move(day, idx, dir)"
+                    @remove="(id) => remove(day, id)"
+                />
+            </li>
+        </ol>
+
+        <AddMealOverlay
+            v-model:open="addOpen"
+            :day="addDay"
+            :saved-meals="savedMeals"
+            :pending="savedPending"
+            :error="savedError"
+            :adding="addingSaved"
+            @add="(sm) => addDay && addTo(addDay, sm)"
+            @retry="refetchSaved()"
+        />
+        <CopyDayOverlay
+            v-model:open="copyOpen"
+            :source="copySource"
+            :pending="copyDay.isPending.value"
+            @copy="(to) => copySource && copy(copySource, to)"
+        />
     </div>
 </template>

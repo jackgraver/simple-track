@@ -7,7 +7,14 @@ import (
 	"gorm.io/gorm"
 )
 
-func CreateWaterLog(db *gorm.DB, date time.Time, amountOz float64, presetID *uint) (*WaterLog, error) {
+// CreateWaterLog inserts a log. With a non-empty clientID it is idempotent: a replay returns the
+// existing row (even if it was deleted since) and creates nothing.
+func CreateWaterLog(db *gorm.DB, date time.Time, amountOz float64, presetID *uint, clientID string) (*WaterLog, error) {
+	if clientID != "" {
+		if row, err := findByClientID(db, clientID); err != nil || row != nil {
+			return row, err
+		}
+	}
 	if amountOz <= 0 {
 		return nil, errors.New("amount_oz must be positive")
 	}
@@ -25,10 +32,31 @@ func CreateWaterLog(db *gorm.DB, date time.Time, amountOz float64, presetID *uin
 		AmountOz: amountOz,
 		PresetID: presetID,
 	}
+	if clientID != "" {
+		row.ClientID = &clientID
+	}
 	if err := db.Create(&row).Error; err != nil {
+		// Lost a race with a concurrent replay of the same client_id: return the winner's row.
+		if clientID != "" {
+			if existing, ferr := findByClientID(db, clientID); ferr == nil && existing != nil {
+				return existing, nil
+			}
+		}
 		return nil, err
 	}
 	if err := db.Preload("Preset").First(&row, row.ID).Error; err != nil {
+		return nil, err
+	}
+	return &row, nil
+}
+
+func findByClientID(db *gorm.DB, clientID string) (*WaterLog, error) {
+	var row WaterLog
+	err := db.Unscoped().Preload("Preset").Where("client_id = ?", clientID).First(&row).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, nil
+	}
+	if err != nil {
 		return nil, err
 	}
 	return &row, nil
@@ -42,6 +70,18 @@ func ListWaterLogsForDate(db *gorm.DB, date time.Time) ([]WaterLog, error) {
 
 func DeleteWaterLog(db *gorm.DB, id uint) error {
 	res := db.Delete(&WaterLog{}, id)
+	if res.Error != nil {
+		return res.Error
+	}
+	if res.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
+}
+
+// DeleteWaterLogByClientID deletes the entry created with clientID (gorm.ErrRecordNotFound if none).
+func DeleteWaterLogByClientID(db *gorm.DB, clientID string) error {
+	res := db.Where("client_id = ?", clientID).Delete(&WaterLog{})
 	if res.Error != nil {
 		return res.Error
 	}

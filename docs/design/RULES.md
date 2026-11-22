@@ -1,0 +1,66 @@
+# UI rules for agents
+
+Apply these to **any** change that touches `frontend/src/**/*.vue` or UI-facing `.ts`, in any
+project. Background: [PRINCIPLES.md](PRINCIPLES.md), [TOKENS.md](TOKENS.md),
+[PRIMITIVES.md](PRIMITIVES.md). Migration tracking lives in `docs/projects/ui-overhaul/`.
+
+## Rules
+1. **Tokens only.** No hex/rgb/hsl literals, no Tailwind palette classes (`zinc-*`, `green-*`,
+   `white`…), no arbitrary colour, type, radius, shadow or z values (`text-[10px]`,
+   `bg-[#1b1b1b]`, `z-[1000]`) outside `src/style.css`. If a token is missing, add it to
+   `style.css` and TOKENS.md in the same PR and log it in the project DECISIONS.md.
+2. **Primitives only.** Buttons, inputs, selects, toggles, cards, rows, badges, overlays, toasts
+   and states come from `shared/ui/`. Don't add a local copy of something that exists there. If
+   it's missing, build it to the PRIMITIVES.md spec with a Storybook story, or use tokens and
+   leave `<!-- ui: replace with <X> -->`.
+3. **No `<style>` blocks**, no new global CSS. Tailwind classes only.
+4. **No `!` overrides** (`m-0!`, `shadow-none!`) in new code. Needing one means the global
+   `App.vue` element CSS is in the way: use a primitive.
+5. **States required.** Every query-backed view renders loading (Skeleton), empty (EmptyState),
+   error (ErrorState + retry) and success. Every mutation trigger shows pending and reports
+   failure with a toast.
+6. **Mobile and desktop both work.** Layout switches at `lg` only. Mobile: no horizontal
+   overflow at 360px, controls ≥ 44px, primary action in thumb reach, safe areas respected,
+   inputs ≥ 16px. Desktop: uses the column, keyboard works (Tab, Enter, Esc).
+7. **Both themes work.** Never use `dark:`. If light looks wrong, fix the token.
+8. **A11y floor.** Icon-only buttons have `aria-label`, inputs have labels, focus is visible,
+   colour is never the only signal.
+9. **No suppressions.** `eslint-suppressions.json` has been empty since phase 6. Never run
+   `--suppress-all`/`--suppress-rule`. A real exception (an `sr-only` native radio, a range input
+   under a drawn slider) gets an inline `eslint-disable-next-line <rule> -- <why>` comment.
+10. **One module per PR** for migrations: tokens, primitives, states and the optimistic-ui
+    conversion together, so each page is touched once.
+
+## Lint (enforced)
+ESLint (`frontend/eslint.config.js`) runs in `npm run lint`, `./bin/dev check` and the j-cicd
+pipeline (`frontend-lint` step, before tests). It covers:
+
+| Rule | Catches |
+|---|---|
+| `better-tailwindcss/no-restricted-classes` | palette colours (`text-zinc-500`, `hover:bg-green-600`, `text-white/15`), arbitrary colour/type/radius/shadow/z values, and `!` important classes |
+| `better-tailwindcss/no-unknown-classes` | classes Tailwind doesn't know: typos, undefined tokens (`bg-primary`), and the custom CSS classes that `<style>` blocks need |
+| `better-tailwindcss/no-conflicting-classes`, `no-duplicate-classes`, `no-deprecated-classes` | contradictory, repeated or v3-era classes |
+| `vue/no-restricted-block` (`style`) | `<style>` blocks |
+| `no-restricted-syntax`, `vue/no-restricted-syntax`, `vue/no-restricted-static-attribute` | hex/rgb/hsl in TS strings, template expressions and `style="…"` |
+| `vue/no-restricted-html-elements` | raw `<button>`, `<input>`, `<select>`, `<textarea>` outside `shared/ui/` |
+| `no-restricted-imports` | `reka-ui` outside `shared/ui/` |
+
+Palette classes also fail to compile: `style.css` sets `--color-*: initial`, so only tokens exist.
+
+```sh
+cd frontend
+mise exec -- npm run lint
+```
+
+## How to verify visually
+Screenshot only what you changed. The owner knows the rest of the UI.
+1. **Components:** check them in Storybook (`npm run storybook`, port `$STORYBOOK_PORT` or 6006; its MCP endpoint is `/mcp`): every state, both themes, 390 and 1280
+   viewports. The story URL needs no backend or login.
+2. **Pages:** `./bin/dev start` (never bare `./bin/dev`), then `./bin/dev env` for the frontend URL.
+   Never hardcode ports. Log in with `dev`/`dev`. devseed provides data for every module.
+3. Use the Playwright plugin (or Claude in Chrome) to open the page at **390×844** and
+   **1280×800**, in dark and light, and check the console for errors.
+4. States: empty (filter to nothing or use a fresh worktree DB), error (block `/api/*` in
+   DevTools, or `./bin/dev stop` with the page open), pending (network throttling).
+5. `mise exec -- npm run type-check`, `npm run lint` and `npx vitest run` in `frontend/` must pass.
+6. Put before/after screenshots in the PR description. `./bin/dev stop` if you started the stack.

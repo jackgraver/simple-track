@@ -1,23 +1,33 @@
 <script setup lang="ts">
-import "~/pages/diet/macro-colors.css";
 import SearchList from "~/shared/SearchList.vue";
 import LogMealGroupBlock from "./LogMealGroupBlock.vue";
 import LogMealItemRow from "./LogMealItemRow.vue";
 import FoodDisplay from "~/pages/diet/logmeal/components/FoodDisplay.vue";
-import { mealItemsListGridClass } from "./mealItemsListGrid";
-import Input from "~/shared/input/Input.vue";
-import { computed, nextTick, watch } from "vue";
-import { useMeal } from "./queries/useMeal";
-import { useSavedMeal } from "./queries/useSavedMeal";
+import {
+    Button,
+    Card,
+    EmptyState,
+    ErrorState,
+    IconButton,
+    Input,
+    List,
+    Menu,
+    SkeletonList,
+    useDelayedFlag,
+} from "~/shared/ui";
+import { computed, nextTick, ref, watch } from "vue";
+import { useMeal, useSavedMeal } from "~/api/diet/queries";
 import { useDietLogsToday } from "~/api/diet/queries";
-import MacroBars from "~/pages/diet/components/MacroBars.vue";
+import SavedMealDisplay from "./components/SavedMealDisplay.vue";
 import { savedMealToMeal } from "~/utils/savedMealToMeal";
 import {
     EDIT_VARIANT,
     PAGE_MODE,
     parseEditMealVariant,
 } from "./logmealMode";
-import SimpleMacros from "~/shared/SimpleMacros.vue";
+import LogMealSummary from "./LogMealSummary.vue";
+import { MoreVertical, UtensilsCrossed } from "lucide-vue-next";
+import { defaultMealName } from "./domain/mealCard";
 import { useLogMealMode } from "./useLogMealMode";
 import {
     cloneMeal,
@@ -41,9 +51,28 @@ const {
     showDietDayMacroBars,
 } = useLogMealMode();
 
-const { data: mealData, error: mealError } = useMeal(mealId);
-const { data: savedMealData, error: savedMealError } =
-    useSavedMeal(savedMealEditId);
+const {
+    data: mealData,
+    error: mealError,
+    isLoading: mealLoading,
+    refetch: refetchMeal,
+} = useMeal(mealId);
+const {
+    data: savedMealData,
+    error: savedMealError,
+    isLoading: savedMealLoading,
+    refetch: refetchSavedMeal,
+} = useSavedMeal(savedMealEditId);
+
+const editLoading = computed(
+    () => mealLoading.value || savedMealLoading.value,
+);
+const showEditSkeleton = useDelayedFlag(editLoading);
+function retryLoad() {
+    void (editVariant.value === EDIT_VARIANT.saved
+        ? refetchSavedMeal()
+        : refetchMeal());
+}
 
 const mealLoadError = computed(() => {
     if (
@@ -64,7 +93,6 @@ const {
     mealItemBlocks,
     totalMacros,
     resetMeal,
-    amountPlusMinus,
     setMealItemAmount,
     isGroupExpanded,
     toggleGroupCollapse,
@@ -101,6 +129,18 @@ const {
     draftStorage,
 });
 
+// The submit functions toast their own failures; this only drives the pending state.
+const submitting = ref(false);
+async function submit(fn: () => Promise<void>) {
+    if (submitting.value) return;
+    submitting.value = true;
+    try {
+        await fn();
+    } finally {
+        submitting.value = false;
+    }
+}
+
 let logMealDraftHydrateGeneration = 0;
 
 watch(
@@ -119,6 +159,9 @@ watch(
             void nextTick(() => {
                 if (hydrateGen !== logMealDraftHydrateGeneration) return;
                 draftStorage.restore();
+                if (mode === PAGE_MODE.log && !meal.value.name.trim()) {
+                    meal.value.name = defaultMealName(new Date().getHours());
+                }
                 draftStorage.setSaveEnabled(true);
             });
             return;
@@ -179,108 +222,126 @@ const macroBarsDayTotals = computed(() => {
         totalFat: dayFat + tm.fat,
     };
 });
+
+const daySummaryTotals = computed(() => {
+    const t = macroBarsDayTotals.value;
+    return {
+        calories: t.totalCalories,
+        protein: t.totalProtein,
+        carbs: t.totalCarbs,
+        fat: t.totalFat,
+        fiber: t.totalFiber,
+    };
+});
+
+const mealItemCount = computed(() => meal.value.items.length);
+
+// Grouping lives behind Select mode so rows stay clean by default.
+const selecting = ref(false);
+const selectedCount = computed(
+    () => Object.values(selectedForGroup.value).filter(Boolean).length,
+);
+function toggleSelecting() {
+    selecting.value = !selecting.value;
+    if (!selecting.value) selectedForGroup.value = {};
+}
+watch(mealItemCount, (n) => {
+    if (n < 2 && selecting.value) toggleSelecting();
+});
+// Group/ungroup clear the selection on success; leave Select mode then.
+function groupAndExit() {
+    groupSelectedRows();
+    if (selectedCount.value === 0) selecting.value = false;
+}
+function ungroupAndExit() {
+    ungroupSelectedRows();
+    if (selectedCount.value === 0) selecting.value = false;
+}
+
+const logMenuItems = [{ key: "log-save", label: "Log and save meal" }];
+
+// One primary action per mode ("Log and save" lives in the menu beside it).
+const primaryAction = computed(() => {
+    if (pageMode.value === PAGE_MODE.create) return { label: "Save meal", run: saveSavedMealTemplate };
+    if (pageMode.value === PAGE_MODE.log) return { label: "Log meal", run: () => logMealToDay(false) };
+    if (editVariant.value === EDIT_VARIANT.saved) return { label: "Save changes", run: saveEditedSavedMeal };
+    if (editVariant.value === EDIT_VARIANT.logged) return { label: "Update", run: updateLoggedMeal };
+    if (editVariant.value === EDIT_VARIANT.planned) return { label: "Log", run: logEditedMeal };
+    return null;
+});
 </script>
 
 <template>
-    <div class="diet-module flex flex-col items-center pt-4">
-        <div
-            v-if="editMissingId"
-            class="flex h-[60dvh] items-center justify-center p-8 text-cfRed"
-        >
-            <span>Missing meal id for this edit.</span>
-        </div>
-        <div
+    <div class="flex w-full flex-col gap-4 pb-above-tabbar lg:pb-4">
+        <p v-if="editMissingId" class="m-0 text-sm text-danger" role="alert">
+            Missing meal id for this edit.
+        </p>
+        <ErrorState
             v-else-if="mealLoadError && id !== 0"
-            class="flex h-[60dvh] items-center justify-center p-8 text-cfRed"
-        >
-            <span
-                >Error loading meal:
-                {{ mealLoadError?.message || "Unknown error" }}</span
-            >
-        </div>
+            title="Couldn't load this meal"
+            :error="mealLoadError"
+            @retry="retryLoad"
+        />
+        <SkeletonList
+            v-else-if="showEditSkeleton"
+            :rows="4"
+            :leading="false"
+        />
         <div
-            v-else-if="meal"
-            class="flex w-full flex-col gap-4 md:grid md:h-[calc(100dvh-7rem)] md:grid-cols-[2fr_1fr] md:grid-rows-2 pb-16 md:pb-0"
+            v-else-if="meal && !editLoading"
+            class="grid grid-cols-1 gap-4 lg:h-[calc(100dvh-8rem)] lg:min-h-[36rem] lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] lg:grid-rows-2"
         >
-            <article
-                class="flex min-h-[min(28rem,55dvh)] flex-col overflow-hidden rounded-lg bg-firstBg md:row-span-2 md:min-h-0"
-            >
-                <header
-                    class="shrink-0 border-b border-secondBg p-4 text-textPrimary"
-                >
-                    <div
-                        class="mb-4 flex flex-row items-center justify-between"
-                    >
-                        <h1 class="m-0 text-xl font-semibold">
+            <!-- Bento at lg: the meal card spans both rows and scrolls its item list; the two pickers split the side column. -->
+            <Card padding="none" as="article" fill class="lg:row-span-2">
+                <header class="flex shrink-0 flex-col gap-4 border-b border-line p-4">
+                    <div class="flex flex-col gap-2">
+                        <h1 class="m-0 text-xs font-semibold tracking-wide text-fg-muted uppercase">
                             {{ pageTitle }}
                         </h1>
-                        <SimpleMacros
-                            :calories="totalMacros.calories"
-                            :protein="totalMacros.protein"
-                            :fat="totalMacros.fat"
-                            :carbs="totalMacros.carbs"
-                            :fiber="totalMacros.fiber"
-                        />
+                        <div class="flex items-center gap-2">
+                            <div class="min-w-0 flex-1">
+                                <Input
+                                    v-model="meal.name"
+                                    aria-label="Meal name"
+                                    placeholder="Name this meal"
+                                    required
+                                />
+                            </div>
+                            <Button
+                                v-if="mealItemCount >= 2"
+                                variant="ghost"
+                                :aria-pressed="selecting"
+                                @click="toggleSelecting"
+                            >
+                                {{ selecting ? "Done" : "Select" }}
+                            </Button>
+                        </div>
                     </div>
-                    <div class="flex min-w-0 flex-1 flex-col gap-2">
-                        <Input
-                            label="Meal Name"
-                            type="text"
-                            v-model="meal.name"
-                            required
-                        />
-                    </div>
+                    <LogMealSummary
+                        :meal="totalMacros"
+                        :day-after="showDietDayMacroBars ? daySummaryTotals : undefined"
+                        :plan="dayLogs?.day.plan"
+                    />
                 </header>
-                <section
-                    class="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden text-textPrimary"
-                >
-                    <div
-                        class="flex shrink-0 items-center justify-between gap-3 px-4 py-2.5"
-                    >
-                        <h3
-                            class="m-0 min-w-0 text-base font-medium leading-tight"
-                        >
-                            Meal Items
-                        </h3>
-                        <div
-                            class="flex shrink-0 flex-wrap items-center justify-end gap-2"
-                        >
-                            <button
-                                type="button"
-                                class="rounded border border-secondBg bg-secondBg px-3 py-1.5 text-sm hover:bg-thirdBg"
-                                @click="groupSelectedRows"
-                            >
-                                Group selected
-                            </button>
-                            <button
-                                type="button"
-                                class="rounded border border-secondBg bg-secondBg px-3 py-1.5 text-sm hover:bg-thirdBg"
-                                @click="ungroupSelectedRows"
-                            >
-                                Ungroup
-                            </button>
+                <section class="flex min-h-0 flex-1 flex-col" aria-labelledby="meal-items-heading">
+                    <div class="flex min-h-touch shrink-0 items-center justify-between gap-3 px-4 py-2 lg:min-h-row">
+                        <h2 id="meal-items-heading" class="m-0 text-xs font-semibold tracking-wide text-fg-muted uppercase">
+                            Items <span class="tabular-nums">{{ mealItemCount }}</span>
+                        </h2>
+                        <div v-if="selecting" class="flex items-center gap-2">
+                            <span class="text-sm text-fg-muted tabular-nums" aria-live="polite">{{ selectedCount }} selected</span>
+                            <Button size="sm" :disabled="selectedCount < 2" @click="groupAndExit">Group</Button>
+                            <Button size="sm" :disabled="selectedCount < 1" @click="ungroupAndExit">Ungroup</Button>
                         </div>
                     </div>
-                    <div
-                        class="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto px-4 pb-1"
-                    >
-                        <div
-                            :class="[
-                                mealItemsListGridClass,
-                                'mb-1 border-b border-secondBg pb-2 text-xs font-medium text-textSecondary sm:grid',
-                            ]"
-                        >
-                            <span><span class="sr-only">Select</span></span>
-                            <span class="min-w-0">Item</span>
-                            <span class="min-w-0 text-center">Qty</span>
-                            <span class="hidden md:block min-w-0 text-right"
-                                >Macros</span
-                            >
-                            <span
-                                class="flex h-9 w-9 shrink-0 justify-self-end"
-                                aria-hidden="true"
-                            ></span>
-                        </div>
+                    <EmptyState
+                        v-if="!mealItemBlocks.length"
+                        class="border-t border-line"
+                        :icon="UtensilsCrossed"
+                        title="No foods yet"
+                        description="Search Add foods, or start from a saved meal."
+                    />
+                    <List v-else class="min-h-0 flex-1 overflow-y-auto border-t border-line">
                         <template
                             v-for="(block, bi) in mealItemBlocks"
                             :key="'b-' + bi"
@@ -292,8 +353,9 @@ const macroBarsDayTotals = computed(() => {
                                     :item="item"
                                     :row-index="i"
                                     :selected="!!selectedForGroup[i]"
+                                    :selecting="selecting"
+                                    :meal-calories="totalMacros.calories"
                                     @toggle-select="toggleSelectRow"
-                                    @amount-plus-minus="amountPlusMinus"
                                     @set-item-amount="setMealItemAmount"
                                     @swap-variant="swapVariant"
                                     @remove="removeFood"
@@ -304,114 +366,60 @@ const macroBarsDayTotals = computed(() => {
                                 :block="block"
                                 :expanded="isGroupExpanded(block.groupId)"
                                 :selected-for-group="selectedForGroup"
+                                :selecting="selecting"
+                                :meal-calories="totalMacros.calories"
                                 @toggle-collapse="toggleGroupCollapse"
                                 @set-group-label="setGroupLabel"
                                 @remove-group="removeGroupLines"
                                 @toggle-select="toggleSelectRow"
-                                @amount-plus-minus="amountPlusMinus"
                                 @set-item-amount="setMealItemAmount"
                                 @swap-variant="swapVariant"
                                 @remove-item="removeFood"
                             />
                         </template>
-                    </div>
+                    </List>
                 </section>
                 <footer
-                    class="flex shrink-0 flex-col gap-4 border-t border-secondBg p-4"
+                    class="sticky bottom-above-tabbar z-raised flex shrink-0 items-center gap-2 rounded-b-card border-t border-line bg-surface p-4 lg:static lg:justify-end"
                 >
-                    <div class="flex w-full flex-row gap-3">
-                        <button
-                            v-if="pageMode === PAGE_MODE.create"
-                            class="flex-1 cursor-pointer rounded bg-secondBg px-5 py-2.5 text-sm text-textPrimary hover:bg-thirdBg"
-                            type="button"
-                            @click="saveSavedMealTemplate"
-                        >
-                            Save Meal
-                        </button>
-                        <button
-                            v-if="pageMode === PAGE_MODE.log"
-                            class="flex-1 cursor-pointer rounded bg-secondBg px-5 py-2.5 text-sm text-textPrimary hover:bg-thirdBg"
-                            type="button"
-                            @click="logMealToDay(false)"
-                        >
-                            Log Meal
-                        </button>
-                        <button
-                            v-if="pageMode === PAGE_MODE.log"
-                            class="flex-1 cursor-pointer rounded bg-secondBg px-5 py-2.5 text-sm text-textPrimary hover:bg-thirdBg"
-                            type="button"
-                            @click="logMealToDay(true)"
-                        >
-                            Log and Save Meal
-                        </button>
-                        <button
-                            v-if="
-                                pageMode === PAGE_MODE.edit &&
-                                editVariant === EDIT_VARIANT.saved
-                            "
-                            class="flex-1 cursor-pointer rounded bg-secondBg px-5 py-2.5 text-sm text-textPrimary hover:bg-thirdBg"
-                            type="button"
-                            @click="saveEditedSavedMeal"
-                        >
-                            Save changes
-                        </button>
-                        <button
-                            v-if="
-                                pageMode === PAGE_MODE.edit &&
-                                editVariant === EDIT_VARIANT.logged
-                            "
-                            class="flex-1 cursor-pointer rounded bg-secondBg px-5 py-2.5 text-sm text-textPrimary hover:bg-thirdBg"
-                            type="button"
-                            @click="updateLoggedMeal"
-                        >
-                            Update
-                        </button>
-                        <button
-                            v-if="
-                                pageMode === PAGE_MODE.edit &&
-                                editVariant === EDIT_VARIANT.planned
-                            "
-                            class="flex-1 cursor-pointer rounded bg-secondBg px-5 py-2.5 text-sm text-textPrimary hover:bg-thirdBg"
-                            type="button"
-                            @click="logEditedMeal"
-                        >
-                            Log
-                        </button>
-                    </div>
-                    <MacroBars
-                        v-if="showDietDayMacroBars"
-                        :totalCalories="macroBarsDayTotals.totalCalories"
-                        :totalProtein="macroBarsDayTotals.totalProtein"
-                        :totalFat="macroBarsDayTotals.totalFat"
-                        :totalCarbs="macroBarsDayTotals.totalCarbs"
-                        :planned-calories="dayLogs?.day.plan.calories ?? 0"
-                        :planned-protein="dayLogs?.day.plan.protein ?? 0"
-                        :planned-fat="dayLogs?.day.plan.fat ?? 0"
-                        :planned-carbs="dayLogs?.day.plan.carbs ?? 0"
-                    />
+                    <Menu v-if="pageMode === PAGE_MODE.log" :items="logMenuItems" @select="submit(() => logMealToDay(true))">
+                        <IconButton label="More log options" variant="secondary" :disabled="submitting">
+                            <MoreVertical class="size-5" />
+                        </IconButton>
+                    </Menu>
+                    <Button
+                        v-if="primaryAction"
+                        class="flex-1 lg:flex-none"
+                        variant="primary"
+                        :loading="submitting"
+                        @click="submit(primaryAction.run)"
+                    >
+                        {{ primaryAction.label }}
+                    </Button>
                 </footer>
-            </article>
-            <aside
-                class="flex min-h-[min(20rem,45dvh)] flex-col overflow-hidden rounded-lg bg-firstBg p-4 text-textPrimary md:min-h-0"
-            >
-                <h2 class="mt-0 text-lg font-semibold">Add Foods</h2>
-                <SearchList
-                    :route="'diet/meals/food/all'"
-                    :onSelect="pickFoodOrComposite"
-                    :onCreate="createFood"
-                    :displayComponent="FoodDisplay"
-                />
-            </aside>
-            <aside
-                class="flex min-h-[min(20rem,45dvh)] flex-col overflow-hidden rounded-lg bg-firstBg p-4 text-textPrimary md:min-h-0"
-            >
-                <h2 class="mt-0 text-lg font-semibold">Select Saved Meal</h2>
-                <SearchList
-                    :key="meal.ID"
-                    :route="'diet/meals/saved-meal/all'"
-                    :on-select="setMeal"
-                />
-            </aside>
+            </Card>
+            <Card as="aside" fill>
+                <div class="flex h-[26rem] flex-col gap-2 lg:h-auto lg:min-h-0 lg:flex-1">
+                    <h2 class="m-0 text-lg font-semibold">Add foods</h2>
+                    <SearchList
+                        :route="'diet/meals/food/all'"
+                        :onSelect="pickFoodOrComposite"
+                        :onCreate="createFood"
+                        :displayComponent="FoodDisplay"
+                    />
+                </div>
+            </Card>
+            <Card as="aside" fill>
+                <div class="flex h-[22rem] flex-col gap-2 lg:h-auto lg:min-h-0 lg:flex-1">
+                    <h2 class="m-0 text-lg font-semibold">Saved meals</h2>
+                    <SearchList
+                        :key="meal.ID"
+                        :route="'diet/meals/saved-meal/all'"
+                        :on-select="setMeal"
+                        :display-component="SavedMealDisplay"
+                    />
+                </div>
+            </Card>
         </div>
     </div>
 </template>

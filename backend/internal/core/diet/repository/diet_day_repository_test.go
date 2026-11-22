@@ -5,11 +5,14 @@ import (
 	dietrepo "be-simpletracker/internal/core/diet/repository"
 	"be-simpletracker/internal/core/diet/testutil"
 	"context"
+	"errors"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
 
 	"be-simpletracker/internal/utils"
+	"gorm.io/gorm"
 )
 
 func TestDayMealPlanToday_createsDayWithDefaultPlan(t *testing.T) {
@@ -270,5 +273,136 @@ func TestDayByIDGeneric_notFound(t *testing.T) {
 	_, err := dietrepo.DayByIDGeneric(context.Background(), 9999)
 	if err == nil {
 		t.Fatal("expected error")
+	}
+}
+
+func TestCopyPlannedMeals_appendsInOrderWithOwnMeals(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	plan := testutil.SeedPlan(t, db, "P")
+	src := testutil.SeedDay(t, db, utils.ZerodTime(0), plan.ID)
+	dst := testutil.SeedDay(t, db, utils.ZerodTime(-1), plan.ID)
+	food := testutil.SeedFood(t, db, "Oats", models.Food{ServingAmount: 1, Calories: 100})
+	a := testutil.SeedMeal(t, db, "A", food.ID, 1)
+	b := testutil.SeedMeal(t, db, "B", food.ID, 2)
+	testutil.SeedPlannedMeal(t, db, src.ID, b.ID, 1, false)
+	testutil.SeedPlannedMeal(t, db, src.ID, a.ID, 0, false)
+	logged := testutil.SeedMeal(t, db, "Eaten", food.ID, 1)
+	testutil.SeedPlannedMeal(t, db, src.ID, logged.ID, 2, true)
+	existing := testutil.SeedMeal(t, db, "Existing", food.ID, 1)
+	testutil.SeedPlannedMeal(t, db, dst.ID, existing.ID, 0, false)
+
+	n, err := dietrepo.CopyPlannedMeals(0, []int{-1, 0, -1})
+	if err != nil || n != 2 {
+		t.Fatalf("n %d err %v", n, err)
+	}
+	var got []models.PlannedMeal
+	db.Where("day_id = ?", dst.ID).Order("display_order").Preload("Meal.Items").Find(&got)
+	names := []string{}
+	for _, p := range got {
+		names = append(names, p.Meal.Name)
+		if p.Meal.Name != "Existing" && (p.MealID == a.ID || p.MealID == b.ID) {
+			t.Fatalf("copy shares the source meal row")
+		}
+	}
+	if strings.Join(names, ",") != "Existing,A,B" {
+		t.Fatalf("got %v", names)
+	}
+	if got[2].Meal.Items[0].Amount != 2 {
+		t.Fatalf("items not copied: %+v", got[2].Meal.Items)
+	}
+	var srcCount int64
+	db.Model(&models.PlannedMeal{}).Where("day_id = ?", src.ID).Count(&srcCount)
+	if srcCount != 3 {
+		t.Fatalf("source changed: %d", srcCount)
+	}
+}
+
+func TestLogPlannedMeal_pastDayIdempotent(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	plan := testutil.SeedPlan(t, db, "P")
+	yesterday := testutil.SeedDay(t, db, testutil.Today().AddDate(0, 0, -1), plan.ID)
+	food := testutil.SeedFood(t, db, "Rice", testutil.DefaultMacros())
+	meal := testutil.SeedMeal(t, db, "Lunch", food.ID, 1)
+	testutil.SeedPlannedMeal(t, db, yesterday.ID, meal.ID, 0, false)
+
+	for i := 0; i < 2; i++ { // second call is a replay
+		if err := dietrepo.LogPlannedMeal(yesterday.ID, meal.ID); err != nil {
+			t.Fatalf("call %d: %v", i, err)
+		}
+	}
+	var n int64
+	db.Model(&models.DayLog{}).Where("day_id = ? AND meal_id = ?", yesterday.ID, meal.ID).Count(&n)
+	if n != 1 {
+		t.Fatalf("want 1 day log, got %d", n)
+	}
+	var pm models.PlannedMeal
+	db.Where("day_id = ?", yesterday.ID).First(&pm)
+	if !pm.Logged {
+		t.Fatal("planned meal should be marked logged")
+	}
+	if err := dietrepo.LogPlannedMeal(yesterday.ID, meal.ID+999); !errors.Is(err, gorm.ErrRecordNotFound) {
+		t.Fatalf("want ErrRecordNotFound, got %v", err)
+	}
+}
+
+func TestDeleteLoggedMeal_idempotent(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	plan := testutil.SeedPlan(t, db, "P")
+	day := testutil.SeedDay(t, db, testutil.Today(), plan.ID)
+	food := testutil.SeedFood(t, db, "Egg", testutil.DefaultMacros())
+	meal := testutil.SeedMeal(t, db, "Eggs", food.ID, 1)
+	testutil.SeedDayLog(t, db, day.ID, meal.ID)
+	for i := 0; i < 2; i++ {
+		if err := dietrepo.DeleteLoggedMeal(day.ID, meal.ID); err != nil {
+			t.Fatalf("call %d: %v", i, err)
+		}
+	}
+}
+
+func TestQuickLogMeal_clientIDIdempotent(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	plan := testutil.SeedPlan(t, db, "P")
+	testutil.SeedDay(t, db, testutil.Today(), plan.ID)
+	cid := "11111111-1111-4111-8111-111111111111"
+	for i := 0; i < 2; i++ {
+		if _, err := dietrepo.QuickLogMeal(dietrepo.QuickLogParams{
+			DisplayName: "Bar", FoodRowName: fmt.Sprintf("Bar [ql-%d]", i), Calories: 200, ClientID: cid,
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	var n int64
+	db.Model(&models.DayLog{}).Count(&n)
+	if n != 1 {
+		t.Fatalf("want 1 day log after replay, got %d", n)
+	}
+}
+
+// A replay of from-saved after its planned meal was deleted is still a replay (the unique index
+// on client_id covers soft-deleted rows).
+func TestAddPlannedMealFromSavedMeal_replayAfterDelete(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	plan := testutil.SeedPlan(t, db, "P")
+	testutil.SeedDay(t, db, testutil.Today(), plan.ID)
+	food := testutil.SeedFood(t, db, "Oats", testutil.DefaultMacros())
+	saved := testutil.SeedSavedMeal(t, db, "Breakfast", food.ID)
+	cid := "44444444-4444-4444-8444-444444444444"
+	add := func() error {
+		meal := models.Meal{Name: saved.Name, Items: []models.MealItem{{FoodID: food.ID, Amount: 1}}}
+		return dietrepo.AddPlannedMealFromSavedMeal(0, saved.ID, &meal, cid)
+	}
+	if err := add(); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Where("client_id = ?", cid).Delete(&models.PlannedMeal{}).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := add(); err != nil {
+		t.Fatal(err)
+	}
+	var n int64
+	db.Unscoped().Model(&models.PlannedMeal{}).Where("client_id = ?", cid).Count(&n)
+	if n != 1 {
+		t.Fatalf("replay after delete created a new planned meal: %d rows", n)
 	}
 }

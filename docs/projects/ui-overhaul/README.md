@@ -2,32 +2,38 @@
 
 **Goal**: one consistent, clean, functional UI across mobile and desktop, with a little beauty. Gym logging is mobile-first; other modules are desktop or split.
 
-**Done when**: every page uses the token set and shared primitives, no raw colors/spacing outside the token layer, every list/form has loading/empty/error states, and `/dev/ui` showcases all primitives.
+**Done when**: every page uses the token set and shared components, no raw colours or styles outside the token layer (`eslint-suppressions.json` has no UI entries left), every list/form has loading/empty/error states, and Storybook shows every shared component in both themes. **Met 2026-11-19** (phases 1–6 done on `proj/ui-charter`; merging to `main` is the owner's call).
 
-**Non-goals**: new features, new brand, a component-library migration (decide in DECISIONS first).
+**Non-goals**: new features, a new brand. A component library is now allowed, chosen by a bake-off (see Phases).
 
-## Principles (draft, refine in the audit)
-- Clean and functional first; polish second. Dense but readable, one accent colour, subtle motion.
-- Touch targets and safe areas are first-class. Desktop is not just a stretched phone layout.
-- States are part of the design: loading, empty, error, offline, pending.
-- Tokens, not literals. Primitives, not one-off markup.
+## Where things live
+- **Design system (permanent):** `docs/design/`: [PRINCIPLES](../../design/PRINCIPLES.md), [RULES](../../design/RULES.md), [TOKENS](../../design/TOKENS.md), [PRIMITIVES](../../design/PRIMITIVES.md). This is what new UI work reads; this project folder is history.
+- **Agent entry points:** `frontend/CLAUDE.md` (auto-loaded under `frontend/`), the `ui` skill (`.claude/skills/ui/`), and a pointer in the root `CLAUDE.md`.
+- **This project:** README (status + retro), TASKS, DECISIONS.
+- **Enforcement:** ESLint (`frontend/eslint.config.js`), runs in `npm run lint`, `dev check` and j-cicd. `eslint-suppressions.json` is empty.
 
-## Current state (audited 2026-11-19)
-- Tailwind v4 with a `@theme` block in `frontend/src/style.css`. Tokens exist for 5 surface/text colours, border and one accent (`cfRed`); dark default, `.light` override. No spacing, radius, type or motion tokens.
-- A stale `frontend/tailwind.config.js` duplicates the colour tokens (v4 ignores it unless loaded). Decide which is canonical.
-- Token names mix camelCase (`mainBg`) and kebab (`--color-main-bg`) via an alias layer.
-- PrimeVue is installed with the Aura preset but only `primevue/chart` and `primevue/config` are used. Aura styling is effectively unused. Decide: keep PrimeVue for charts only, or drop the theme.
-- Shared primitives are sparse: `shared/input/{Input,Dropdown}.vue`, `shared/nav/*`, a few list/title components. No Button, Sheet/Dialog, Card, ListRow, Badge, Toggle. Pages likely rebuild these inline.
-- 83 `.vue` files, 14.7k lines. Largest: `diet/edit-planned/index.vue` (782), `gym/plans/[id].vue` (526), `gym/plans/index.vue` (525), `finances/account.vue` (461), `media/[id].vue` (432).
-- ~93 uses of raw palette colours or arbitrary hex in templates (`bg-red-500`, `[#...]`), ~52 hex literals in total; 23 files with `<style>` blocks.
-- Mobile nav (BottomTabBar, MobileHeader) and SideNav exist and are relatively recent.
+## Status (2026-11-19): done
+- Phases 1–6 are done. Every page is on tokens and `shared/ui/` primitives (Reka UI underneath), both themes work, and every primitive has stories in Storybook.
+- All of it is on `proj/ui-charter` (the phase 6 slices are stacked on it: `proj/ui-p6-element-css` → `-tokens` → `-lint` → `-final`). **None of it is merged to `main` or pushed.** Merging is the owner's call; it's a large diff, so deploy it on its own.
+- `lab/` and the bake-off stay on `proj/ui-bakeoff`, unmerged (comparison page https://claude.ai/artifact/4buX5k9LpVSCJ36o8LEMux).
 
 ## Phases
-1. **Audit**: screenshots of every page at 390px and 1280px, inconsistency list (spacing, colours, buttons, states). Output to `audit/` + TASKS.
-2. **Foundations**: token set (colour, spacing, radius, type, motion), consolidate tailwind config, lint rule banning literals.
-3. **Primitives + `/dev/ui` showcase**.
-4. **Module migration**, one module per slice (coordinate with optimistic-ui).
-5. **Enforcement + cleanup**: remove dead styles, PrimeVue decision, docs.
+1. **Charter + setup** (done).
+2. **Library bake-off**: Reka UI + own Tailwind picked over PrimeVue Volt and PrimeVue styled (done).
+3. **Foundations**: tokens, Storybook, Reka in `shared/ui/`, theme toggle, charts on tokens (done).
+4. **Shared components**, each with stories (done).
+5. **Module migration**: M1–M9, run as four parallel workers (done).
+6. **Enforcement + cleanup**: lint rules, no global element CSS, `--color-*: initial`, no legacy aliases (done).
 
-## Next up / gotchas
-- Run the audit (phase 1) first. Nothing else until the inconsistency list exists.
+## Open follow-ups (outside this project)
+- Not verified in a browser: forced error and empty states (they're in the code), Combobox load-more paging, grocery and finances with no data, signin register mode (no UI reaches it).
+- `useExerciseLoggingSession.ts` writes to a readonly query proxy on every set log (Vue warning). Fix with optimistic set logging (optimistic-ui project).
+- Candidate primitives if a second user appears: a radio-card group (PresetDialog, StarRating, PlanCalendar share the sr-only-radio pattern), a Progress bar (RoomCard), a Banner/tinted Card (finance stale warnings), a Sheet presentation for Menu/Combobox on mobile.
+- `MobileHeader`'s module switcher is a hand-rolled popover; move it to `Menu`.
+- Dev: `POST /api/auth/login` is rate-limited, so screenshot scripts get 429s. Use a cookie `auth_token=<DEV_AUTH_TOKEN>` instead.
+
+## Retro (2026-11-19)
+- **What worked:** the bake-off before tokens (the library decided naming and effort, and Reka's density matched the charter). ESLint with bulk suppressions as a ratchet: 849 violations to 0 without blocking anyone. Building primitives with a real consumer per slice (P4 logging shell, P7 water-presets) caught API gaps early. Pixel-diffing every route before and after the cleanup made deleting the global CSS safe.
+- **Parallel module migration** (four workers, one lead): fast, and module boundaries kept conflicts to `eslint-suppressions.json` and `shared/ui/index.ts`, both trivial to resolve. What made it work: one owner per shared change (others cherry-pick its commit), workers writing doc updates to notes files instead of the shared docs, and the lead reviewing screenshots before merging. The review still caught real issues (nested buttons, `role=button` stars, `!` in a page, devseed amounts), so keep it.
+- **What cost time:** the global element CSS in `App.vue`. It forced `!` overrides into every primitive, hid a content-box bug on links (`a { all: unset }`), and made Storybook differ from the app. Next time, remove global element styling first, before building primitives.
+- **Gaps:** error/empty states were mostly checked in code, not by forcing failures in a browser. A small Playwright "force each state" helper would close that for future work.

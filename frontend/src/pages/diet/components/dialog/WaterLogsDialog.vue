@@ -1,19 +1,25 @@
 <script setup lang="ts">
-import { getApiErrorMessage } from "~/api/httpError";
-import { computed, ref } from "vue";
+import { computed } from "vue";
 import type { WaterLog } from "~/api/tracking/types";
 import { useDeleteWater, useWaterLogs } from "~/api/tracking/queries";
 import { useWaterPrefs } from "~/composables/water/useWaterPrefs";
-import { toast } from "~/composables/toast/useToast";
+import { Trash2 } from "lucide-vue-next";
+import { EmptyState, ErrorState, IconButton, List, ListRow, SkeletonList, useDelayedFlag } from "~/shared/ui";
 
 const props = defineProps<{
     dateStr: string;
     dayLabel: string;
 }>();
 
-const { data: logs, isPending } = useWaterLogs(() => props.dateStr);
+const {
+    data: logs,
+    isPending,
+    isError,
+    error,
+    refetch,
+} = useWaterLogs(() => props.dateStr);
+const showSkeleton = useDelayedFlag(isPending);
 const deleteMutation = useDeleteWater();
-const deletingId = ref<number | null>(null);
 
 const { displayUnit, formatVolumeFromOz } = useWaterPrefs();
 
@@ -45,46 +51,51 @@ const sortedLogs = computed(() =>
     [...(logs.value ?? [])].sort((a, b) => createdMs(a) - createdMs(b)),
 );
 
-async function removeLog(log: WaterLog) {
-    if (deletingId.value != null || deleteMutation.isPending.value) return;
-    deletingId.value = log.ID;
-    try {
-        await deleteMutation.mutateAsync({ id: log.ID, date: props.dateStr });
-        toast.push("Removed", "success");
-    } catch (err: unknown) {
-        toast.push(getApiErrorMessage(err, "Failed to delete"), "error");
-    } finally {
-        deletingId.value = null;
-    }
+/** Rows whose create is still in flight have no server id yet (negative temp id). */
+function isUnsaved(log: WaterLog): boolean {
+    return log.ID < 0;
+}
+
+/** Any row can be deleted: one still being saved is deleted by client_id once its create is through. */
+function removeLog(log: WaterLog) {
+    deleteMutation.mutate({ id: log.ID, date: props.dateStr, client_id: log.client_id });
 }
 </script>
 
 <template>
-    <div class="flex flex-col gap-3 text-left text-zinc-100">
-        <p class="m-0 text-xs mx-1 text-zinc-400">{{ dayLabel }}</p>
-        <p v-if="isPending" class="m-0 text-sm text-zinc-500">Loading…</p>
-        <p v-else-if="!sortedLogs.length" class="m-0 text-sm text-zinc-500">
-            No water logged for this day.
-        </p>
-        <ul v-else class="m-0 list-none space-y-1.5 p-0">
-            <li v-for="log in sortedLogs" :key="log.ID">
-                <button
-                    type="button"
-                    class="flex w-full cursor-pointer items-baseline justify-between gap-4 rounded border! border-transparent! py-2 px-1! text-left text-sm transition-colors hover:border-red-500! shadow-none! m-0!"
-                    :disabled="
-                        deletingId === log.ID || deleteMutation.isPending.value
-                    "
-                    :aria-label="`Delete water entry ${amountLine(log)}`"
-                    @click="removeLog(log)"
-                >
-                    <span class="font-semibold tabular-nums text-zinc-100">{{
-                        amountLine(log)
-                    }}</span>
-                    <span class="shrink-0 tabular-nums text-zinc-400">{{
-                        formatTime(log)
-                    }}</span>
-                </button>
-            </li>
-        </ul>
+    <div class="flex flex-col gap-3 text-left">
+        <p class="m-0 text-xs text-fg-muted">{{ dayLabel }}</p>
+        <ErrorState
+            v-if="isError"
+            compact
+            title="Couldn't load water"
+            :error="error"
+            @retry="refetch()"
+        />
+        <SkeletonList v-else-if="showSkeleton" :rows="3" :leading="false" />
+        <EmptyState
+            v-else-if="!isPending && !sortedLogs.length"
+            title="No water logged"
+            description="Use Log Water to add an entry for this day."
+        />
+        <List v-else-if="sortedLogs.length">
+            <ListRow
+                v-for="log in sortedLogs"
+                :key="log.ID"
+                :pending="isUnsaved(log)"
+            >
+                <span class="font-semibold tabular-nums">{{ amountLine(log) }}</span>
+                <template #subtitle>{{ formatTime(log) }}</template>
+                <template #end>
+                    <IconButton
+                        variant="danger"
+                        :label="`Delete water entry ${amountLine(log)}`"
+                        @click="removeLog(log)"
+                    >
+                        <Trash2 class="size-5" />
+                    </IconButton>
+                </template>
+            </ListRow>
+        </List>
     </div>
 </template>

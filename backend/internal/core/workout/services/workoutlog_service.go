@@ -14,7 +14,12 @@ import (
 )
 
 func GetOrCreateToday(ctx context.Context, offset int) (models.WorkoutLog, error) {
-	day := utils.ZerodTime(offset)
+	return GetOrCreateDay(ctx, utils.ZerodTime(offset))
+}
+
+// GetOrCreateDay loads the workout log for day (local midnight), creating it with the plan
+// assigned to that weekday if missing. Concurrent callers for the same day get one row.
+func GetOrCreateDay(ctx context.Context, day time.Time) (models.WorkoutLog, error) {
 	workoutDay, err := workoutrepo.LoadByDate(ctx, day)
 	if err == nil {
 		return workoutDay, nil
@@ -35,7 +40,7 @@ func GetOrCreateToday(ctx context.Context, offset int) (models.WorkoutLog, error
 		Date:          day,
 		WorkoutPlanID: planID,
 	}
-	if err := workoutrepo.CreateMinimal(ctx, &newLog); err != nil {
+	if err := workoutrepo.CreateMinimalIfMissing(ctx, &newLog); err != nil {
 		return models.WorkoutLog{}, err
 	}
 	return workoutrepo.LoadByDate(ctx, day)
@@ -416,6 +421,75 @@ func RemoveLoggedExerciseForDay(ctx context.Context, offset int, exerciseID uint
 	return workoutrepo.RemoveLoggedExerciseForDay(ctx, utils.ZerodTime(offset), exerciseID)
 }
 
+// ErrExerciseNotFound is returned when a set is logged for an exercise id that doesn't exist.
+var ErrExerciseNotFound = errors.New("exercise not found")
+
+type LogSetInput struct {
+	ClientID    string
+	Day         time.Time // local midnight of the workout day
+	ExerciseID  uint
+	Reps        uint
+	Weight      float32
+	WeightSetup string
+}
+
+type LogSetResult struct {
+	Exercise      models.LoggedExercise
+	Set           models.LoggedSet
+	Created       bool
+	FirstSetOfDay bool
+}
+
+// LogSet creates one set idempotently (keyed by client_id), creating the day's workout log and
+// the logged exercise when needed, and returns the full logged exercise.
+func LogSet(ctx context.Context, in LogSetInput) (LogSetResult, error) {
+	exists, err := workoutrepo.ExerciseRowExists(ctx, in.ExerciseID)
+	if err != nil {
+		return LogSetResult{}, err
+	}
+	if !exists {
+		return LogSetResult{}, ErrExerciseNotFound
+	}
+	day, err := GetOrCreateDay(ctx, in.Day)
+	if err != nil {
+		return LogSetResult{}, err
+	}
+	res, err := workoutrepo.CreateSet(ctx, workoutrepo.CreateSetInput{
+		ClientID:     in.ClientID,
+		WorkoutLogID: day.ID,
+		ExerciseID:   in.ExerciseID,
+		Reps:         in.Reps,
+		Weight:       in.Weight,
+		WeightSetup:  in.WeightSetup,
+	})
+	if err != nil {
+		return LogSetResult{}, err
+	}
+	exercise, err := workoutrepo.LoadLoggedExercise(res.LoggedExerciseID)
+	if err != nil {
+		return LogSetResult{}, err
+	}
+	return LogSetResult{Exercise: exercise, Set: res.Set, Created: res.Created, FirstSetOfDay: res.FirstSetOfDay}, nil
+}
+
+// UpdateSet patches one set and returns it with its full logged exercise.
+func UpdateSet(ctx context.Context, ref workoutrepo.SetRef, patch workoutrepo.SetPatch) (models.LoggedSet, models.LoggedExercise, error) {
+	set, err := workoutrepo.UpdateSet(ctx, ref, patch)
+	if err != nil {
+		return models.LoggedSet{}, models.LoggedExercise{}, err
+	}
+	exercise, err := workoutrepo.LoadLoggedExercise(set.LoggedExerciseID)
+	if err != nil {
+		return models.LoggedSet{}, models.LoggedExercise{}, err
+	}
+	return set, exercise, nil
+}
+
+// DeleteSet removes one set; a missing set is reported as Deleted=false, not an error.
+func DeleteSet(ctx context.Context, ref workoutrepo.SetRef) (workoutrepo.DeleteSetResult, error) {
+	return workoutrepo.DeleteSet(ctx, ref)
+}
+
 func DeleteLoggedSet(setID uint) error {
 	return workoutrepo.DeleteLoggedSet(setID)
 }
@@ -680,4 +754,29 @@ func SetPlannedMobility(planID uint, preItems, postItems []string) (*models.Work
 		return nil, err
 	}
 	return workoutrepo.LoadPlanWithOrderedExercises(planID)
+}
+
+func RenameWorkoutPlan(id uint, name string) (*models.WorkoutPlan, error) {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return nil, fmt.Errorf("routine name is required")
+	}
+	if err := workoutrepo.UpdateWorkoutPlanName(id, name); err != nil {
+		return nil, err
+	}
+	return workoutrepo.LoadPlanWithOrderedExercises(id)
+}
+
+func DeleteWorkoutPlan(id uint) error {
+	return workoutrepo.SoftDeleteWorkoutPlan(id)
+}
+
+func RestoreWorkoutPlan(id uint) (*models.WorkoutPlan, error) {
+	if err := workoutrepo.RestoreWorkoutPlan(id); err != nil {
+		return nil, err
+	}
+	if err := workoutrepo.RefreshLegacyDay(id); err != nil {
+		return nil, err
+	}
+	return workoutrepo.LoadPlanWithOrderedExercises(id)
 }

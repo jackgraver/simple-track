@@ -1,23 +1,12 @@
 import { createApp } from 'vue'
-import { VueQueryPlugin, QueryClient } from '@tanstack/vue-query'
+import { VueQueryPlugin } from '@tanstack/vue-query'
 import { router } from './router'
 import App from './App.vue'
 import './style.css'
-import PrimeVue from 'primevue/config'
-import Aura from '@primeuix/themes/aura'
 import { setUnauthorizedRedirect } from './composables/auth/session'
 import { resolveAuthSession } from './composables/auth/useAuth'
-
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      staleTime: 1000 * 60 * 5,
-      gcTime: 1000 * 60 * 10,
-      retry: 1,
-      refetchOnWindowFocus: false,
-    },
-  },
-})
+import { queryClient } from './api/queryClient'
+import { initTheme } from './composables/useTheme'
 
 // After a deploy, a tab still running the previous build asks for chunks
 // that no longer exist. Reload once to pick up the new build instead of
@@ -38,6 +27,8 @@ window.addEventListener('vite:preloadError', (event) => {
 })
 
 setUnauthorizedRedirect(() => {
+  // Session expired: drop the previous user's cached data before the sign-in page.
+  queryClient.clear()
   if (router.currentRoute.value.name === 'signin') return
   void router.push({
     name: 'signin',
@@ -45,20 +36,14 @@ setUnauthorizedRedirect(() => {
   })
 })
 
+initTheme()
+
 const app = createApp(App)
 
 app.use(router)
 app.use(VueQueryPlugin, { queryClient })
-app.use(PrimeVue, {
-  theme: {
-    preset: Aura,
-    options: {
-      darkModeSelector: '.dark',
-      cssLayer: false,
-    },
-  },
-})
 
+// The landing route's queries start in the router's first `beforeEach` (see router/index.ts).
 void resolveAuthSession().then(() => {
   app.mount('#app')
 })

@@ -5,6 +5,7 @@ import {
     useWorkoutActivity,
     type WorkoutActivityQueryOpts,
 } from "~/api/workout/queries";
+import { ErrorState, SegmentedControl, Skeleton, useDelayedFlag } from "~/shared/ui";
 import { formatDateLong } from "~/utils/dateUtil";
 
 const router = useRouter();
@@ -21,7 +22,12 @@ const activityOpts = computed<WorkoutActivityQueryOpts>(() => {
     return { mode: "rolling", weeks: 52, days: null };
 });
 
-const { data, isPending, isError, error } = useWorkoutActivity(activityOpts);
+const { data, isPending, isError, error, refetch } = useWorkoutActivity(activityOpts);
+const showSkeleton = useDelayedFlag(() => isPending.value);
+const viewOptions: { label: string; value: ViewMode }[] = [
+    { label: "This year", value: "year" },
+    { label: "52 weeks", value: "weeks52" },
+];
 
 function parseDateOnly(s: string): Date {
     const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(s);
@@ -123,12 +129,12 @@ function cellClass(c: {
     active: boolean;
 }): string {
     if (c.active) {
-        return "bg-emerald-500";
+        return "bg-success";
     }
     if (c.isFuture) {
-        return "bg-firstBg/30";
+        return "bg-surface-2";
     }
-    return "bg-firstBg";
+    return "bg-surface-3";
 }
 
 function titleForKey(k: string): string {
@@ -164,58 +170,26 @@ watch(gridCells, () => scrollToToday());
 </script>
 
 <template>
-    <div class="flex flex-col gap-2 w-full min-w-0">
-        <div class="flex items-center justify-between">
-            <p class="m-0 text-sm text-textSecondary">Activity</p>
-            <div class="flex gap-1">
-                <button
-                    type="button"
-                    class="rounded px-2 py-0.5 text-xs transition-colors"
-                    :class="
-                        viewMode === 'year'
-                            ? 'bg-secondBg text-textPrimary'
-                            : 'text-textSecondary hover:bg-firstBg hover:text-textPrimary'
-                    "
-                    @click="viewMode = 'year'"
-                >
-                    This year
-                </button>
-                <button
-                    type="button"
-                    class="rounded px-2 py-0.5 text-xs transition-colors"
-                    :class="
-                        viewMode === 'weeks52'
-                            ? 'bg-secondBg text-textPrimary'
-                            : 'text-textSecondary hover:bg-firstBg hover:text-textPrimary'
-                    "
-                    @click="viewMode = 'weeks52'"
-                >
-                    52 weeks
-                </button>
+    <div class="flex w-full min-w-0 flex-col gap-2">
+        <div class="flex items-center justify-between gap-3">
+            <p class="m-0 text-sm text-fg-muted">Activity</p>
+            <div class="w-52">
+                <SegmentedControl v-model="viewMode" label="Activity range" :options="viewOptions" />
             </div>
         </div>
-        <div v-if="isPending" class="text-sm text-textSecondary">
-            Loading activity…
-        </div>
-        <div v-else-if="isError" class="text-sm text-(--color-cf-red)">
-            {{ error?.message ?? "Failed to load activity" }}
-        </div>
-        <div
-            v-else
-            ref="scrollContainer"
-            class="w-full min-w-0 overflow-x-auto scrollbar-thin"
-        >
-            <div
-                class="grid grid-rows-7 grid-flow-col gap-[3px] w-max"
-                role="grid"
-                aria-label="Workout activity"
-            >
+        <ErrorState v-if="isError" compact :error="error" title="Couldn't load activity" @retry="refetch()" />
+        <template v-else-if="isPending">
+            <Skeleton v-if="showSkeleton" shape="block" height="6rem" />
+        </template>
+        <div v-else ref="scrollContainer" class="w-full min-w-0 overflow-x-auto">
+            <div class="grid w-max grid-flow-col grid-rows-7 gap-[3px]" role="grid" aria-label="Workout activity">
+                <!-- eslint-disable-next-line vue/no-restricted-html-elements -- heatmap cell (10px square), not a button style -->
                 <button
                     v-for="(c, i) in gridCells"
                     :key="c.key + '-' + i"
                     type="button"
                     role="gridcell"
-                    class="m-0! min-h-0! size-[10px] rounded-sm p-0! border-0 cursor-pointer shadow-none! focus:outline-none focus-visible:ring-2 focus-visible:ring-thirdBg"
+                    class="size-[10px] min-h-0 cursor-pointer rounded-sm border-0 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
                     :class="cellClass(c)"
                     :title="titleForKey(c.key)"
                     :aria-label="titleForKey(c.key)"

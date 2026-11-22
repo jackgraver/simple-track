@@ -2,9 +2,9 @@
 import { computed, reactive, watch } from "vue";
 import { createContributionTypeFromPreset } from "~/api/money/api";
 import { useContributionPresets, useMoneyMutation } from "~/api/money/queries";
-import { getApiErrorMessage } from "~/api/httpError";
 import { toast } from "~/composables/toast/useToast";
-import { formatMoney, parseAmount, ui } from "../format";
+import { Button, Field, Input, Skeleton } from "~/shared/ui";
+import { formatMoney, parseAmount } from "../format";
 
 const props = defineProps<{
     existingNames: string[];
@@ -37,7 +37,7 @@ watch(
     { immediate: true },
 );
 
-const mutation = useMoneyMutation(createContributionTypeFromPreset);
+const mutation = useMoneyMutation(createContributionTypeFromPreset, "Failed to add account type");
 
 async function submit() {
     const preset = selected.value;
@@ -53,76 +53,86 @@ async function submit() {
         });
         toast.push(`${preset.name} added`, "success");
         props.onResolve?.(true);
-    } catch (error) {
-        toast.push(getApiErrorMessage(error, "Failed to add account type"), "error");
+    } catch {
+        // useMoneyMutation already toasted the error.
     }
 }
 </script>
 
 <template>
-    <form class="flex w-full min-w-72 flex-col gap-4 sm:min-w-[28rem]" @submit.prevent="submit">
-        <p v-if="isPending" class="m-0 text-sm text-textSecondary">Loading presets…</p>
-        <div class="grid gap-2 sm:grid-cols-3">
-            <button
+    <form class="flex w-full flex-col gap-4" @submit.prevent="submit">
+        <div v-if="isPending" class="grid grid-cols-1 gap-2 lg:grid-cols-3" aria-busy="true">
+            <Skeleton v-for="n in 3" :key="n" height="3.5rem" />
+        </div>
+        <fieldset v-else class="m-0 grid min-w-0 grid-cols-1 gap-2 border-0 p-0 lg:grid-cols-3">
+            <legend class="sr-only">Account type</legend>
+            <label
                 v-for="preset in available"
                 :key="preset.key"
-                type="button"
-                class="rounded-md border px-3 py-2 text-left text-sm transition-colors disabled:cursor-not-allowed disabled:opacity-40"
-                :class="form.key === preset.key ? 'border-green-600 bg-green-950/40 text-textPrimary' : 'border-(--color-border) bg-secondBg hover:bg-thirdBg'"
-                :disabled="preset.taken"
-                @click="form.key = preset.key"
+                class="flex min-h-touch cursor-pointer flex-col justify-center rounded-control border border-line bg-surface-2 px-3 py-2 text-base text-fg transition-colors duration-100 hover:bg-surface-3 has-checked:border-accent has-checked:bg-accent-soft has-disabled:cursor-not-allowed has-disabled:opacity-50 has-focus-visible:ring-2 has-focus-visible:ring-accent lg:text-sm"
             >
+                <!-- eslint-disable-next-line vue/no-restricted-html-elements -- sr-only native radio behind a styled card label (radio-card pattern, PRIMITIVES.md) -->
+                <input
+                    v-model="form.key"
+                    type="radio"
+                    name="preset"
+                    class="sr-only"
+                    :value="preset.key"
+                    :disabled="preset.taken"
+                />
                 <span class="block font-semibold">{{ preset.name }}</span>
-                <span class="block text-xs text-textSecondary">{{ preset.taken ? "Already added" : "Canada" }}</span>
-            </button>
-        </div>
+                <span class="block text-xs text-fg-muted">{{ preset.taken ? "Already added" : "Canada" }}</span>
+            </label>
+        </fieldset>
 
-        <p v-if="!isPending && available.length && available.every((p) => p.taken)" class="m-0 text-sm text-textSecondary">
+        <p v-if="!isPending && available.length && available.every((p) => p.taken)" class="m-0 text-sm text-fg-muted">
             All presets are already set up. Use <strong>Custom type</strong> for anything else, or edit an existing type's rules.
         </p>
 
         <template v-if="selected">
-            <p class="m-0 text-sm text-textSecondary">{{ selected.description }}</p>
-            <ul v-if="selected.limits.length" class="m-0 flex list-none flex-wrap gap-x-4 gap-y-1 p-0 text-xs text-textSecondary">
+            <p class="m-0 text-sm text-fg-muted">{{ selected.description }}</p>
+            <ul v-if="selected.limits.length" class="m-0 flex list-none flex-wrap gap-x-4 gap-y-1 p-0 text-xs text-fg-muted">
                 <li v-for="limit in selected.limits" :key="limit.year">
-                    {{ limit.year }}+: <span class="text-textPrimary">{{ formatMoney(limit.annual_limit) }}</span>
+                    {{ limit.year }}+: <span class="text-fg">{{ formatMoney(limit.annual_limit) }}</span>
                 </li>
             </ul>
 
-            <label v-if="selected.needs_start_year" :class="ui.label">
-                Year you opened your first {{ selected.name }}
-                <input v-model="form.startYear" inputmode="numeric" required placeholder="e.g. 2024" :class="ui.input" />
-            </label>
+            <Field v-if="selected.needs_start_year" :label="`Year you opened your first ${selected.name}`" required>
+                <Input v-model="form.startYear" inputmode="numeric" required placeholder="e.g. 2024" />
+            </Field>
 
             <div class="flex flex-col gap-2">
-                <p class="m-0 text-sm font-medium text-textPrimary">
+                <p class="m-0 text-sm font-medium text-fg">
                     Opening room {{ selected.suggest_opening_room ? "(recommended)" : "(optional)" }}
                 </p>
-                <p class="m-0 text-xs text-textSecondary">
+                <p class="m-0 text-xs text-fg-muted">
                     {{
                         selected.suggest_opening_room
                             ? "Your RRSP deduction limit from your latest notice of assessment."
-                            : "If you know your exact room from CRA, enter it — otherwise it's calculated from your birth year and deposits."
+                            : "If you know your exact room from CRA, enter it. Otherwise it's calculated from your birth year and deposits."
                     }}
                 </p>
-                <div class="grid gap-3 sm:grid-cols-2">
-                    <label :class="ui.label">
-                        Room on Jan 1 of
-                        <input v-model="form.openingRoomYear" inputmode="numeric" :class="ui.input" />
-                    </label>
-                    <label :class="ui.label">
-                        Amount
-                        <input v-model="form.openingRoom" inputmode="decimal" placeholder="Leave blank to calculate" :class="ui.input" />
-                    </label>
+                <div class="grid grid-cols-1 gap-3 lg:grid-cols-2">
+                    <Field label="Room on Jan 1 of">
+                        <Input v-model="form.openingRoomYear" inputmode="numeric" />
+                    </Field>
+                    <Field label="Amount">
+                        <Input v-model="form.openingRoom" inputmode="decimal" placeholder="Leave blank to calculate" />
+                    </Field>
                 </div>
             </div>
         </template>
 
-        <div class="flex justify-end gap-2">
-            <button type="button" :class="ui.btnSecondary" @click="props.onCancel?.()">Cancel</button>
-            <button type="submit" :class="ui.btnPrimary" :disabled="!selected || selected.taken || mutation.isPending.value">
+        <div class="flex flex-col-reverse gap-2 lg:flex-row lg:justify-end">
+            <Button variant="ghost" @click="props.onCancel?.()">Cancel</Button>
+            <Button
+                type="submit"
+                variant="primary"
+                :disabled="!selected || selected.taken"
+                :loading="mutation.isPending.value"
+            >
                 Add {{ selected?.name ?? "" }}
-            </button>
+            </Button>
         </div>
     </form>
 </template>

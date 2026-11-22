@@ -11,8 +11,10 @@ import (
 // It links an exercise to a workout log and contains the sets performed
 type LoggedExercise struct {
 	gorm.Model
-	WorkoutLogID  uint        `json:"workout_log_id"`
-	ExerciseID    uint        `json:"exercise_id"`
+	// One live row per (workout_log_id, exercise_id): idx_logged_exercises_workout_exercise
+	// (migration 0004). The tags mirror it for the SQLite module tests.
+	WorkoutLogID  uint        `json:"workout_log_id" gorm:"uniqueIndex:idx_logged_exercises_workout_exercise,where:deleted_at IS NULL"`
+	ExerciseID    uint        `json:"exercise_id" gorm:"uniqueIndex:idx_logged_exercises_workout_exercise,where:deleted_at IS NULL"`
 	Exercise      *Exercise   `json:"exercise"`
 	Sets          []LoggedSet `json:"sets" gorm:"constraint:OnDelete:CASCADE;"`
 	Notes         string      `json:"notes"`
@@ -28,10 +30,13 @@ func (l LoggedExercise) Preloads() []string { return []string{"Exercise", "Sets"
 // Contains reps, weight, and weight setup information for tracking progression
 type LoggedSet struct {
 	gorm.Model
-	LoggedExerciseID uint    `json:"logged_exercise_id"`
-	Reps             uint    `json:"reps"`
-	Weight           float32 `json:"weight"`
-	WeightSetup      string  `json:"weight_setup"`
+	LoggedExerciseID uint `json:"logged_exercise_id"`
+	// ClientID is a client-generated uuid that makes POST /workout/sets idempotent.
+	// NULL for sets created before migration 0004 or through the legacy full-replace endpoint.
+	ClientID    *string `json:"client_id" gorm:"type:uuid;uniqueIndex:idx_logged_sets_client_id"`
+	Reps        uint    `json:"reps"`
+	Weight      float32 `json:"weight"`
+	WeightSetup string  `json:"weight_setup"`
 }
 
 func (l LoggedSet) GetID() uint       { return l.ID }
@@ -60,11 +65,20 @@ func NormalizeExerciseLoadType(loadType ExerciseLoadType) ExerciseLoadType {
 // Can be associated with multiple workout plans via many-to-many relationship
 type Exercise struct {
 	gorm.Model
-	Name         string           `gorm:"uniqueIndex;not null" json:"name"`
-	RepRollover  uint             `json:"rep_rollover"`
-	Cues         string           `json:"cues"`
-	LoadType     ExerciseLoadType `gorm:"type:text;not null;default:plate_loaded_with_bar" json:"load_type"`
-	WorkoutPlans []WorkoutPlan    `gorm:"many2many:workout_plan_exercises;" json:"workout_plans"`
+	Name        string           `gorm:"uniqueIndex;not null" json:"name"`
+	RepRollover uint             `json:"rep_rollover"`
+	Cues        string           `json:"cues"`
+	LoadType    ExerciseLoadType `gorm:"type:text;not null;default:plate_loaded_with_bar" json:"load_type"`
+	// MachineSettings holds per-exercise machine positions (seat 4, pad 2, pulley top),
+	// shown on the logging screen. Read-only for now: no endpoint writes it yet.
+	MachineSettings []MachineSetting `gorm:"type:jsonb;serializer:json" json:"machine_settings"`
+	WorkoutPlans    []WorkoutPlan    `gorm:"many2many:workout_plan_exercises;" json:"workout_plans"`
+}
+
+// MachineSetting is one labelled machine position, e.g. {"label": "Seat", "value": "4"}.
+type MachineSetting struct {
+	Label string `json:"label"`
+	Value string `json:"value"`
 }
 
 func (e Exercise) GetID() uint        { return e.ID }

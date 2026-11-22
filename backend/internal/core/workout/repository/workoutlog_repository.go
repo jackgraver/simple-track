@@ -16,7 +16,8 @@ func LoadByDate(ctx context.Context, date time.Time) (models.WorkoutLog, error) 
 		Preload("Cardio").
 		Preload("Exercises.Sets").
 		Preload("Exercises.Exercise").
-		Preload("WorkoutPlan").
+		// Unscoped: a routine deleted after the session was logged still names and shapes that log.
+		Preload("WorkoutPlan", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
 		Where("date = ?", date).
 		First(&workoutDay).Error
 	if err != nil {
@@ -32,8 +33,27 @@ func LoadByDate(ctx context.Context, date time.Time) (models.WorkoutLog, error) 
 	return workoutDay, nil
 }
 
-func CreateMinimal(ctx context.Context, log *models.WorkoutLog) error {
-	return conn().WithContext(ctx).Omit("WorkoutPlan", "Exercises", "Cardio").Create(log).Error
+// CreateMinimalIfMissing inserts log unless a live workout log already exists for log.Date.
+// workout_logs.date has no unique index (legacy duplicates may exist), so on Postgres the
+// check-and-insert is serialized per date with a transaction-scoped advisory lock. If a row
+// already exists, log is left without an ID and nil is returned.
+func CreateMinimalIfMissing(ctx context.Context, log *models.WorkoutLog) error {
+	return conn().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if tx.Dialector.Name() == "postgres" {
+			key := "workout_logs.date:" + log.Date.Format("2006-01-02")
+			if err := tx.Exec("SELECT pg_advisory_xact_lock(hashtext(?))", key).Error; err != nil {
+				return err
+			}
+		}
+		var count int64
+		if err := tx.Model(&models.WorkoutLog{}).Where("date = ?", log.Date).Count(&count).Error; err != nil {
+			return err
+		}
+		if count > 0 {
+			return nil
+		}
+		return tx.Omit("WorkoutPlan", "Exercises", "Cardio").Create(log).Error
+	})
 }
 
 func GetByDateRange(ctx context.Context, start, end time.Time) ([]models.WorkoutLog, error) {

@@ -1,10 +1,7 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from "vue";
+import { computed, reactive, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import {
-    createMedia,
-    deleteMedia,
-    getMedia,
     LOOKUP_SOURCE_LABELS,
     LOOKUP_TYPES,
     lookupMedia,
@@ -13,16 +10,34 @@ import {
     MEDIA_STATUSES,
     MEDIA_TYPE_LABELS,
     MEDIA_TYPES,
-    updateMedia,
     type LookupResult,
     type MediaInput,
     type MediaItem,
     type MediaStatus,
     type MediaType,
 } from "~/api/media/api";
+import { useCreateMedia, useDeleteMedia, useMediaItem, useQuickUpdateMedia, useUpdateMedia } from "~/api/media/queries";
 import { getApiErrorMessage } from "~/api/httpError";
 import { useDialog } from "~/composables/dialog/useDialog";
 import { toast } from "~/composables/toast/useToast";
+import {
+    Button,
+    Card,
+    Checkbox,
+    EmptyState,
+    ErrorState,
+    Field,
+    Input,
+    List,
+    ListRow,
+    PageHeader,
+    SegmentedControl,
+    Select,
+    Skeleton,
+    Spinner,
+    Textarea,
+    useDelayedFlag,
+} from "~/shared/ui";
 import StarRating from "./StarRating.vue";
 
 const route = useRoute();
@@ -32,9 +47,19 @@ const { confirm } = useDialog();
 const isNew = computed(() => route.name === "media-new");
 const itemId = computed(() => Number(route.params.id));
 
-const isLoading = ref(!isNew.value);
-const isSaving = ref(false);
-const errorMessage = ref("");
+// NaN id (new item) disables the query. The list cache seeds the detail, so most visits skip the cold load.
+const itemQuery = useMediaItem(() => (isNew.value ? NaN : itemId.value));
+const createMut = useCreateMedia();
+const updateMut = useUpdateMedia();
+const quickMut = useQuickUpdateMedia();
+const deleteMut = useDeleteMedia();
+
+const isLoading = computed(() => !isNew.value && itemQuery.data.value === undefined && !itemQuery.isError.value);
+const hasError = computed(() => !isNew.value && itemQuery.isError.value && itemQuery.data.value === undefined);
+const loadError = computed(() => itemQuery.error.value);
+const isSaving = computed(() => createMut.isPending.value || updateMut.isPending.value);
+const isDeleting = computed(() => deleteMut.isPending.value);
+const showSkeleton = useDelayedFlag(isLoading);
 
 const LENGTH_UNITS: Record<MediaType, string> = {
     movie: "minutes",
@@ -71,6 +96,9 @@ const form = reactive({
     source: "",
     external_id: "",
 });
+
+const typeOptions = MEDIA_TYPES.map((t) => ({ label: MEDIA_TYPE_LABELS[t], value: t }));
+const statusOptions = MEDIA_STATUSES.map((s) => ({ label: MEDIA_STATUS_LABELS[s], value: s }));
 
 const unit = computed(() => LENGTH_UNITS[form.type]);
 const coverOk = ref(true);
@@ -187,80 +215,100 @@ function toPayload(): MediaInput {
     };
 }
 
-async function load() {
-    if (isNew.value) return;
-    isLoading.value = true;
-    errorMessage.value = "";
-    try {
-        toForm(await getMedia(itemId.value));
-    } catch (error) {
-        errorMessage.value = getApiErrorMessage(error, "Failed to load item");
-    } finally {
-        isLoading.value = false;
-    }
+// The form is a draft: fill it once per item, so a background refetch never clobbers unsaved edits.
+let filledId: number | null = null;
+watch(
+    () => itemQuery.data.value,
+    (item) => {
+        if (isNew.value || !item || item.ID === filledId) return;
+        filledId = item.ID;
+        toForm(item);
+    },
+    { immediate: true },
+);
+
+function load() {
+    void itemQuery.refetch();
 }
 
 async function save() {
     if (!form.title.trim() || isSaving.value) return;
-    isSaving.value = true;
     try {
         if (isNew.value) {
-            const item = await createMedia(toPayload());
+            const item = await createMut.mutateAsync(toPayload());
             toast.push("Added", "success");
+            filledId = item.ID;
             await router.replace({ name: "media-detail", params: { id: item.ID } });
             toForm(item);
         } else {
-            await updateMedia(itemId.value, toPayload());
+            await updateMut.mutateAsync({ id: itemId.value, payload: toPayload() });
             toast.push("Saved", "success");
             await router.push({ name: "media" });
         }
-    } catch (error) {
-        toast.push(getApiErrorMessage(error, "Failed to save"), "error");
-    } finally {
-        isSaving.value = false;
+    } catch {
+        // The mutation helper already toasted the error; the form keeps its inputs.
     }
 }
 
-/** Quick status change that saves immediately (backend fills in dates). */
-async function quickStatus(status: MediaStatus) {
+/** Quick status change: the form and caches update now, the server fills in dates and we adopt them. */
+function quickStatus(status: MediaStatus) {
+    const previous = form.status;
     form.status = status;
     if (isNew.value) return;
-    isSaving.value = true;
-    try {
-        toForm(await updateMedia(itemId.value, { status }));
-    } catch (error) {
-        toast.push(getApiErrorMessage(error, "Failed to update status"), "error");
-    } finally {
-        isSaving.value = false;
-    }
+    quickMut.mutate(
+        { id: itemId.value, fields: { status } },
+        {
+            onSuccess: (item) => {
+                // Adopt server-filled dates (and only those) so unsaved edits elsewhere survive.
+                if (form.status === item.status) {
+                    form.started_at = item.started_at?.slice(0, 10) ?? "";
+                    form.finished_at = item.finished_at?.slice(0, 10) ?? "";
+                    form.progress = item.progress?.toString() ?? "";
+                }
+            },
+            onError: () => {
+                if (form.status === status) form.status = previous;
+            },
+        },
+    );
 }
 
 async function remove() {
     const ok = await confirm({
         title: "Delete this item?",
+        tone: "danger",
         message: `"${form.title}" and your review will be removed.`,
         confirmText: "Delete",
     });
     if (!ok) return;
     try {
-        await deleteMedia(itemId.value);
+        await deleteMut.mutateAsync(itemId.value);
         toast.push("Deleted", "success");
         await router.push({ name: "media" });
-    } catch (error) {
-        toast.push(getApiErrorMessage(error, "Failed to delete"), "error");
+    } catch {
+        // Toasted by the mutation helper.
     }
 }
-
-onMounted(() => void load());
 </script>
 
 <template>
     <div class="mx-auto flex w-full max-w-4xl flex-col gap-6">
-        <p v-if="errorMessage" class="m-0 text-sm text-(--color-cf-red)">{{ errorMessage }}</p>
-        <p v-else-if="isLoading" class="m-0 text-sm text-textSecondary">Loading…</p>
-        <form v-else class="grid gap-6 md:grid-cols-[200px_1fr]" @submit.prevent="save">
+        <PageHeader :title="isNew ? 'Add media' : form.title || 'Media'" />
+
+        <ErrorState v-if="hasError" :error="loadError" title="Couldn't load this item" @retry="load" />
+        <div v-else-if="isLoading" class="grid grid-cols-1 gap-6 lg:grid-cols-[200px_1fr]">
+            <template v-if="showSkeleton">
+                <div class="aspect-[2/3] w-full max-w-50"><Skeleton shape="block" width="100%" height="100%" /></div>
+                <div class="flex flex-col gap-4">
+                    <Skeleton shape="block" height="2.75rem" />
+                    <Skeleton shape="block" height="2.75rem" />
+                    <Skeleton shape="block" height="8rem" />
+                </div>
+            </template>
+        </div>
+        <form v-else class="grid grid-cols-1 gap-6 lg:grid-cols-[200px_1fr]" @submit.prevent="save">
             <aside class="flex flex-col gap-3">
-                <div class="aspect-[2/3] w-full max-w-50 overflow-hidden rounded-lg bg-secondBg">
+                <div class="aspect-[2/3] w-full max-w-50 overflow-hidden rounded-card border border-line bg-surface-2">
                     <img
                         v-if="form.cover_url && coverOk"
                         :src="form.cover_url"
@@ -269,161 +317,116 @@ onMounted(() => void load());
                         class="h-full w-full object-cover"
                         @error="coverOk = false"
                     />
-                    <div v-else class="flex h-full items-center justify-center p-3 text-center text-sm text-textSecondary">
+                    <div v-else class="flex h-full items-center justify-center p-3 text-center text-sm text-fg-muted">
                         {{ form.cover_url ? "Couldn't load cover" : "No cover" }}
                     </div>
                 </div>
-                <input
-                    v-model="form.cover_url"
-                    type="url"
-                    placeholder="Cover image URL"
-                    class="rounded-md bg-thirdBg px-3 py-2 text-sm outline-none"
-                    @input="coverOk = true"
-                />
-                <label class="flex items-center gap-2 text-sm">
-                    <input v-model="form.favorite" type="checkbox" /> Favourite
-                </label>
+                <Input v-model="form.cover_url" type="url" inputmode="url" placeholder="Cover image URL" aria-label="Cover image URL" @input="coverOk = true" />
+                <Checkbox v-model="form.favorite" label="Favourite" />
             </aside>
 
-            <div class="flex min-w-0 flex-col gap-5">
-                <div class="grid grid-cols-[1fr_auto] gap-2 sm:grid-cols-[1fr_auto_auto]">
-                    <input
-                        v-model="form.title"
-                        required
-                        placeholder="Title"
-                        class="col-span-2 rounded-md bg-thirdBg px-3 py-2 text-lg font-semibold outline-none sm:col-span-1"
-                    />
-                    <select v-model="form.type" class="rounded-md bg-thirdBg px-3 py-2 text-sm outline-none" @change="closeLookup">
-                        <option v-for="t in MEDIA_TYPES" :key="t" :value="t">{{ MEDIA_TYPE_LABELS[t] }}</option>
-                    </select>
-                    <button
-                        type="button"
-                        class="rounded-md bg-secondBg px-3 py-2 text-sm hover:bg-thirdBg disabled:opacity-50"
-                        :disabled="!form.title.trim() || !canLookup || isLookingUp"
-                        :title="canLookup ? 'Search online for this title and fill in the details' : `No lookup source for ${MEDIA_TYPE_LABELS[form.type]} yet`"
-                        @click="runLookup"
-                    >
-                        {{ isLookingUp ? "Looking up…" : "Look up" }}
-                    </button>
+            <div class="flex min-w-0 flex-col gap-6">
+                <div class="grid grid-cols-1 gap-3 lg:grid-cols-[1fr_auto_auto]">
+                    <Field label="Title" required>
+                        <Input v-model="form.title" required placeholder="Title" />
+                    </Field>
+                    <Field label="Type">
+                        <Select v-model="form.type" :options="typeOptions" @update:model-value="closeLookup" />
+                    </Field>
+                    <div class="flex items-end">
+                        <Button
+                            block
+                            :loading="isLookingUp"
+                            :disabled="!form.title.trim() || !canLookup"
+                            :title="canLookup ? 'Search online for this title and fill in the details' : `No lookup source for ${MEDIA_TYPE_LABELS[form.type]} yet`"
+                            @click="runLookup"
+                        >
+                            {{ isLookingUp ? "Looking up…" : "Look up" }}
+                        </Button>
+                    </div>
                 </div>
 
-                <section v-if="lookupResults" class="flex flex-col gap-2 rounded-lg bg-secondBg p-3">
-                    <div class="flex items-center justify-between gap-2">
-                        <h2 class="m-0 text-sm font-medium text-textSecondary">
+                <Card v-if="lookupResults" padding="none">
+                    <div class="flex items-center justify-between gap-2 px-3 py-2 lg:px-4">
+                        <h2 class="m-0 text-sm font-medium text-fg-muted">
                             {{ lookupError ? "Lookup failed" : lookupResults.length ? "Pick a match" : "No matches found" }}
                         </h2>
-                        <button type="button" class="text-sm text-textSecondary hover:underline" @click="closeLookup">Close</button>
+                        <Button variant="ghost" size="sm" @click="closeLookup">Close</Button>
                     </div>
-                    <p v-if="lookupError" class="m-0 text-sm text-(--color-cf-red)">{{ lookupError }}</p>
-                    <button
-                        v-for="r in lookupResults"
-                        :key="r.source + r.external_id"
-                        type="button"
-                        class="flex items-center gap-3 rounded-md p-1.5 text-left hover:bg-thirdBg disabled:opacity-50"
-                        :disabled="applyingId !== null"
-                        @click="applyLookup(r)"
-                    >
-                        <div class="aspect-[2/3] w-10 shrink-0 overflow-hidden rounded bg-thirdBg">
-                            <img v-if="r.cover_url" :src="r.cover_url" alt="" loading="lazy" referrerpolicy="no-referrer" class="h-full w-full object-cover" />
-                        </div>
-                        <div class="min-w-0">
-                            <p class="m-0 truncate text-sm font-medium text-textPrimary">{{ r.title }}</p>
-                            <p class="m-0 truncate text-xs text-textSecondary">
-                                {{ [r.release_year, r.creator].filter(Boolean).join(" · ") || "\u00a0" }}
-                            </p>
-                        </div>
-                        <span v-if="applyingId === r.external_id" class="ml-auto shrink-0 text-xs text-textSecondary">Loading…</span>
-                    </button>
-                </section>
-                <div class="grid gap-2 sm:grid-cols-[1fr_7rem_1fr]">
-                    <input v-model="form.creator" placeholder="Creator (director, author…)" class="rounded-md bg-thirdBg px-3 py-2 text-sm outline-none" />
-                    <input v-model="form.release_year" type="number" min="0" max="9999" placeholder="Year" class="rounded-md bg-thirdBg px-3 py-2 text-sm outline-none" />
-                    <input v-model="form.genres" placeholder="Genres (comma separated)" class="rounded-md bg-thirdBg px-3 py-2 text-sm outline-none" />
+                    <ErrorState v-if="lookupError" compact :error="lookupError" title="Lookup failed" @retry="runLookup" />
+                    <EmptyState v-else-if="!lookupResults.length" title="No matches" description="Try a different title, or fill the details in by hand." />
+                    <List v-else>
+                        <ListRow
+                            v-for="r in lookupResults"
+                            :key="r.source + r.external_id"
+                            :disabled="applyingId !== null"
+                            :pending="applyingId === r.external_id"
+                            @click="applyLookup(r)"
+                        >
+                            <template #leading>
+                                <span class="block aspect-[2/3] w-10 overflow-hidden rounded-control bg-surface-3">
+                                    <img v-if="r.cover_url" :src="r.cover_url" alt="" loading="lazy" referrerpolicy="no-referrer" class="h-full w-full object-cover" />
+                                </span>
+                            </template>
+                            {{ r.title }}
+                            <template #subtitle>{{ [r.release_year, r.creator].filter(Boolean).join(" · ") || "\u00a0" }}</template>
+                            <template v-if="applyingId === r.external_id" #trailing><Spinner size="sm" label="Applying" /></template>
+                        </ListRow>
+                    </List>
+                </Card>
+
+                <div class="grid grid-cols-1 gap-3 lg:grid-cols-[1fr_7rem_1fr]">
+                    <Field label="Creator"><Input v-model="form.creator" placeholder="Director, author…" /></Field>
+                    <Field label="Year"><Input v-model="form.release_year" type="number" inputmode="numeric" placeholder="Year" /></Field>
+                    <Field label="Genres"><Input v-model="form.genres" placeholder="Comma separated" /></Field>
                 </div>
 
-                <section class="flex flex-col gap-2">
-                    <h2 class="m-0 text-sm font-medium text-textSecondary">Status</h2>
-                    <div class="flex flex-wrap gap-1">
-                        <button
-                            v-for="s in MEDIA_STATUSES"
-                            :key="s"
-                            type="button"
-                            class="rounded-md px-3 py-1.5 text-sm disabled:opacity-50"
-                            :class="form.status === s ? 'bg-primary text-white' : 'bg-secondBg hover:bg-thirdBg'"
-                            :disabled="isSaving"
-                            @click="quickStatus(s)"
-                        >
-                            {{ MEDIA_STATUS_LABELS[s] }}
-                        </button>
+                <Field label="Status">
+                    <!-- Six options don't fit a segmented control at phone width: native picker below lg. -->
+                    <div class="lg:hidden">
+                        <Select :model-value="form.status" :options="statusOptions" @update:model-value="(v) => quickStatus(v as MediaStatus)" />
                     </div>
-                </section>
+                    <div class="hidden lg:block">
+                        <SegmentedControl :model-value="form.status" :options="statusOptions" label="Status" @update:model-value="quickStatus" />
+                    </div>
+                </Field>
 
-                <section class="flex flex-col gap-2">
-                    <h2 class="m-0 text-sm font-medium text-textSecondary">Your rating</h2>
+                <Field label="Your rating">
                     <div class="flex items-center gap-3">
                         <StarRating v-model="form.rating" />
-                        <span class="text-sm text-textSecondary">{{ form.rating != null ? form.rating.toFixed(1) : "Unrated" }}</span>
+                        <span class="text-sm text-fg-muted">{{ form.rating != null ? form.rating.toFixed(1) : "Unrated" }}</span>
                     </div>
-                </section>
+                </Field>
 
-                <section class="flex flex-col gap-2">
-                    <h2 class="m-0 text-sm font-medium text-textSecondary">Thoughts</h2>
-                    <textarea
-                        v-model="form.review"
-                        rows="5"
-                        placeholder="What did you think?"
-                        class="resize-y rounded-md bg-thirdBg px-3 py-2 text-sm outline-none"
-                    />
-                </section>
+                <Field label="Thoughts">
+                    <Textarea v-model="form.review" :rows="5" placeholder="What did you think?" />
+                </Field>
 
-                <section class="grid gap-3 sm:grid-cols-2">
-                    <label class="flex flex-col gap-1 text-sm text-textSecondary">
-                        Progress ({{ unit }})
+                <div class="grid grid-cols-1 gap-3 lg:grid-cols-2">
+                    <Field :label="`Progress (${unit})`">
                         <div class="flex items-center gap-2">
-                            <input v-model="form.progress" type="number" min="0" class="w-full rounded-md bg-thirdBg px-3 py-2 text-sm text-textPrimary outline-none" />
-                            <span>/</span>
-                            <input v-model="form.length" type="number" min="0" placeholder="total" class="w-full rounded-md bg-thirdBg px-3 py-2 text-sm text-textPrimary outline-none" />
+                            <div class="min-w-0 flex-1"><Input v-model="form.progress" type="number" inputmode="numeric" aria-label="Progress" /></div>
+                            <span class="text-fg-muted">/</span>
+                            <div class="min-w-0 flex-1"><Input v-model="form.length" type="number" inputmode="numeric" placeholder="total" aria-label="Total" /></div>
                         </div>
-                    </label>
-                    <label class="flex flex-col gap-1 text-sm text-textSecondary">
-                        Times finished
-                        <input v-model="form.times_consumed" type="number" min="0" class="rounded-md bg-thirdBg px-3 py-2 text-sm text-textPrimary outline-none" />
-                    </label>
-                    <label class="flex flex-col gap-1 text-sm text-textSecondary">
-                        Started
-                        <input v-model="form.started_at" type="date" class="rounded-md bg-thirdBg px-3 py-2 text-sm text-textPrimary outline-none" />
-                    </label>
-                    <label class="flex flex-col gap-1 text-sm text-textSecondary">
-                        Finished
-                        <input v-model="form.finished_at" type="date" class="rounded-md bg-thirdBg px-3 py-2 text-sm text-textPrimary outline-none" />
-                    </label>
-                </section>
+                    </Field>
+                    <Field label="Times finished"><Input v-model="form.times_consumed" type="number" inputmode="numeric" /></Field>
+                    <Field label="Started"><Input v-model="form.started_at" type="date" /></Field>
+                    <Field label="Finished"><Input v-model="form.finished_at" type="date" /></Field>
+                </div>
 
-                <section class="flex flex-col gap-2">
-                    <h2 class="m-0 text-sm font-medium text-textSecondary">Synopsis</h2>
-                    <textarea
-                        v-model="form.synopsis"
-                        rows="3"
-                        placeholder="What's it about?"
-                        class="resize-y rounded-md bg-thirdBg px-3 py-2 text-sm outline-none"
-                    />
-                </section>
+                <Field label="Synopsis">
+                    <Textarea v-model="form.synopsis" :rows="3" placeholder="What's it about?" />
+                </Field>
 
-                <div class="flex flex-wrap justify-between gap-2">
-                    <button
-                        v-if="!isNew"
-                        type="button"
-                        class="rounded-md px-3 py-2 text-sm text-(--color-cf-red) hover:bg-secondBg"
-                        @click="remove"
-                    >
-                        Delete
-                    </button>
+                <div class="flex flex-col-reverse gap-2 lg:flex-row lg:justify-between">
+                    <Button v-if="!isNew" variant="danger" :loading="isDeleting" @click="remove">Delete</Button>
                     <span v-else />
-                    <div class="flex gap-2">
-                        <router-link :to="{ name: 'media' }" class="rounded-md bg-secondBg px-3 py-2 text-sm hover:bg-thirdBg">Back</router-link>
-                        <button type="submit" class="rounded-md bg-primary px-3 py-2 text-sm text-white disabled:opacity-50" :disabled="isSaving">
+                    <div class="flex flex-col gap-2 lg:flex-row">
+                        <Button :to="{ name: 'media' }">Back</Button>
+                        <Button type="submit" variant="primary" :loading="isSaving" :disabled="!form.title.trim()">
                             {{ isNew ? "Add" : "Save" }}
-                        </button>
+                        </Button>
                     </div>
                 </div>
             </div>

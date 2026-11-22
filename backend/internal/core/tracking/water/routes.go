@@ -8,6 +8,7 @@ import (
 	"be-simpletracker/internal/core/tracking/common"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
@@ -48,6 +49,7 @@ type postWaterBody struct {
 	Date     string  `json:"date"`
 	AmountOz float64 `json:"amount_oz"`
 	PresetID *uint   `json:"preset_id"`
+	ClientID string  `json:"client_id"`
 }
 
 func (h *handler) postWater(c *gin.Context) {
@@ -61,7 +63,13 @@ func (h *handler) postWater(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid date"})
 		return
 	}
-	row, err := CreateWaterLog(h.db, date, body.AmountOz, body.PresetID)
+	if body.ClientID != "" {
+		if _, err := uuid.Parse(body.ClientID); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid client_id"})
+			return
+		}
+	}
+	row, err := CreateWaterLog(h.db, date, body.AmountOz, body.PresetID, body.ClientID)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -70,12 +78,18 @@ func (h *handler) postWater(c *gin.Context) {
 }
 
 func (h *handler) deleteWater(c *gin.Context) {
-	id64, err := strconv.ParseUint(c.Param("id"), 10, 32)
-	if err != nil {
+	// :id is the numeric id or the entry's client_id (an entry added offline can be deleted before
+	// the client knows its server id).
+	raw := c.Param("id")
+	var err error
+	if id64, perr := strconv.ParseUint(raw, 10, 32); perr == nil && id64 != 0 {
+		err = DeleteWaterLog(h.db, uint(id64))
+	} else if u, uerr := uuid.Parse(raw); uerr == nil && u != uuid.Nil {
+		err = DeleteWaterLogByClientID(h.db, u.String())
+	} else {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
 		return
 	}
-	err = DeleteWaterLog(h.db, uint(id64))
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "not found"})

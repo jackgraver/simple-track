@@ -8,6 +8,7 @@ import {
     formatDateLong,
     parseDietDayOffsetQuery,
 } from "~/utils/dateUtil";
+import { IconButton } from "~/shared/ui";
 
 const route = useRoute();
 const router = useRouter();
@@ -87,14 +88,7 @@ function onNativeDateChange(ev: Event) {
 <template>
     <section class="flex flex-col gap-2">
         <div class="flex items-center justify-between gap-3">
-            <button
-                type="button"
-                aria-label="Previous day"
-                class="shrink-0 rounded-md border border-(--color-border) bg-firstBg p-2 text-textPrimary transition-colors hover:bg-secondBg"
-                @click="goToPreviousDay"
-            >
-                <ChevronLeftIcon class="size-4" />
-            </button>
+            <IconButton label="Previous day" variant="secondary" @click="goToPreviousDay"><ChevronLeftIcon /></IconButton>
             <div
                 class="flex min-w-0 flex-1 flex-col items-center justify-center gap-0"
             >
@@ -102,20 +96,22 @@ function onNativeDateChange(ev: Event) {
                     class="grid w-full max-w-[min(100%,22rem)] place-items-center text-center text-pretty"
                 >
                     <span
-                        class="invisible col-start-1 row-start-1 m-0 max-w-full px-1 text-base font-medium leading-tight text-textPrimary"
+                        class="invisible col-start-1 row-start-1 m-0 max-w-full px-1 text-base font-medium leading-tight text-fg"
                         aria-hidden="true"
                     >
                         Wednesday, December&nbsp;31st,&nbsp;2026
                     </span>
+                    <!-- eslint-disable-next-line vue/no-restricted-html-elements -- the date itself, styled as text, opens the native date picker -->
                     <button
                         type="button"
-                        class="col-start-1 row-start-1 m-0 max-w-full cursor-pointer rounded border-none bg-transparent px-1 text-base font-medium leading-tight text-textPrimary underline-offset-2 transition-colors hover:text-textPrimary hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-(--color-border)"
+                        class="col-start-1 row-start-1 max-w-full cursor-pointer rounded-control px-1 text-base font-medium leading-tight text-fg underline-offset-2 transition-colors hover:text-fg hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
                         :aria-label="`Chosen day: ${dateLabel}. Open calendar`"
                         @click="openNativeDatePicker"
                     >
                         {{ dateLabel }}
                     </button>
                 </div>
+                <!-- eslint-disable-next-line vue/no-restricted-html-elements -- hidden native date input that provides the picker -->
                 <input
                     ref="nativeDateInputEl"
                     type="date"
@@ -128,9 +124,10 @@ function onNativeDateChange(ev: Event) {
                 <div
                     class="flex h-4 shrink-0 items-center justify-center leading-none"
                 >
+                    <!-- eslint-disable-next-line vue/no-restricted-html-elements -- small text link under the date -->
                     <button
                         type="button"
-                        class="m-0! py-0! text-xs leading-none text-textSecondary underline-offset-2 transition-colors hover:text-textPrimary hover:underline disabled:pointer-events-none"
+                        class="py-0 text-xs leading-none text-fg-muted underline-offset-2 transition-colors hover:text-fg hover:underline disabled:pointer-events-none"
                         :class="{ invisible: isToday }"
                         :disabled="isToday"
                         :tabindex="isToday ? -1 : 0"
@@ -141,14 +138,7 @@ function onNativeDateChange(ev: Event) {
                     </button>
                 </div>
             </div>
-            <button
-                type="button"
-                aria-label="Next day"
-                class="shrink-0 rounded-md border border-(--color-border) bg-firstBg p-2 text-textPrimary transition-colors hover:bg-secondBg"
-                @click="goToNextDay"
-            >
-                <ChevronRightIcon class="size-4" />
-            </button>
+            <IconButton label="Next day" variant="secondary" @click="goToNextDay"><ChevronRightIcon /></IconButton>
         </div>
     </section>
 </template>

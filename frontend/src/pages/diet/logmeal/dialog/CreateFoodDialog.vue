@@ -3,8 +3,11 @@ import { ref } from "vue";
 import type { Food } from "~/types/diet";
 import SearchList from "~/shared/SearchList.vue";
 import FoodDisplay from "~/pages/diet/logmeal/components/FoodDisplay.vue";
-import { useCreateFood } from "../queries/useFoodMutations";
+import { useCreateFood } from "~/api/diet/queries";
 import { ChevronDown, ChevronUp } from "lucide-vue-next";
+import { getApiErrorMessage } from "~/api/httpError";
+import { toast } from "~/composables/toast/useToast";
+import { Badge, Button, Field, IconButton, Input, Select } from "~/shared/ui";
 
 const props = defineProps<{
     foodName?: string;
@@ -30,6 +33,10 @@ const relatedOpen = ref(false);
 const relatedFood = ref<Food | null>(null);
 
 const createFoodMutation = useCreateFood();
+const servingOptions = [
+    { label: "Unit", value: "Unit" },
+    { label: "Grams", value: "Grams" },
+];
 
 function clearRelated() {
     relatedFood.value = null;
@@ -58,112 +65,75 @@ const createFood = async () => {
             props.onResolve(response.food);
         }
     } catch (error) {
-        console.error("Failed to create food:", error);
+        toast.push(getApiErrorMessage(error, "Could not create food"), "error");
     }
 };
 </script>
 
 <template>
-    <div class="food-form">
-        <div class="field">
-            <label for="name">Food Name</label>
-            <input type="text" id="name" v-model="meal.name" />
+    <form class="flex flex-col gap-4 text-left" @submit.prevent="createFood">
+        <Field label="Food name" required>
+            <Input v-model="meal.name" required autocomplete="off" />
+        </Field>
+        <div class="grid grid-cols-2 gap-4 lg:grid-cols-5">
+            <Field label="Calories">
+                <Input v-model="meal.calories" type="number" inputmode="decimal" />
+            </Field>
+            <Field label="Protein">
+                <Input v-model="meal.protein" type="number" inputmode="decimal" />
+            </Field>
+            <Field label="Carbs">
+                <Input v-model="meal.carbs" type="number" inputmode="decimal" />
+            </Field>
+            <Field label="Fat">
+                <Input v-model="meal.fat" type="number" inputmode="decimal" />
+            </Field>
+            <Field label="Fiber">
+                <Input v-model="meal.fiber" type="number" inputmode="decimal" />
+            </Field>
         </div>
-        <div class="macros-row">
-            <div class="field">
-                <label for="calories">Calories</label>
-                <input
-                    type="number"
-                    id="calories"
-                    min="0"
-                    v-model="meal.calories"
-                />
-            </div>
-            <div class="field">
-                <label for="protein">Protein</label>
-                <input
-                    type="number"
-                    id="protein"
-                    min="0"
-                    v-model="meal.protein"
-                />
-            </div>
-            <div class="field">
-                <label for="carbs">Carbs</label>
-                <input type="number" id="carbs" min="0" v-model="meal.carbs" />
-            </div>
-            <div class="field">
-                <label for="fat">Fat</label>
-                <input type="number" id="fat" min="0" v-model="meal.fat" />
-            </div>
-            <div class="field">
-                <label for="fiber">Fiber</label>
-                <input type="number" id="fiber" min="0" v-model="meal.fiber" />
-            </div>
-        </div>
-        <div class="field">
-            <label for="unit">Serving Type</label>
-            <select id="unit" v-model="meal.serving_type">
-                <option value="none" selected disabled hidden>
-                    Select Serving Type
-                </option>
-                <option value="Unit">Unit</option>
-                <option value="Grams">Grams</option>
-            </select>
-            <label
-                v-if="
-                    meal.serving_type === 'Unit' ||
-                    meal.serving_type === 'Grams'
-                "
-                >Serving Amount</label
-            >
-            <input
-                type="number"
-                v-if="meal.serving_type === 'Unit'"
-                v-model="meal.serving_amount"
+        <Field label="Serving type">
+            <Select
+                v-model="meal.serving_type"
+                :options="servingOptions"
+                placeholder="Select serving type"
             />
-            <input
-                type="number"
-                v-if="meal.serving_type === 'Grams'"
-                v-model="meal.serving_amount"
-            />
-        </div>
-        <div class="field related-field">
-            <div class="related-header">
-                <label class="related-label" for="related-toggle"
-                    >Related to existing food (optional)</label
+        </Field>
+        <Field
+            v-if="meal.serving_type === 'Unit' || meal.serving_type === 'Grams'"
+            label="Serving amount"
+        >
+            <Input v-model="meal.serving_amount" type="number" inputmode="decimal" />
+        </Field>
+        <div class="flex flex-col gap-2">
+            <div class="flex items-center justify-between gap-2">
+                <span class="min-w-0 flex-1 text-sm font-medium text-fg-muted"
+                    >Related to existing food (optional)</span
                 >
-                <button
-                    id="related-toggle"
-                    type="button"
-                    class="related-toggle"
+                <IconButton
+                    :label="relatedOpen ? 'Hide related food search' : 'Search related food'"
+                    variant="secondary"
+                    size="sm"
                     :aria-expanded="relatedOpen"
                     aria-controls="related-search-panel"
                     @click="relatedOpen = !relatedOpen"
                 >
-                    <span
-                        class="related-chevron"
-                        :class="{ open: relatedOpen }"
-                    >
-                        <ChevronDown v-if="!relatedOpen" :size="16" />
-                        <ChevronUp v-else :size="16" />
-                    </span>
-                </button>
+                    <ChevronUp v-if="relatedOpen" class="size-5" />
+                    <ChevronDown v-else class="size-5" />
+                </IconButton>
             </div>
-            <div v-if="relatedFood" class="related-chip">
-                <span class="related-name">{{ relatedFood.name }}</span>
-                <button
-                    type="button"
-                    class="related-clear"
-                    @click="clearRelated"
-                >
-                    Clear
-                </button>
+            <div
+                v-if="relatedFood"
+                class="flex items-center justify-between gap-2 rounded-control bg-surface-2 px-3 py-1"
+            >
+                <Badge tone="accent">Related</Badge>
+                <span class="min-w-0 flex-1 truncate text-sm">{{ relatedFood.name }}</span>
+                <Button variant="ghost" size="sm" @click="clearRelated">Clear</Button>
             </div>
             <div
                 v-show="relatedOpen"
                 id="related-search-panel"
-                class="related-search"
+                class="flex h-56 flex-col overflow-hidden rounded-control border border-line"
             >
                 <SearchList
                     route="diet/meals/food/all"
@@ -172,121 +142,14 @@ const createFood = async () => {
                 />
             </div>
         </div>
-        <button type="button" class="create-food-submit" @click="createFood">
+        <Button
+            type="submit"
+            variant="primary"
+            size="lg"
+            block
+            :loading="createFoodMutation.isPending.value"
+        >
             Create
-        </button>
-    </div>
+        </Button>
+    </form>
 </template>
-
-<style scoped>
-.food-form {
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-    color: white;
-}
-
-.field {
-    display: flex;
-    flex-direction: column;
-    gap: 0.25rem;
-}
-
-.macros-row {
-    display: flex;
-    gap: 1rem;
-}
-
-input {
-    background-color: rgb(50, 50, 50);
-    color: white;
-    border: none;
-    border-radius: 4px;
-    padding: 0.5rem;
-    width: 100%;
-    box-sizing: border-box;
-}
-
-label {
-    font-size: 0.9rem;
-    color: #ccc;
-}
-
-.related-field {
-    gap: 0.5rem;
-}
-.related-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.5rem;
-}
-.related-label {
-    margin: 0;
-    flex: 1;
-    min-width: 0;
-    font-size: 0.9rem;
-    color: #ccc;
-}
-.related-toggle {
-    flex-shrink: 0;
-    cursor: pointer;
-    border: none;
-    border-radius: 4px;
-    padding: 0.35rem 0.55rem;
-    background: rgb(70, 70, 70);
-    color: white;
-    line-height: 1;
-}
-.related-chevron {
-    display: inline-block;
-    font-size: 0.65rem;
-    transition: transform 0.15s ease;
-}
-
-.related-chip {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.5rem;
-    padding: 0.45rem 0.6rem;
-    border-radius: 4px;
-    background: rgb(55, 55, 55);
-}
-
-.related-name {
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    font-size: 0.9rem;
-}
-
-.related-clear {
-    flex-shrink: 0;
-    cursor: pointer;
-    border: none;
-    border-radius: 4px;
-    padding: 0.25rem 0.5rem;
-    background: rgb(70, 70, 70);
-    color: white;
-    font-size: 0.8rem;
-}
-
-.related-search {
-    max-height: 14rem;
-    min-height: 6rem;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-    border-radius: 4px;
-    border: 1px solid rgb(60, 60, 60);
-}
-
-.create-food-submit {
-    background-color: var(--color-secondBg);
-    color: var(--color-textPrimary);
-    &:hover {
-        background-color: var(--color-thirdBg);
-    }
-}
-</style>

@@ -32,6 +32,8 @@ type PlannedMeal struct {
 	SavedMealID  *uint   `json:"saved_meal_id,omitempty" gorm:"index"`
 	Logged       bool    `json:"logged"`
 	DisplayOrder int     `json:"display_order" gorm:"not null;default:0"`
+	// ClientID is a client-generated uuid that makes creates idempotent (unique when set).
+	ClientID *string `json:"client_id,omitempty" gorm:"type:uuid"`
 }
 
 func (p PlannedMeal) GetID() uint        { return p.ID }

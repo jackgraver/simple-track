@@ -61,9 +61,11 @@ func run() error {
 	return nil
 }
 
+// Local midnight, the same day boundary the API uses (utils.ZerodTime). UTC midnight lands on the
+// previous local day west of UTC, so seeded logs would show up a day early.
 func today() time.Time {
 	n := time.Now()
-	return time.Date(n.Year(), n.Month(), n.Day(), 0, 0, 0, 0, time.UTC)
+	return time.Date(n.Year(), n.Month(), n.Day(), 0, 0, 0, 0, time.Local)
 }
 
 func seed(tx *gorm.DB) error {
@@ -106,6 +108,10 @@ func seedGym(tx *gorm.DB) error {
 	if err := tx.Create(&prog).Error; err != nil {
 		return err
 	}
+	// One active program, as ActivateWorkoutProgram keeps it (the baseline seeds an active "Default").
+	if err := tx.Model(&workm.WorkoutProgram{}).Where("id != ?", prog.ID).Update("is_active", false).Error; err != nil {
+		return err
+	}
 
 	type pl struct {
 		name    string
@@ -142,11 +148,29 @@ func seedGym(tx *gorm.DB) error {
 		}
 	}
 
-	// Past sessions: one every 2-3 days over the last ~4 weeks, cycling plans.
-	for i := 0; i < 9; i++ {
-		p := plans[i%3]
-		wp := created[i%3]
-		log := workm.WorkoutLog{Date: today().AddDate(0, 0, -(i*3 + 1)), WorkoutPlanID: &wp.ID}
+	// Past sessions on each plan's scheduled weekday over the last four weeks (today excluded), with
+	// weights rising session by session. One session is skipped so the UI shows a missed day.
+	byWeekday := map[time.Weekday]int{}
+	for i, p := range plans {
+		byWeekday[time.Weekday(p.day)] = i
+	}
+	const daysBack = 28
+	skipped := false
+	session := 0
+	for back := daysBack; back >= 1; back-- {
+		date := today().AddDate(0, 0, -back)
+		pi, ok := byWeekday[date.Weekday()]
+		if !ok {
+			continue
+		}
+		if !skipped && back > 7 && back <= 14 {
+			skipped = true
+			continue
+		}
+		session++
+		p := plans[pi]
+		wp := created[pi]
+		log := workm.WorkoutLog{Date: date, WorkoutPlanID: &wp.ID}
 		if err := tx.Create(&log).Error; err != nil {
 			return err
 		}
@@ -155,7 +179,7 @@ func seedGym(tx *gorm.DB) error {
 			if err := tx.Create(&le).Error; err != nil {
 				return err
 			}
-			base := float32(45 + ei*10 + (9-i)*2)
+			base := float32(45 + ei*10 + session*2)
 			for s := 0; s < 3; s++ {
 				set := workm.LoggedSet{LoggedExerciseID: le.ID, Reps: uint(10 - s), Weight: base, WeightSetup: ""}
 				if err := tx.Create(&set).Error; err != nil {
@@ -175,7 +199,7 @@ func seedGym(tx *gorm.DB) error {
 
 func seedDiet(tx *gorm.DB) error {
 	type fd struct {
-		name, serving string
+		name, serving          string
 		amt, cal, p, f, c, fat float32
 	}
 	defs := []fd{
@@ -190,6 +214,7 @@ func seedDiet(tx *gorm.DB) error {
 		{"Salmon", "g", 100, 208, 20, 0, 0, 13},
 		{"Whey Protein", "scoop", 1, 120, 24, 0, 3, 1.5},
 	}
+	// Item Amount below is a number of servings (ServingAmount units each), not grams.
 	foods := make([]dietm.Food, len(defs))
 	for i, d := range defs {
 		foods[i] = dietm.Food{Name: d.name, ServingType: d.serving, ServingAmount: d.amt, Calories: d.cal, Protein: d.p, Fiber: d.f, Carbs: d.c, Fat: d.fat}
@@ -206,7 +231,7 @@ func seedDiet(tx *gorm.DB) error {
 	}
 
 	saved := []dietm.SavedMeal{
-		{Name: "Chicken & Rice", Items: []dietm.SavedMealItem{{FoodID: foods[0].ID, Amount: 200}, {FoodID: foods[1].ID, Amount: 250}, {FoodID: foods[6].ID, Amount: 100}}},
+		{Name: "Chicken & Rice", Items: []dietm.SavedMealItem{{FoodID: foods[0].ID, Amount: 2}, {FoodID: foods[1].ID, Amount: 2.5}, {FoodID: foods[6].ID, Amount: 1}}},
 		{Name: "Breakfast", Items: []dietm.SavedMealItem{{FoodID: foods[2].ID, Amount: 3}, {FoodID: foods[4].ID, Amount: 1}}},
 	}
 	if err := tx.Create(&saved).Error; err != nil {
@@ -228,7 +253,7 @@ func seedDiet(tx *gorm.DB) error {
 		}
 		if i <= 0 {
 			meal := dietm.Meal{Name: "Lunch", Items: []dietm.MealItem{
-				{FoodID: foods[0].ID, Amount: 200}, {FoodID: foods[1].ID, Amount: 250}, {FoodID: foods[7].ID, Amount: 1},
+				{FoodID: foods[0].ID, Amount: 2}, {FoodID: foods[1].ID, Amount: 2.5}, {FoodID: foods[7].ID, Amount: 1},
 			}}
 			if err := tx.Create(&meal).Error; err != nil {
 				return err
@@ -238,7 +263,7 @@ func seedDiet(tx *gorm.DB) error {
 			}
 		}
 		if i >= 0 {
-			meal := dietm.Meal{Name: "Dinner", Items: []dietm.MealItem{{FoodID: foods[8].ID, Amount: 180}, {FoodID: foods[6].ID, Amount: 150}}}
+			meal := dietm.Meal{Name: "Dinner", Items: []dietm.MealItem{{FoodID: foods[8].ID, Amount: 1.8}, {FoodID: foods[6].ID, Amount: 1.5}}}
 			if err := tx.Create(&meal).Error; err != nil {
 				return err
 			}

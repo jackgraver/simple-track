@@ -1,7 +1,9 @@
 <script setup lang="ts">
+import { SearchX } from "lucide-vue-next";
+import { Button, EmptyState, ErrorState, Skeleton, SkeletonList, useDelayedFlag } from "~/shared/ui";
 import LoggingHeader from "./LoggingHeader.vue";
 
-defineProps<{
+const props = defineProps<{
     pending?: boolean;
     error?: Error | null;
     empty?: boolean;
@@ -10,64 +12,36 @@ defineProps<{
 
 const emit = defineEmits<{
     (e: "back"): void;
+    (e: "retry"): void;
 }>();
+
+// Fast loads show nothing instead of flashing a skeleton.
+const showSkeleton = useDelayedFlag(() => !!props.pending);
 </script>
 
 <template>
-    <div
-        v-if="pending"
-        class="logging-page-shell logging-page-shell--pad logging-page-shell--loading flex w-full flex-col gap-6 self-stretch"
-    >
+    <div v-if="pending" class="mx-auto flex w-full max-w-md flex-col gap-6 self-stretch py-2 lg:py-0">
         <LoggingHeader @back="emit('back')">
             <template #center>
-                <h2
-                    class="logging-title m-0 min-w-0 truncate text-center text-lg font-medium text-zinc-400"
-                >
-                    Loading…
-                </h2>
-            </template>
-            <template #right>
-                <span class="set-indicator text-zinc-500">Set —</span>
+                <div v-if="showSkeleton" class="flex justify-center"><Skeleton width="8rem" /></div>
             </template>
         </LoggingHeader>
+        <SkeletonList v-if="showSkeleton" :rows="3" />
     </div>
-    <div
-        v-else-if="error"
-        class="logging-page-shell logging-page-shell--pad flex w-full flex-col gap-4 self-stretch"
-    >
-        <div>Error: {{ error.message }}</div>
+    <div v-else-if="error" class="mx-auto flex w-full max-w-md flex-col gap-4 self-stretch py-2 lg:py-0">
+        <LoggingHeader @back="emit('back')" />
+        <ErrorState :error="error" title="Couldn't load this workout" @retry="emit('retry')" />
     </div>
-    <div
-        v-else-if="empty"
-        class="logging-page-shell logging-page-shell--pad flex w-full flex-col gap-4 self-stretch"
-    >
+    <div v-else-if="empty" class="mx-auto flex w-full max-w-md flex-col gap-4 self-stretch py-2 lg:py-0">
         <slot name="empty">
-            <div>{{ emptyMessage ?? "Nothing to show." }}</div>
-            <button
-                class="rounded border border-zinc-600 px-4 py-2 hover:bg-zinc-800"
-                type="button"
-                @click="emit('back')"
-            >
-                Back
-            </button>
+            <EmptyState :icon="SearchX" :title="emptyMessage ?? 'Nothing to show'">
+                <template #action>
+                    <Button variant="secondary" @click="emit('back')">Back</Button>
+                </template>
+            </EmptyState>
         </slot>
     </div>
-    <div
-        v-else
-        class="logging-page-shell logging-page-shell--pad flex w-full flex-col gap-4 self-stretch"
-    >
+    <div v-else class="mx-auto flex w-full max-w-md flex-col gap-4 self-stretch py-2 lg:py-0">
         <slot />
     </div>
 </template>
-
-<style scoped>
-.logging-page-shell--pad {
-    width: 100%;
-    max-width: 100%;
-}
-@media (max-width: 767px) {
-    .logging-page-shell--pad {
-        padding: 0.5rem 0;
-    }
-}
-</style>

@@ -41,6 +41,8 @@ export interface LoggedSet extends BaseModel {
     reps: number;
     weight: number;
     weight_setup: string;
+    /** Client-generated uuid (POST /workout/sets). Null on sets logged before G1. */
+    client_id?: string | null;
 }
 
 export interface LoggedExercise extends BaseModel {
@@ -58,6 +60,13 @@ export interface Exercise extends BaseModel {
     rep_rollover: number;
     cues: string;
     load_type?: ExerciseLoadType;
+    /** Machine positions (seat, pad, pulley). Not editable yet; null/absent means none. */
+    machine_settings?: MachineSetting[] | null;
+}
+
+export interface MachineSetting {
+    label: string;
+    value: string;
 }
 
 export type ExerciseLoadType =

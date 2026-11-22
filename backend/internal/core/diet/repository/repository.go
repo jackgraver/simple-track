@@ -12,6 +12,7 @@ import (
 	"be-simpletracker/internal/utils"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 func EnrichFoodVariants(f *models.Food) {
@@ -611,12 +612,44 @@ func SetPlannedMealLogged(dayID uint, mealID uint) error {
 	return conn().Save(&pm).Error
 }
 
+// DeleteLoggedMeal removes a logged meal from a day. It is idempotent: a log that is already
+// gone is success, so a repeated (or retried) unlog does not fail.
+//
+// It does not reset planned_meals.logged: whether an unlogged planned meal returns to
+// "planned" is an open owner question (optimistic-ui README, Q1).
 func DeleteLoggedMeal(dayID uint, mealID uint) error {
-	var log models.DayLog
-	if err := conn().Where("day_id = ? AND meal_id = ?", dayID, mealID).First(&log).Error; err != nil {
-		return err
-	}
-	return conn().Delete(&log).Error
+	return conn().Where("day_id = ? AND meal_id = ?", dayID, mealID).Delete(&models.DayLog{}).Error
+}
+
+// LogPlannedMeal marks the day's planned meal as logged and ensures exactly one day log exists
+// for it. Repeating the call is a no-op. Returns gorm.ErrRecordNotFound when the day has no such
+// planned meal.
+func LogPlannedMeal(dayID uint, mealID uint) error {
+	return conn().Transaction(func(tx *gorm.DB) error {
+		// FOR UPDATE serializes concurrent calls for the same planned meal even when it is
+		// already logged=true (after an unlog, which keeps the flag), so the day_log count below
+		// sees the other call's insert instead of both inserting and one hitting
+		// uq_day_logs_day_meal.
+		var pm models.PlannedMeal
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+			Where("day_id = ? AND meal_id = ?", dayID, mealID).First(&pm).Error; err != nil {
+			return err
+		}
+		if !pm.Logged {
+			if err := tx.Model(&pm).Update("logged", true).Error; err != nil {
+				return err
+			}
+		}
+		var count int64
+		if err := tx.Model(&models.DayLog{}).
+			Where("day_id = ? AND meal_id = ?", dayID, mealID).Count(&count).Error; err != nil {
+			return err
+		}
+		if count > 0 {
+			return nil
+		}
+		return tx.Create(&models.DayLog{DayID: dayID, MealID: mealID}).Error
+	})
 }
 
 func UpdateDayLogMeal(dayID uint, oldMealID uint, newMealID uint) error {
@@ -707,11 +740,45 @@ func DeleteSavedMeal(id uint) error {
 	})
 }
 
-func AddPlannedMealFromSavedMeal(offset int, savedMealID uint, meal *models.Meal) error {
+// lockClientID serializes creates that carry the same client_id (a retry racing the original
+// request, or a double submit) with a transaction-scoped advisory lock on Postgres. The caller's
+// "does a row with this client_id exist?" check then runs after the other transaction committed,
+// so the replay returns cleanly instead of failing on the unique index with a 500.
+func lockClientID(tx *gorm.DB, table, clientID string) error {
+	if tx.Dialector.Name() != "postgres" {
+		return nil
+	}
+	return tx.Exec("SELECT pg_advisory_xact_lock(hashtext(?))", table+".client_id:"+clientID).Error
+}
+
+func nilIfEmpty(s string) *string {
+	if s == "" {
+		return nil
+	}
+	return &s
+}
+
+// AddPlannedMealFromSavedMeal appends a planned copy of a saved meal. A non-empty clientID makes it
+// idempotent: when a planned meal with that id exists, nothing is created.
+func AddPlannedMealFromSavedMeal(offset int, savedMealID uint, meal *models.Meal, clientID string) error {
 	return conn().Transaction(func(tx *gorm.DB) error {
 		day, err := findOrCreateDietDayForCalendarDateInTx(tx, utils.ZerodTime(offset))
 		if err != nil {
 			return err
+		}
+		if clientID != "" {
+			if err := lockClientID(tx, "planned_meals", clientID); err != nil {
+				return err
+			}
+			// Unscoped: the unique index covers soft-deleted planned meals too, so a replay
+			// after the planned meal was removed is still a replay.
+			var existing int64
+			if err := tx.Unscoped().Model(&models.PlannedMeal{}).Where("client_id = ?", clientID).Count(&existing).Error; err != nil {
+				return err
+			}
+			if existing > 0 {
+				return nil
+			}
 		}
 		for i := range meal.Items {
 			meal.Items[i].ID = 0
@@ -733,6 +800,7 @@ func AddPlannedMealFromSavedMeal(offset int, savedMealID uint, meal *models.Meal
 			SavedMealID:  &sid,
 			Logged:       false,
 			DisplayOrder: next,
+			ClientID:     nilIfEmpty(clientID),
 		}
 		return tx.Create(&pm).Error
 	})
@@ -780,6 +848,8 @@ type QuickLogParams struct {
 	Fiber         float32
 	Offset        int
 	ReplaceMealID uint
+	// ClientID, when set, makes the call idempotent: if a meal with this id exists, nothing is created.
+	ClientID string
 }
 
 func QuickLogMeal(params QuickLogParams) (dayID uint, err error) {
@@ -789,6 +859,18 @@ func QuickLogMeal(params QuickLogParams) (dayID uint, err error) {
 			return derr
 		}
 		dayID = day.ID
+		if params.ClientID != "" {
+			if err := lockClientID(tx, "meals", params.ClientID); err != nil {
+				return err
+			}
+			var existing int64
+			if cerr := tx.Unscoped().Model(&models.Meal{}).Where("client_id = ?", params.ClientID).Count(&existing).Error; cerr != nil {
+				return cerr
+			}
+			if existing > 0 {
+				return nil
+			}
+		}
 		food := models.Food{
 			Name:          params.FoodRowName,
 			ServingType:   "",
@@ -804,7 +886,8 @@ func QuickLogMeal(params QuickLogParams) (dayID uint, err error) {
 			return err
 		}
 		meal := models.Meal{
-			Name: params.DisplayName,
+			Name:     params.DisplayName,
+			ClientID: nilIfEmpty(params.ClientID),
 			Items: []models.MealItem{{
 				FoodID: food.ID,
 				Amount: 1,
@@ -854,4 +937,73 @@ func EditLoggedMeal(dayID uint, oldMealID uint, meal *models.Meal) error {
 		log.MealID = meal.ID
 		return tx.Save(&log).Error
 	})
+}
+
+// CopyPlannedMeals appends a copy of every unlogged planned meal on the source day (in its order) to
+// each target day, after whatever that day already has. Each copy gets its own Meal row, so editing
+// or logging one day never touches another. Targets equal to the source are skipped. Returns how many
+// meals the source day had.
+func CopyPlannedMeals(fromOffset int, toOffsets []int) (int, error) {
+	var n int
+	err := conn().Transaction(func(tx *gorm.DB) error {
+		src, err := findOrCreateDietDayForCalendarDateInTx(tx, utils.ZerodTime(fromOffset))
+		if err != nil {
+			return err
+		}
+		var planned []models.PlannedMeal
+		if err := tx.Where("day_id = ? AND logged = ?", src.ID, false).
+			Order("display_order ASC, id ASC").
+			Preload("Meal.Items").
+			Find(&planned).Error; err != nil {
+			return err
+		}
+		n = len(planned)
+		if n == 0 {
+			return nil
+		}
+		seen := map[int]bool{fromOffset: true}
+		for _, off := range toOffsets {
+			if seen[off] {
+				continue
+			}
+			seen[off] = true
+			day, err := findOrCreateDietDayForCalendarDateInTx(tx, utils.ZerodTime(off))
+			if err != nil {
+				return err
+			}
+			var next int
+			if err := tx.Model(&models.PlannedMeal{}).
+				Where("day_id = ? AND logged = ?", day.ID, false).
+				Select("COALESCE(MAX(display_order), -1) + 1").
+				Scan(&next).Error; err != nil {
+				return err
+			}
+			for i, p := range planned {
+				meal := models.Meal{Name: p.Meal.Name}
+				for _, it := range p.Meal.Items {
+					meal.Items = append(meal.Items, models.MealItem{
+						FoodID:          it.FoodID,
+						Amount:          it.Amount,
+						GroupID:         it.GroupID,
+						GroupLabel:      it.GroupLabel,
+						CompositeFoodID: it.CompositeFoodID,
+					})
+				}
+				if err := tx.Create(&meal).Error; err != nil {
+					return err
+				}
+				pm := models.PlannedMeal{
+					DayID:        day.ID,
+					MealID:       meal.ID,
+					SavedMealID:  p.SavedMealID,
+					DisplayOrder: next + i,
+				}
+				if err := tx.Create(&pm).Error; err != nil {
+					return err
+				}
+			}
+		}
+		return nil
+	})
+	return n, err
 }
