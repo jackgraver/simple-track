@@ -189,31 +189,6 @@ export function useCreateWorkoutPlan() {
     });
 }
 
-/** Put a routine on a weekday. The backend clears whichever routine had that day in the same program. */
-export function useAssignPlanDay() {
-    const queryClient = useQueryClient();
-    return useMutation({
-        mutationFn: ({ planId, dayOfWeek }: { planId: number; dayOfWeek: number }) =>
-            apiPOST<{ plan: WorkoutPlan }>(`/workout/plans/${planId}/assign-day`, { day_of_week: dayOfWeek }),
-        onSuccess: () => {
-            invalidateWorkoutPrograms(queryClient);
-            queryClient.invalidateQueries({ queryKey: workoutKeys.days.all });
-        },
-    });
-}
-
-export function useUnassignPlanDay() {
-    const queryClient = useQueryClient();
-    return useMutation({
-        mutationFn: ({ planId, dayOfWeek }: { planId: number; dayOfWeek: number }) =>
-            apiDELETE<{ plan: WorkoutPlan }>(`/workout/plans/${planId}/assign-day`, { params: { day_of_week: dayOfWeek } }),
-        onSuccess: () => {
-            invalidateWorkoutPrograms(queryClient);
-            queryClient.invalidateQueries({ queryKey: workoutKeys.days.all });
-        },
-    });
-}
-
 export function useSwitchWorkoutPlan() {
     const queryClient = useQueryClient();
 

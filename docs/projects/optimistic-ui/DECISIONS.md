@@ -96,3 +96,9 @@ Water rows pending create get a negative deterministic temp `ID` from the `clien
 Failures use the default rollback mode with the helper's Retry toast (no inline mark mode: nothing to keep on screen). Success toasts ("Logged"/"Saved") now fire on tap, not on server ack. Save buttons lost their loading state because the write is instant; Overwrite confirm dialogs for weight/steps are kept.
 `google/uuid` is now a direct dependency (was `// indirect`), used only to validate `client_id`.
 Not verified in a browser or against real Postgres (no dev stack/docker allowed): migration SQL checked by reading only, Go tests use SQLite with the partial index created by hand.
+
+## 2026-11-22: P1 gym plans hooks
+All routine hooks use the shared helper and patch only `workoutKeys.programs`; every settle invalidates programs, `plans.all` and `days.all` (plan edits change today's workout). Requests per routine are serialised with `scope: routine:<planId>`, so rapid toggles and drags reach the server in order.
+Assign mirrors the backend rule locally (the program's other routines lose that day). Revert restores only the affected routines' fields from the snapshot, so concurrent edits survive a failure.
+Optimistic hooks now toast via the helper (with Retry); the pages no longer toast for them and dropped their per-day pending dimming and the "reordering" lock. Delete/restore routine, add exercise, create/update exercise stay `useServerMutation` with `errorMessage: false` (the pages and dialogs show errors in context). Create/update exercise invalidate exercises, searchList, programs, plans and days.
+Conservative: no `client_id` on routine edits (all idempotent PUT/POST/DELETE by id). Moving a routine between days sends assign then unassign (same scope, ordered); a failure of the first leaves the second to run, as before.

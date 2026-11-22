@@ -56,6 +56,8 @@
 - TanStack v5 mutation `scope` is per `useMutation` instance, not per call. See DESIGN.md §2 "Concurrency".
 
 - T1 done (migration 0006): `POST /tracking/water` takes `client_id` (idempotent). Water add/delete and weight/steps save use `useOptimisticMutation` with pure patch fns in `api/tracking/patches.ts` (vitest). Callers `mutate()` instead of awaiting; the helper toasts failures with Retry. T2 uses 0007 and can reuse `GroceryItem.client_id` the same way.
+
+- P1 done: `pages/gym/plans/**` has no axios. Routine hooks (rename/reorder/remove/mobility/cardio/assign/unassign, plus `useCreateExercise`/`useUpdateExercise`) live in `api/workout/routines.ts`, pure patches in `routinePatches.ts` (tested). Assign/unassign moved out of `queries.ts`. Not browser-verified.
 - Open questions for the owner are listed at the bottom of this README. Answers go into DECISIONS.md.
 
 ## Open questions (owner)
