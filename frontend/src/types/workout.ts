@@ -41,6 +41,8 @@ export interface LoggedSet extends BaseModel {
     reps: number;
     weight: number;
     weight_setup: string;
+    /** Client-generated uuid (POST /workout/sets). Null on sets logged before G1. */
+    client_id?: string | null;
 }
 
 export interface LoggedExercise extends BaseModel {

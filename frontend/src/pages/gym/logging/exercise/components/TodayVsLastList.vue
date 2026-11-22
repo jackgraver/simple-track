@@ -46,7 +46,7 @@ function diff(index: number): { text: string; tone: string } {
         <List class="rounded-card border border-line bg-surface">
             <ListRow
                 v-for="(set, index) in sets"
-                :key="set.tempId || index"
+                :key="set.key"
                 :pending="set.status === 'pending'"
                 :selected="editingIndex === index"
                 v-bind="
@@ -66,13 +66,18 @@ function diff(index: number): { text: string; tone: string } {
                     <span v-else-if="editingIndex === index" class="text-xs font-medium text-accent">Editing</span>
                     <span v-else class="text-sm font-medium tabular-nums" :class="diff(index).tone">{{ diff(index).text }}</span>
                 </template>
-                <template v-if="set.status === 'error'" #end>
-                    <IconButton :label="`Retry saving set ${index + 1}`" variant="danger" @click="emit('retry', index)">
-                        <RotateCcw />
-                    </IconButton>
-                </template>
-                <template v-else-if="set.status === 'success'" #end>
-                    <IconButton :label="`Delete set ${index + 1}`" variant="danger" @click="emit('delete', index)"><X /></IconButton>
+                <template #end>
+                    <div class="flex items-center gap-1">
+                        <IconButton
+                            v-if="set.status === 'error'"
+                            :label="`Retry saving set ${index + 1}`"
+                            variant="danger"
+                            @click="emit('retry', index)"
+                        >
+                            <RotateCcw />
+                        </IconButton>
+                        <IconButton :label="`Delete set ${index + 1}`" variant="danger" @click="emit('delete', index)"><X /></IconButton>
+                    </div>
                 </template>
             </ListRow>
         </List>
