@@ -46,7 +46,14 @@
 - M1 done: media pages use `api/media/queries.ts` (list/detail/stats, detail seeded from list cache, quick status via `useQuickUpdateMedia`; create/save/delete are `useServerMutation`). Pure patches in `api/media/cache.ts`.
 
 - T2 done (migration 0007): `POST /tracking/grocery/items` takes `client_id` (idempotent replay). `useCreateGroceryItem` / `useCompleteGroceryItem` are optimistic (`{client_id, name}` / `{id}` vars; pure patches in `api/tracking/groceryCache.ts`). Bulk add (`useCreateGroceryItems`) stays pessimistic. Migration numbers: 0004 G1, 0005 D1, 0006 T1, 0007 T2; the no-gaps test fails until all are merged.
-- Next: G1 (in progress, migration 0004), then G2 (first user-visible slice), D2, T1, T2.
+
+- G1 done (backend only): `POST /workout/sets`, `PATCH|DELETE /workout/sets/:id` (`:id` = id or client_id), migration 0004. Contract in DECISIONS 2026-11-22 "G1".
+  G2 should send `date` (YYYY-MM-DD) in the body, reconcile from `exercise`, and invalidate activity only when `first_set_of_day`. DELETE of the last set removes the parent (`exercise_removed: true`): drop `group.logged`.
+  `first_set_of_day` can be true for more than one racing create (never zero). Legacy full-replace still deletes sets missing from its payload, so G2 must stop using `/exercises/log` for sets (notes only).
+  Postgres-only behaviour (real concurrency, the 0004 merge) is covered by `services/pg_sets_test.go`, which skips without `TEST_DATABASE_URL` (`dev test` sets it).
+- `PostLogPlanned` ignores the day (500 off-today). Fixed in D1, and until then don't build optimistic log-planned on top of it.
+- `crypto.randomUUID()` is undefined on plain-http LAN testing from a phone. Use `newClientId()` (F6).
+- TanStack v5 mutation `scope` is per `useMutation` instance, not per call. See DESIGN.md §2 "Concurrency".
 - Open questions for the owner are listed at the bottom of this README. Answers go into DECISIONS.md.
 
 ## Open questions (owner)

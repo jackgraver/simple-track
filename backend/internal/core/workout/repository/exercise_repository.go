@@ -1,6 +1,7 @@
 package workoutrepo
 
 import (
+	"context"
 	"time"
 
 	"be-simpletracker/internal/core/workout/models"
@@ -112,4 +113,12 @@ func UpdateExerciseCues(exerciseID uint, cues string) (*models.Exercise, error) 
 		return nil, err
 	}
 	return &exercise, nil
+}
+
+// ExerciseRowExists reports whether an exercise row exists, including soft-deleted ones (old
+// sessions may still log against them).
+func ExerciseRowExists(ctx context.Context, id uint) (bool, error) {
+	var count int64
+	err := conn().WithContext(ctx).Unscoped().Model(&models.Exercise{}).Where("id = ?", id).Count(&count).Error
+	return count > 0, err
 }

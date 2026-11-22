@@ -37,7 +37,7 @@ References: AUDIT.md (findings), MUTATIONS.md (per-mutation plan), ID-STRATEGY.m
   suppression, `mark` mode.
 
 ## Stage 2: modules (pair with the ui-overhaul phase-4 slice of the same module)
-- [ ] **G1 Gym backend: safe set writes.** Migration: merge duplicate `logged_exercises`, unique
+- [x] **G1 Gym backend: safe set writes.** (done; migration 0004, see DECISIONS 2026-11-22) Migration: merge duplicate `logged_exercises`, unique
   `(workout_log_id, exercise_id)`, FK indexes, `logged_sets.client_id` + unique index. `POST
   /workout/sets` (idempotent by `client_id`, upserts the parent), `PATCH /workout/sets/:id`, `DELETE`
   treating repeats as success. *Done:* Go tests for idempotent replay and concurrent first-set

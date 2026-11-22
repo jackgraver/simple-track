@@ -2,15 +2,71 @@ package workoutrepo
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"be-simpletracker/internal/core/workout/models"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
+// ErrLoggedExerciseExists is returned by CreateLoggedExercise when the workout log already has a
+// live row for that exercise. The exercise's ID is set to the existing row.
+var ErrLoggedExerciseExists = errors.New("exercise already logged in this workout")
+
+// liveLoggedExerciseConflict targets idx_logged_exercises_workout_exercise (partial, live rows only).
+func liveLoggedExerciseConflict() clause.OnConflict {
+	return clause.OnConflict{
+		Columns:     []clause.Column{{Name: "workout_log_id"}, {Name: "exercise_id"}},
+		TargetWhere: clause.Where{Exprs: []clause.Expression{clause.Expr{SQL: "deleted_at IS NULL"}}},
+		DoNothing:   true,
+	}
+}
+
+// upsertLoggedExercise returns the live logged_exercise for (workoutLogID, exerciseID), inserting
+// it if missing. Safe under concurrency: the unique index decides which insert wins and the loser
+// reads the winner's row.
+func upsertLoggedExercise(tx *gorm.DB, workoutLogID, exerciseID uint, notes string) (uint, bool, error) {
+	le := models.LoggedExercise{WorkoutLogID: workoutLogID, ExerciseID: exerciseID, Notes: notes}
+	res := tx.Omit("Exercise", "Sets").Clauses(liveLoggedExerciseConflict()).Create(&le)
+	if res.Error != nil {
+		return 0, false, res.Error
+	}
+	if res.RowsAffected == 1 && le.ID != 0 {
+		return le.ID, true, nil
+	}
+	var existing models.LoggedExercise
+	if err := tx.Select("id").
+		Where("workout_log_id = ? AND exercise_id = ?", workoutLogID, exerciseID).
+		First(&existing).Error; err != nil {
+		return 0, false, err
+	}
+	return existing.ID, false, nil
+}
+
+// CreateLoggedExercise inserts a logged exercise and its sets. If the workout log already has a
+// live row for the exercise, nothing is written and ErrLoggedExerciseExists is returned with
+// exercise.ID set to the existing row.
 func CreateLoggedExercise(exercise *models.LoggedExercise) error {
-	return conn().Omit("Exercise").Create(exercise).Error
+	return conn().Transaction(func(tx *gorm.DB) error {
+		id, created, err := upsertLoggedExercise(tx, exercise.WorkoutLogID, exercise.ExerciseID, exercise.Notes)
+		if err != nil {
+			return err
+		}
+		exercise.ID = id
+		if !created {
+			return ErrLoggedExerciseExists
+		}
+		for i := range exercise.Sets {
+			exercise.Sets[i].ID = 0
+			exercise.Sets[i].LoggedExerciseID = id
+			if err := tx.Create(&exercise.Sets[i]).Error; err != nil {
+				return err
+			}
+		}
+		return nil
+	})
 }
 
 func UpdateLoggedExerciseWithSets(exercise models.LoggedExercise) error {
@@ -97,7 +153,9 @@ func RemoveLoggedExerciseForDay(ctx context.Context, day time.Time, exerciseID u
 
 func LoadLoggedExercise(id uint) (models.LoggedExercise, error) {
 	var exercise models.LoggedExercise
-	err := conn().Preload("Exercise").Preload("Sets").Where("id = ?", id).First(&exercise).Error
+	err := conn().Preload("Exercise").
+		Preload("Sets", func(db *gorm.DB) *gorm.DB { return db.Order("id ASC") }).
+		Where("id = ?", id).First(&exercise).Error
 	if err != nil {
 		return models.LoggedExercise{}, err
 	}
