@@ -62,6 +62,8 @@
 - D2 done: diet day mutations (log/unlog planned, quick log, add-from-saved, delete planned, reorder) are optimistic via `api/diet/dayPatches.ts` (pure apply/revert, tested). Vars carry `{offset, date, client_id}` from `dayRef(offset)`; requests for one day are serialised with `scope`. Temp rows have negative ids (`isTempId`); UI ignores actions on them. Not done: copy-day, saved-meal CRUD, logmeal page submits (create/edit meal) stay pessimistic.
 
 - $1 done: `useMoneyMutation(fn, failureMessage)` is a `useServerMutation` (one error toast, invalidates `moneyKeys.all` on settle); call sites only `catch` to stop their flow. `useDeleteTransaction` / `useDeleteBalance` (`api/money/queries.ts`, pure patches in `api/money/cache.ts`) are optimistic: row removed now, totals refetch on settle.
+
+- N1 done: `route.meta.queries` + `router/prefetch.ts` (`warmRoute`, 150 ms budget in `beforeResolve`), `shared/nav/NavLink.vue` and tab-bar hover/touch prefetch. Add `meta.queries` to a route to opt in; use `queryOptions` factories (`trackingQueries`, `moneyQueries`, `mediaQueries` added). Not browser-verified.
 - Open questions for the owner are listed at the bottom of this README. Answers go into DECISIONS.md.
 
 ## Open questions (owner)

@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/vue-query";
+import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/vue-query";
 import { computed, type MaybeRefOrGetter, toValue } from "vue";
 import {
     completeGroceryItem,
@@ -138,11 +138,17 @@ export function useSaveSteps() {
     });
 }
 
+/** Single source for hooks and route prefetch. */
+export const trackingQueries = {
+    groceryItems: () =>
+        queryOptions({
+            queryKey: trackingKeys.groceryItems,
+            queryFn: fetchGroceryItems,
+        }),
+};
+
 export function useGroceryItems() {
-    return useQuery({
-        queryKey: trackingKeys.groceryItems,
-        queryFn: fetchGroceryItems,
-    });
+    return useQuery(trackingQueries.groceryItems());
 }
 
 export function useGrocerySuggestions(query: MaybeRefOrGetter<string>) {

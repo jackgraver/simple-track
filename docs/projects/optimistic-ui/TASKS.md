@@ -70,7 +70,7 @@ References: AUDIT.md (findings), MUTATIONS.md (per-mutation plan), ID-STRATEGY.m
   optimistic (row removed now, totals pending).
 
 ## Stage 3: instant navigation
-- [ ] **N1 Prefetch on intent:** `route.meta.queries` + NavLink `pointerenter`/`touchstart` prefetch +
+- [x] **N1 Prefetch on intent:** (done; see DECISIONS 2026-11-22 "N1") `route.meta.queries` + NavLink `pointerenter`/`touchstart` prefetch +
   `beforeResolve` `ensureQueryData` with a 150 ms budget. *Done:* main nav switches render without a
   skeleton after hovering or touching (screen recording).
 - [ ] **N2 Adjacent days + cold-only skeletons:** prefetch date ± 1 in diet/gym. Skeleton only when

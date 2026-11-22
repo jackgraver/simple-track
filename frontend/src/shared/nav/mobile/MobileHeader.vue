@@ -3,6 +3,7 @@ import { Check, ChevronDown, ChevronLeft, CircleUser } from "lucide-vue-next";
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { isDevEnvironment } from "~/composables/auth/session";
+import NavLink from "../NavLink.vue";
 import { IconButton } from "~/shared/ui";
 import {
     activeGroup,
@@ -94,7 +95,7 @@ onUnmounted(() => {
                 <p class="m-0 px-3 pt-1.5 pb-1 text-xs font-semibold tracking-wide text-fg-muted uppercase">
                     {{ group.label }}
                 </p>
-                <router-link
+                <NavLink
                     v-for="item in group.items"
                     :key="item.to"
                     :to="itemLocation(item, route)"
@@ -109,19 +110,19 @@ onUnmounted(() => {
                 >
                     {{ item.label }}
                     <Check v-if="isItemActive(item, route)" class="size-4" />
-                </router-link>
+                </NavLink>
             </div>
         </div>
 
         <span v-if="isDevEnvironment" class="rounded-control bg-surface-3 px-1.5 text-xs text-fg-muted"
             >dev</span
         >
-        <router-link
+        <NavLink
             :to="{ name: 'settings-profile' }"
             class="flex size-touch items-center justify-center rounded-control text-fg-muted hover:bg-surface-3 hover:text-fg"
             aria-label="Profile"
         >
             <CircleUser class="size-6" />
-        </router-link>
+        </NavLink>
     </header>
 </template>

@@ -1,4 +1,4 @@
-import { useQuery, useQueryClient, type QueryClient } from "@tanstack/vue-query";
+import { queryOptions, useQuery, useQueryClient, type QueryClient } from "@tanstack/vue-query";
 import { computed, type MaybeRefOrGetter, toValue } from "vue";
 
 import { getApiErrorMessage } from "~/api/httpError";
@@ -25,6 +25,22 @@ export const mediaMutationKeys = {
     create: ["media", "mutation", "create"] as const,
     update: ["media", "mutation", "update"] as const,
     remove: ["media", "mutation", "remove"] as const,
+};
+
+/** Single source for hooks and route prefetch. */
+export const mediaQueries = {
+    list: (params: MediaListParams = {}) =>
+        queryOptions({
+            queryKey: mediaKeys.list(params),
+            queryFn: () => listMedia(params),
+            staleTime: STALE.default,
+        }),
+    stats: () =>
+        queryOptions({
+            queryKey: mediaKeys.stats,
+            queryFn: getMediaStats,
+            staleTime: STALE.default,
+        }),
 };
 
 export function useMediaList(params: MaybeRefOrGetter<MediaListParams>) {
