@@ -34,14 +34,14 @@ const createExercise = async (name: string) => {
     if (!name.trim()) return false;
 
     try {
-        await apiClient.post<{ exercise: Exercise }>("/workout/exercises", {
+        // Create and add in one step: typing a name that isn't in the library means "this one".
+        const res = await apiClient.post<{ exercise: Exercise }>("/workout/exercises", {
             name: name.trim(),
             rep_rollover: 10,
             cues: "",
         });
-        toast.push(`Created exercise: ${name}`, "success");
         await queryClient.invalidateQueries({ queryKey: searchListKeys.all });
-        return true;
+        return addExerciseToPlan(res.data.exercise);
     } catch (err: unknown) {
         const message = getApiErrorMessage(err, "Something went wrong");
         toast.push("Failed to create exercise: " + message, "error");
@@ -56,6 +56,7 @@ const createExercise = async (name: string) => {
             route="workout/exercises/all"
             :onSelect="addExerciseToPlan"
             :onCreate="createExercise"
+            create-label="Create and add"
             :prefilter="plan.exercises.map((e) => e.ID)"
             auto-focus
         />

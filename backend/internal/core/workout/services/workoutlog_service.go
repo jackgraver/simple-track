@@ -681,3 +681,28 @@ func SetPlannedMobility(planID uint, preItems, postItems []string) (*models.Work
 	}
 	return workoutrepo.LoadPlanWithOrderedExercises(planID)
 }
+
+func RenameWorkoutPlan(id uint, name string) (*models.WorkoutPlan, error) {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return nil, fmt.Errorf("routine name is required")
+	}
+	if err := workoutrepo.UpdateWorkoutPlanName(id, name); err != nil {
+		return nil, err
+	}
+	return workoutrepo.LoadPlanWithOrderedExercises(id)
+}
+
+func DeleteWorkoutPlan(id uint) error {
+	return workoutrepo.SoftDeleteWorkoutPlan(id)
+}
+
+func RestoreWorkoutPlan(id uint) (*models.WorkoutPlan, error) {
+	if err := workoutrepo.RestoreWorkoutPlan(id); err != nil {
+		return nil, err
+	}
+	if err := workoutrepo.RefreshLegacyDay(id); err != nil {
+		return nil, err
+	}
+	return workoutrepo.LoadPlanWithOrderedExercises(id)
+}

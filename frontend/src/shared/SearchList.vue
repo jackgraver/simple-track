@@ -12,6 +12,8 @@ const props = defineProps<{
     route: string;
     onSelect: (item: any) => Promise<boolean>;
     onCreate?: (name: string) => Promise<boolean>;
+    /** Verb for the create row, e.g. "Create and add". Defaults to "Create". */
+    createLabel?: string;
     displayComponent?: Component;
     prefilter?: any[];
     autoFocus?: boolean;
@@ -207,7 +209,7 @@ watch(isPending, (pending) => {
                     @click="handleFunctionCall(onCreate, search)"
                 >
                     <template #leading><Plus aria-hidden="true" class="size-4" /></template>
-                    Create "{{ search }}"
+                    {{ createLabel ?? "Create" }} "{{ search }}"
                 </ListRow>
             </List>
             <EmptyState v-if="!isPending && !search && !list.length" title="Nothing here yet" />

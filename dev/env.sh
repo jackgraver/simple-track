@@ -64,7 +64,16 @@ export PC_DISABLE_DOTENV=1
 # Backend (env vars take precedence over backend/.env).
 export LISTEN_ADDR="0.0.0.0:$DEV_BACKEND_PORT"
 export DATABASE_URL="postgresql://postgres:postgres@localhost:$DEV_PG_PORT/simpletracker_dev?sslmode=disable"
-export CORS_ORIGINS="http://localhost:$DEV_FRONTEND_PORT,http://127.0.0.1:$DEV_FRONTEND_PORT"
+# Also allow this machine's LAN addresses (phone testing via http://<lan-ip>:<port>).
+# Override with DEV_LAN_HOST="ip1 ip2" (space separated); default is every private IPv4.
+CORS_ORIGINS="http://localhost:$DEV_FRONTEND_PORT,http://127.0.0.1:$DEV_FRONTEND_PORT"
+for _ip in ${DEV_LAN_HOST:-$(hostname -I 2>/dev/null)}; do
+  case "$_ip" in
+    10.*|192.168.*|172.1[6-9].*|172.2?.*|172.3[01].*) CORS_ORIGINS="$CORS_ORIGINS,http://$_ip:$DEV_FRONTEND_PORT" ;;
+  esac
+done
+unset _ip
+export CORS_ORIGINS
 export ALLOW_BYPASS=true
 export DEV_AUTH_USER=dev
 

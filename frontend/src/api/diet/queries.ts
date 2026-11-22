@@ -44,10 +44,6 @@ export function useRecentDietDays(n: number) {
     });
 }
 
-export function usePlans() {
-    return useQuery({ queryKey: dietKeys.plans.all, queryFn: getAllPlans });
-}
-
 /** Several days by offset (e.g. a week), sharing cache entries with `useDietLogsToday`. */
 export function useDietDays(offsets: MaybeRefOrGetter<number[]>) {
     return useQueries({
@@ -59,6 +55,10 @@ export function useDietDays(offsets: MaybeRefOrGetter<number[]>) {
             })),
         ),
     });
+}
+
+export function usePlans() {
+    return useQuery({ queryKey: dietKeys.plans.all, queryFn: getAllPlans });
 }
 
 function invalidateMonthPlannedSummaries(queryClient: QueryClient) {

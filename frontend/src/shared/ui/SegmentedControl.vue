@@ -16,14 +16,14 @@ function onUpdate(v: unknown) {
         type="single"
         :model-value="model"
         :aria-label="label"
-        class="inline-flex w-full gap-0.5 rounded-control bg-surface-2 p-0.5"
+        class="inline-flex w-full gap-0.5 rounded-control border border-line bg-surface-2 p-0.5"
         @update:model-value="onUpdate"
     >
         <ToggleGroupItem
             v-for="o in options"
             :key="o.value"
             :value="o.value"
-            class="min-h-10 flex-1 rounded-control px-3 text-base text-fg-muted transition-colors duration-150 hover:text-fg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent data-[state=on]:bg-surface data-[state=on]:text-fg data-[state=on]:shadow-raised lg:min-h-8 lg:text-sm"
+            class="min-h-10 flex-1 rounded-control-inner px-3 text-base text-fg-muted transition-colors duration-150 hover:text-fg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent data-[state=on]:bg-thumb data-[state=on]:text-fg data-[state=on]:shadow-thumb lg:min-h-8 lg:text-sm"
         >
             {{ o.label }}
         </ToggleGroupItem>
