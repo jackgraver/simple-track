@@ -77,13 +77,13 @@ const lastLine = computed(() => {
             </span>
             <span v-if="cues" class="flex flex-col gap-1">
                 <span class="text-2xs tracking-wide text-fg-muted uppercase">Cues</span>
-                <span class="text-sm whitespace-pre-wrap text-fg">{{ cues }}</span>
+                <span class="line-clamp-3 text-sm whitespace-pre-wrap text-fg">{{ cues }}</span>
             </span>
         </span>
         <span v-else class="flex items-center gap-3">
             <span class="text-xl font-semibold text-fg tabular-nums">{{ weight }} lb</span>
             <Badge v-if="badge" :tone="badge.tone">{{ badge.text }}</Badge>
-            <span class="flex min-w-0 flex-1 flex-wrap justify-end gap-1.5">
+            <span class="flex min-w-0 flex-1 flex-nowrap justify-end gap-1.5 overflow-hidden">
                 <Badge v-for="s in machineSettings.slice(0, 3)" :key="s.label" variant="outline">
                     {{ s.label }} {{ s.value.trim() || "—" }}
                 </Badge>
