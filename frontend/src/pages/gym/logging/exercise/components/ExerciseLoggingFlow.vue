@@ -233,7 +233,7 @@ const goTo = (item: UpNextItem) => {
                     : editing
                       ? `Editing set ${(session.editingSetIndex ?? 0) + 1}`
                       : plannedDone
-                        ? `${setsTally(loggedCount, targetSets)} · done`
+                        ? `${setsTally(loggedCount, targetSets)} sets · done`
                         : `Set ${session.currentSetNumber}/${targetSets}`
             "
             @back="goBackToLogging"

@@ -46,7 +46,7 @@ describe("setsTally", () => {
     it("counts against the plan, then just counts past it", () => {
         expect(setsTally(2, 4)).toBe("2/4");
         expect(setsTally(4, 4)).toBe("4/4");
-        expect(setsTally(5, 4)).toBe("5 sets");
+        expect(setsTally(5, 4)).toBe("5");
     });
 });
 

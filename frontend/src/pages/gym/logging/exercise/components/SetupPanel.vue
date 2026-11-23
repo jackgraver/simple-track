@@ -83,7 +83,9 @@ const lastLine = computed(() => {
         <span v-else class="flex items-center gap-3">
             <span class="text-xl font-semibold text-fg tabular-nums">{{ weight }} lb</span>
             <Badge v-if="badge" :tone="badge.tone">{{ badge.text }}</Badge>
-            <span class="flex min-w-0 flex-1 flex-nowrap justify-end gap-1.5 overflow-hidden">
+            <!-- One line: badges that don't fit wrap to a second row, which the fixed height hides whole
+                 (clipping one mid-word read as "at 4"). The sheet behind the chevron shows them all. -->
+            <span class="flex h-6 min-w-0 flex-1 flex-wrap items-center justify-end gap-x-1.5 gap-y-2 overflow-hidden">
                 <Badge v-for="s in machineSettings.slice(0, 3)" :key="s.label" variant="outline">
                     {{ s.label }} {{ s.value.trim() || "—" }}
                 </Badge>
