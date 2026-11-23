@@ -71,6 +71,18 @@ reload. Add the module's API helpers to `fixtures/api.ts` as needed.
       with `source`/`external_id`; upstream 500 shows "Lookup failed" and keeps the form.
       Not yet: TMDB / Open Library / iTunes fakes (add handlers to `Upstream`), manual add/edit/delete,
       list filters and status tabs, rating, progress, cover image (needs a fake image route).
+- [x] **B4. Finances** (`tests/finances/transactions.spec.ts`, helpers `createAccount`/`addTransaction`).
+      The product has no "edit transaction" (only add and delete); edit-shaped paths are account edit
+      and re-recording a balance. Scenarios:
+      - [x] add account (opening balance) -> app opens it -> persists across reload and in the list
+      - [x] deposit with "also update balance": row, balance and exactly one DB row survive reload
+      - [x] delete transaction: row gone after reload, balance unchanged (by design)
+      - [x] edit account name via dialog; persists, old name gone
+      - [x] data-loss: deposit whose balance update fails (`test.fail`, see Findings)
+      - [ ] later: withdrawal, record balance over an existing day (upsert), balance delete, archive/
+            restore (net worth), delete account (cascade), contribution-room rules, update-balances
+            dialog, liability accounts (no transactions section), validation errors (400)
+- [ ] **B5. Media**: needs a fake upstream for the lookup APIs (AniList etc., URLs are configurable).
 - [ ] **B6. Grocery**
 - [ ] **B7. Settings and auth**: login UI (no bypass cookie), logout, session expiry (via clock).
 - [ ] **B8. Optimistic UI**: hold-based assertions of instant state and post-reload state.
@@ -96,6 +108,11 @@ reload. Add the module's API helpers to `fixtures/api.ts` as needed.
 - Gym reps slider (`NumberSlider`): `syncingScroll` is cleared after one animation frame, but a
   smooth scroll outlasts it, so mid-scroll events can overwrite the tapped value (a tap on 9 saved 11 in
   ~1 of 3 runs before the spec waited for scrolling to stop). Worth making the tap deterministic.
+- Adding a transaction with "also update the balance" is two client requests (`POST .../transactions`
+  then `PUT .../balances`), not one atomic call. If the second fails, the transaction is saved, the
+  balance is stale and the user sees an error, so retrying double-counts the deposit. Pinned by a
+  `test.fail` spec in `tests/finances`; fix = one server endpoint doing both in a DB transaction, then
+  drop the `test.fail`.
 
 ## Decisions log
 
@@ -132,3 +149,6 @@ reload. Add the module's API helpers to `fixtures/api.ts` as needed.
   the value), so `setReps` waits for the scroll to settle before trusting the value.
 - 2026-11-22: Diet specs start with Quick log: no catalogue dependency, one row, and it covers the
   optimistic log/edit/delete flow. Delete asks for confirmation ("Remove quick log" dialog).
+- 2026-11-22: Finances specs create accounts through the API with a balance date before `E2E_EPOCH`:
+  the form only offers "also update the balance" when the transaction date is on/after the latest
+  balance. After creating an account the app navigates to it, so specs wait for the URL before reloading.
