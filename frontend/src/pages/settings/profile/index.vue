@@ -4,6 +4,7 @@ import { computed, ref, watch } from 'vue';
 import { Button, Card, ErrorState, PageHeader, Section, Skeleton, useDelayedFlag } from '~/shared/ui';
 import { useProfile, useSaveProfile } from '~/api/tracking/queries';
 import { toast } from '~/composables/toast/useToast';
+import AccountSection from '../AccountSection.vue';
 import AppearanceSection from '../AppearanceSection.vue';
 import BodyProfileForm from './BodyProfileForm.vue';
 
@@ -78,5 +79,6 @@ async function save() {
                 </Button>
             </form>
         </Section>
+        <AccountSection />
     </div>
 </template>
