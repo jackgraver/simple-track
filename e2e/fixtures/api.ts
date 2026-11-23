@@ -43,4 +43,23 @@ export class Api {
       ...food,
     });
   }
+
+  // --- gym ---
+
+  /** Log a set through the real per-set endpoint (idempotent by client_id). `date` is YYYY-MM-DD. */
+  logSet(set: { exerciseId: number; reps: number; weight: number; date: string; clientId?: string }) {
+    return this.post<{ set: { ID: number; reps: number; weight: number }; created: boolean }>('/workout/sets', {
+      client_id: set.clientId ?? crypto.randomUUID(),
+      date: set.date,
+      exercise_id: set.exerciseId,
+      reps: set.reps,
+      weight: set.weight,
+      weight_setup: '',
+    });
+  }
+
+  /** Today's workout log (planned + logged exercises), as the logging page loads it. */
+  gymToday(offset = 0) {
+    return this.get<any>(`/workout/logs/today?offset=${offset}`);
+  }
 }

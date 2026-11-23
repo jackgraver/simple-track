@@ -39,7 +39,19 @@ reload. Add the module's API helpers to `fixtures/api.ts` as needed.
       amount), finances (add account), media (add item), grocery (add item), settings (save body
       profile). Whole `@smoke` set: 40 tests in ~8s.
 - [ ] **B2. Gym** (first: most active and riskiest): log a set, edit, delete, history, persistence
+- [ ] **B1. Smoke**: one write per module on top of A8; `@smoke` stays under a minute.
+- [x] **B2. Gym** (first: most active and riskiest): log a set, edit, delete, history, persistence
       across reload, mobile sticky log bar, retry after dropped response (no duplicate set).
+      Specs: `tests/gym/logging.spec.ts` (per-exercise logger, Back Squat on today's "Legs" plan).
+      Scenarios (done unless marked):
+      - log a set: shows at once, one row in DB, survives reload
+      - edit: tap a saved set, change reps, save; persists
+      - delete: removes only that set; persists
+      - history: last session's set shows as "Last" next to today's
+      - mobile: on a short phone the Log button is pinned above the tab bar (mobile project only)
+      - dropped response (hold after + drop): retry with the same client_id, exactly one set
+      - todo: weight/plates edit, notes, finish + "Up next", cardio/mobility, add/remove exercise,
+        offline log, persistent save failure ("Didn't save" + Retry), plans pages, progression, weight, steps
 - [ ] **B3. Diet**
 - [ ] **B4. Finances**
 - [x] **B5. Media**: fake upstream for the lookup APIs (`infra/upstream.ts`, fixture `upstream`).
@@ -68,6 +80,10 @@ reload. Add the module's API helpers to `fixtures/api.ts` as needed.
 
 - `POST /diet/foods` with an existing name returns **500**: the unique index `idx_foods_name` rejects it
   and `PostFood` maps every error to `apierr.Internal`. Decide the intended status (409?), then pin it.
+
+- Gym reps slider (`NumberSlider`): `syncingScroll` is cleared after one animation frame, but a
+  smooth scroll outlasts it, so mid-scroll events can overwrite the tapped value (a tap on 9 saved 11 in
+  ~1 of 3 runs before the spec waited for scrolling to stop). Worth making the tap deterministic.
 
 ## Decisions log
 
@@ -99,3 +115,6 @@ reload. Add the module's API helpers to `fixtures/api.ts` as needed.
 - 2026-11-22: B1 smoke writes wait for their own response (URL regex) before reloading. Where the
   page doesn't prefill after reload (steps form) or navigates after create (finances account page,
   which hides its title on mobile), persistence is checked via `api.get` / a fresh `goto` of the list.
+- 2026-11-22: Gym specs drive the per-exercise logger directly (`/gym/logging/<id>`); sets are arranged
+  with `api.logSet`. The reps slider is scroll-driven (a tick click smooth-scrolls and scroll events set
+  the value), so `setReps` waits for the scroll to settle before trusting the value.
