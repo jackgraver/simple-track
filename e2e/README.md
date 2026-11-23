@@ -104,7 +104,7 @@ stub. On top of that the server refuses to start with `E2E` set in production. I
    |---|---|---|
    | Input | malformed body → 400 | send it |
    | State | duplicate name, missing id | arrange it (API, or `db` when the API can't) |
-   | Dependency | DB error, slow or dropped response, AniList down | `e2e.fault`, `e2e.hold`, fake upstream |
+   | Dependency | DB error, slow or dropped response, AniList down | `e2e.fault`, `e2e.hold`, `upstream` (fake lookup APIs, `infra/upstream.ts`) |
    | Environment | expired session, date rules | fixed clock, real expired cookie |
    | Network | offline, connection refused | `context.setOffline()`, `route.abort()` |
    | Unreachable otherwise | failure between two writes | named failpoint (add only when needed) |
@@ -157,6 +157,7 @@ test('…', { tag: ['@gym'] }, async ({ page, api, e2e, db }) => {
   // page: authenticated, clock at E2E_EPOCH, hermetic, console-guarded
   // api:  arrange through the real API (fixtures/api.ts)
   // e2e:  e2e.fault({ table, op, times? , code? }), e2e.hold('POST /path', { phase }), e2e.setClock(date)
+  // upstream: fake third-party lookup API, e.g. upstream.setAniList([...]), upstream.failAniList(500)
   // db:   pg Client on this worker's DB (narrow use)
 });
 test.use({ now: new Date('…') });         // a different "now" (null = real time)

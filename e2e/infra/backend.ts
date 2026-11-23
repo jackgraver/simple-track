@@ -47,7 +47,11 @@ export function backendEnv(databaseUrl: string, listen: string): NodeJS.ProcessE
 }
 
 /** Start the e2e server binary against `databaseUrl` on a free port; resolves once /health is 200. */
-export async function startBackend(name: string, databaseUrl: string): Promise<Backend> {
+export async function startBackend(
+  name: string,
+  databaseUrl: string,
+  extraEnv: NodeJS.ProcessEnv = {},
+): Promise<Backend> {
   fs.mkdirSync(LOG_DIR, { recursive: true });
   const logFile = path.join(LOG_DIR, `${name}.log`);
   for (let attempt = 0; ; attempt++) {
@@ -55,7 +59,7 @@ export async function startBackend(name: string, databaseUrl: string): Promise<B
     const out = fs.openSync(logFile, 'w');
     const child = spawn(path.join(BIN_DIR, 'server'), [], {
       cwd: CACHE_DIR, // no .env here: everything comes from the env below
-      env: backendEnv(databaseUrl, `127.0.0.1:${port}`),
+      env: { ...backendEnv(databaseUrl, `127.0.0.1:${port}`), ...extraEnv },
       stdio: ['ignore', out, out],
     });
     fs.closeSync(out);

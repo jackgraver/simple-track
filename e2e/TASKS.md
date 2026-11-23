@@ -39,7 +39,11 @@ reload. Add the module's API helpers to `fixtures/api.ts` as needed.
       across reload, mobile sticky log bar, retry after dropped response (no duplicate set).
 - [ ] **B3. Diet**
 - [ ] **B4. Finances**
-- [ ] **B5. Media**: needs a fake upstream for the lookup APIs (AniList etc., URLs are configurable).
+- [x] **B5. Media**: fake upstream for the lookup APIs (`infra/upstream.ts`, fixture `upstream`).
+      Specs (`tests/media/lookup.spec.ts`): look up an anime, pick a match, form fills, save, persisted
+      with `source`/`external_id`; upstream 500 shows "Lookup failed" and keeps the form.
+      Not yet: TMDB / Open Library / iTunes fakes (add handlers to `Upstream`), manual add/edit/delete,
+      list filters and status tabs, rating, progress, cover image (needs a fake image route).
 - [ ] **B6. Grocery**
 - [ ] **B7. Settings and auth**: login UI (no bypass cookie), logout, session expiry (via clock).
 - [ ] **B8. Optimistic UI**: hold-based assertions of instant state and post-reload state.
@@ -85,3 +89,7 @@ reload. Add the module's API helpers to `fixtures/api.ts` as needed.
   container; one run per checkout at a time (lock file).
 - 2026-11-22: Example specs use grocery add: it is optimistic, retries twice (TanStack `retry: 2`) and
   is idempotent by `client_id`, so it exercises every failure mode.
+- 2026-11-22: Third-party lookups (media) are replaced by a per-worker fake upstream HTTP server in the
+  Playwright worker (`infra/upstream.ts`), not by `route.fulfill`: the backend's own HTTP client,
+  parsing and error mapping run. The backend takes `LOOKUP_*_URL` env overrides (ignored in
+  production); `startBackend` accepts extra env. Add a source by adding a handler plus its env var.
