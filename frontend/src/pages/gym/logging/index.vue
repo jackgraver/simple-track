@@ -80,6 +80,12 @@ const selectExercise = (index: number) => {
 
 const handleAddExercise = (exerciseId: number, exercise?: Exercise) => {
     addExerciseToWorkout(exerciseId, exercise);
+    // Add and start in one step: the group is already in the cache (optimistic), so open its logger.
+    router.push({
+        name: "logging-exercise",
+        params: { id: String(exerciseId) },
+        query: route.query,
+    });
 };
 
 const selectCardio = () => {

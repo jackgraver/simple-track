@@ -39,7 +39,7 @@ const stateOf = (i: number) => (props.steps[i]?.done ? "done" : i === next.value
 const startLabel = (s: WorkoutStep) =>
     s.kind === "lift" ? "Start" : s.kind === "cardio" ? "Log cardio" : `Start ${stepKindLabel[s.kind].toLowerCase()}`;
 
-// Add exercise (catalog search, skipping what's already in today's log)
+// Add exercise (catalog search, skipping what is already in today's log). Picking one adds it and opens its logger.
 const exerciseSearch = ref("");
 const { data: exercisesPages, fetchNextPage, hasNextPage, isFetching } = useExercisesPaginated(exerciseSearch);
 const catalog = computed(() => exercisesPages.value?.pages.flatMap((p) => p.exercises) ?? []);
