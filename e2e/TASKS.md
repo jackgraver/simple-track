@@ -89,6 +89,13 @@ reload. Add the module's API helpers to `fixtures/api.ts` as needed.
       Not yet: Paste list dialog (`/items/parse`, `/items/bulk`, de-dupe), suggestions dropdown,
       offline complete, blank-name input.
 - [ ] **B7. Settings and auth**: login UI (no bypass cookie), logout, session expiry (via clock).
+- [ ] **B6. Grocery**
+- [x] **B7. Settings and auth**: login UI (no bypass cookie), logout, session expiry (via clock).
+      Specs in `tests/auth/login.spec.ts` (`@auth`, `authenticated: false`): unauthenticated visit
+      redirects to sign-in with `redirect=` and returns there after login (+ reload keeps session,
+      `@smoke`); wrong password shows an alert; logout (API call, no UI control) ends the session;
+      expired session (server clock +366d) redirects to sign-in on direct load and on next full load.
+      Not yet: settings profile (body profile form) save + reload, register flow, rate-limit lockout.
 - [ ] **B8. Optimistic UI**: hold-based assertions of instant state and post-reload state.
 
 ## C. CI and scale
@@ -121,6 +128,8 @@ reload. Add the module's API helpers to `fixtures/api.ts` as needed.
   scenario arranges via API and asserts the UI. Decide whether a UI delete is intended.
 - Grocery checkbox accessible name is the item name ("Milk"), not "Complete Milk" (the `label` prop is
   not exposed by `Checkbox` when the slot is used).
+- The UI has no logout control: `useAuth().logout` is never called from a component. The logout spec
+  calls `POST /api/auth/logout` instead. Add the button, then drive it through the UI.
 
 ## Decisions log
 
@@ -161,3 +170,6 @@ reload. Add the module's API helpers to `fixtures/api.ts` as needed.
   the form only offers "also update the balance" when the transaction date is on/after the latest
   balance. After creating an account the app navigates to it, so specs wait for the URL before reloading.
 - 2026-11-22: Grocery specs use `waitForApi` with `:id` placeholders (not `*`) for path params.
+- 2026-11-22: Real logins stay few: one per test, all as the seeded `dev`, one wrong password per run (the
+  limiter is per backend process; only failures should count toward 5/user). Session expiry moves the
+  server clock past the 365d token lifetime; the browser cookie's own expiry uses real time.
