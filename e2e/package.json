@@ -7,7 +7,9 @@
     "flake": "playwright test --repeat-each=10 --retries=0",
     "report": "playwright show-report",
     "typecheck": "tsc --noEmit",
-    "down": "docker rm -f simple-track-e2e"
+    "down": "docker rm -f simple-track-e2e",
+    "ci": "./ci.sh",
+    "ci:history": "node --no-warnings infra/ci-history.ts"
   },
   "devDependencies": {
     "@playwright/test": "1.65.1",

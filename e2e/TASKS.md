@@ -109,11 +109,17 @@ reload. Add the module's API helpers to `fixtures/api.ts` as needed.
 
 ## C. CI and scale
 
-- [ ] **C1. CI step**: non-blocking `e2e` step in `.cicd.yaml` (production build, `--fail-on-flaky-tests`).
-- [ ] **C2. Promote to blocking** after a stretch of stable runs.
-- [ ] **C3. `large` seed profile** (or bulk `/__e2e/seed/*` endpoints) for long histories and scale.
-- [ ] **C4. Aria snapshots** for key screens, if they earn their keep.
-- [ ] **C5. Failure summary reporter** (`results/failures.md`), after reviewing how agents read failures.
+- [x] **C1. CI step**: `e2e` step in `.cicd.yaml` runs `e2e/ci.sh`: CI settings, run history in
+      `~/.local/state/simple-track-e2e/ci-history.jsonl`, failed runs' reports kept. Non-blocking.
+- [ ] **C2. Promote to blocking**: set `E2E_BLOCKING=1` on the step once `npm run ci:history` reports
+      the last 20 runs clean (green, no flaky). Waiting on run history.
+- [x] **C3. `large` seed profile**: `seed.Large` (two years of history in every module, odd values),
+      `test.use({ seed: 'large' })`, `POST /__e2e/seed/large`, `e2eseed -profile large`; `tests/scale/`
+      renders every page against it. Timing budgets wait for the performance project.
+- [x] **C4. Aria snapshots**: `tests/aria/` covers the main nav and the gym week strip, per project.
+      Grow only for regions where losing an item would go unnoticed.
+- [x] **C5. Failure summary reporter**: `test-results/failures.md`. Revisit its contents after agents
+      have used it on real failures.
 
 ## Findings (bugs the suite surfaced; not fixed here)
 
@@ -166,6 +172,11 @@ reload. Add the module's API helpers to `fixtures/api.ts` as needed.
   ~2.5x slower per test, so the production build stays the default.
 - 2026-11-22: Worker DBs are named per checkout (`e2e_<hash of path>_w<N>`) so worktrees share the one
   container; one run per checkout at a time (lock file).
+- 2026-11-22: CI is non-blocking through `ci.sh` (j-cicd steps have no allow-failure option); the
+  switch to blocking is a data-backed decision (`npm run ci:history`, 20 clean runs).
+- 2026-11-22: Orphan pruning drops only databases whose recorded checkout path no longer exists. An
+  earlier version also dropped databases without a recorded path and broke concurrent runs in other
+  worktrees: never prune what can't be proven orphaned.
 - 2026-11-22: Example specs use grocery add: it is optimistic, retries twice (TanStack `retry: 2`) and
   is idempotent by `client_id`, so it exercises every failure mode.
 - 2026-11-22: Third-party lookups (media) are replaced by a per-worker fake upstream HTTP server in the

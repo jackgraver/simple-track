@@ -4,6 +4,7 @@
 // only with `-tags e2e`. It adds, under /__e2e (no auth):
 //
 //	POST   /__e2e/reset                 truncate + reseed, clear clock, faults and holds
+//	POST   /__e2e/seed/:profile         add a data profile on top of the seed (e.g. "large")
 //	POST   /__e2e/clock  {time}         move the server clock (RFC 3339); DELETE resets it
 //	POST   /__e2e/faults {table,op,...} make matching DB statements fail
 //	POST   /__e2e/holds  {method,path,phase,...} hold matching requests
@@ -51,6 +52,19 @@ func (s *state) routes(g *gin.RouterGroup) {
 		s.clear()
 		clock.Reset()
 		if err := seed.Reset(s.db); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.Status(http.StatusNoContent)
+	})
+
+	g.POST("/seed/:profile", func(c *gin.Context) {
+		apply, ok := seed.Profiles[c.Param("profile")]
+		if !ok {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "unknown seed profile " + c.Param("profile")})
+			return
+		}
+		if err := apply(s.db); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}

@@ -13,7 +13,14 @@ export default defineConfig({
   failOnFlakyTests: CI,
   timeout: 30_000,
   expect: { timeout: 5_000 },
-  reporter: [['list'], ['html', { open: 'never' }]],
+  // Desktop and mobile render different structure, so snapshots are per project.
+  snapshotPathTemplate: '{testDir}/{testFilePath}-snapshots/{arg}-{projectName}{ext}',
+  reporter: [
+    [CI ? 'dot' : 'list'],
+    ['html', { open: 'never' }],
+    ['./infra/summary-reporter.ts'],
+    ...(CI ? [['json', { outputFile: 'test-results/results.json' }] as const] : []),
+  ],
   use: {
     // baseURL is set per worker by the fixtures (the front door starts in global setup).
     timezoneId: TZ,

@@ -7,7 +7,7 @@ import { buildBackend, buildFrontend, ensureFrontendDeps } from './infra/build';
 import { sleep } from './infra/exec';
 import { startFrontDoor } from './infra/frontdoor';
 import { CACHE_DIR, DIST_DIR, FRONTEND_DIR } from './infra/paths';
-import { ensurePostgres, ensureTemplate } from './infra/postgres';
+import { ensurePostgres, ensureTemplate, pruneOrphans } from './infra/postgres';
 import { freePort } from './infra/backend';
 
 const LOCK = path.join(CACHE_DIR, 'run.lock');
@@ -57,6 +57,7 @@ export default async function globalSetup(_config: FullConfig) {
     devMode ? startViteDev() : buildFrontend(),
     ensurePostgres(),
   ]);
+  await pruneOrphans(pgPort);
   const templateRebuilt = await ensureTemplateTimed(pgPort, backend.key);
 
   const door = await startFrontDoor('url' in frontend ? { devServer: frontend.url } : { dist: DIST_DIR });
