@@ -53,6 +53,18 @@ reload. Add the module's API helpers to `fixtures/api.ts` as needed.
       - todo: weight/plates edit, notes, finish + "Up next", cardio/mobility, add/remove exercise,
         offline log, persistent save failure ("Didn't save" + Retry), plans pages, progression, weight, steps
 - [ ] **B3. Diet**
+- [x] **B3. Diet**: specs in `tests/diet/quick-log.spec.ts` (Quick log, the simplest logged-meal path).
+      Done: log (optimistic, persists after reload, `@smoke`); edit (replaces the row, exactly one logged
+      meal left); delete via confirm dialog (other meal survives reload).
+      Scenario list still open: log a catalogue-food meal via `/diet/log` (multi-item, amounts);
+      log a planned meal (one-tap Log, "Logged" badge, no double log); edit-and-log a planned meal;
+      day navigation (`?offset=`) logs to the right day; water log; macro totals/goals update after
+      log/delete; delete a still-saving row; retry after dropped response (no duplicate, `client_id`);
+      DB fault on log rolls the row back with a Retry toast; targets edit persists; plan week
+      (add/copy/delete planned meal); saved meals CRUD.
+      Data-loss risks to cover next: editing a logged meal is replace-by-id (`replace_meal_id`), so a
+      failure between create and delete could lose or duplicate it; deleting a logged meal must not
+      delete shared foods or saved meals.
 - [ ] **B4. Finances**
 - [ ] **B5. Media**: needs a fake upstream for the lookup APIs (AniList etc., URLs are configurable).
 - [ ] **B6. Grocery**
@@ -121,3 +133,5 @@ reload. Add the module's API helpers to `fixtures/api.ts` as needed.
 - 2026-11-22: Gym specs drive the per-exercise logger directly (`/gym/logging/<id>`); sets are arranged
   with `api.logSet`. The reps slider is scroll-driven (a tick click smooth-scrolls and scroll events set
   the value), so `setReps` waits for the scroll to settle before trusting the value.
+- 2026-11-22: Diet specs start with Quick log: no catalogue dependency, one row, and it covers the
+  optimistic log/edit/delete flow. Delete asks for confirmation ("Remove quick log" dialog).
