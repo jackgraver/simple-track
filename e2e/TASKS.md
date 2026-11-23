@@ -172,6 +172,11 @@ reload. Add the module's API helpers to `fixtures/api.ts` as needed.
   container; one run per checkout at a time (lock file).
 - 2026-11-22: CI is non-blocking through `ci.sh` (j-cicd steps have no allow-failure option); the
   switch to blocking is a data-backed decision (`npm run ci:history`, 20 clean runs).
+- 2026-11-23: Failure analysis reviewed by injecting three bugs (a silent non-save on grocery
+  complete, a render crash on `/gym/logging`, a first-attempt flake). Results: the crash went
+  uncaught (no spec opened that page) until smoke covered every param-free route; the non-save was
+  caught but only diagnosable via `db.sql`, so failures now list the rows the test changed; bundle
+  stack frames were unreadable, so the e2e build has source maps and the guard maps them to src.
 - 2026-11-23: e2e step made blocking after 20/20 clean CI-equivalent runs (clean clones, `ci.sh`).
   If it turns red without a code reason, unset `E2E_BLOCKING` first, then fix the flake.
 - 2026-11-22: Orphan pruning drops only databases whose recorded checkout path no longer exists. An

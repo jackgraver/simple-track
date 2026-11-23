@@ -2,18 +2,28 @@ import { expect, test } from '../../fixtures';
 
 // Every top-level page renders for a signed-in user, with no console errors, page errors or 5xx
 // (the fixtures' console guard fails the test on any of those).
+// Every route without params (redirect-only ones are covered by their targets). When adding a route
+// to frontend/src/router/index.ts, add it here: a page that crashes on load is otherwise only caught
+// if some deeper spec happens to open it.
 const routes = [
   '/home',
   '/gym',
   '/gym/plans',
+  '/gym/logging',
+  '/gym/logging/cardio',
   '/gym/progression',
   '/gym/weight',
   '/gym/steps',
   '/diet',
+  '/diet/log',
+  '/diet/edit-planned',
   '/diet/targets',
+  '/diet/water-presets',
   '/grocery',
   '/finances',
+  '/finances/rules',
   '/media',
+  '/media/new',
   '/settings/profile',
 ];
 

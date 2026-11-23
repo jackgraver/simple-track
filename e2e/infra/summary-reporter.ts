@@ -56,19 +56,33 @@ export default class SummaryReporter implements Reporter {
     const loc = `${path.relative(process.cwd(), test.location.file)}:${test.location.line}`;
     const lines = [`## ${flaky ? '[flaky] ' : ''}[${project}] ${title}`, '', `- spec: \`${loc}\``];
     const err = result.errors[0];
-    if (err?.location) lines.push(`- failed at: \`${path.relative(process.cwd(), err.location.file)}:${err.location.line}\``);
+    if (err?.location && fs.existsSync(err.location.file)) lines.push(`- failed at: \`${path.relative(process.cwd(), err.location.file)}:${err.location.line}\``);
     lines.push(`- rerun: \`npx playwright test ${loc} --project=${project}\``);
+    // The fixtures write backend.log / db.sql / db-changes.txt into the test's output dir;
+    // Playwright also keeps hashed copies under attachments/. Point at the readable originals.
+    const outDir = result.attachments.map((a) => a.path).find((p) => p && !p.includes(`${path.sep}attachments${path.sep}`));
+    const file = (a: TestResult['attachments'][number]) => {
+      const original = outDir && path.join(path.dirname(outDir), a.name);
+      return original && fs.existsSync(original) ? original : a.path;
+    };
     for (const a of result.attachments) {
-      if (a.path) lines.push(`- ${a.name}: \`${path.relative(process.cwd(), a.path)}\``);
+      const p = file(a);
+      if (p) lines.push(`- ${a.name}: \`${path.relative(process.cwd(), p)}\``);
     }
     if (err) {
       const msg = strip(err.message ?? '').split('\n').filter(Boolean).slice(0, 12).join('\n');
       lines.push('', '```', msg, '```');
       if (err.snippet) lines.push('', '```', strip(err.snippet), '```');
     }
-    const log = result.attachments.find((a) => a.name === 'backend.log' && a.path);
-    if (log?.path && fs.existsSync(log.path)) {
-      const text = fs.readFileSync(log.path, 'utf8').split('\n');
+    const changes = result.attachments.find((a) => a.name === 'db-changes.txt');
+    const changesFile = changes && file(changes);
+    if (changesFile && fs.existsSync(changesFile)) {
+      lines.push('', 'Data this test changed (created, updated or deleted rows):', '```', fs.readFileSync(changesFile, 'utf8'), '```');
+    }
+    const log = result.attachments.find((a) => a.name === 'backend.log');
+    const logFile = log && file(log);
+    if (logFile && fs.existsSync(logFile)) {
+      const text = fs.readFileSync(logFile, 'utf8').split('\n');
       const calls = text.filter((l) => l.includes('[GIN]') && !l.includes('/__e2e/')).slice(-6);
       const errors = text.filter((l) => /\bERROR\b|panic/.test(l)).slice(-5);
       if (calls.length) lines.push('', 'Last API calls:', '```', ...calls.map((l) => l.replace(/^\[GIN\] \S+ - /, '')), '```');

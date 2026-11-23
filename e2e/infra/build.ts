@@ -39,13 +39,17 @@ export async function buildFrontend(): Promise<BuildResult> {
       (p) => path.join(FRONTEND_DIR, p),
     ),
     () => true,
-  );
+  ) + '-sourcemap';
   const keyFile = path.join(CACHE_DIR, 'dist.key');
   if (!force() && readKey(keyFile) === key && fs.existsSync(path.join(DIST_DIR, 'index.html'))) {
     return { key, built: false, ms: Date.now() - t0 };
   }
   await ensureFrontendDeps();
-  await run('npx', ['vite', 'build', '--outDir', DIST_DIR, '--emptyOutDir', '--logLevel', 'warn'], { cwd: FRONTEND_DIR });
+  // Source maps let the console guard report frontend errors as src/ file:line (infra/sourcemap.ts).
+  // The bundle itself is the normal minified production build.
+  await run('npx', ['vite', 'build', '--sourcemap', '--outDir', DIST_DIR, '--emptyOutDir', '--logLevel', 'warn'], {
+    cwd: FRONTEND_DIR,
+  });
   fs.writeFileSync(keyFile, key);
   return { key, built: true, ms: Date.now() - t0 };
 }

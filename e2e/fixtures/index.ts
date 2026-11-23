@@ -5,7 +5,8 @@ import { startUpstream, type Upstream } from '../infra/upstream';
 import { startBackend, type Backend } from '../infra/backend';
 import { BACKEND_COOKIE } from '../infra/frontdoor';
 import { workerDb } from '../infra/paths';
-import { cloneTemplate, dropDatabase, dumpData, pgUrl } from '../infra/postgres';
+import { mapStack } from '../infra/sourcemap';
+import { changedRows, cloneTemplate, dropDatabase, dumpData, maxIds, pgUrl, tablesWithId, type TableInfo } from '../infra/postgres';
 import { Api } from './api';
 import { E2E } from './e2e';
 
@@ -25,6 +26,9 @@ interface WorkerStack {
   dbUrl: string;
   backend: Backend;
   upstream: Upstream;
+  /** The fixtures' own connection to this worker's DB (change tracking for failure reports). */
+  sql: Client;
+  tables: TableInfo[];
 }
 
 interface Options {
@@ -71,7 +75,11 @@ export const test = base.extend<Fixtures & Options, { stack: WorkerStack }>({
       const backend = await startBackend(`w${workerInfo.parallelIndex}`, dbUrl, {
         LOOKUP_ANILIST_URL: `${upstream.url}/anilist`,
       });
-      await use({ db, dbUrl, backend, upstream });
+      const sql = new Client({ connectionString: dbUrl });
+      await sql.connect();
+      const tables = await tablesWithId(sql);
+      await use({ db, dbUrl, backend, upstream, sql, tables });
+      await sql.end();
       await backend.stop();
       await upstream.stop();
       if (process.env.E2E_KEEP !== '1') await dropDatabase(PG_PORT(), db);
@@ -109,6 +117,7 @@ export const test = base.extend<Fixtures & Options, { stack: WorkerStack }>({
       if (seed !== 'base') await e2e.seedProfile(seed);
       if (now) await e2e.setClock(now);
       const logStart = fs.statSync(stack.backend.logFile).size;
+      const idsAtStart = await maxIds(stack.sql, stack.tables);
 
       await use();
 
@@ -124,6 +133,13 @@ export const test = base.extend<Fixtures & Options, { stack: WorkerStack }>({
         const dumpPath = testInfo.outputPath('db.sql');
         fs.writeFileSync(dumpPath, await dumpData(stack.db).catch((e) => `pg_dump failed: ${e}`));
         await testInfo.attach('db.sql', { path: dumpPath, contentType: 'text/plain' });
+        // Rows this test created, updated or deleted: the part of db.sql that usually matters.
+        const changesPath = testInfo.outputPath('db-changes.txt');
+        fs.writeFileSync(
+          changesPath,
+          await changedRows(stack.sql, stack.tables, idsAtStart).catch((e) => `change query failed: ${e}`),
+        );
+        await testInfo.attach('db-changes.txt', { path: changesPath, contentType: 'text/plain' });
       }
     },
     { auto: true },
@@ -159,7 +175,7 @@ export const test = base.extend<Fixtures & Options, { stack: WorkerStack }>({
     );
     if (unexpected.length && test.info().status === 'passed') {
       throw new Error(
-        `Unexpected browser errors (allow with test.use({ allowedErrors: [/.../] })):\n  ${unexpected.join('\n  ')}`,
+        `Unexpected browser errors (allow with test.use({ allowedErrors: [/.../] })):\n  ${unexpected.map(readableStack).join('\n  ')}`,
       );
     }
   },
@@ -190,4 +206,13 @@ export function waitForApi(page: Page, route: string) {
   return page.waitForResponse(
     (r) => r.request().method() === method.toUpperCase() && re.test(new URL(r.url()).pathname + '?') && r.ok(),
   );
+}
+
+/** Source-mapped stack with app frames (frontend/src) kept and library frames cut to a couple. */
+function readableStack(problem: string): string {
+  const [head, ...frames] = mapStack(problem).split('\n');
+  const app = frames.filter((f) => f.includes('frontend/src/'));
+  const kept = app.length ? app.slice(0, 6) : frames.slice(0, 3);
+  const cut = frames.length - kept.length;
+  return [head, ...kept, ...(cut > 0 ? [`    … ${cut} library frame${cut === 1 ? '' : 's'}`] : [])].join('\n');
 }

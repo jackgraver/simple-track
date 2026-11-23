@@ -202,13 +202,17 @@ the guards still fail tests: `tests/examples/guards.spec.ts` (`@infra`).
 ## Reading a failure
 
 Start with **`test-results/failures.md`**: one block per failed or flaky test with the error, the
-failing line, a rerun command, the last API calls, backend errors and the artifact paths. Each failed
+failing line, a rerun command, **the rows this test created, updated or deleted**, the last API calls,
+backend errors and the artifact paths. Browser errors carry source-mapped stacks
+(`frontend/src/...vue:line`, from the e2e build's source maps), with library frames trimmed. Each failed
 test also gets, in `test-results/<test>/` and the HTML report:
 
 - `trace.zip`: DOM snapshots, network (with response bodies), console, one step per action.
   `npx playwright show-trace <file>`.
 - `backend.log`: the worker backend's log lines while that test ran.
 - `db.sql`: `pg_dump --data-only` of the worker DB at the moment of failure.
+- `db-changes.txt`: only the rows this test created, updated or soft-deleted (also inlined in
+  `failures.md`). "API said 200 but the row didn't change" shows up here.
 
 Every test starts from the seed with a fixed clock, so re-running the single test reproduces it.
 
@@ -234,6 +238,9 @@ Mirrors `frontend/src/pages`, so an agent knows which lane to run for the module
 fixtures over page objects; don't wrap every locator.
 
 ## Adding a test
+
+New route in `frontend/src/router/index.ts`? Add it to `tests/smoke/routes.spec.ts`: a page that
+crashes on load is otherwise caught only if a deeper spec happens to open it.
 
 1. Put it under `tests/<module>/`, tag it (`{ tag: ['@gym'] }`, plus `@smoke` if it belongs there).
 2. Arrange with `api` helpers (add one to `fixtures/api.ts` if missing), act through the UI, assert,

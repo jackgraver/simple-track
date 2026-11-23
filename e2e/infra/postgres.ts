@@ -174,3 +174,51 @@ export async function pruneOrphans(port: number): Promise<string[]> {
     return dropped;
   });
 }
+
+/**
+ * Per-test "what did this test change" support. At test start the fixtures record each table's
+ * max(id); on failure, changedRows() returns rows the test created (id above the start max),
+ * updated (updated_at <> created_at: seeded rows are written with both equal) or soft-deleted.
+ * Small by construction, so it goes straight into failures.md.
+ */
+export interface TableInfo {
+  name: string;
+  hasTimestamps: boolean;
+  hasDeletedAt: boolean;
+}
+
+export async function tablesWithId(c: Client): Promise<TableInfo[]> {
+  const r = await c.query(`
+    SELECT table_name AS name,
+           bool_or(column_name = 'updated_at') AND bool_or(column_name = 'created_at') AS "hasTimestamps",
+           bool_or(column_name = 'deleted_at') AS "hasDeletedAt"
+    FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name <> 'schema_migrations'
+    GROUP BY table_name HAVING bool_or(column_name = 'id') ORDER BY table_name`);
+  return r.rows;
+}
+
+export async function maxIds(c: Client, tables: TableInfo[]): Promise<Map<string, number>> {
+  if (!tables.length) return new Map();
+  const sql = tables.map((t) => `SELECT '${t.name}' AS t, coalesce(max(id), 0)::bigint AS m FROM "${t.name}"`).join(' UNION ALL ');
+  const r = await c.query(sql);
+  return new Map(r.rows.map((x) => [x.t as string, Number(x.m)]));
+}
+
+export async function changedRows(c: Client, tables: TableInfo[], start: Map<string, number>, limit = 10): Promise<string> {
+  const out: string[] = [];
+  for (const t of tables) {
+    const conds = [`id > ${start.get(t.name) ?? 0}`];
+    if (t.hasTimestamps) conds.push('updated_at <> created_at');
+    if (t.hasDeletedAt) conds.push('deleted_at IS NOT NULL');
+    const r = await c.query(
+      `SELECT to_jsonb(x) - 'created_at' - 'updated_at' AS row, count(*) OVER () AS n
+       FROM "${t.name}" x WHERE ${conds.join(' OR ')} ORDER BY id LIMIT ${limit}`,
+    );
+    if (!r.rows.length) continue;
+    const n = Number(r.rows[0].n);
+    out.push(`${t.name} (${n} row${n === 1 ? '' : 's'}${n > limit ? `, first ${limit}` : ''}):`);
+    for (const { row } of r.rows) out.push('  ' + JSON.stringify(row));
+  }
+  return out.length ? out.join('\n') : '(no rows created, updated or deleted)';
+}
