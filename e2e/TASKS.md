@@ -42,7 +42,15 @@ reload. Add the module's API helpers to `fixtures/api.ts` as needed.
 - [ ] **B5. Media**: needs a fake upstream for the lookup APIs (AniList etc., URLs are configurable).
 - [ ] **B6. Grocery**
 - [ ] **B7. Settings and auth**: login UI (no bypass cookie), logout, session expiry (via clock).
-- [ ] **B8. Optimistic UI**: hold-based assertions of instant state and post-reload state.
+- [x] **B8. Optimistic UI**: hold-based assertions of instant state and post-reload state.
+      Pattern (`tests/optimistic/`): hold the request, assert the instant state, release, wait for the
+      UI to settle (`aria-busy` gone, no network wait), reload, assert again. Scenarios:
+      grocery add (row visible + `aria-busy` while held, persists), grocery complete (checked at once,
+      gone after reload; hold by template because the client may use `client_id` as the ref), weight save
+      (overwrite prompt quotes the optimistic value while held and the server value after reload; the
+      chart is a canvas, so the cache is probed through that prompt). Not yet: rollback with Retry
+      (covered for grocery add in examples), gym set logging and diet/finances (their lanes B2-B4 own
+      them; reuse this pattern).
 
 ## C. CI and scale
 
@@ -61,6 +69,12 @@ reload. Add the module's API helpers to `fixtures/api.ts` as needed.
 
 - `POST /diet/foods` with an existing name returns **500**: the unique index `idx_foods_name` rejects it
   and `PostFood` maps every error to `apierr.Internal`. Decide the intended status (409?), then pin it.
+
+- `ListRow` already sets `aria-busy="true"` on pending rows (grocery uses it), so the "mark pending
+  rows" idea only needs extending to the other optimistic lists (gym sets, diet, finances) before
+  specs there can drop `waitForApi`. Specs for grocery use it now.
+- `Checkbox.vue` takes `label` but the slot content replaces it, so grocery checkboxes are named by the
+  item name (`Eggs`), not `Complete Eggs` as the `label` prop suggests.
 
 ## Decisions log
 
@@ -85,3 +99,5 @@ reload. Add the module's API helpers to `fixtures/api.ts` as needed.
   container; one run per checkout at a time (lock file).
 - 2026-11-22: Example specs use grocery add: it is optimistic, retries twice (TanStack `retry: 2`) and
   is idempotent by `client_id`, so it exercises every failure mode.
+- 2026-11-22: Optimistic specs wait for the UI to settle (`aria-busy` gone) before reloading, instead of
+  `waitForApi`, where the app exposes it; holds on completes use a route template (ref may be `client_id`).

@@ -43,4 +43,17 @@ export class Api {
       ...food,
     });
   }
+
+  // --- tracking ---
+
+  createGroceryItem(name: string) {
+    return this.post<{ item: { ID: number; name: string } }>('/tracking/grocery/items', {
+      name,
+      client_id: crypto.randomUUID(),
+    });
+  }
+
+  saveWeight(date: string, weight_lbs: number) {
+    return this.post('/tracking/weight', { date, weight_lbs });
+  }
 }
