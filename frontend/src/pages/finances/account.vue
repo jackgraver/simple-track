@@ -174,20 +174,15 @@ const txForm = reactive({
 const txMutation = useMoneyMutation(async () => {
     const amount = parseAmount(txForm.amount);
     if (amount === null) return;
+    // Cash moving in or out changes the balance by the same amount; the server
+    // saves the transaction and the new balance together or not at all.
     await createTransaction(accountId.value, {
         kind: txForm.kind,
         amount,
         date: txForm.date,
         note: txForm.note,
+        update_balance: txForm.alsoUpdateBalance && canAdjustBalance.value,
     });
-    // Cash moving in or out changes the balance by the same amount.
-    if (txForm.alsoUpdateBalance && canAdjustBalance.value && account.value) {
-        const delta = txForm.kind === "deposit" ? amount : -amount;
-        await setBalance(accountId.value, {
-            balance: Math.round((account.value.current_balance + delta) * 100) / 100,
-            date: txForm.date,
-        });
-    }
 }, "Failed to add transaction");
 
 /** Only offer to adjust the balance when the transaction is on/after the latest balance. */

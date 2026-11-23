@@ -94,7 +94,14 @@ export async function fetchTransactions(accountId: number) {
 
 export async function createTransaction(
     accountId: number,
-    payload: { kind: TransactionKind; amount: number; date: string; note: string },
+    payload: {
+        kind: TransactionKind;
+        amount: number;
+        date: string;
+        note: string;
+        /** Also move the balance by the amount, atomically on the server. */
+        update_balance?: boolean;
+    },
 ) {
     await apiClient.post(`/money/accounts/${accountId}/transactions`, payload);
 }
