@@ -1,6 +1,7 @@
 package services
 
 import (
+	"be-simpletracker/internal/clock"
 	"be-simpletracker/internal/core/workout/models"
 	workoutrepo "be-simpletracker/internal/core/workout/repository"
 	"be-simpletracker/internal/utils"
@@ -188,7 +189,7 @@ func plannedCardioFromPlan(plan *models.WorkoutPlan) any {
 }
 
 func GetMonthWorkoutLogs(ctx context.Context, monthOffset int) (MonthWorkoutLogsResponse, error) {
-	today := time.Now()
+	today := clock.Now()
 	target := today.AddDate(0, monthOffset, 0)
 	startOfMonth := time.Date(target.Year(), target.Month(), 1, 0, 0, 0, 0, target.Location())
 	endOfMonth := startOfMonth.AddDate(0, 1, -1)
@@ -224,7 +225,7 @@ func GetWorkoutActivity(ctx context.Context, mode string, weeks int) (WorkoutAct
 	if mode != "year" && mode != "rolling" {
 		return WorkoutActivityResponse{}, ErrInvalidActivityMode
 	}
-	now := time.Now()
+	now := clock.Now()
 	loc := now.Location()
 	end := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, loc)
 	var start time.Time

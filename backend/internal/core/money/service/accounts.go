@@ -1,6 +1,7 @@
 package service
 
 import (
+	"be-simpletracker/internal/clock"
 	"errors"
 	"strings"
 	"time"
@@ -133,7 +134,7 @@ func summarizeAccounts(db *gorm.DB, accounts []models.Account) ([]AccountSummary
 // balance as the first snapshot.
 func CreateAccount(db *gorm.DB, input AccountInput, openingBalance *float64, balanceDate time.Time) (*models.Account, error) {
 	account := models.Account{}
-	applyAccountInput(&account, input, time.Now())
+	applyAccountInput(&account, input, clock.Now())
 	if err := validateAccount(db, account); err != nil {
 		return nil, err
 	}
@@ -157,7 +158,7 @@ func UpdateAccount(db *gorm.DB, id uint, input AccountInput) (*models.Account, e
 	if err := db.First(&account, id).Error; err != nil {
 		return nil, err
 	}
-	applyAccountInput(&account, input, time.Now())
+	applyAccountInput(&account, input, clock.Now())
 	if err := validateAccount(db, account); err != nil {
 		return nil, err
 	}

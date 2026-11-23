@@ -1,6 +1,7 @@
 package services
 
 import (
+	"be-simpletracker/internal/clock"
 	"context"
 	"time"
 
@@ -28,14 +29,14 @@ func MealPlanToday(ctx context.Context, offset int) (models.DietDay, dietrepo.Me
 }
 
 func MealPlanWeek(ctx context.Context) ([]models.DietDay, error) {
-	today := time.Now()
+	today := clock.Now()
 	start := today.AddDate(0, 0, -3)
 	end := today.AddDate(0, 0, 3)
 	return dietrepo.DaysByDateRange(ctx, start, end)
 }
 
 func MealPlanMonth(ctx context.Context, offset int) (days []models.DietDay, startOfMonth, endOfMonth time.Time, month time.Month, err error) {
-	today := time.Now()
+	today := clock.Now()
 	target := today.AddDate(0, offset, 0)
 	startOfMonth = time.Date(target.Year(), target.Month(), 1, 0, 0, 0, 0, target.Location())
 	endOfMonth = startOfMonth.AddDate(0, 1, -1)
@@ -47,7 +48,7 @@ func MealPlanMonth(ctx context.Context, offset int) (days []models.DietDay, star
 }
 
 func MonthPlannedSummary(_ context.Context, monthOffset int) ([]int, error) {
-	today := time.Now()
+	today := clock.Now()
 	target := today.AddDate(0, monthOffset, 0)
 	loc := target.Location()
 	startOfMonth := time.Date(target.Year(), target.Month(), 1, 0, 0, 0, 0, loc)
