@@ -195,3 +195,22 @@ describe("notes", () => {
         expect(findGroup(qc.getQueryData(KEY), BENCH)!.logged!.notes).toBe("seat 4");
     });
 });
+
+describe("reps default for the next set", () => {
+    it("follows the previous set of this session, not last session's reps", async () => {
+        const lastSession = logged([set(1, "p0", 12), set(2, "p1", 12), set(3, "p2", 12)]);
+        qc.setQueryData(KEY, {
+            ...day(),
+            planned_exercises: [{ planned: exercise, logged: undefined, previous: lastSession }],
+        });
+        http.apiPOST.mockRejectedValue(new Error("offline"));
+        const s = openSession();
+
+        s.commitRepsFromInput(8);
+        expect(s.addNextSet()).toBe(true);
+        expect(s.currentReps).toBe(8); // not 12 from last session's set 2
+        s.commitRepsFromInput(7);
+        expect(s.addNextSet()).toBe(true);
+        expect(s.currentReps).toBe(7);
+    });
+});

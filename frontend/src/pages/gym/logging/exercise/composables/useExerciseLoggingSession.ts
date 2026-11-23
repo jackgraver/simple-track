@@ -304,16 +304,6 @@ export function useExerciseLoggingSession(options: {
         );
     };
 
-    /** Point the reps slider at last session's reps for set `index` (0-based), when there is one. */
-    const resetRepsForSet = (index: number) => {
-        const previous = previousRepsForSetAtWeight(
-            exerciseGroup.value?.previous?.sets,
-            index,
-            currentWeight.value,
-        );
-        if (previous != null) currentReps.value = normalizeReps(previous);
-    };
-
     const stepWeight = (direction: "plus" | "minus") => {
         if (direction === "plus") {
             updateWeightAndDefaultReps(
@@ -385,8 +375,14 @@ export function useExerciseLoggingSession(options: {
 
         draftDirty.value = false;
         editingSetIndex.value = null;
-        // The next set is index `count` (+1 if we just added one); the rows update a tick later.
-        resetRepsForSet(editingIndex != null ? count : count + 1);
+        // The next set starts from the previous set of this session (last session's reps live in the
+        // last-time indicator, not the slider). A new set leaves the slider at the reps just logged;
+        // after fixing an earlier set, go back to the last set's reps (rows update a tick later).
+        if (editingIndex != null) {
+            currentReps.value = normalizeReps(
+                editingIndex === count - 1 ? reps : (loggedSets.value[count - 1]?.reps ?? reps),
+            );
+        }
         return true;
     };
 
@@ -478,7 +474,7 @@ export function useExerciseLoggingSession(options: {
         editingSetIndex.value = null;
         const last = loggedSets.value[loggedSets.value.length - 1];
         if (last) currentWeight.value = last.weight;
-        resetRepsForSet(loggedSets.value.length);
+        if (last) currentReps.value = normalizeReps(last.reps);
     };
 
     const goBackToList = () => {
