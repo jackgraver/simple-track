@@ -17,7 +17,7 @@ import {
     parseWeightSetup,
     type WeightSetupDialogResult,
 } from "../domain/weightSetup";
-import { overloadStatus, plannedSetCount, progressVerdict, visibleMachineSettings } from "../domain/liveLogging";
+import { overloadStatus, plannedSetCount, progressVerdict, setsTally, visibleMachineSettings } from "../domain/liveLogging";
 import { buildUpNext, type UpNextItem } from "../domain/upNext";
 import { useExerciseLoggingSession } from "../composables/useExerciseLoggingSession";
 import WeightSetupDialog from "../dialog/WeightSetupDialog.vue";
@@ -233,7 +233,7 @@ const goTo = (item: UpNextItem) => {
                     : editing
                       ? `Editing set ${(session.editingSetIndex ?? 0) + 1}`
                       : plannedDone
-                        ? `${loggedCount}/${targetSets} · done`
+                        ? `${setsTally(loggedCount, targetSets)} · done`
                         : `Set ${session.currentSetNumber}/${targetSets}`
             "
             @back="goBackToLogging"
@@ -275,7 +275,6 @@ const goTo = (item: UpNextItem) => {
             >
                 Keep {{ session.weightProgression.previousWeight }} lb instead of +{{ session.weightProgression.increase }}
             </Button>
-
 
             <section v-if="showSlider" class="flex flex-col gap-1" aria-label="Reps">
                 <p class="m-0 text-xs font-semibold tracking-wide uppercase" :class="editing ? 'text-accent' : 'text-fg-muted'">
@@ -331,7 +330,6 @@ const goTo = (item: UpNextItem) => {
                         v-if="loggedCount > 0 && !plannedDone && !editing"
                         variant="ghost"
                         size="sm"
-                       
                         @click="finish"
                     >
                         Finish early

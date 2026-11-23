@@ -2,7 +2,7 @@
 import { RotateCcw, X } from "lucide-vue-next";
 import { IconButton, List, ListRow } from "~/shared/ui";
 import type { LoggedSetWithStatus } from "../../store/useWorkoutStore";
-import type { ProgressVerdict } from "../domain/liveLogging";
+import { setsTally, type ProgressVerdict } from "../domain/liveLogging";
 import { useOnline } from "~/api/online";
 
 // Below the fold: every set today next to the same set last session, and whether the weight goes up next time.
@@ -43,11 +43,11 @@ function diff(index: number): { text: string; tone: string } {
     <section v-if="sets.length" class="flex flex-col gap-2" aria-label="Sets">
         <div class="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
             <p class="m-0 text-xs font-semibold tracking-wide text-fg-muted uppercase">
-                Sets <span class="tabular-nums">{{ sets.length }}/{{ Math.max(target, sets.length) }}</span>
+                Sets <span class="tabular-nums">{{ setsTally(sets.length, target) }}</span>
             </p>
             <p v-if="verdict" class="m-0 text-sm" :class="verdict.onTrack ? 'text-success' : 'text-fg-muted'">
                 {{ verdict.hit }}/{{ verdict.total }} hit {{ verdict.rollover }}
-                {{ verdict.onTrack ? "· going up" : `· stay at ${weight}` }}
+                {{ verdict.onTrack ? "· up next time" : `· stay at ${weight} lb next time` }}
             </p>
         </div>
         <List class="rounded-card border border-line bg-surface">
@@ -67,7 +67,7 @@ function diff(index: number): { text: string; tone: string } {
                 <template #trailing>
                     <span v-if="editingIndex === index" class="text-xs font-medium text-accent">Editing</span>
                     <span v-else-if="set.status === 'error'" class="text-xs text-danger">Didn't save</span>
-                    <span v-else-if="set.status === 'pending' && !online" class="text-xs text-fg-muted">Offline</span>
+                    <span v-else-if="set.status === 'pending' && !online" class="text-xs text-fg-muted">Saves when online</span>
                     <span v-else class="text-sm font-medium tabular-nums" :class="diff(index).tone">{{ diff(index).text }}</span>
                 </template>
                 <template #end>

@@ -46,7 +46,7 @@ const settingsLine = (item: UpNextItem) =>
                 </div>
                 <p v-if="verdict" class="m-0 text-sm" :class="verdict.onTrack ? 'text-success' : 'text-fg-muted'">
                     {{ verdict.hit }}/{{ verdict.total }} hit {{ verdict.rollover }}
-                    {{ verdict.onTrack ? "· goes up" : "· same weight" }}
+                    {{ verdict.onTrack ? "· up next time" : "· same weight next time" }}
                 </p>
             </div>
         </Card>
