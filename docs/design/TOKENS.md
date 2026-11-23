@@ -127,7 +127,6 @@ A popover inside a dialog stacks inside the dialog's context, so 50 < 60 isn't a
 - `bottom-above-tabbar`: `bottom` offset (not `bottom-tabbar`: Tailwind resolves that to the plain spacing token, 4rem, and ignores the utility) for fixed things above the tab bar (toasts, sticky actions).
 - `bottom-at-tabbar`: the same offset with no gap, for full-width sticky bars that sit flush on the
   tab bar (the gym logger's Log/Finish bar).
-- `short:` variant: `max-height: 700px`, to tighten tall elements on short phone screens.
 - Layout breakpoint is `lg` (64rem) only. Replace the `@media (max-width: 767px)` blocks
   (`LoggingPageShell`, `PlannedMealsDisplay` matchMedia) with `lg` when touched.
 
@@ -268,7 +267,6 @@ emitted even when no utility uses it, which JS such as the chart theme reads). V
 @utility pb-above-tabbar { padding-bottom: calc(var(--spacing-tabbar) + 0.5rem + env(safe-area-inset-bottom)); }
 @utility bottom-above-tabbar { bottom: calc(var(--spacing-tabbar) + 1rem + env(safe-area-inset-bottom)); }
 @utility bottom-at-tabbar { bottom: calc(var(--spacing-tabbar) + env(safe-area-inset-bottom)); }
-@custom-variant short (@media (max-height: 700px));
 
 @layer base {
     html { background: var(--color-canvas); color: var(--color-fg); }

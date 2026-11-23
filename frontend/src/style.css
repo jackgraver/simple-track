@@ -179,9 +179,6 @@
 /* Flush on the tab bar, for full-width sticky bars. Not `bottom-tabbar`: the spacing token wins that name. */
 @utility bottom-at-tabbar { bottom: calc(var(--spacing-tabbar) + env(safe-area-inset-bottom)); }
 
-/* Short phone screens (landscape-ish or small phones): tighten tall elements. */
-@custom-variant short (@media (max-height: 700px));
-
 @utility h-safe-top { height: env(safe-area-inset-top); }
 
 @layer base {

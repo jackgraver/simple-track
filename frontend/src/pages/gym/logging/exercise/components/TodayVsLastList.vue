@@ -46,8 +46,8 @@ function diff(index: number): { text: string; tone: string } {
                 Sets <span class="tabular-nums">{{ setsTally(sets.length, target) }}</span>
             </p>
             <p v-if="verdict" class="m-0 text-sm" :class="verdict.onTrack ? 'text-success' : 'text-fg-muted'">
-                {{ verdict.hit }}/{{ verdict.total }} hit {{ verdict.rollover }}
-                {{ verdict.onTrack ? "· up next time" : `· stay at ${weight} lb next time` }}
+                {{ verdict.hit }}/{{ verdict.total }} sets hit {{ verdict.rollover }}
+                {{ verdict.onTrack ? "· on track to go up" : `· stay at ${weight} next time` }}
             </p>
         </div>
         <List class="rounded-card border border-line bg-surface">
@@ -67,7 +67,7 @@ function diff(index: number): { text: string; tone: string } {
                 <template #trailing>
                     <span v-if="editingIndex === index" class="text-xs font-medium text-accent">Editing</span>
                     <span v-else-if="set.status === 'error'" class="text-xs text-danger">Didn't save</span>
-                    <span v-else-if="set.status === 'pending' && !online" class="text-xs text-fg-muted">Saves when online</span>
+                    <span v-else-if="set.status === 'pending' && !online" class="text-xs text-fg-muted">Waiting for connection</span>
                     <span v-else class="text-sm font-medium tabular-nums" :class="diff(index).tone">{{ diff(index).text }}</span>
                 </template>
                 <template #end>

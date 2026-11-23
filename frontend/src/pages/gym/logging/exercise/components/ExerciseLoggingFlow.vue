@@ -17,7 +17,7 @@ import {
     parseWeightSetup,
     type WeightSetupDialogResult,
 } from "../domain/weightSetup";
-import { overloadStatus, plannedSetCount, progressVerdict, setsTally, visibleMachineSettings } from "../domain/liveLogging";
+import { overloadStatus, plannedSetCount, progressVerdict, visibleMachineSettings } from "../domain/liveLogging";
 import { buildUpNext, type UpNextItem } from "../domain/upNext";
 import { useExerciseLoggingSession } from "../composables/useExerciseLoggingSession";
 import WeightSetupDialog from "../dialog/WeightSetupDialog.vue";
@@ -151,16 +151,20 @@ const openPlatesDialog = async () => {
     if (result.syncWeight) session.commitWeightFromInput(result.totalLbs);
 };
 
+// Today's weight is the automatic +5: offer to keep last session's weight (on screen and in the sheet).
+const canUndoProgression = computed(
+    () => session.weightProgression != null && session.currentWeight === session.weightProgression.nextWeight,
+);
+
 const openWeightSheet = async () => {
-    const progression = session.weightProgression;
     const result = await dialogManager.custom<WeightSheetResult>({
-        title: `Setup · ${exerciseName.value}`,
+        title: `Weight & setup · ${exerciseName.value}`,
         component: WeightSheet,
         componentProps: {
             weight: session.currentWeight,
             step: session.weightIncrement,
             overload: overload.value,
-            canUndoProgression: progression != null && session.currentWeight === progression.nextWeight,
+            canUndoProgression: canUndoProgression.value,
             plates: plates.value,
             machineSettings: machineSettings.value,
             cues: cues.value,
@@ -229,12 +233,14 @@ const goTo = (item: UpNextItem) => {
             :title="view === 'next' ? 'Up next' : exerciseName"
             :subtitle="
                 view === 'next'
-                    ? `${doneCount}/${steps.length} done`
+                    ? `${doneCount} of ${steps.length} done`
                     : editing
                       ? `Editing set ${(session.editingSetIndex ?? 0) + 1}`
                       : plannedDone
-                        ? `${setsTally(loggedCount, targetSets)} sets · done`
-                        : `Set ${session.currentSetNumber}/${targetSets}`
+                        ? loggedCount > targetSets
+                          ? `${loggedCount} sets · done`
+                          : `${loggedCount} of ${targetSets} sets · done`
+                        : `Set ${session.currentSetNumber} of ${targetSets}`
             "
             @back="goBackToLogging"
         >
@@ -267,7 +273,7 @@ const goTo = (item: UpNextItem) => {
                 @edit="openWeightSheet"
             />
             <Button
-                v-if="session.weightProgression && session.currentWeight === session.weightProgression.nextWeight && loggedCount === 0"
+                v-if="session.weightProgression && canUndoProgression && loggedCount === 0"
                 variant="ghost"
                 size="sm"
                 class="self-start"
@@ -290,9 +296,8 @@ const goTo = (item: UpNextItem) => {
                 />
             </section>
 
-            <!-- Pinned above the tab bar so Log/Finish never scrolls off on short phones, whatever the cards above
-                 (setup, cues, last time) add in height. min-h keeps the bar from collapsing between states. -->
-            <div class="sticky bottom-at-tabbar z-raised -mx-4 flex min-h-14 flex-col gap-2 bg-canvas px-4 py-2 lg:static lg:mx-0 lg:px-0">
+            <!-- Pinned above the tab bar so Log/Finish stays on screen on short phones. -->
+            <div class="sticky bottom-at-tabbar z-raised -mx-4 flex flex-col gap-2 bg-canvas px-4 py-2 lg:static lg:mx-0 lg:p-0">
                 <Button v-if="showSlider" variant="primary" size="lg" block @click="logSet">
                     {{ editing ? `Save set ${(session.editingSetIndex ?? 0) + 1}` : `Log set ${session.currentSetNumber}` }}
                     · {{ session.currentReps }} reps
@@ -309,7 +314,7 @@ const goTo = (item: UpNextItem) => {
                     + Add set {{ loggedCount + 1 }}
                 </Button>
                 <Button v-if="extraSetOpen && !editing" variant="ghost" class="self-center" @click="extraSetOpen = false">
-                    Cancel
+                    Cancel extra set
                 </Button>
             </div>
 

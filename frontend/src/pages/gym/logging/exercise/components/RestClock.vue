@@ -28,14 +28,14 @@ const fillTone: Record<RestStage, string> = {
 <template>
     <section class="flex flex-col items-center gap-1 pt-1 text-center" aria-label="Time since last set">
         <p
-            class="m-0 text-7xl leading-none short:text-6xl font-semibold tracking-tight tabular-nums transition-colors duration-500"
+            class="m-0 text-7xl leading-none font-semibold tracking-tight tabular-nums transition-colors duration-500"
             :class="textTone[stage]"
             role="timer"
             aria-live="off"
         >
             {{ isActive ? displayText : "0:00" }}
         </p>
-        <div class="relative mt-3 short:mt-2 h-1.5 w-full rounded-full bg-surface-3" aria-hidden="true">
+        <div class="relative mt-3 h-1.5 w-full rounded-full bg-surface-3" aria-hidden="true">
             <div
                 class="absolute inset-y-0 left-0 rounded-full transition-[width,background-color] duration-500"
                 :class="fillTone[stage]"
