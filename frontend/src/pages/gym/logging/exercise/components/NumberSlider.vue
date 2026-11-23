@@ -188,6 +188,15 @@ onUnmounted(() => {
     clearTimeout(syncTimer);
 });
 
+// The side pads follow the strip's width. When the left pad grows, scroll anchoring moves
+// scrollLeft with the content and snapping then lands a few ticks off, which a later scroll event
+// would write as the value (180 -> 180.9). Re-pin to the model whenever the pad changes (resize,
+// rotation). The pads are `transition-none`: the reduced-motion rule gives every element a 1ms
+// transition, which delayed their first width by a frame and caused exactly this on load.
+watch(padPx, () => {
+    nextTick(() => scrollToIndex(valueToIndex(model.value || 0)));
+});
+
 watch(
     () => [props.min, props.max, props.step],
     () => {
@@ -339,7 +348,7 @@ const onTickClick = (index: number) => {
                     @touchstart.passive="onUserScrollStart"
                 >
                     <div
-                        class="shrink-0"
+                        class="shrink-0 transition-none"
                         :style="{ width: `${padPx}px` }"
                         aria-hidden="true"
                     />
@@ -382,7 +391,7 @@ const onTickClick = (index: number) => {
                         >
                     </button>
                     <div
-                        class="shrink-0"
+                        class="shrink-0 transition-none"
                         :style="{ width: `${padPx}px` }"
                         aria-hidden="true"
                     />
