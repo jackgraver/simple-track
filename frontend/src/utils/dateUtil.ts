@@ -1,7 +1,13 @@
+// Reused formatters: building one per call (what toLocale*String does) is slow, and the activity
+// heatmap formats ~700 labels per render.
+const MONTH_SHORT = new Intl.DateTimeFormat("en-US", { month: "short" });
+const MONTH_LONG = new Intl.DateTimeFormat("en-US", { month: "long" });
+const WEEKDAY_LONG = new Intl.DateTimeFormat("en-US", { weekday: "long" });
+
 export function formatDate(isoDate: string): string {
     const date = new Date(isoDate);
     const day = date.getDate(); // local day
-    const month = date.toLocaleString("en-US", { month: "short" });
+    const month = MONTH_SHORT.format(date);
 
     let suffix = "th";
     if (day % 10 === 1 && day !== 11) suffix = "st";
@@ -14,9 +20,9 @@ export function formatDate(isoDate: string): string {
 export function formatDateLong(isoDate: string): string {
     const date = new Date(isoDate);
     const day = date.getDate(); // local day
-    const month = date.toLocaleString("en-US", { month: "long" });
+    const month = MONTH_LONG.format(date);
     const year = date.getFullYear();
-    const dayOfWeek = date.toLocaleDateString("en-US", { weekday: "long" });
+    const dayOfWeek = WEEKDAY_LONG.format(date);
 
     let suffix = "th";
     if (day % 10 === 1 && day !== 11) suffix = "st";
@@ -40,7 +46,7 @@ export function formatDateShort(isoDate: string): string {
 
 export function monthName(isoDate: string): string {
     const date = new Date(isoDate);
-    return date.toLocaleString("en-US", { month: "long" });
+    return MONTH_LONG.format(date);
 }
 
 export function isSameDay(a: string | Date, b: string | Date): boolean {
@@ -62,7 +68,7 @@ export function isSameMonth(month: number, b: string | Date): boolean {
 
 export function dayOfWeek(dateStr: string): string {
     const date = new Date(dateStr);
-    return date.toLocaleDateString("en-US", { weekday: "long" }); // local
+    return WEEKDAY_LONG.format(date); // local
 }
 
 export function parseYmdDateQuery(raw: unknown): string | null {

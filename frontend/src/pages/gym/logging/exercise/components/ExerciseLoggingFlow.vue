@@ -1,11 +1,10 @@
 <script setup lang="ts">
-import { computed, nextTick, ref, watch } from "vue";
+import { computed, defineAsyncComponent, h, nextTick, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { dialogManager } from "~/composables/dialog/useDialog";
 import { DEFAULT_EXERCISE_LOAD_TYPE, type ExerciseLoadType } from "~/types/workout";
 import { ChartLine } from "lucide-vue-next";
-import { Button, IconButton } from "~/shared/ui";
-import ExerciseProgressionChartPanel from "~/pages/gym/progression/ExerciseProgressionChartPanel.vue";
+import { Button, IconButton, Skeleton } from "~/shared/ui";
 import { useWorkoutStore } from "../../store/useWorkoutStore";
 import { useLoggingRouteContext } from "../../composables/useLoggingRouteContext";
 import { buildWorkoutSteps, formatSets } from "../../domain/workoutSteps";
@@ -29,6 +28,14 @@ import RestClock from "./RestClock.vue";
 import SetupPanel from "./SetupPanel.vue";
 import TodayVsLastList from "./TodayVsLastList.vue";
 import UpNextView from "./UpNextView.vue";
+
+// The chart (and chart.js, ~60KB compressed) only matters once the sheet opens: load it then.
+// Same skeleton the panel shows while its data loads, after the same short delay.
+const ExerciseProgressionChartPanel = defineAsyncComponent({
+    loader: () => import("~/pages/gym/progression/ExerciseProgressionChartPanel.vue"),
+    loadingComponent: () => h(Skeleton, { shape: "block", height: "16rem" }),
+    delay: 150,
+});
 
 // One screen for the whole lift → log → rest loop (docs/projects/ui-overhaul/DECISIONS.md, 2026-11-21).
 // Top to bottom: rest clock, weight + setup, the set just logged, reps slider, one primary action.

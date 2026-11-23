@@ -98,6 +98,9 @@ function activityParams(o: WorkoutActivityQueryOpts) {
     return params;
 }
 
+/** The heatmap's default view; the gym week strip reads the same cache entry. */
+export const ROLLING_YEAR_ACTIVITY: WorkoutActivityQueryOpts = { mode: "rolling", weeks: 52, days: null };
+
 /** Single source for hooks, prefetch and `ensureQueryData`. Keys are absolute dates. */
 export const workoutQueries = {
     /** The offset is derived from the date when the request is sent, so it never goes stale. */
@@ -116,6 +119,12 @@ export const workoutQueries = {
             queryFn: () =>
                 apiGET<WorkoutActivityResponse>('/workout/logs/activity', { params: activityParams(o) }),
             staleTime: STALE_HOT,
+        }),
+    programs: () =>
+        queryOptions({
+            queryKey: workoutKeys.programs,
+            queryFn: getWorkoutPrograms,
+            staleTime: STALE_COLD,
         }),
     exercisesAll: () =>
         queryOptions({
@@ -175,11 +184,7 @@ export function useWorkoutPlansAll() {
 }
 
 export function useWorkoutPrograms() {
-    return useQuery({
-        queryKey: workoutKeys.programs,
-        queryFn: getWorkoutPrograms,
-        staleTime: STALE_COLD,
-    });
+    return useQuery(workoutQueries.programs());
 }
 
 /** The pages catch these and toast in context, so the global mutation toast stays quiet. */

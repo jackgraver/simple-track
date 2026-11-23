@@ -24,6 +24,23 @@ export default defineConfig(({ mode }) => {
         '~': fileURLToPath(new URL('./src', import.meta.url)),
       },
     },
+    build: {
+      rolldownOptions: {
+        output: {
+          codeSplitting: {
+            // Every page needs these. One stable chunk instead of letting automatic splitting cut
+            // them into fragments that regroup (and add entry requests) whenever a lazy import
+            // somewhere else changes.
+            groups: [
+              {
+                name: 'framework',
+                test: /[\\/]node_modules[\\/](@vue|vue|vue-router|@tanstack|axios)[\\/]/,
+              },
+            ],
+          },
+        },
+      },
+    },
     server: {
       host: true,
       port: 3000,

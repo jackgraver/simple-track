@@ -8,7 +8,7 @@ import { mediaQueries } from "~/api/media/queries";
 import { moneyQueries } from "~/api/money/queries";
 import { queryClient } from "~/api/queryClient";
 import { trackingQueries } from "~/api/tracking/queries";
-import { workoutQueries } from "~/api/workout/queries";
+import { ROLLING_YEAR_ACTIVITY, workoutQueries } from "~/api/workout/queries";
 import { offsetToDate } from "~/api/workout/dates";
 import { parseDietDayOffsetQuery } from "~/utils/dateUtil";
 import { prefetchRoute, warmNavigation, type RouteQueries } from "./prefetch";
@@ -91,7 +91,13 @@ const routes: RouteRecordRaw[] = [
         meta: {
             breadcrumb: "Gym",
             dated: true,
-            queries: (to) => [workoutQueries.day(offsetToDate(parseDietDayOffsetQuery(to.query.offset)))],
+            // The week strip and heatmap read programs + activity: start them with the day so they
+            // don't land after first paint and push the Today card down.
+            queries: (to) => [
+                workoutQueries.day(offsetToDate(parseDietDayOffsetQuery(to.query.offset))),
+                workoutQueries.programs(),
+                workoutQueries.activity(ROLLING_YEAR_ACTIVITY),
+            ],
         },
         children: [
             {

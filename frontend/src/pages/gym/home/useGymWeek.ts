@@ -1,5 +1,5 @@
 import { computed, toValue, type MaybeRefOrGetter } from "vue";
-import { useWorkoutActivity, useWorkoutPrograms } from "~/api/workout/queries";
+import { ROLLING_YEAR_ACTIVITY, useWorkoutActivity, useWorkoutPrograms } from "~/api/workout/queries";
 import type { WorkoutPlan } from "~/types/workout";
 
 export type WeekDay = {
@@ -77,7 +77,7 @@ export function weekdayLong(d: Date): string {
 export function useGymWeek(offset: MaybeRefOrGetter<number>) {
     const programs = useWorkoutPrograms();
     // Same options as WorkoutActivityGraph's default view, so both read one cached response.
-    const activity = useWorkoutActivity({ mode: "rolling", weeks: 52, days: null });
+    const activity = useWorkoutActivity(ROLLING_YEAR_ACTIVITY);
 
     const today = computed(() => startOfDay(new Date()));
     const selected = computed(() => addDays(today.value, -toValue(offset)));

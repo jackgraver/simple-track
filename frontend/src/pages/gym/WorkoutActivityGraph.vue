@@ -2,6 +2,7 @@
 import { computed, ref, watch, nextTick } from "vue";
 import { useRouter } from "vue-router";
 import {
+    ROLLING_YEAR_ACTIVITY,
     useWorkoutActivity,
     type WorkoutActivityQueryOpts,
 } from "~/api/workout/queries";
@@ -19,7 +20,7 @@ const activityOpts = computed<WorkoutActivityQueryOpts>(() => {
     if (viewMode.value === "year") {
         return { mode: "year", weeks: null, days: null };
     }
-    return { mode: "rolling", weeks: 52, days: null };
+    return ROLLING_YEAR_ACTIVITY;
 });
 
 const { data, isPending, isError, error, refetch } = useWorkoutActivity(activityOpts);

@@ -15,4 +15,8 @@
 - No `pg_stat_statements`, no EXPLAIN review, no Lighthouse/Web Vitals baseline.
 
 ## Next up / gotchas
-- Build the large-data seed and take baselines before touching anything.
+- Build the large-data seed; /gym numbers so far are on devseed volume (API answers in a few ms).
+- First gym pass done 2026-11-23 (BASELINE.md, LOG.md). The measurement setup (local prod copy with
+  Caddy, throttled Chromium script) isn't in the repo yet; prod mode refuses a non-HTTPS CORS origin,
+  so the local Caddy needs `tls internal`.
+- `vite.config.ts` groups framework libs into one chunk: add a lib there only if every page needs it.
