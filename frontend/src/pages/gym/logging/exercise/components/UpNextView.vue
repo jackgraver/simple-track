@@ -45,8 +45,8 @@ const settingsLine = (item: UpNextItem) =>
                     <span class="shrink-0 text-sm text-fg-muted tabular-nums">{{ finishedSets }}</span>
                 </div>
                 <p v-if="verdict" class="m-0 text-sm" :class="verdict.onTrack ? 'text-success' : 'text-fg-muted'">
-                    {{ verdict.hit }}/{{ verdict.total }} sets hit {{ verdict.rollover }}
-                    {{ verdict.onTrack ? "· goes up next time" : "· same weight next time" }}
+                    {{ verdict.hit }}/{{ verdict.total }} hit {{ verdict.rollover }}
+                    {{ verdict.onTrack ? "· goes up" : "· same weight" }}
                 </p>
             </div>
         </Card>
@@ -54,8 +54,8 @@ const settingsLine = (item: UpNextItem) =>
         <EmptyState
             v-if="!next"
             :icon="PartyPopper"
-            title="Everything's logged"
-            description="Nice session. The summary is on the session page."
+            title="All logged"
+            description="Nice session."
         >
             <template #action>
                 <Button variant="primary" @click="emit('list')">Back to session</Button>
@@ -85,7 +85,7 @@ const settingsLine = (item: UpNextItem) =>
             </section>
 
             <section v-if="rest.length" class="flex flex-col gap-2" aria-label="Also left">
-                <p class="m-0 text-xs font-semibold tracking-wide text-fg-muted uppercase">Or pick another · {{ rest.length }}</p>
+                <p class="m-0 text-xs font-semibold tracking-wide text-fg-muted uppercase">Also left · {{ rest.length }}</p>
                 <List class="rounded-card border border-line bg-surface">
                     <ListRow v-for="item in rest" :key="item.key" @click="emit('go', item)">
                         {{ item.name }}
@@ -104,7 +104,7 @@ const settingsLine = (item: UpNextItem) =>
             </section>
 
             <Button variant="ghost" block @click="emit('list')">
-                Full session list <ChevronRight class="size-4" aria-hidden="true" />
+                Session list <ChevronRight class="size-4" aria-hidden="true" />
             </Button>
         </template>
     </div>

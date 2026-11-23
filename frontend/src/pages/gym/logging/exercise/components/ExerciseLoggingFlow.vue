@@ -154,7 +154,7 @@ const openPlatesDialog = async () => {
 const openWeightSheet = async () => {
     const progression = session.weightProgression;
     const result = await dialogManager.custom<WeightSheetResult>({
-        title: `Weight & setup · ${exerciseName.value}`,
+        title: `Setup · ${exerciseName.value}`,
         component: WeightSheet,
         componentProps: {
             weight: session.currentWeight,
@@ -229,12 +229,12 @@ const goTo = (item: UpNextItem) => {
             :title="view === 'next' ? 'Up next' : exerciseName"
             :subtitle="
                 view === 'next'
-                    ? `${doneCount} of ${steps.length} done`
+                    ? `${doneCount}/${steps.length} done`
                     : editing
                       ? `Editing set ${(session.editingSetIndex ?? 0) + 1}`
                       : plannedDone
-                        ? `${loggedCount} of ${targetSets} sets · done`
-                        : `Set ${session.currentSetNumber} of ${targetSets}`
+                        ? `${loggedCount}/${targetSets} · done`
+                        : `Set ${session.currentSetNumber}/${targetSets}`
             "
             @back="goBackToLogging"
         >
@@ -270,7 +270,7 @@ const goTo = (item: UpNextItem) => {
 
             <section v-if="showSlider" class="flex flex-col gap-1" aria-label="Reps">
                 <p class="m-0 text-xs font-semibold tracking-wide uppercase" :class="editing ? 'text-accent' : 'text-fg-muted'">
-                    {{ editing ? `Editing set ${(session.editingSetIndex ?? 0) + 1}` : `Reps · set ${session.currentSetNumber}` }}
+                    {{ editing ? `Editing set ${(session.editingSetIndex ?? 0) + 1}` : "Reps" }}
                 </p>
                 <NumberSlider
                     label=""
@@ -299,7 +299,7 @@ const goTo = (item: UpNextItem) => {
                     + Add set {{ loggedCount + 1 }}
                 </Button>
                 <Button v-if="extraSetOpen && !editing" variant="ghost" class="self-center" @click="extraSetOpen = false">
-                    Cancel extra set
+                    Cancel
                 </Button>
             </div>
 
@@ -310,6 +310,7 @@ const goTo = (item: UpNextItem) => {
                     :verdict="verdict"
                     :weight="session.currentWeight"
                     :editing-index="session.editingSetIndex"
+                    :target="targetSets"
                     @select="selectSet"
                     @delete="session.deleteSet"
                     @retry="session.retrySet"

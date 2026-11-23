@@ -24,7 +24,7 @@ const fillTone: Record<RestStage, string> = {
 };
 // Never colour alone: the word changes with the stage.
 const stateLabel: Record<RestStage, string> = {
-    idle: "Starts when you log a set",
+    idle: "Starts after a set",
     wait: "",
     near: "Almost 2:00",
     ready: "Past 2:00",

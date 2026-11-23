@@ -13,6 +13,8 @@ const props = defineProps<{
     previous: { weight: number; reps: number }[];
     verdict: ProgressVerdict | null;
     weight: number;
+    /** Planned number of sets, for the done/total count. */
+    target: number;
 }>();
 
 const emit = defineEmits<{
@@ -38,12 +40,14 @@ function diff(index: number): { text: string; tone: string } {
 </script>
 
 <template>
-    <section v-if="sets.length" class="flex flex-col gap-2" aria-label="Today vs last time">
+    <section v-if="sets.length" class="flex flex-col gap-2" aria-label="Sets">
         <div class="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-            <p class="m-0 text-xs font-semibold tracking-wide text-fg-muted uppercase">Today vs last time</p>
+            <p class="m-0 text-xs font-semibold tracking-wide text-fg-muted uppercase">
+                Sets <span class="tabular-nums">{{ sets.length }}/{{ Math.max(target, sets.length) }}</span>
+            </p>
             <p v-if="verdict" class="m-0 text-sm" :class="verdict.onTrack ? 'text-success' : 'text-fg-muted'">
-                {{ verdict.hit }}/{{ verdict.total }} sets hit {{ verdict.rollover }}
-                {{ verdict.onTrack ? "· on track to go up" : `· stay at ${weight} next time` }}
+                {{ verdict.hit }}/{{ verdict.total }} hit {{ verdict.rollover }}
+                {{ verdict.onTrack ? "· going up" : `· stay at ${weight}` }}
             </p>
         </div>
         <List class="rounded-card border border-line bg-surface">
@@ -63,7 +67,7 @@ function diff(index: number): { text: string; tone: string } {
                 <template #trailing>
                     <span v-if="editingIndex === index" class="text-xs font-medium text-accent">Editing</span>
                     <span v-else-if="set.status === 'error'" class="text-xs text-danger">Didn't save</span>
-                    <span v-else-if="set.status === 'pending' && !online" class="text-xs text-fg-muted">Waiting for connection</span>
+                    <span v-else-if="set.status === 'pending' && !online" class="text-xs text-fg-muted">Offline</span>
                     <span v-else class="text-sm font-medium tabular-nums" :class="diff(index).tone">{{ diff(index).text }}</span>
                 </template>
                 <template #end>
