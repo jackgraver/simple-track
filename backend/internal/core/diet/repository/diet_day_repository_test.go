@@ -219,7 +219,7 @@ func TestQuickLogMeal_replaceExistingLog(t *testing.T) {
 }
 
 func TestQuickLogMeal_replaceInvalid(t *testing.T) {
-	testutil.SetupTestDB(t)
+	db := testutil.SetupTestDB(t)
 	_, err := dietrepo.QuickLogMeal(dietrepo.QuickLogParams{
 		DisplayName:   "X",
 		FoodRowName:   "X [ql-1]",
@@ -227,6 +227,41 @@ func TestQuickLogMeal_replaceInvalid(t *testing.T) {
 	})
 	if err == nil || !strings.Contains(err.Error(), "replace_meal_id") {
 		t.Fatalf("expected replace error, got %v", err)
+	}
+	// The edit is one DB transaction: the failed replace leaves no new food, meal or log behind.
+	for _, m := range []any{&models.Food{}, &models.Meal{}, &models.DayLog{}} {
+		var n int64
+		db.Unscoped().Model(m).Count(&n)
+		if n != 0 {
+			t.Fatalf("%T rows after failed replace = %d, want 0", m, n)
+		}
+	}
+}
+
+// A failed replace keeps the original log: the edit cannot lose the meal.
+func TestQuickLogMeal_replaceFailureKeepsOriginal(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	plan := testutil.SeedPlan(t, db, "P")
+	day := testutil.SeedDay(t, db, testutil.Today(), plan.ID)
+	food := testutil.SeedFood(t, db, "Bar", testutil.DefaultMacros())
+	oldMeal := testutil.SeedMeal(t, db, "Old Bar", food.ID, 1)
+	testutil.SeedDayLog(t, db, day.ID, oldMeal.ID)
+	// Wrong day (tomorrow): the replace target is not logged there, so the whole call rolls back.
+	if _, err := dietrepo.QuickLogMeal(dietrepo.QuickLogParams{
+		DisplayName:   "New Bar",
+		FoodRowName:   "New Bar [ql-2]",
+		ReplaceMealID: oldMeal.ID,
+		Offset:        1,
+	}); err == nil {
+		t.Fatal("expected replace error")
+	}
+	if ok, _ := dietrepo.DayLogExists(day.ID, oldMeal.ID); !ok {
+		t.Fatal("original log should survive a failed replace")
+	}
+	var meals int64
+	db.Model(&models.Meal{}).Count(&meals)
+	if meals != 1 {
+		t.Fatalf("meals = %d, want 1 (no duplicate)", meals)
 	}
 }
 
