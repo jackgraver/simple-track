@@ -22,11 +22,11 @@ const fillTone: Record<RestStage, string> = {
     near: "bg-rest-near",
     ready: "bg-success",
 };
-// Never colour alone: the word changes with the stage.
+// Only the idle and ready stages carry a word; the near stage is colour-only (no "Almost 2:00" label).
 const stateLabel: Record<RestStage, string> = {
     idle: "Starts when you log a set",
     wait: "",
-    near: "Almost 2:00",
+    near: "",
     ready: "Past 2:00",
 };
 </script>
