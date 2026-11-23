@@ -38,8 +38,6 @@ reload. Add the module's API helpers to `fixtures/api.ts` as needed.
       `tests/smoke/writes.spec.ts`, each verified after a reload: gym (log steps), diet (custom water
       amount), finances (add account), media (add item), grocery (add item), settings (save body
       profile). Whole `@smoke` set: 40 tests in ~8s.
-- [ ] **B2. Gym** (first: most active and riskiest): log a set, edit, delete, history, persistence
-- [ ] **B1. Smoke**: one write per module on top of A8; `@smoke` stays under a minute.
 - [x] **B2. Gym** (first: most active and riskiest): log a set, edit, delete, history, persistence
       across reload, mobile sticky log bar, retry after dropped response (no duplicate set).
       Specs: `tests/gym/logging.spec.ts` (per-exercise logger, Back Squat on today's "Legs" plan).
@@ -52,7 +50,6 @@ reload. Add the module's API helpers to `fixtures/api.ts` as needed.
       - dropped response (hold after + drop): retry with the same client_id, exactly one set
       - todo: weight/plates edit, notes, finish + "Up next", cardio/mobility, add/remove exercise,
         offline log, persistent save failure ("Didn't save" + Retry), plans pages, progression, weight, steps
-- [ ] **B3. Diet**
 - [x] **B3. Diet**: specs in `tests/diet/quick-log.spec.ts` (Quick log, the simplest logged-meal path).
       Done: log (optimistic, persists after reload, `@smoke`); edit (replaces the row, exactly one logged
       meal left); delete via confirm dialog (other meal survives reload).
@@ -65,12 +62,6 @@ reload. Add the module's API helpers to `fixtures/api.ts` as needed.
       Data-loss risks to cover next: editing a logged meal is replace-by-id (`replace_meal_id`), so a
       failure between create and delete could lose or duplicate it; deleting a logged meal must not
       delete shared foods or saved meals.
-- [ ] **B4. Finances**
-- [x] **B5. Media**: fake upstream for the lookup APIs (`infra/upstream.ts`, fixture `upstream`).
-      Specs (`tests/media/lookup.spec.ts`): look up an anime, pick a match, form fills, save, persisted
-      with `source`/`external_id`; upstream 500 shows "Lookup failed" and keeps the form.
-      Not yet: TMDB / Open Library / iTunes fakes (add handlers to `Upstream`), manual add/edit/delete,
-      list filters and status tabs, rating, progress, cover image (needs a fake image route).
 - [x] **B4. Finances** (`tests/finances/transactions.spec.ts`, helpers `createAccount`/`addTransaction`).
       The product has no "edit transaction" (only add and delete); edit-shaped paths are account edit
       and re-recording a balance. Scenarios:
@@ -82,21 +73,22 @@ reload. Add the module's API helpers to `fixtures/api.ts` as needed.
       - [ ] later: withdrawal, record balance over an existing day (upsert), balance delete, archive/
             restore (net worth), delete account (cascade), contribution-room rules, update-balances
             dialog, liability accounts (no transactions section), validation errors (400)
-- [ ] **B5. Media**: needs a fake upstream for the lookup APIs (AniList etc., URLs are configurable).
+- [x] **B5. Media**: fake upstream for the lookup APIs (`infra/upstream.ts`, fixture `upstream`).
+      Specs (`tests/media/lookup.spec.ts`): look up an anime, pick a match, form fills, save, persisted
+      with `source`/`external_id`; upstream 500 shows "Lookup failed" and keeps the form.
+      Not yet: TMDB / Open Library / iTunes fakes (add handlers to `Upstream`), manual add/edit/delete,
+      list filters and status tabs, rating, progress, cover image (needs a fake image route).
 - [x] **B6. Grocery** (`tests/grocery/list.spec.ts`; add-failure modes are A8's, not repeated).
       Scenarios: empty state; add several items, persisted after reload; check off (leaves the list,
       stays gone after reload, `completed_at` set); delete via API is gone from the UI (soft delete).
       Not yet: Paste list dialog (`/items/parse`, `/items/bulk`, de-dupe), suggestions dropdown,
       offline complete, blank-name input.
-- [ ] **B7. Settings and auth**: login UI (no bypass cookie), logout, session expiry (via clock).
-- [ ] **B6. Grocery**
 - [x] **B7. Settings and auth**: login UI (no bypass cookie), logout, session expiry (via clock).
       Specs in `tests/auth/login.spec.ts` (`@auth`, `authenticated: false`): unauthenticated visit
       redirects to sign-in with `redirect=` and returns there after login (+ reload keeps session,
       `@smoke`); wrong password shows an alert; logout (API call, no UI control) ends the session;
       expired session (server clock +366d) redirects to sign-in on direct load and on next full load.
       Not yet: settings profile (body profile form) save + reload, register flow, rate-limit lockout.
-- [ ] **B8. Optimistic UI**: hold-based assertions of instant state and post-reload state.
 - [x] **B8. Optimistic UI**: hold-based assertions of instant state and post-reload state.
       Pattern (`tests/optimistic/`): hold the request, assert the instant state, release, wait for the
       UI to settle (`aria-busy` gone, no network wait), reload, assert again. Scenarios:
@@ -125,9 +117,8 @@ reload. Add the module's API helpers to `fixtures/api.ts` as needed.
 
 - Optimistic rows appear before their request is sent, so a reload right after the row shows can
   cancel the write (found as a mobile-only flake in the first golden-path spec). Not a realistic user
-  path, but specs must `waitForApi` before reloading. Idea: mark pending rows with `aria-busy="true"`;
-  it is accessible and gives tests a UI signal to wait on instead of a network one.
-
+  path, but specs must wait before reloading: `waitForApi`, or the row's `aria-busy` clearing where
+  the row is a `ListRow` (see B8).
 - `POST /diet/foods` with an existing name returns **500**: the unique index `idx_foods_name` rejects it
   and `PostFood` maps every error to `apierr.Internal`. Decide the intended status (409?), then pin it.
 
