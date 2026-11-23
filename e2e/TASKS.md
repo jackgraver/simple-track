@@ -83,7 +83,11 @@ reload. Add the module's API helpers to `fixtures/api.ts` as needed.
             restore (net worth), delete account (cascade), contribution-room rules, update-balances
             dialog, liability accounts (no transactions section), validation errors (400)
 - [ ] **B5. Media**: needs a fake upstream for the lookup APIs (AniList etc., URLs are configurable).
-- [ ] **B6. Grocery**
+- [x] **B6. Grocery** (`tests/grocery/list.spec.ts`; add-failure modes are A8's, not repeated).
+      Scenarios: empty state; add several items, persisted after reload; check off (leaves the list,
+      stays gone after reload, `completed_at` set); delete via API is gone from the UI (soft delete).
+      Not yet: Paste list dialog (`/items/parse`, `/items/bulk`, de-dupe), suggestions dropdown,
+      offline complete, blank-name input.
 - [ ] **B7. Settings and auth**: login UI (no bypass cookie), logout, session expiry (via clock).
 - [ ] **B8. Optimistic UI**: hold-based assertions of instant state and post-reload state.
 
@@ -113,6 +117,10 @@ reload. Add the module's API helpers to `fixtures/api.ts` as needed.
   balance is stale and the user sees an error, so retrying double-counts the deposit. Pinned by a
   `test.fail` spec in `tests/finances`; fix = one server endpoint doing both in a DB transaction, then
   drop the `test.fail`.
+- Grocery has no delete control in the UI (only `DELETE /tracking/grocery/items/:id`), so the delete
+  scenario arranges via API and asserts the UI. Decide whether a UI delete is intended.
+- Grocery checkbox accessible name is the item name ("Milk"), not "Complete Milk" (the `label` prop is
+  not exposed by `Checkbox` when the slot is used).
 
 ## Decisions log
 
@@ -152,3 +160,4 @@ reload. Add the module's API helpers to `fixtures/api.ts` as needed.
 - 2026-11-22: Finances specs create accounts through the API with a balance date before `E2E_EPOCH`:
   the form only offers "also update the balance" when the transaction date is on/after the latest
   balance. After creating an account the app navigates to it, so specs wait for the URL before reloading.
+- 2026-11-22: Grocery specs use `waitForApi` with `:id` placeholders (not `*`) for path params.
