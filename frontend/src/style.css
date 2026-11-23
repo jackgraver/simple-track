@@ -176,6 +176,8 @@
 }
 @utility pb-above-tabbar { padding-bottom: calc(var(--spacing-tabbar) + 0.5rem + env(safe-area-inset-bottom)); }
 @utility bottom-above-tabbar { bottom: calc(var(--spacing-tabbar) + 1rem + env(safe-area-inset-bottom)); }
+/* Flush on the tab bar, for full-width sticky bars. Not `bottom-tabbar`: the spacing token wins that name. */
+@utility bottom-at-tabbar { bottom: calc(var(--spacing-tabbar) + env(safe-area-inset-bottom)); }
 
 @utility h-safe-top { height: env(safe-area-inset-top); }
 

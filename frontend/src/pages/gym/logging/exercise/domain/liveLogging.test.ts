@@ -7,6 +7,7 @@ import {
     progressVerdict,
     restBarPercent,
     restStage,
+    setsTally,
     visibleMachineSettings,
 } from "./liveLogging";
 
@@ -38,6 +39,14 @@ describe("plannedSetCount", () => {
         expect(plannedSetCount([{ weight: 1, reps: 1 }, { weight: 1, reps: 1 }, { weight: 1, reps: 1 }])).toBe(3);
         expect(plannedSetCount([])).toBe(2);
         expect(plannedSetCount(undefined)).toBe(2);
+    });
+});
+
+describe("setsTally", () => {
+    it("counts against the plan, then just counts past it", () => {
+        expect(setsTally(2, 4)).toBe("2/4");
+        expect(setsTally(4, 4)).toBe("4/4");
+        expect(setsTally(5, 4)).toBe("5");
     });
 });
 

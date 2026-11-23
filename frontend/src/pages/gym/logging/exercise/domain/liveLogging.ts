@@ -30,6 +30,11 @@ export function plannedSetCount(previousSets: readonly SetLike[] | null | undefi
     return previousSets?.length ? previousSets.length : DEFAULT_PLANNED_SETS;
 }
 
+/** Sets done against the plan: "2/4", or just "5" once extra sets pass it ("5/4" reads as an error). */
+export function setsTally(done: number, planned: number): string {
+    return done > planned ? String(done) : `${done}/${planned}`;
+}
+
 /** Today's weight against last session's top weight, with the rollover tally that explains it. */
 export type OverloadStatus =
     | { kind: "none" }

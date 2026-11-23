@@ -80,6 +80,15 @@ const selectExercise = (index: number) => {
 
 const handleAddExercise = (exerciseId: number, exercise?: Exercise) => {
     addExerciseToWorkout(exerciseId, exercise);
+    // Add and start in one step: with the exercise known, its group is in the cache at once
+    // (optimistic), so open its logger. Without it the row only appears once the add is saved.
+    // A failed add rolls back with a toast, and the logger sends the lifter back to this list.
+    if (!exercise) return;
+    router.push({
+        name: "logging-exercise",
+        params: { id: String(exerciseId) },
+        query: route.query,
+    });
 };
 
 const selectCardio = () => {

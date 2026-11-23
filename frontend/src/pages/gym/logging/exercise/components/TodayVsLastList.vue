@@ -2,7 +2,7 @@
 import { RotateCcw, X } from "lucide-vue-next";
 import { IconButton, List, ListRow } from "~/shared/ui";
 import type { LoggedSetWithStatus } from "../../store/useWorkoutStore";
-import type { ProgressVerdict } from "../domain/liveLogging";
+import { setsTally, type ProgressVerdict } from "../domain/liveLogging";
 import { useOnline } from "~/api/online";
 
 // Below the fold: every set today next to the same set last session, and whether the weight goes up next time.
@@ -13,6 +13,8 @@ const props = defineProps<{
     previous: { weight: number; reps: number }[];
     verdict: ProgressVerdict | null;
     weight: number;
+    /** Planned number of sets, for the done/total count. */
+    target: number;
 }>();
 
 const emit = defineEmits<{
@@ -38,9 +40,11 @@ function diff(index: number): { text: string; tone: string } {
 </script>
 
 <template>
-    <section v-if="sets.length" class="flex flex-col gap-2" aria-label="Today vs last time">
+    <section v-if="sets.length" class="flex flex-col gap-2" aria-label="Sets">
         <div class="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-            <p class="m-0 text-xs font-semibold tracking-wide text-fg-muted uppercase">Today vs last time</p>
+            <p class="m-0 text-xs font-semibold tracking-wide text-fg-muted uppercase">
+                Sets <span class="tabular-nums">{{ setsTally(sets.length, target) }}</span>
+            </p>
             <p v-if="verdict" class="m-0 text-sm" :class="verdict.onTrack ? 'text-success' : 'text-fg-muted'">
                 {{ verdict.hit }}/{{ verdict.total }} sets hit {{ verdict.rollover }}
                 {{ verdict.onTrack ? "· on track to go up" : `· stay at ${weight} next time` }}

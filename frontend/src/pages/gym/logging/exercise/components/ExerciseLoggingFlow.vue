@@ -151,8 +151,12 @@ const openPlatesDialog = async () => {
     if (result.syncWeight) session.commitWeightFromInput(result.totalLbs);
 };
 
+// Today's weight is the automatic +5: offer to keep last session's weight (on screen and in the sheet).
+const canUndoProgression = computed(
+    () => session.weightProgression != null && session.currentWeight === session.weightProgression.nextWeight,
+);
+
 const openWeightSheet = async () => {
-    const progression = session.weightProgression;
     const result = await dialogManager.custom<WeightSheetResult>({
         title: `Weight & setup · ${exerciseName.value}`,
         component: WeightSheet,
@@ -160,7 +164,7 @@ const openWeightSheet = async () => {
             weight: session.currentWeight,
             step: session.weightIncrement,
             overload: overload.value,
-            canUndoProgression: progression != null && session.currentWeight === progression.nextWeight,
+            canUndoProgression: canUndoProgression.value,
             plates: plates.value,
             machineSettings: machineSettings.value,
             cues: cues.value,
@@ -233,7 +237,9 @@ const goTo = (item: UpNextItem) => {
                     : editing
                       ? `Editing set ${(session.editingSetIndex ?? 0) + 1}`
                       : plannedDone
-                        ? `${loggedCount} of ${targetSets} sets · done`
+                        ? loggedCount > targetSets
+                          ? `${loggedCount} sets · done`
+                          : `${loggedCount} of ${targetSets} sets · done`
                         : `Set ${session.currentSetNumber} of ${targetSets}`
             "
             @back="goBackToLogging"
@@ -266,11 +272,19 @@ const goTo = (item: UpNextItem) => {
                 :cues="cues"
                 @edit="openWeightSheet"
             />
-
+            <Button
+                v-if="session.weightProgression && canUndoProgression && loggedCount === 0"
+                variant="ghost"
+                size="sm"
+                class="self-start"
+                @click="session.undoWeightProgression"
+            >
+                Keep {{ session.weightProgression.previousWeight }} lb instead of +{{ session.weightProgression.increase }}
+            </Button>
 
             <section v-if="showSlider" class="flex flex-col gap-1" aria-label="Reps">
                 <p class="m-0 text-xs font-semibold tracking-wide uppercase" :class="editing ? 'text-accent' : 'text-fg-muted'">
-                    {{ editing ? `Editing set ${(session.editingSetIndex ?? 0) + 1}` : `Reps · set ${session.currentSetNumber}` }}
+                    {{ editing ? `Editing set ${(session.editingSetIndex ?? 0) + 1}` : "Reps" }}
                 </p>
                 <NumberSlider
                     label=""
@@ -282,7 +296,8 @@ const goTo = (item: UpNextItem) => {
                 />
             </section>
 
-            <div class="flex flex-col gap-2">
+            <!-- Pinned above the tab bar so Log/Finish stays on screen on short phones. -->
+            <div class="sticky bottom-at-tabbar z-raised -mx-4 flex flex-col gap-2 bg-canvas px-4 py-2 lg:static lg:mx-0 lg:p-0">
                 <Button v-if="showSlider" variant="primary" size="lg" block @click="logSet">
                     {{ editing ? `Save set ${(session.editingSetIndex ?? 0) + 1}` : `Log set ${session.currentSetNumber}` }}
                     · {{ session.currentReps }} reps
@@ -310,6 +325,7 @@ const goTo = (item: UpNextItem) => {
                     :verdict="verdict"
                     :weight="session.currentWeight"
                     :editing-index="session.editingSetIndex"
+                    :target="targetSets"
                     @select="selectSet"
                     @delete="session.deleteSet"
                     @retry="session.retrySet"
@@ -319,7 +335,6 @@ const goTo = (item: UpNextItem) => {
                         v-if="loggedCount > 0 && !plannedDone && !editing"
                         variant="ghost"
                         size="sm"
-                       
                         @click="finish"
                     >
                         Finish early
