@@ -43,4 +43,57 @@ export class Api {
       ...food,
     });
   }
+
+  // --- gym ---
+
+  /** Log a set through the real per-set endpoint (idempotent by client_id). `date` is YYYY-MM-DD. */
+  logSet(set: { exerciseId: number; reps: number; weight: number; date: string; clientId?: string }) {
+    return this.post<{ set: { ID: number; reps: number; weight: number }; created: boolean }>('/workout/sets', {
+      client_id: set.clientId ?? crypto.randomUUID(),
+      date: set.date,
+      exercise_id: set.exerciseId,
+      reps: set.reps,
+      weight: set.weight,
+      weight_setup: '',
+    });
+  }
+
+  /** Today's workout log (planned + logged exercises), as the logging page loads it. */
+  gymToday(offset = 0) {
+    return this.get<any>(`/workout/logs/today?offset=${offset}`);
+  }
+
+  // --- finances ---
+
+  async createAccount(a: { name: string; kind?: string; opening_balance?: number; balance_date?: string }) {
+    const r = await this.post<{ account: { ID: number; name: string } }>('/money/accounts', {
+      kind: 'savings',
+      institution: '',
+      notes: '',
+      balance_date: '2026-01-10',
+      ...a,
+    });
+    return r.account;
+  }
+
+  addTransaction(accountId: number, t: { kind: 'deposit' | 'withdrawal'; amount: number; date: string; note?: string }) {
+    return this.post(`/money/accounts/${accountId}/transactions`, { note: '', ...t });
+  }
+
+  // --- grocery ---
+
+  async createGroceryItem(name: string) {
+    const r = await this.post<{ item: { ID: number; name: string } }>('/tracking/grocery/items', { name });
+    return r.item;
+  }
+
+  deleteGroceryItem(id: number) {
+    return this.delete(`/tracking/grocery/items/${id}`);
+  }
+
+  // --- tracking ---
+
+  saveWeight(date: string, weight_lbs: number) {
+    return this.post('/tracking/weight', { date, weight_lbs });
+  }
 }

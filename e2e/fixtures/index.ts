@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import { test as base, expect, request as pwRequest, type Page } from '@playwright/test';
 import { Client } from 'pg';
+import { startUpstream, type Upstream } from '../infra/upstream';
 import { startBackend, type Backend } from '../infra/backend';
 import { BACKEND_COOKIE } from '../infra/frontdoor';
 import { workerDb } from '../infra/paths';
@@ -23,6 +24,7 @@ interface WorkerStack {
   db: string;
   dbUrl: string;
   backend: Backend;
+  upstream: Upstream;
 }
 
 interface Options {
@@ -37,6 +39,8 @@ interface Options {
 interface Fixtures {
   /** Control the backend: faults, holds, clock (backend/internal/e2e). */
   e2e: E2E;
+  /** Fake third-party lookup APIs (AniList...) this worker's backend talks to. */
+  upstream: Upstream;
   /** Arrange helpers over the real API, authenticated. */
   api: Api;
   /** Direct Postgres access to this worker's DB. Narrow use only: see README principle 7. */
@@ -60,9 +64,13 @@ export const test = base.extend<Fixtures & Options, { stack: WorkerStack }>({
       const db = workerDb(workerInfo.parallelIndex);
       await cloneTemplate(PG_PORT(), db);
       const dbUrl = pgUrl(PG_PORT(), db);
-      const backend = await startBackend(`w${workerInfo.parallelIndex}`, dbUrl);
-      await use({ db, dbUrl, backend });
+      const upstream = await startUpstream();
+      const backend = await startBackend(`w${workerInfo.parallelIndex}`, dbUrl, {
+        LOOKUP_ANILIST_URL: `${upstream.url}/anilist`,
+      });
+      await use({ db, dbUrl, backend, upstream });
       await backend.stop();
+      await upstream.stop();
       if (process.env.E2E_KEEP !== '1') await dropDatabase(PG_PORT(), db);
     },
     { scope: 'worker', timeout: 60_000 },
@@ -73,6 +81,8 @@ export const test = base.extend<Fixtures & Options, { stack: WorkerStack }>({
     await use(new E2E(ctx, stack.backend.url));
     await ctx.dispose();
   },
+
+  upstream: async ({ stack }, use) => use(stack.upstream),
 
   api: async ({ stack }, use) => {
     const ctx = await pwRequest.newContext({ extraHTTPHeaders: { cookie: authCookieHeader() } });
@@ -92,6 +102,7 @@ export const test = base.extend<Fixtures & Options, { stack: WorkerStack }>({
   _isolate: [
     async ({ stack, e2e, now }, use, testInfo) => {
       await e2e.reset();
+      stack.upstream.reset();
       if (now) await e2e.setClock(now);
       const logStart = fs.statSync(stack.backend.logFile).size;
 
