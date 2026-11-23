@@ -1,0 +1,19 @@
+{
+  "name": "simple-track-e2e",
+  "private": true,
+  "scripts": {
+    "test": "playwright test",
+    "smoke": "playwright test --grep @smoke",
+    "flake": "playwright test --repeat-each=10 --retries=0",
+    "report": "playwright show-report",
+    "typecheck": "tsc --noEmit",
+    "down": "docker rm -f simple-track-e2e"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.65.1",
+    "@types/node": "^22.0.0",
+    "@types/pg": "^8.11.0",
+    "pg": "^8.13.0",
+    "typescript": "^5.6.0"
+  }
+}

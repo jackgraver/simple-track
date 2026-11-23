@@ -17,6 +17,8 @@ button. 30-50 well-chosen tests beat 300 shallow ones.
 ## Running
 
 ```
+./bin/dev e2e [playwright args]                # from the repo root: installs deps if needed, runs the suite
+
 cd e2e
 npm ci && npx playwright install chromium     # once (no --with-deps: it needs sudo)
 npm test                                       # full suite, desktop + mobile
@@ -28,14 +30,20 @@ npm run report                                 # open the last HTML report
 npm run down                                   # stop the e2e Postgres container
 ```
 
-Node comes from mise: prefix with `mise exec --` if `node` is not on PATH.
+Node comes from mise: prefix with `mise exec --` if `node` is not on PATH. One run per checkout at a
+time (a lock in `.cache/`); different worktrees can run at once. The suite never touches the dev
+stack, so it runs whether or not `dev start` is up.
+
+Timings on the dev machine (24 cores, 6 workers): setup is ~60ms when everything is cached, ~3s for a
+frontend rebuild, ~1.3s for a cold Postgres container + template. Each test costs ~0.5s (reset
+~60ms included). The smoke set takes ~2.5s, and 280 tests take ~28s (~21s with 12 workers).
 
 Environment knobs:
 
 | Var | Effect |
 |---|---|
 | `E2E_WORKERS` | Parallel workers (default 6 locally, 2 in CI). |
-| `E2E_FRONTEND=dev` | Serve the frontend from a vite dev server instead of the cached production build. No rebuild after frontend edits, but every page load is slower (unbundled modules), so it only pays off when re-running one or two specs while iterating. |
+| `E2E_FRONTEND=dev` | Serve the frontend from a vite dev server instead of the cached production build. Skips the ~3s rebuild after frontend edits, but every page load is slower (unbundled modules): measured ~2.5x slower per test. It rarely pays off; the production build is the default. |
 | `E2E_KEEP=1` | Leave the per-worker databases in place after the run, for poking with psql. |
 | `E2E_REBUILD=1` | Ignore build caches (frontend, Go binaries, template DB). |
 
@@ -96,7 +104,7 @@ stub. On top of that the server refuses to start with `E2E` set in production. I
    |---|---|---|
    | Input | malformed body → 400 | send it |
    | State | duplicate name, missing id | arrange it (API, or `db` when the API can't) |
-   | Dependency | DB error, slow or dropped response, AniList down | `api.fault`, `api.hold`, fake upstream |
+   | Dependency | DB error, slow or dropped response, AniList down | `e2e.fault`, `e2e.hold`, fake upstream |
    | Environment | expired session, date rules | fixed clock, real expired cookie |
    | Network | offline, connection refused | `context.setOffline()`, `route.abort()` |
    | Unreachable otherwise | failure between two writes | named failpoint (add only when needed) |
@@ -119,6 +127,9 @@ stub. On top of that the server refuses to start with `E2E` set in production. I
    never CSS or class selectors.
 9. **Web-first assertions only.** `await expect(locator)...` auto-retries. No `waitForTimeout`. For
    slow/optimistic paths, use a hold instead of a delay: assert the in-flight state, then release.
+   Optimistic rows appear before their request is even sent, so before a persistence reload, await
+   `waitForApi(page, 'POST /...')` (started before the action). Skip retry backoff with
+   `page.clock.runFor()` after the failed response lands, not before.
 10. **Clean console.** Console errors, page errors and unexpected 5xx fail the test. Opt out per test
     with `test.use({ allowedErrors: [/pattern/] })`.
 11. **Hermetic.** Requests to anything but the front door are blocked (Google Fonts included).
@@ -136,6 +147,25 @@ stub. On top of that the server refuses to start with `E2E` set in production. I
 
 If a test writes it or asserts on its exact value, the test creates it. Never assert on seed contents
 beyond "it exists".
+
+## The fixtures in one screen
+
+```ts
+import { expect, test, waitForApi } from '../../fixtures';
+
+test('…', { tag: ['@gym'] }, async ({ page, api, e2e, db }) => {
+  // page: authenticated, clock at E2E_EPOCH, hermetic, console-guarded
+  // api:  arrange through the real API (fixtures/api.ts)
+  // e2e:  e2e.fault({ table, op, times? , code? }), e2e.hold('POST /path', { phase }), e2e.setClock(date)
+  // db:   pg Client on this worker's DB (narrow use)
+});
+test.use({ now: new Date('…') });         // a different "now" (null = real time)
+test.use({ allowedErrors: [/…/] });       // tolerate specific browser errors
+test.use({ authenticated: false });       // no auth cookie (login UI tests)
+```
+
+Worked examples of every failure mode: `tests/examples/failure-modes.spec.ts`. Self-tests that prove
+the guards still fail tests: `tests/examples/guards.spec.ts` (`@infra`).
 
 ## Reading a failure
 
@@ -155,13 +185,14 @@ e2e/
   playwright.config.ts
   global-setup.ts             # builds, Postgres, template DB, front door
   infra/                      # build cache, postgres, backend process, front door
+  .cache/                     # (gitignored) binaries, dist, backend logs, run lock
   fixtures/
     index.ts                  # extended `test`: worker stack, auth, reset, clock, guards, artifacts
     api.ts                    # typed arrange helpers, grown per module
     e2e.ts                    # /__e2e client: reset, clock, fault, hold
   pages/                      # page objects ONLY for complex screens (gym logging)
   tests/
-    smoke/  auth/  gym/  diet/  finances/  media/  grocery/  settings/
+    smoke/  examples/  auth/  gym/  diet/  finances/  media/  grocery/  settings/
 ```
 
 Mirrors `frontend/src/pages`, so an agent knows which lane to run for the module it touched. Prefer
@@ -171,5 +202,5 @@ fixtures over page objects; don't wrap every locator.
 
 1. Put it under `tests/<module>/`, tag it (`{ tag: ['@gym'] }`, plus `@smoke` if it belongs there).
 2. Arrange with `api` helpers (add one to `fixtures/api.ts` if missing), act through the UI, assert,
-   then `page.reload()` and assert again.
+   await the write (`waitForApi`), then `page.reload()` and assert again.
 3. `npm run flake -- <spec>` before committing.

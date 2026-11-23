@@ -7,26 +7,27 @@ Order: infrastructure (A), then scenarios module by module (B), then CI and scal
 
 ## A. Infrastructure
 
-- [ ] **A1. Scaffold**: `e2e/package.json` (own deps), `tsconfig`, `playwright.config.ts` (desktop +
+- [x] **A1. Scaffold**: `e2e/package.json` (own deps), `tsconfig`, `playwright.config.ts` (desktop +
       mobile Chromium, retries 0 local / 1 CI, trace/screenshot on failure, hermetic context options),
       `.gitignore`, npm scripts (`test`, `smoke`, `flake`, `report`, `down`).
-- [ ] **A2. Isolated stack**: content-hash build cache (Go `-tags e2e` binaries, vite build),
+- [x] **A2. Isolated stack**: content-hash build cache (Go `-tags e2e` binaries, vite build),
       long-lived tmpfs Postgres container, `e2e_template` (migrate + seed), front door (static dist or
       vite dev proxy, `/api` routed by cookie), per-worker DB clone + backend.
-- [ ] **A3. Clock**: `backend/internal/clock` used by every domain `time.Now()` and gorm's `NowFunc`;
+- [x] **A3. Clock**: `backend/internal/clock` used by every domain `time.Now()` and gorm's `NowFunc`;
       settable only through `/__e2e/clock`.
-- [ ] **A4. e2e backend package** (`-tags e2e`, no-op stub otherwise, refused in production):
+- [x] **A4. e2e backend package** (`-tags e2e`, no-op stub otherwise, refused in production):
       reset, clock, DB faults (gorm hooks), holds (before/after phase; release, fail, drop; safety
       timeout), arm-time validation, unused-fault check, Go tests.
-- [ ] **A5. Seed**: `backend/internal/e2e/seed` + `cmd/e2eseed`: dev user, exercises + active program,
+- [x] **A5. Seed**: `backend/internal/e2e/seed` + `cmd/e2eseed`: dev user, exercises + active program,
       foods, diet plan; dates relative to the epoch; refuses production.
-- [ ] **A6. Fixtures**: worker stack, bypass auth cookie, per-test reset, clock on both sides,
+- [x] **A6. Fixtures**: worker stack, bypass auth cookie, per-test reset, clock on both sides,
       console/pageerror/5xx guard with opt-out, `db` fixture, `e2e` client (fault/hold).
-- [ ] **A7. Failure artifacts**: backend log slice + `pg_dump` attached on failure.
-- [ ] **A8. First green tests**: `@smoke` (app loads, every top-level route renders) on both projects,
-      plus one example spec per failure mode (DB fault, hold before/after, offline).
-- [ ] **A9. Flake guard**: `npm run flake` over smoke passes; record timings in the decisions log.
-- [ ] **A10. Docs pointer**: one line in the project `CLAUDE.md` pointing at `e2e/README.md`.
+- [x] **A7. Failure artifacts**: backend log slice + `pg_dump` attached on failure.
+- [x] **A8. First green tests**: `@smoke` (app loads, every top-level route renders) on both projects,
+      plus one example spec per failure mode (DB fault, hold before/after, offline) on grocery add,
+      and `@infra` self-tests proving each guard still fails tests.
+- [x] **A9. Flake guard**: `npm run flake` over smoke passes; record timings in the decisions log.
+- [x] **A10. Docs pointer**: one line in the project `CLAUDE.md` pointing at `e2e/README.md`.
 
 ## B. Scenarios (golden paths + data-loss risks)
 
@@ -53,6 +54,11 @@ reload. Add the module's API helpers to `fixtures/api.ts` as needed.
 
 ## Findings (bugs the suite surfaced; not fixed here)
 
+- Optimistic rows appear before their request is sent, so a reload right after the row shows can
+  cancel the write (found as a mobile-only flake in the first golden-path spec). Not a realistic user
+  path, but specs must `waitForApi` before reloading. Idea: mark pending rows with `aria-busy="true"`;
+  it is accessible and gives tests a UI signal to wait on instead of a network one.
+
 - `POST /diet/foods` with an existing name returns **500**: the unique index `idx_foods_name` rejects it
   and `PostFood` maps every error to `apierr.Internal`. Decide the intended status (409?), then pin it.
 
@@ -72,3 +78,10 @@ reload. Add the module's API helpers to `fixtures/api.ts` as needed.
 - 2026-11-22: Production build by default; `E2E_FRONTEND=dev` for fast iteration.
 - 2026-11-22: No attach mode against the dev stack (shared dev DB breaks isolation).
 - 2026-11-22: Docs stay in `e2e/` (`docs/projects/` is going away).
+- 2026-11-22: Measured (24 cores, 6 workers): cached setup ~60ms, cold container + template ~1.3s,
+  frontend rebuild ~3s, ~0.5s per test, 280 tests in ~28s with 0 flaky over 5 repeats. Vite dev mode
+  ~2.5x slower per test, so the production build stays the default.
+- 2026-11-22: Worker DBs are named per checkout (`e2e_<hash of path>_w<N>`) so worktrees share the one
+  container; one run per checkout at a time (lock file).
+- 2026-11-22: Example specs use grocery add: it is optimistic, retries twice (TanStack `retry: 2`) and
+  is idempotent by `client_id`, so it exercises every failure mode.
