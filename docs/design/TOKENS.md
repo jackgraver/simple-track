@@ -59,7 +59,7 @@ use `fg-muted`). Known gap: `on-solid` (white) on a solid `danger`/`success`/`wa
 4.5:1 in dark; P1 decides the solid-button treatment.
 
 ### Type
-Font: Plus Jakarta Sans (already loaded in `index.html`). Weights: **400, 500, 600** only.
+Font: Plus Jakarta Sans, self-hosted via `@fontsource-variable/plus-jakarta-sans` (imported in `main.ts`, latin subset preloaded in `index.html`). Weights: **400, 500, 600** only.
 | Utility | Size/line | Use |
 |---|---|---|
 | `text-2xs` (new) | 11/14px | tab-bar labels, chart ticks, micro meta (replaces `[10px]`, `[11px]`, `[0.6–0.7rem]`) |
@@ -140,7 +140,7 @@ emitted even when no utility uses it, which JS such as the chart theme reads). V
 /* Tokens only. Values flip per theme under [data-theme="light"]. */
 @theme {
     --color-*: initial; /* no Tailwind palette */
-    --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif,
+    --font-sans: "Plus Jakarta Sans Variable", ui-sans-serif, system-ui, sans-serif,
         "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
 
     --color-canvas: hsl(0 0% 5%);
