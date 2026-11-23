@@ -174,13 +174,13 @@
     padding-left: env(safe-area-inset-left);
     padding-right: env(safe-area-inset-right);
 }
-/* Sticky offset that sits just above the mobile tab bar (tab bar is fixed on < lg). */
-@utility bottom-tabbar { bottom: calc(var(--spacing-tabbar) + env(safe-area-inset-bottom)); }
-
-@custom-variant short (@media (max-height: 700px));
-
 @utility pb-above-tabbar { padding-bottom: calc(var(--spacing-tabbar) + 0.5rem + env(safe-area-inset-bottom)); }
 @utility bottom-above-tabbar { bottom: calc(var(--spacing-tabbar) + 1rem + env(safe-area-inset-bottom)); }
+/* Flush on the tab bar, for full-width sticky bars. Not `bottom-tabbar`: the spacing token wins that name. */
+@utility bottom-at-tabbar { bottom: calc(var(--spacing-tabbar) + env(safe-area-inset-bottom)); }
+
+/* Short phone screens (landscape-ish or small phones): tighten tall elements. */
+@custom-variant short (@media (max-height: 700px));
 
 @utility h-safe-top { height: env(safe-area-inset-top); }
 
