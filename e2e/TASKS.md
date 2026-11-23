@@ -40,7 +40,11 @@ reload. Add the module's API helpers to `fixtures/api.ts` as needed.
 - [ ] **B3. Diet**
 - [ ] **B4. Finances**
 - [ ] **B5. Media**: needs a fake upstream for the lookup APIs (AniList etc., URLs are configurable).
-- [ ] **B6. Grocery**
+- [x] **B6. Grocery** (`tests/grocery/list.spec.ts`; add-failure modes are A8's, not repeated).
+      Scenarios: empty state; add several items, persisted after reload; check off (leaves the list,
+      stays gone after reload, `completed_at` set); delete via API is gone from the UI (soft delete).
+      Not yet: Paste list dialog (`/items/parse`, `/items/bulk`, de-dupe), suggestions dropdown,
+      offline complete, blank-name input.
 - [ ] **B7. Settings and auth**: login UI (no bypass cookie), logout, session expiry (via clock).
 - [ ] **B8. Optimistic UI**: hold-based assertions of instant state and post-reload state.
 
@@ -61,6 +65,11 @@ reload. Add the module's API helpers to `fixtures/api.ts` as needed.
 
 - `POST /diet/foods` with an existing name returns **500**: the unique index `idx_foods_name` rejects it
   and `PostFood` maps every error to `apierr.Internal`. Decide the intended status (409?), then pin it.
+
+- Grocery has no delete control in the UI (only `DELETE /tracking/grocery/items/:id`), so the delete
+  scenario arranges via API and asserts the UI. Decide whether a UI delete is intended.
+- Grocery checkbox accessible name is the item name ("Milk"), not "Complete Milk" (the `label` prop is
+  not exposed by `Checkbox` when the slot is used).
 
 ## Decisions log
 
@@ -85,3 +94,4 @@ reload. Add the module's API helpers to `fixtures/api.ts` as needed.
   container; one run per checkout at a time (lock file).
 - 2026-11-22: Example specs use grocery add: it is optimistic, retries twice (TanStack `retry: 2`) and
   is idempotent by `client_id`, so it exercises every failure mode.
+- 2026-11-22: Grocery specs use `waitForApi` with `:id` placeholders (not `*`) for path params.

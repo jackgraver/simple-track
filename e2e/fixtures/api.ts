@@ -43,4 +43,15 @@ export class Api {
       ...food,
     });
   }
+
+  // --- grocery ---
+
+  async createGroceryItem(name: string) {
+    const r = await this.post<{ item: { ID: number; name: string } }>('/tracking/grocery/items', { name });
+    return r.item;
+  }
+
+  deleteGroceryItem(id: number) {
+    return this.delete(`/tracking/grocery/items/${id}`);
+  }
 }
