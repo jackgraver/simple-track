@@ -1,7 +1,8 @@
+import fs from 'node:fs';
 import path from 'node:path';
 import { Client } from 'pg';
 import { run, sleep } from './exec';
-import { BIN_DIR, CACHE_DIR, DB_PREFIX, TEMPLATE_DB, TZ } from './paths';
+import { BIN_DIR, CACHE_DIR, DB_PREFIX, ROOT, TEMPLATE_DB, TZ } from './paths';
 
 /**
  * One long-lived Postgres container for every e2e run on this machine (all checkouts share it;
@@ -41,6 +42,7 @@ export async function ensurePostgres(): Promise<number> {
     await run('docker', ['rm', '-f', CONTAINER]);
   }
   if (state !== 'running') {
+    // Several checkouts can get here at once; the loser of the name race just uses the winner's.
     await run('docker', [
       'run', '-d', '--name', CONTAINER,
       '-p', '127.0.0.1::5432', // random free host port; read back with `docker port`
@@ -52,7 +54,9 @@ export async function ensurePostgres(): Promise<number> {
       '-c', 'synchronous_commit=off',
       '-c', 'full_page_writes=off',
       '-c', 'max_connections=300',
-    ]);
+    ]).catch(async (e) => {
+      if ((await containerState()) !== 'running') throw e;
+    });
   }
   const port = await containerPort();
   if (!port) throw new Error(`could not read the host port of ${CONTAINER}`);
@@ -84,7 +88,8 @@ export async function withAdmin<T>(port: number, fn: (c: Client) => Promise<T>):
 
 /**
  * The template is migrations + seed. Rebuilt only when the backend key (Go + SQL sources, which
- * include the migrations and the seed) changes; the key is stored as the database's comment.
+ * include the migrations and the seed) changes. The database's comment is `<key> <checkout path>`;
+ * the path lets pruneOrphans() drop databases of checkouts that no longer exist.
  */
 export async function ensureTemplate(port: number, backendKey: string): Promise<boolean> {
   const current = await withAdmin(port, async (c) => {
@@ -92,7 +97,7 @@ export async function ensureTemplate(port: number, backendKey: string): Promise<
       `SELECT shobj_description(oid, 'pg_database') AS key FROM pg_database WHERE datname = $1`,
       [TEMPLATE_DB],
     );
-    return r.rows[0]?.key as string | undefined;
+    return (r.rows[0]?.key as string | undefined)?.split(' ')[0];
   });
   if (current === backendKey && process.env.E2E_REBUILD !== '1') return false;
 
@@ -103,7 +108,9 @@ export async function ensureTemplate(port: number, backendKey: string): Promise<
   const env = { ...process.env, DATABASE_URL: pgUrl(port, TEMPLATE_DB), TZ, APP_ENV: 'development' };
   await run(path.join(BIN_DIR, 'migrate'), ['up'], { cwd: CACHE_DIR, env });
   await run(path.join(BIN_DIR, 'e2eseed'), [], { cwd: CACHE_DIR, env });
-  await withAdmin(port, (c) => c.query(`COMMENT ON DATABASE ${TEMPLATE_DB} IS '${backendKey}'`));
+  await withAdmin(port, (c) =>
+    c.query(`COMMENT ON DATABASE ${TEMPLATE_DB} IS ${c.escapeLiteral(`${backendKey} ${ROOT}`)}`),
+  );
   return true;
 }
 
@@ -138,5 +145,32 @@ export async function ownDatabases(port: number): Promise<string[]> {
   return withAdmin(port, async (c) => {
     const r = await c.query(`SELECT datname FROM pg_database WHERE datname LIKE $1`, [`${DB_PREFIX}_%`]);
     return r.rows.map((x) => x.datname as string);
+  });
+}
+
+/**
+ * Drop every e2e database (template + workers) whose checkout path is gone: deleted worktrees and
+ * CI snapshot checkouts would otherwise pile up in the container's tmpfs.
+ */
+export async function pruneOrphans(port: number): Promise<string[]> {
+  return withAdmin(port, async (c) => {
+    const r = await c.query(
+      `SELECT datname, shobj_description(oid, 'pg_database') AS note FROM pg_database WHERE datname ~ '^e2e_[0-9a-f]{6}_template$'`,
+    );
+    const dropped: string[] = [];
+    for (const { datname, note } of r.rows as { datname: string; note: string | null }[]) {
+      const prefix = datname.replace(/_template$/, '');
+      if (prefix === DB_PREFIX) continue;
+      // Only drop what is provably orphaned: the comment names a checkout and that path is gone.
+      // No path (older suite versions) means unknown owner: keep it.
+      const root = note?.split(' ').slice(1).join(' ');
+      if (!root || fs.existsSync(root)) continue;
+      const all = await c.query(`SELECT datname FROM pg_database WHERE datname LIKE $1`, [`${prefix}_%`]);
+      for (const { datname: db } of all.rows) {
+        await c.query(`DROP DATABASE IF EXISTS ${db} WITH (FORCE)`);
+        dropped.push(db);
+      }
+    }
+    return dropped;
   });
 }
