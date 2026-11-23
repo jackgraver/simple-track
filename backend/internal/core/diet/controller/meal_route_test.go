@@ -20,6 +20,7 @@ func dietRouter(t *testing.T) *gin.Engine {
 	r.POST("/quick-log", controller.PostQuickLog)
 	r.POST("/planned/from-saved", controller.PostPlannedFromSaved)
 	r.DELETE("/meal/logged", controller.DeleteLoggedMeal)
+	r.POST("/foods", controller.PostFood)
 	return r
 }
 
@@ -51,5 +52,18 @@ func TestDeleteLoggedMeal_unknownDayIs404(t *testing.T) {
 	w := send(r, http.MethodDelete, "/meal/logged", `{"day_id": 9999, "meal_id": 1}`)
 	if w.Code != http.StatusNotFound {
 		t.Fatalf("want 404, got %d %s", w.Code, w.Body.String())
+	}
+}
+
+// e2e backlog: a duplicate food name is a 409 with a readable message, not a 500.
+func TestPostFood_duplicateNameIs409(t *testing.T) {
+	r := dietRouter(t)
+	body := `{"name": "Oats", "serving_type": "g", "serving_amount": 40, "calories": 150}`
+	if w := send(r, http.MethodPost, "/foods", body); w.Code != http.StatusCreated {
+		t.Fatalf("first create: want 201, got %d %s", w.Code, w.Body.String())
+	}
+	w := send(r, http.MethodPost, "/foods", body)
+	if w.Code != http.StatusConflict || !strings.Contains(w.Body.String(), "already exists") {
+		t.Fatalf("duplicate: want 409, got %d %s", w.Code, w.Body.String())
 	}
 }
