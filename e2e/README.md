@@ -155,9 +155,9 @@ stub. On top of that the server refuses to start with `E2E` set in production. I
 `~/.local/state/simple-track-e2e/ci-history.jsonl`, and a failed run's `test-results/` and
 `playwright-report/` are kept next to it in `runs/` (the pipeline's checkout is thrown away).
 
-The step is **non-blocking** (exits 0 on a red suite) until `E2E_BLOCKING=1` is set on it.
-`npm run ci:history` prints the record and says when the bar is met: the last 20 runs all green
-with no flaky tests.
+The step is **blocking** (`E2E_BLOCKING=1` on it): a failed or flaky suite stops the deploy. It was
+promoted after 20 clean runs. `npm run ci:history` prints the record. If the step goes red without
+a code reason, drop `E2E_BLOCKING=1` to unblock deploys, then fix the flake.
 
 The container is shared by every checkout, CI's snapshot checkouts included. Database names carry
 a hash of the checkout path and each template's comment records that path, so setup drops the

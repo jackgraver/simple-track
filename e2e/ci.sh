@@ -3,8 +3,8 @@
 # --fail-on-flaky-tests), records one line per run in the history file below and keeps the report
 # of a failed run, since the pipeline's snapshot checkout is thrown away.
 #
-# Non-blocking until E2E_BLOCKING=1 (TASKS C2): a red suite is reported but the step exits 0.
-# `npm run ci:history` shows the record that decides when to flip it.
+# Blocks only with E2E_BLOCKING=1 (set in .cicd.yaml); without it a red suite is reported but the
+# step exits 0. `npm run ci:history` shows the record.
 set -uo pipefail
 cd "$(dirname "$0")"
 

@@ -102,9 +102,9 @@ reload. Add the module's API helpers to `fixtures/api.ts` as needed.
 ## C. CI and scale
 
 - [x] **C1. CI step**: `e2e` step in `.cicd.yaml` runs `e2e/ci.sh`: CI settings, run history in
-      `~/.local/state/simple-track-e2e/ci-history.jsonl`, failed runs' reports kept. Non-blocking.
-- [ ] **C2. Promote to blocking**: set `E2E_BLOCKING=1` on the step once `npm run ci:history` reports
-      the last 20 runs clean (green, no flaky). Waiting on run history.
+      `~/.local/state/simple-track-e2e/ci-history.jsonl`, failed runs' reports kept (blocking since C2).
+- [x] **C2. Promote to blocking**: `E2E_BLOCKING=1` on the step. Verified with 20 runs of `ci.sh`,
+      each from a clean clone of the merged A+B+C commit: 20/20 green, 145 passed, 0 flaky, ~18s each.
 - [x] **C3. `large` seed profile**: `seed.Large` (two years of history in every module, odd values),
       `test.use({ seed: 'large' })`, `POST /__e2e/seed/large`, `e2eseed -profile large`; `tests/scale/`
       renders every page against it. Timing budgets wait for the performance project.
@@ -112,6 +112,13 @@ reload. Add the module's API helpers to `fixtures/api.ts` as needed.
       Grow only for regions where losing an item would go unnoticed.
 - [x] **C5. Failure summary reporter**: `test-results/failures.md`. Revisit its contents after agents
       have used it on real failures.
+- [ ] **C6. Two devices, one backend** (later): a `device('desktop' | 'mobile')` fixture that opens a
+      second browser context with the same cookies, clock, guards and hermetic routing as `page`
+      (~20 lines in `fixtures/index.ts`), plus one worked example. Scenarios are one person on phone +
+      laptop: both logging weight/steps for the same day (unique-per-date tables), editing a set the
+      other device deleted, overlapping optimistic writes. Order the interleaving with holds (e.g.
+      phone's save held `after` commit while the laptop saves), never by racing clicks. With
+      multi-user, the fixture gains a `user` option for cross-user isolation tests.
 
 ## Findings (bugs the suite surfaced; not fixed here)
 
@@ -165,6 +172,8 @@ reload. Add the module's API helpers to `fixtures/api.ts` as needed.
   container; one run per checkout at a time (lock file).
 - 2026-11-22: CI is non-blocking through `ci.sh` (j-cicd steps have no allow-failure option); the
   switch to blocking is a data-backed decision (`npm run ci:history`, 20 clean runs).
+- 2026-11-23: e2e step made blocking after 20/20 clean CI-equivalent runs (clean clones, `ci.sh`).
+  If it turns red without a code reason, unset `E2E_BLOCKING` first, then fix the flake.
 - 2026-11-22: Orphan pruning drops only databases whose recorded checkout path no longer exists. An
   earlier version also dropped databases without a recorded path and broke concurrent runs in other
   worktrees: never prune what can't be proven orphaned.
