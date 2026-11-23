@@ -266,6 +266,15 @@ const goTo = (item: UpNextItem) => {
                 :cues="cues"
                 @edit="openWeightSheet"
             />
+            <Button
+                v-if="session.weightProgression && session.currentWeight === session.weightProgression.nextWeight && loggedCount === 0"
+                variant="ghost"
+                size="sm"
+                class="self-start"
+                @click="session.undoWeightProgression"
+            >
+                Keep {{ session.weightProgression.previousWeight }} lb instead of +{{ session.weightProgression.increase }}
+            </Button>
 
 
             <section v-if="showSlider" class="flex flex-col gap-1" aria-label="Reps">
