@@ -72,7 +72,7 @@ const lastLine = computed(() => {
                     <span class="flex items-center gap-2 text-2xs tracking-wide text-fg-muted uppercase">
                         Machine settings <Badge tone="warn">Preview</Badge>
                     </span>
-                    <span class="text-sm text-fg-subtle">Seat, pad and pulley positions will show here.</span>
+                    <span class="text-sm text-fg-subtle">Seat and pad positions show here.</span>
                 </span>
             </span>
             <span v-if="cues" class="flex flex-col gap-1">
