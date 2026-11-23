@@ -38,7 +38,17 @@ reload. Add the module's API helpers to `fixtures/api.ts` as needed.
 - [ ] **B2. Gym** (first: most active and riskiest): log a set, edit, delete, history, persistence
       across reload, mobile sticky log bar, retry after dropped response (no duplicate set).
 - [ ] **B3. Diet**
-- [ ] **B4. Finances**
+- [x] **B4. Finances** (`tests/finances/transactions.spec.ts`, helpers `createAccount`/`addTransaction`).
+      The product has no "edit transaction" (only add and delete); edit-shaped paths are account edit
+      and re-recording a balance. Scenarios:
+      - [x] add account (opening balance) -> app opens it -> persists across reload and in the list
+      - [x] deposit with "also update balance": row, balance and exactly one DB row survive reload
+      - [x] delete transaction: row gone after reload, balance unchanged (by design)
+      - [x] edit account name via dialog; persists, old name gone
+      - [x] data-loss: deposit whose balance update fails (`test.fail`, see Findings)
+      - [ ] later: withdrawal, record balance over an existing day (upsert), balance delete, archive/
+            restore (net worth), delete account (cascade), contribution-room rules, update-balances
+            dialog, liability accounts (no transactions section), validation errors (400)
 - [ ] **B5. Media**: needs a fake upstream for the lookup APIs (AniList etc., URLs are configurable).
 - [ ] **B6. Grocery**
 - [ ] **B7. Settings and auth**: login UI (no bypass cookie), logout, session expiry (via clock).
@@ -61,6 +71,12 @@ reload. Add the module's API helpers to `fixtures/api.ts` as needed.
 
 - `POST /diet/foods` with an existing name returns **500**: the unique index `idx_foods_name` rejects it
   and `PostFood` maps every error to `apierr.Internal`. Decide the intended status (409?), then pin it.
+
+- Adding a transaction with "also update the balance" is two client requests (`POST .../transactions`
+  then `PUT .../balances`), not one atomic call. If the second fails, the transaction is saved, the
+  balance is stale and the user sees an error, so retrying double-counts the deposit. Pinned by a
+  `test.fail` spec in `tests/finances`; fix = one server endpoint doing both in a DB transaction, then
+  drop the `test.fail`.
 
 ## Decisions log
 
@@ -85,3 +101,6 @@ reload. Add the module's API helpers to `fixtures/api.ts` as needed.
   container; one run per checkout at a time (lock file).
 - 2026-11-22: Example specs use grocery add: it is optimistic, retries twice (TanStack `retry: 2`) and
   is idempotent by `client_id`, so it exercises every failure mode.
+- 2026-11-22: Finances specs create accounts through the API with a balance date before `E2E_EPOCH`:
+  the form only offers "also update the balance" when the transaction date is on/after the latest
+  balance. After creating an account the app navigates to it, so specs wait for the URL before reloading.

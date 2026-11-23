@@ -43,4 +43,21 @@ export class Api {
       ...food,
     });
   }
+
+  // --- finances ---
+
+  async createAccount(a: { name: string; kind?: string; opening_balance?: number; balance_date?: string }) {
+    const r = await this.post<{ account: { ID: number; name: string } }>('/money/accounts', {
+      kind: 'savings',
+      institution: '',
+      notes: '',
+      balance_date: '2026-01-10',
+      ...a,
+    });
+    return r.account;
+  }
+
+  addTransaction(accountId: number, t: { kind: 'deposit' | 'withdrawal'; amount: number; date: string; note?: string }) {
+    return this.post(`/money/accounts/${accountId}/transactions`, { note: '', ...t });
+  }
 }
