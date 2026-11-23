@@ -34,7 +34,10 @@ Order: infrastructure (A), then scenarios module by module (B), then CI and scal
 For each module: write the scenario list here first, then the specs. Every write is verified after a
 reload. Add the module's API helpers to `fixtures/api.ts` as needed.
 
-- [ ] **B1. Smoke**: one write per module on top of A8; `@smoke` stays under a minute.
+- [x] **B1. Smoke**: one write per module on top of A8; `@smoke` stays under a minute.
+      `tests/smoke/writes.spec.ts`, each verified after a reload: gym (log steps), diet (custom water
+      amount), finances (add account), media (add item), grocery (add item), settings (save body
+      profile). Whole `@smoke` set: 40 tests in ~8s.
 - [ ] **B2. Gym** (first: most active and riskiest): log a set, edit, delete, history, persistence
       across reload, mobile sticky log bar, retry after dropped response (no duplicate set).
 - [ ] **B3. Diet**
@@ -93,3 +96,6 @@ reload. Add the module's API helpers to `fixtures/api.ts` as needed.
   Playwright worker (`infra/upstream.ts`), not by `route.fulfill`: the backend's own HTTP client,
   parsing and error mapping run. The backend takes `LOOKUP_*_URL` env overrides (ignored in
   production); `startBackend` accepts extra env. Add a source by adding a handler plus its env var.
+- 2026-11-22: B1 smoke writes wait for their own response (URL regex) before reloading. Where the
+  page doesn't prefill after reload (steps form) or navigates after create (finances account page,
+  which hides its title on mobile), persistence is checked via `api.get` / a fresh `goto` of the list.
