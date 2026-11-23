@@ -291,7 +291,9 @@ const goTo = (item: UpNextItem) => {
                 />
             </section>
 
-            <div class="flex flex-col gap-2">
+            <!-- Pinned above the tab bar so Log/Finish never scrolls off on short phones, whatever the cards above
+                 (setup, cues, last time) add in height. min-h keeps the bar from collapsing between states. -->
+            <div class="sticky bottom-tabbar z-raised -mx-4 flex min-h-14 flex-col gap-2 bg-canvas px-4 py-2 lg:static lg:mx-0 lg:px-0">
                 <Button v-if="showSlider" variant="primary" size="lg" block @click="logSet">
                     {{ editing ? `Save set ${(session.editingSetIndex ?? 0) + 1}` : `Log set ${session.currentSetNumber}` }}
                     · {{ session.currentReps }} reps
