@@ -1,10 +1,14 @@
 <script setup lang="ts">
 // Selection or completion in lists. Reka Checkbox gives role=checkbox, keyboard and indeterminate.
+import { useSlots } from "vue";
 import { CheckboxIndicator, CheckboxRoot } from "reka-ui";
 import { Check, Minus } from "lucide-vue-next";
 
 const model = defineModel<boolean | "indeterminate">({ default: false });
+// `label` is always the accessible name. Slot content replaces only the visible
+// text, e.g. "Milk" shown while the checkbox is announced as "Complete Milk".
 defineProps<{ label: string; disabled?: boolean }>();
+const slots = useSlots();
 </script>
 
 <template>
@@ -15,6 +19,7 @@ defineProps<{ label: string; disabled?: boolean }>();
         <CheckboxRoot
             v-model="model"
             :disabled="disabled"
+            :aria-label="slots.default ? label : undefined"
             class="flex size-5 shrink-0 items-center justify-center rounded-control border border-line-strong bg-surface-2 transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent data-[state=checked]:border-accent data-[state=checked]:bg-accent data-[state=indeterminate]:border-accent data-[state=indeterminate]:bg-accent"
         >
             <CheckboxIndicator class="flex text-fg-inverse">

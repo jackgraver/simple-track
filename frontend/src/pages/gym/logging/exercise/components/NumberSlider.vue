@@ -120,18 +120,46 @@ const hasBottomMarkerLabel = computed(() =>
 
 const indexToScrollLeft = (index: number) => index * TICK_WIDTH_PX;
 
+// While we scroll the strip ourselves (a tap or a model change), scroll events
+// must not write the value: a smooth scroll passes through other ticks and
+// outlasts any single frame. The sync ends when the strip reaches its target,
+// on `scrollend`, when the user grabs the strip, or after a fallback timeout.
+const SYNC_FALLBACK_MS = 1000;
+let syncTarget: number | null = null;
+let syncTimer: ReturnType<typeof setTimeout> | undefined;
+
+const endSync = () => {
+    syncTarget = null;
+    clearTimeout(syncTimer);
+    syncingScroll.value = false;
+    const el = scrollEl.value;
+    if (el) scrollLeft.value = el.scrollLeft;
+};
+
 const scrollToIndex = (index: number, smooth = false) => {
     const el = scrollEl.value;
     if (!el) return;
+    const target = Math.min(
+        indexToScrollLeft(index),
+        Math.max(0, el.scrollWidth - el.clientWidth),
+    );
+    syncTarget = target;
     syncingScroll.value = true;
-    el.scrollTo({
-        left: indexToScrollLeft(index),
-        behavior: smooth ? "smooth" : "instant",
-    });
-    requestAnimationFrame(() => {
-        syncingScroll.value = false;
-        scrollLeft.value = el.scrollLeft;
-    });
+    clearTimeout(syncTimer);
+    el.scrollTo({ left: target, behavior: smooth ? "smooth" : "instant" });
+    if (!smooth || Math.abs(el.scrollLeft - target) < 1) {
+        requestAnimationFrame(endSync);
+        return;
+    }
+    syncTimer = setTimeout(endSync, SYNC_FALLBACK_MS);
+};
+
+const onUserScrollStart = () => {
+    if (syncTarget !== null) endSync();
+};
+
+const onScrollEnd = () => {
+    if (syncTarget !== null) endSync();
 };
 
 const updatePad = () => {
@@ -157,6 +185,7 @@ onMounted(() => {
 
 onUnmounted(() => {
     resizeObserver?.disconnect();
+    clearTimeout(syncTimer);
 });
 
 watch(
@@ -196,7 +225,10 @@ const onScroll = () => {
     const el = scrollEl.value;
     if (!el) return;
     scrollLeft.value = el.scrollLeft;
-    if (syncingScroll.value) return;
+    if (syncTarget !== null) {
+        if (Math.abs(el.scrollLeft - syncTarget) < 1) endSync();
+        return;
+    }
     const index = Math.min(
         Math.max(Math.round(el.scrollLeft / TICK_WIDTH_PX), 0),
         tickValues.value.length - 1,
@@ -301,6 +333,10 @@ const onTickClick = (index: number) => {
                     class="relative flex h-full touch-pan-x overflow-x-auto overflow-y-hidden overscroll-x-contain overscroll-y-none [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
                     style="scroll-snap-type: x mandatory"
                     @scroll.passive="onScroll"
+                    @scrollend="onScrollEnd"
+                    @pointerdown="onUserScrollStart"
+                    @wheel.passive="onUserScrollStart"
+                    @touchstart.passive="onUserScrollStart"
                 >
                     <div
                         class="shrink-0"

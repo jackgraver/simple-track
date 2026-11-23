@@ -339,6 +339,10 @@ type TransactionInput struct {
 	Amount float64                `json:"amount"`
 	Date   time.Time              `json:"-"`
 	Note   string                 `json:"note"`
+	// UpdateBalance also moves the account balance by the amount (deposit adds,
+	// withdrawal subtracts), recorded as a snapshot on the transaction's date.
+	// Both writes happen in one DB transaction, so a failure leaves neither.
+	UpdateBalance bool `json:"update_balance"`
 }
 
 func CreateTransaction(db *gorm.DB, accountID uint, input TransactionInput) (*models.AccountTransaction, error) {
@@ -351,9 +355,6 @@ func CreateTransaction(db *gorm.DB, accountID uint, input TransactionInput) (*mo
 	if input.Amount <= 0 {
 		return nil, invalid("amount must be positive")
 	}
-	if err := accountExists(db, accountID); err != nil {
-		return nil, err
-	}
 	transaction := models.AccountTransaction{
 		AccountID: accountID,
 		Kind:      input.Kind,
@@ -361,10 +362,45 @@ func CreateTransaction(db *gorm.DB, accountID uint, input TransactionInput) (*mo
 		Date:      input.Date,
 		Note:      strings.TrimSpace(input.Note),
 	}
-	if err := db.Create(&transaction).Error; err != nil {
+	err := db.Transaction(func(tx *gorm.DB) error {
+		if err := accountExists(tx, accountID); err != nil {
+			return err
+		}
+		if err := tx.Create(&transaction).Error; err != nil {
+			return err
+		}
+		if !input.UpdateBalance {
+			return nil
+		}
+		return applyTransactionToBalance(tx, accountID, transaction)
+	})
+	if err != nil {
 		return nil, err
 	}
 	return &transaction, nil
+}
+
+// applyTransactionToBalance records latest balance +/- the transaction amount
+// as a snapshot on the transaction's date. Only allowed on or after the latest
+// snapshot: a back-dated adjustment would be overwritten by the later one.
+func applyTransactionToBalance(tx *gorm.DB, accountID uint, transaction models.AccountTransaction) error {
+	var latest models.AccountBalance
+	current := 0.0
+	err := tx.Where("account_id = ?", accountID).Order("date DESC").First(&latest).Error
+	switch {
+	case err == nil:
+		if transaction.Date.Format(time.DateOnly) < latest.Date.Format(time.DateOnly) {
+			return invalid("cannot update the balance from a transaction before the latest balance (%s)", latest.Date.Format(time.DateOnly))
+		}
+		current = latest.Balance
+	case !errors.Is(err, gorm.ErrRecordNotFound):
+		return err
+	}
+	delta := transaction.Amount
+	if transaction.Kind == models.TransactionWithdrawal {
+		delta = -delta
+	}
+	return setBalance(tx, accountID, transaction.Date, current+delta)
 }
 
 func DeleteTransaction(db *gorm.DB, accountID, transactionID uint) error {

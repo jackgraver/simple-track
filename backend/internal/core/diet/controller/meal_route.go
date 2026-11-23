@@ -103,6 +103,10 @@ func PostFood(c *gin.Context) {
 		return
 	}
 	createdFood, err := services.CreateFood(&req.Food, req.RelatedFoodID)
+	if errors.Is(err, dietrepo.ErrFoodNameTaken) {
+		apierr.Conflict(c, err.Error())
+		return
+	}
 	if err != nil {
 		apierr.Internal(c, err)
 		return

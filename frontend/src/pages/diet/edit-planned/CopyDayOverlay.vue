@@ -50,6 +50,13 @@ function selectEmpty() {
     selected.value = new Set(days.value.filter((d) => d.meals === 0).map((d) => d.offset));
 }
 
+/** Accessible name: the same facts the row shows, e.g. "Mon 16 Nov, 3 planned, 1,800 / 2,200 kcal". */
+function dayCheckboxLabel(d: { date: Date; meals: number; kcal: number; target: number }): string {
+    const month = d.date.toLocaleDateString(undefined, { month: "short" });
+    const plan = d.meals === 0 ? "nothing planned" : `${d.meals} planned, ${kcalLine(d.kcal, d.target)}`;
+    return `${shortDayLabel(d.date)} ${month}, ${plan}`;
+}
+
 const title = computed(() => (props.source ? `Copy ${shortDayLabel(props.source.date)} to…` : "Copy day"));
 const description = computed(() => {
     const s = props.source;
@@ -79,7 +86,7 @@ const count = computed(() => selected.value.size);
                 <li v-for="d in days" :key="d.offset">
                     <Checkbox
                         :model-value="selected.has(d.offset)"
-                        :label="shortDayLabel(d.date)"
+                        :label="dayCheckboxLabel(d)"
                         @update:model-value="(v) => toggle(d.offset, v)"
                     >
                         <span class="flex flex-col py-1">

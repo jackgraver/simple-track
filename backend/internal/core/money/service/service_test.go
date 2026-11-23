@@ -318,3 +318,41 @@ func TestArchiveHidesAccountAndNetWorthHistory(t *testing.T) {
 		t.Fatalf("last point = %+v, want card excluded after archiving", last)
 	}
 }
+
+func TestTransactionUpdatesBalanceAtomically(t *testing.T) {
+	db := setupTestDB(t)
+	opening := 1_000.0
+	account := mustAccount(t, db, AccountInput{Name: "Savings", Kind: models.AccountKindCash}, &opening, day(2026, time.March, 1))
+
+	if _, err := CreateTransaction(db, account.ID, TransactionInput{Amount: 250.5, Date: day(2026, time.March, 5), UpdateBalance: true}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := CreateTransaction(db, account.ID, TransactionInput{Kind: models.TransactionWithdrawal, Amount: 50.5, Date: day(2026, time.March, 5), UpdateBalance: true}); err != nil {
+		t.Fatal(err)
+	}
+	var cached models.Account
+	db.First(&cached, account.ID)
+	if cached.CurrentBalance != 1_200 {
+		t.Fatalf("balance = %v, want 1200", cached.CurrentBalance)
+	}
+
+	// Before the latest snapshot: rejected, and the transaction is not saved either.
+	var validation ValidationError
+	if _, err := CreateTransaction(db, account.ID, TransactionInput{Amount: 10, Date: day(2026, time.March, 2), UpdateBalance: true}); !errors.As(err, &validation) {
+		t.Fatalf("back-dated update err = %v, want validation error", err)
+	}
+	var count int64
+	db.Model(&models.AccountTransaction{}).Where("account_id = ?", account.ID).Count(&count)
+	if count != 2 {
+		t.Fatalf("transactions = %d, want 2 (rejected one rolled back)", count)
+	}
+
+	// Without UpdateBalance the balance is untouched.
+	if _, err := CreateTransaction(db, account.ID, TransactionInput{Amount: 10, Date: day(2026, time.March, 2)}); err != nil {
+		t.Fatal(err)
+	}
+	db.First(&cached, account.ID)
+	if cached.CurrentBalance != 1_200 {
+		t.Fatalf("balance = %v, want 1200", cached.CurrentBalance)
+	}
+}

@@ -88,10 +88,17 @@ func FoodCreate(food *models.Food) error {
 }
 
 // FoodCreateWithOptionalRelated inserts a food and, if set, links it to a related food's variant group.
+// ErrFoodNameTaken is returned when a food with the same name already exists
+// (unique index idx_foods_name, which also covers soft-deleted foods).
+var ErrFoodNameTaken = errors.New("a food with this name already exists")
+
 func FoodCreateWithOptionalRelated(food *models.Food, relatedFoodID *uint) error {
 	return conn().Transaction(func(tx *gorm.DB) error {
 		food.ID = 0
 		if err := tx.Create(food).Error; err != nil {
+			if isUniqueConstraintError(err) {
+				return ErrFoodNameTaken
+			}
 			return err
 		}
 		if relatedFoodID == nil || *relatedFoodID == 0 {
