@@ -32,6 +32,8 @@ interface Options {
   now: Date | null;
   /** Set the auth cookie (false for tests of the login UI). */
   authenticated: boolean;
+  /** Data on top of the base seed: 'large' = two years of history and odd values (~0.5s per test). */
+  seed: 'base' | 'large';
 }
 
 interface Fixtures {
@@ -51,6 +53,7 @@ export const test = base.extend<Fixtures & Options, { stack: WorkerStack }>({
   allowedErrors: [[], { option: true }],
   now: [E2E_EPOCH, { option: true }],
   authenticated: [true, { option: true }],
+  seed: ['base', { option: true }],
 
   baseURL: async ({}, use) => use(process.env.E2E_BASE_URL),
 
@@ -90,8 +93,9 @@ export const test = base.extend<Fixtures & Options, { stack: WorkerStack }>({
   // Before each test: fresh seed data and a fixed clock. After: fail on leftover faults/holds,
   // and on failure attach the backend log slice and a data dump (README "Reading a failure").
   _isolate: [
-    async ({ stack, e2e, now }, use, testInfo) => {
+    async ({ stack, e2e, now, seed }, use, testInfo) => {
       await e2e.reset();
+      if (seed !== 'base') await e2e.seedProfile(seed);
       if (now) await e2e.setClock(now);
       const logStart = fs.statSync(stack.backend.logFile).size;
 

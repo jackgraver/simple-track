@@ -91,6 +91,11 @@ export class E2E {
     await this.post('/__e2e/reset');
   }
 
+  /** Add a data profile on top of the seed (backend/internal/e2e/seed: "large"). Prefer the `seed` option. */
+  async seedProfile(profile: 'large'): Promise<void> {
+    await this.post(`/__e2e/seed/${profile}`);
+  }
+
   /** Move the server's clock (it keeps ticking from there). */
   async setClock(time: Date): Promise<void> {
     await this.post('/__e2e/clock', { time: time.toISOString() });

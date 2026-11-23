@@ -13,6 +13,8 @@ export default defineConfig({
   failOnFlakyTests: CI,
   timeout: 30_000,
   expect: { timeout: 5_000 },
+  // Desktop and mobile render different structure, so snapshots are per project.
+  snapshotPathTemplate: '{testDir}/{testFilePath}-snapshots/{arg}-{projectName}{ext}',
   reporter: [
     [CI ? 'dot' : 'list'],
     ['html', { open: 'never' }],

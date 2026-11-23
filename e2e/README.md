@@ -27,7 +27,15 @@ npx playwright test tests/gym                  # one module ("lane")
 npx playwright test --grep @gym                # same, by tag
 npm run flake -- tests/gym/logging.spec.ts     # run a spec 10x to prove it is stable
 npm run report                                 # open the last HTML report
-npm run down                                   # stop the e2e Postgres container
+npx playwright test tests/aria --update-snapshots   # accept an intended structure change
+npm run ci:history                             # CI e2e record; is it ready to block?
+npm run down                                   # remove the shared e2e Postgres container
+```
+
+`npm run down` removes the container for **every** checkout (other worktrees' runs included); a run
+recreates it. Overriding the reporter (`--reporter=dot`) also drops the failure summary below.
+
+```
 ```
 
 Node comes from mise: prefix with `mise exec --` if `node` is not on PATH. One run per checkout at a
@@ -46,6 +54,7 @@ Environment knobs:
 | `E2E_FRONTEND=dev` | Serve the frontend from a vite dev server instead of the cached production build. Skips the ~3s rebuild after frontend edits, but every page load is slower (unbundled modules): measured ~2.5x slower per test. It rarely pays off; the production build is the default. |
 | `E2E_KEEP=1` | Leave the per-worker databases in place after the run, for poking with psql. |
 | `E2E_REBUILD=1` | Ignore build caches (frontend, Go binaries, template DB). |
+| `E2E_BLOCKING=1` | `ci.sh` only: fail the pipeline step when the suite fails. |
 
 ## Architecture
 
@@ -136,7 +145,23 @@ stub. On top of that the server refuses to start with `E2E` set in production. I
     Service workers blocked, `reducedMotion: 'reduce'`.
 12. **Flakiness is a bug.** `retries: 0` locally, `1` in CI with `--fail-on-flaky-tests`. Run every new
     spec through `npm run flake` (10 repeats) before merging.
-13. **Snapshots: structure, not pixels.** `toMatchAriaSnapshot` for key screens, if any.
+13. **Snapshots: structure, not pixels.** A few `toMatchAriaSnapshot` checks in `tests/aria/` (main
+    nav, gym week strip), per project. Keep the set small while the UI overhaul churns markup.
+
+## CI
+
+`.cicd.yaml` runs `e2e/ci.sh` after the unit tests: the whole suite with `CI=1` (retries 1,
+`--fail-on-flaky-tests`, dot + JSON reporters). Each run appends a line to
+`~/.local/state/simple-track-e2e/ci-history.jsonl`, and a failed run's `test-results/` and
+`playwright-report/` are kept next to it in `runs/` (the pipeline's checkout is thrown away).
+
+The step is **non-blocking** (exits 0 on a red suite) until `E2E_BLOCKING=1` is set on it.
+`npm run ci:history` prints the record and says when the bar is met: the last 20 runs all green
+with no flaky tests.
+
+The container is shared by every checkout, CI's snapshot checkouts included. Database names carry
+a hash of the checkout path and each template's comment records that path, so setup drops the
+databases of checkouts that no longer exist, never anyone else's.
 
 ## Data
 
@@ -147,6 +172,12 @@ stub. On top of that the server refuses to start with `E2E` set in production. I
 
 If a test writes it or asserts on its exact value, the test creates it. Never assert on seed contents
 beyond "it exists".
+
+**Seed profiles** add data on top of the seed for scale and edge cases: `test.use({ seed: 'large' })`
+loads two years of history in every module plus awkward values (unicode and very long names, zero
+and huge numbers, an overdrawn account), in ~300ms per test. `tests/scale/` runs every page against
+it. The same data can go into any non-production database: `go run ./cmd/e2eseed -profile large`
+(it empties the database first).
 
 ## The fixtures in one screen
 
@@ -169,7 +200,9 @@ the guards still fail tests: `tests/examples/guards.spec.ts` (`@infra`).
 
 ## Reading a failure
 
-Each failed test gets, in `test-results/<test>/` and the HTML report:
+Start with **`test-results/failures.md`**: one block per failed or flaky test with the error, the
+failing line, a rerun command, the last API calls, backend errors and the artifact paths. Each failed
+test also gets, in `test-results/<test>/` and the HTML report:
 
 - `trace.zip`: DOM snapshots, network (with response bodies), console, one step per action.
   `npx playwright show-trace <file>`.
@@ -184,7 +217,8 @@ Every test starts from the seed with a fixed clock, so re-running the single tes
 e2e/
   playwright.config.ts
   global-setup.ts             # builds, Postgres, template DB, front door
-  infra/                      # build cache, postgres, backend process, front door
+  ci.sh                       # the j-cicd step (history, kept reports, E2E_BLOCKING)
+  infra/                      # build cache, postgres, backend process, front door, summary reporter
   .cache/                     # (gitignored) binaries, dist, backend logs, run lock
   fixtures/
     index.ts                  # extended `test`: worker stack, auth, reset, clock, guards, artifacts
@@ -192,7 +226,7 @@ e2e/
     e2e.ts                    # /__e2e client: reset, clock, fault, hold
   pages/                      # page objects ONLY for complex screens (gym logging)
   tests/
-    smoke/  examples/  auth/  gym/  diet/  finances/  media/  grocery/  settings/
+    smoke/  examples/  scale/  aria/  auth/  gym/  diet/  finances/  media/  grocery/  settings/
 ```
 
 Mirrors `frontend/src/pages`, so an agent knows which lane to run for the module it touched. Prefer
