@@ -4,6 +4,7 @@ import { useGlobalRestTimer } from "~/composables/useGlobalRestTimer";
 import { REST_BAR_MAX_MS, REST_READY_MS, restBarPercent, restStage, type RestStage } from "../domain/liveLogging";
 
 // Counts up from the last logged set (any exercise). Colour says "not yet" until 2:00, then "good to go".
+// No stage words above the time (owner, 2026-11-22): the time itself and the 2:00 mark on the bar say it.
 const { elapsedMs, isActive, displayText } = useGlobalRestTimer();
 
 const stage = computed(() => restStage(elapsedMs.value, isActive.value));
@@ -22,21 +23,10 @@ const fillTone: Record<RestStage, string> = {
     near: "bg-rest-near",
     ready: "bg-success",
 };
-// Only the idle and ready stages carry a word; the near stage is colour-only (no "Almost 2:00" label).
-const stateLabel: Record<RestStage, string> = {
-    idle: "Starts after a set",
-    wait: "",
-    near: "",
-    ready: "Past 2:00",
-};
 </script>
 
 <template>
     <section class="flex flex-col items-center gap-1 pt-1 text-center" aria-label="Time since last set">
-        <!-- Stage word above the time. Fixed height, so it coming and going never moves the page. -->
-        <p class="m-0 min-h-5 text-sm font-medium transition-colors duration-500" :class="textTone[stage]">
-            {{ stateLabel[stage] }}
-        </p>
         <p
             class="m-0 text-7xl leading-none short:text-6xl font-semibold tracking-tight tabular-nums transition-colors duration-500"
             :class="textTone[stage]"
