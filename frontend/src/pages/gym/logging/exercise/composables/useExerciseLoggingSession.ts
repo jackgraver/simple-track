@@ -276,6 +276,17 @@ export function useExerciseLoggingSession(options: {
         { immediate: true },
     );
 
+    // An exercise added from the list opens before its history is in the cache (it arrives when
+    // the day refetches after the add). Fill the draft again then, unless logging has started.
+    watch(
+        () => exerciseGroup.value?.previous,
+        (previous, before) => {
+            if (!previous || before || sessionKey.value == null) return;
+            if (draftDirty.value || editingSetIndex.value != null || loggedSets.value.length > 0) return;
+            initializeExercise();
+        },
+    );
+
     /**
      * Save the notes when they differ from the cached exercise's (no-op otherwise). `afterSet`: a set
      * was just logged, so the save may go out even though the cache doesn't show a logged exercise
@@ -291,10 +302,16 @@ export function useExerciseLoggingSession(options: {
         saveNotes.mutate(vars);
     };
 
+    /**
+     * Change the weight. Before the first set the reps follow last session's set 1 at that weight;
+     * once this session has a set (or one is being fixed) the slider holds this session's reps and
+     * a weight change leaves it where it is.
+     */
     const updateWeightAndDefaultReps = (value: number) => {
         if (value === currentWeight.value) return;
         draftDirty.value = true;
         currentWeight.value = value;
+        if (editingSetIndex.value != null || loggedSets.value.length > 0) return;
         currentReps.value = normalizeReps(
             previousRepsForSetAtWeight(
                 exerciseGroup.value?.previous?.sets,
@@ -302,6 +319,19 @@ export function useExerciseLoggingSession(options: {
                 value,
             ) ?? DEFAULT_REPS_AFTER_WEIGHT_CHANGE,
         );
+    };
+
+    /**
+     * Point the draft at this session's last set (or `last`), after editing a set. The next set
+     * starts from the previous set of this session; last session's reps live in the "Last time"
+     * marker, not the slider.
+     */
+    const resumeFromLastSet = (last?: SetFields) => {
+        const row = last ?? loggedSets.value[loggedSets.value.length - 1];
+        if (!row) return;
+        currentWeight.value = row.weight;
+        currentReps.value = normalizeReps(row.reps);
+        currentWeightSetup.value = row.weight_setup;
     };
 
     const stepWeight = (direction: "plus" | "minus") => {
@@ -375,14 +405,9 @@ export function useExerciseLoggingSession(options: {
 
         draftDirty.value = false;
         editingSetIndex.value = null;
-        // The next set starts from the previous set of this session (last session's reps live in the
-        // last-time indicator, not the slider). A new set leaves the slider at the reps just logged;
-        // after fixing an earlier set, go back to the last set's reps (rows update a tick later).
-        if (editingIndex != null) {
-            currentReps.value = normalizeReps(
-                editingIndex === count - 1 ? reps : (loggedSets.value[count - 1]?.reps ?? reps),
-            );
-        }
+        // A new set leaves the draft at what was just logged. After fixing a set, go back to this
+        // session's last set (the edited values if that was the last one: rows update a tick later).
+        if (editingIndex != null) resumeFromLastSet(editingIndex === count - 1 ? fields : undefined);
         return true;
     };
 
@@ -472,9 +497,7 @@ export function useExerciseLoggingSession(options: {
     const cancelEditingSet = () => {
         if (editingSetIndex.value == null) return;
         editingSetIndex.value = null;
-        const last = loggedSets.value[loggedSets.value.length - 1];
-        if (last) currentWeight.value = last.weight;
-        if (last) currentReps.value = normalizeReps(last.reps);
+        resumeFromLastSet();
     };
 
     const goBackToList = () => {

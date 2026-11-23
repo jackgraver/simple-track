@@ -4,7 +4,7 @@
  */
 import type { QueryClient } from "@tanstack/vue-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { computed, effectScope, ref, shallowRef, type EffectScope } from "vue";
+import { computed, effectScope, nextTick, ref, shallowRef, type EffectScope } from "vue";
 import type { Router } from "vue-router";
 
 import { createQueryClient } from "~/api/queryClient";
@@ -212,5 +212,57 @@ describe("reps default for the next set", () => {
         s.commitRepsFromInput(7);
         expect(s.addNextSet()).toBe(true);
         expect(s.currentReps).toBe(7);
+    });
+
+    it("a weight change after the first set keeps this session's reps", () => {
+        const lastSession = logged([set(1, "p0", 12), { ...set(2, "p1", 12), weight: 110 }]);
+        qc.setQueryData(KEY, {
+            ...day(logged([set(11, "s0", 7)])),
+            planned_exercises: [{ planned: exercise, logged: logged([set(11, "s0", 7)]), previous: lastSession }],
+        });
+        const s = openSession();
+        expect(s.currentReps).toBe(7);
+        s.commitWeightFromInput(110); // last session did 12 at 110 for set 2
+        expect(s.currentReps).toBe(7);
+    });
+
+    it("saving a fix to an earlier set goes back to the last set's weight and reps", () => {
+        qc.setQueryData(KEY, day(logged([{ ...set(11, "s0", 10), weight: 90 }, set(12, "s1", 8)])));
+        http.apiPATCH.mockReturnValue(new Promise(() => {}));
+        const s = openSession();
+        s.editSet(0);
+        expect(s.currentWeight).toBe(90);
+        s.commitRepsFromInput(9);
+        expect(s.addNextSet()).toBe(true);
+        expect(s.currentWeight).toBe(100);
+        expect(s.currentReps).toBe(8);
+    });
+});
+
+describe("an exercise opened before its history is cached", () => {
+    it("fills the draft from last session once the history arrives", async () => {
+        qc.setQueryData(KEY, day(logged([])));
+        const s = openSession();
+        expect(s.currentWeight).toBe(0);
+
+        const withHistory = day(logged([]));
+        withHistory.planned_exercises![0]!.previous = logged([set(1, "p0", 6), set(2, "p1", 6)]);
+        qc.setQueryData(KEY, withHistory);
+        await nextTick();
+        expect(s.currentWeight).toBe(100);
+        expect(s.currentReps).toBe(6);
+    });
+
+    it("leaves the draft alone once the lifter has changed it", async () => {
+        qc.setQueryData(KEY, day(logged([])));
+        const s = openSession();
+        s.commitRepsFromInput(5);
+
+        const withHistory = day(logged([]));
+        withHistory.planned_exercises![0]!.previous = logged([set(1, "p0", 6)]);
+        qc.setQueryData(KEY, withHistory);
+        await nextTick();
+        expect(s.currentWeight).toBe(0);
+        expect(s.currentReps).toBe(5);
     });
 });
