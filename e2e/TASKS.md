@@ -97,6 +97,15 @@ reload. Add the module's API helpers to `fixtures/api.ts` as needed.
       expired session (server clock +366d) redirects to sign-in on direct load and on next full load.
       Not yet: settings profile (body profile form) save + reload, register flow, rate-limit lockout.
 - [ ] **B8. Optimistic UI**: hold-based assertions of instant state and post-reload state.
+- [x] **B8. Optimistic UI**: hold-based assertions of instant state and post-reload state.
+      Pattern (`tests/optimistic/`): hold the request, assert the instant state, release, wait for the
+      UI to settle (`aria-busy` gone, no network wait), reload, assert again. Scenarios:
+      grocery add (row visible + `aria-busy` while held, persists), grocery complete (checked at once,
+      gone after reload; hold by template because the client may use `client_id` as the ref), weight save
+      (overwrite prompt quotes the optimistic value while held and the server value after reload; the
+      chart is a canvas, so the cache is probed through that prompt). Not yet: rollback with Retry
+      (covered for grocery add in examples), gym set logging and diet/finances (their lanes B2-B4 own
+      them; reuse this pattern).
 
 ## C. CI and scale
 
@@ -130,6 +139,11 @@ reload. Add the module's API helpers to `fixtures/api.ts` as needed.
   not exposed by `Checkbox` when the slot is used).
 - The UI has no logout control: `useAuth().logout` is never called from a component. The logout spec
   calls `POST /api/auth/logout` instead. Add the button, then drive it through the UI.
+- `ListRow` already sets `aria-busy="true"` on pending rows (grocery uses it), so the "mark pending
+  rows" idea only needs extending to the other optimistic lists (gym sets, diet, finances) before
+  specs there can drop `waitForApi`. Specs for grocery use it now.
+- `Checkbox.vue` takes `label` but the slot content replaces it, so grocery checkboxes are named by the
+  item name (`Eggs`), not `Complete Eggs` as the `label` prop suggests.
 
 ## Decisions log
 
@@ -173,3 +187,5 @@ reload. Add the module's API helpers to `fixtures/api.ts` as needed.
 - 2026-11-22: Real logins stay few: one per test, all as the seeded `dev`, one wrong password per run (the
   limiter is per backend process; only failures should count toward 5/user). Session expiry moves the
   server clock past the 365d token lifetime; the browser cookie's own expiry uses real time.
+- 2026-11-22: Optimistic specs wait for the UI to settle (`aria-busy` gone) before reloading, instead of
+  `waitForApi`, where the app exposes it; holds on completes use a route template (ref may be `client_id`).

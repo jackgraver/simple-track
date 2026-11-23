@@ -90,4 +90,10 @@ export class Api {
   deleteGroceryItem(id: number) {
     return this.delete(`/tracking/grocery/items/${id}`);
   }
+
+  // --- tracking ---
+
+  saveWeight(date: string, weight_lbs: number) {
+    return this.post('/tracking/weight', { date, weight_lbs });
+  }
 }
