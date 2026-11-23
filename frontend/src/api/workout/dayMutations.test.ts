@@ -68,6 +68,9 @@ let qc: QueryClient;
 let scope: EffectScope;
 beforeEach(() => {
     vi.useFakeTimers();
+    // DATE is "today" in these tests: the day offset sent to the API is computed from the clock,
+    // so without pinning it the suite breaks the day after DATE.
+    vi.setSystemTime(new Date(2026, 10, 22, 12, 0, 0));
     vi.clearAllMocks();
     qc = createQueryClient(vi.fn());
     qcRef.qc = qc;
