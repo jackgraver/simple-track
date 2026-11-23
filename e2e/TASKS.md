@@ -41,7 +41,12 @@ reload. Add the module's API helpers to `fixtures/api.ts` as needed.
 - [ ] **B4. Finances**
 - [ ] **B5. Media**: needs a fake upstream for the lookup APIs (AniList etc., URLs are configurable).
 - [ ] **B6. Grocery**
-- [ ] **B7. Settings and auth**: login UI (no bypass cookie), logout, session expiry (via clock).
+- [x] **B7. Settings and auth**: login UI (no bypass cookie), logout, session expiry (via clock).
+      Specs in `tests/auth/login.spec.ts` (`@auth`, `authenticated: false`): unauthenticated visit
+      redirects to sign-in with `redirect=` and returns there after login (+ reload keeps session,
+      `@smoke`); wrong password shows an alert; logout (API call, no UI control) ends the session;
+      expired session (server clock +366d) redirects to sign-in on direct load and on next full load.
+      Not yet: settings profile (body profile form) save + reload, register flow, rate-limit lockout.
 - [ ] **B8. Optimistic UI**: hold-based assertions of instant state and post-reload state.
 
 ## C. CI and scale
@@ -61,6 +66,9 @@ reload. Add the module's API helpers to `fixtures/api.ts` as needed.
 
 - `POST /diet/foods` with an existing name returns **500**: the unique index `idx_foods_name` rejects it
   and `PostFood` maps every error to `apierr.Internal`. Decide the intended status (409?), then pin it.
+
+- The UI has no logout control: `useAuth().logout` is never called from a component. The logout spec
+  calls `POST /api/auth/logout` instead. Add the button, then drive it through the UI.
 
 ## Decisions log
 
@@ -85,3 +93,6 @@ reload. Add the module's API helpers to `fixtures/api.ts` as needed.
   container; one run per checkout at a time (lock file).
 - 2026-11-22: Example specs use grocery add: it is optimistic, retries twice (TanStack `retry: 2`) and
   is idempotent by `client_id`, so it exercises every failure mode.
+- 2026-11-22: Real logins stay few: one per test, all as the seeded `dev`, one wrong password per run (the
+  limiter is per backend process; only failures should count toward 5/user). Session expiry moves the
+  server clock past the 365d token lifetime; the browser cookie's own expiry uses real time.
