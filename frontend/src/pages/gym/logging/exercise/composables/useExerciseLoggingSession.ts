@@ -70,7 +70,8 @@ export type ExerciseLoggingSessionViewModel = {
     goBackToList: () => void;
     updateNotes: (value: string) => void;
     updateWeightSetup: (value: string) => void;
-    undoWeightProgression: () => void;
+    /** Before the first set: go up to the earned weight, or stay at last session's. Reversible. */
+    chooseWeightProgression: (choice: "up" | "stay") => void;
     setWeightIncrement: (value: number) => void;
 };
 
@@ -244,7 +245,11 @@ export function useExerciseLoggingSession(options: {
         draftDirty.value = false;
 
         if (draftStorage.restore()) {
-            weightProgression.value = null;
+            // Coming back before set 1 with one of the two weights (go up / stay): keep the choice.
+            const p = weightProgression.value;
+            const stillChoosing =
+                p != null && loggedSets.value.length === 0 && [p.previousWeight, p.nextWeight].includes(currentWeight.value);
+            if (!stillChoosing) weightProgression.value = null;
             if (editingSetIndex.value != null && !loggedSets.value[editingSetIndex.value]) {
                 editingSetIndex.value = null;
             }
@@ -516,10 +521,11 @@ export function useExerciseLoggingSession(options: {
         draftDirty.value = true;
     };
 
-    const undoWeightProgression = () => {
-        if (!weightProgression.value) return;
-        updateWeightAndDefaultReps(weightProgression.value.previousWeight);
-        weightProgression.value = null;
+    // Keeps `weightProgression` so the choice can be flipped back until the first set is logged.
+    const chooseWeightProgression = (choice: "up" | "stay") => {
+        const p = weightProgression.value;
+        if (!p || loggedSets.value.length > 0) return;
+        updateWeightAndDefaultReps(choice === "up" ? p.nextWeight : p.previousWeight);
     };
 
     return reactive({
@@ -546,7 +552,7 @@ export function useExerciseLoggingSession(options: {
         goBackToList,
         updateNotes,
         updateWeightSetup,
-        undoWeightProgression,
+        chooseWeightProgression,
         setWeightIncrement,
     }) as ExerciseLoggingSessionViewModel;
 }
