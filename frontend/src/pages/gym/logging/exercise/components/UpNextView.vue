@@ -85,7 +85,7 @@ const settingsLine = (item: UpNextItem) =>
             </section>
 
             <section v-if="rest.length" class="flex flex-col gap-2" aria-label="Also left">
-                <p class="m-0 text-xs font-semibold tracking-wide text-fg-muted uppercase">Or pick another · {{ rest.length }}</p>
+                <p class="m-0 text-xs font-semibold tracking-wide text-fg-muted uppercase">Or pick another</p>
                 <List class="rounded-card border border-line bg-surface">
                     <ListRow v-for="item in rest" :key="item.key" @click="emit('go', item)">
                         {{ item.name }}

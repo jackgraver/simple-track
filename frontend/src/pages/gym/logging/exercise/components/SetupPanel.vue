@@ -47,7 +47,7 @@ const lastLine = computed(() => {
         <span v-if="expanded" class="flex flex-col gap-4">
             <span class="flex items-start justify-between gap-3">
                 <span class="flex min-w-0 flex-col gap-1">
-                    <span class="text-xs font-semibold tracking-wide text-fg-muted uppercase">Setup</span>
+                    <span class="text-xs font-semibold tracking-wide text-fg-muted uppercase">Exercise Setup</span>
                     <span class="flex items-baseline gap-2">
                         <span class="text-display font-semibold text-fg tabular-nums">{{ weight }} lb</span>
                         <Badge v-if="badge" :tone="badge.tone">{{ badge.text }}</Badge>
@@ -80,7 +80,9 @@ const lastLine = computed(() => {
                 <span class="line-clamp-3 text-sm whitespace-pre-wrap text-fg">{{ cues }}</span>
             </span>
         </span>
-        <span v-else class="flex items-center gap-3">
+        <span v-else class="flex flex-col gap-1">
+            <span class="text-xs font-semibold tracking-wide text-fg-muted uppercase">Exercise Setup</span>
+            <span class="flex items-center gap-3">
             <span class="text-xl font-semibold text-fg tabular-nums">{{ weight }} lb</span>
             <Badge v-if="badge" :tone="badge.tone">{{ badge.text }}</Badge>
             <!-- One line: badges that don't fit wrap to a second row, which the fixed height hides whole
@@ -92,6 +94,7 @@ const lastLine = computed(() => {
                 <Badge v-if="plates" variant="outline">{{ plates }}</Badge>
             </span>
             <ChevronRight class="size-4 shrink-0 text-fg-subtle" aria-hidden="true" />
+            </span>
         </span>
     </Card>
 </template>

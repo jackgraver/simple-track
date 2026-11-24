@@ -306,8 +306,7 @@ const goTo = (item: UpNextItem) => {
             <!-- Pinned above the tab bar so Log/Finish stays on screen on short phones. -->
             <div class="sticky bottom-at-tabbar z-raised -mx-4 flex flex-col gap-2 bg-canvas px-4 py-2 lg:static lg:mx-0 lg:p-0">
                 <Button v-if="showSlider" variant="primary" size="lg" block @click="logSet">
-                    {{ editing ? `Save set ${(session.editingSetIndex ?? 0) + 1}` : `Log set ${session.currentSetNumber}` }}
-                    · {{ session.currentReps }} reps
+                    {{ editing ? `Save Set ${(session.editingSetIndex ?? 0) + 1}` : `Log Set ${session.currentSetNumber}` }}
                 </Button>
                 <Button v-if="plannedDone && !editing && !extraSetOpen" variant="primary" size="lg" block @click="finish">
                     Finish {{ exerciseName }}
