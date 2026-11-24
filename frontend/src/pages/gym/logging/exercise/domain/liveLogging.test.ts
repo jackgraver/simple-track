@@ -8,6 +8,7 @@ import {
     restBarPercent,
     restStage,
     setsTally,
+    verdictText,
     visibleMachineSettings,
 } from "./liveLogging";
 
@@ -70,12 +71,19 @@ describe("overloadStatus", () => {
     it("handles a manual drop and no rollover", () => {
         expect(overloadStatus(prev, 0, 90)).toMatchObject({ kind: "down", delta: -10, hit: null, rollover: null });
     });
-    it("compares against the top weight last time", () => {
+    it("compares against last time's final set, and mixed weights never earn", () => {
         const mixed = [
             { weight: 80, reps: 12 },
             { weight: 100, reps: 10 },
         ];
-        expect(overloadStatus(mixed, 10, 100)).toMatchObject({ previousWeight: 100, hit: 1, total: 1, earned: true });
+        expect(overloadStatus(mixed, 10, 100)).toMatchObject({ previousWeight: 100, hit: 2, total: 2, earned: false, mixed: true, dropped: false });
+    });
+    it("starts from a drop last time", () => {
+        const drop = [
+            { weight: 100, reps: 10 },
+            { weight: 90, reps: 8 },
+        ];
+        expect(overloadStatus(drop, 10, 90)).toMatchObject({ kind: "same", previousWeight: 90, earned: false, dropped: true });
     });
 });
 
@@ -88,18 +96,32 @@ describe("formatWeightDelta", () => {
 });
 
 describe("progressVerdict", () => {
-    it("counts today's sets at the current weight", () => {
+    it("counts every set today and points at today's final weight", () => {
         const sets = [
             { weight: 105, reps: 10 },
             { weight: 105, reps: 9 },
-            { weight: 95, reps: 12 },
         ];
-        expect(progressVerdict(sets, 10, 105)).toEqual({ hit: 1, total: 2, rollover: 10, onTrack: false });
-        expect(progressVerdict(sets.slice(0, 1), 10, 105)?.onTrack).toBe(true);
+        expect(progressVerdict(sets, 10)).toEqual({
+            hit: 1,
+            total: 2,
+            rollover: 10,
+            onTrack: false,
+            nextWeight: 105,
+            dropped: false,
+            mixed: false,
+        });
+        expect(progressVerdict(sets.slice(0, 1), 10)?.onTrack).toBe(true);
+    });
+    it("a drop today is never on track and moves next time's start", () => {
+        const sets = [
+            { weight: 100, reps: 10 },
+            { weight: 90, reps: 12 },
+        ];
+        expect(progressVerdict(sets, 10)).toMatchObject({ onTrack: false, nextWeight: 90, dropped: true });
     });
     it("is null without a rollover or sets", () => {
-        expect(progressVerdict([{ weight: 1, reps: 1 }], 0, 1)).toBeNull();
-        expect(progressVerdict([], 10, 100)).toBeNull();
+        expect(progressVerdict([{ weight: 1, reps: 1 }], 0)).toBeNull();
+        expect(progressVerdict([], 10)).toBeNull();
     });
 });
 
@@ -126,5 +148,33 @@ describe("overloadReason", () => {
             "Last time 2/3 sets hit 10. Hit 10 on every set to go up.",
         );
         expect(overloadReason({ kind: "none" })).toMatch(/No history/);
+    });
+    it("explains a drop and mixed weights", () => {
+        const drop = [
+            { weight: 100, reps: 10 },
+            { weight: 90, reps: 8 },
+        ];
+        expect(overloadReason(overloadStatus(drop, 10, 90))).toBe(
+            "Dropped to 90 lb last time, so starting there. Keep every set at 90 lb and hit 10 to go up.",
+        );
+        const bounce = [...drop, { weight: 100, reps: 10 }];
+        expect(overloadReason(overloadStatus(bounce, 10, 100))).toBe(
+            "Mixed weights last time, ending at 100 lb. Keep every set at 100 lb and hit 10 to go up.",
+        );
+    });
+});
+
+describe("verdictText", () => {
+    const v = { hit: 2, total: 2, rollover: 10, onTrack: true, nextWeight: 100, dropped: false, mixed: false };
+    it("reads live and finished", () => {
+        expect(verdictText(v)).toBe("2/2 sets hit 10 · on track to go up");
+        expect(verdictText(v, true)).toBe("2/2 sets hit 10 · goes up next time");
+        expect(verdictText({ ...v, hit: 1, onTrack: false })).toBe("1/2 sets hit 10 · stay at 100 next time");
+    });
+    it("names a drop and mixed weights", () => {
+        expect(verdictText({ ...v, onTrack: false, nextWeight: 90, dropped: true, mixed: true })).toBe(
+            "Dropped to 90 lb · start at 90 next time",
+        );
+        expect(verdictText({ ...v, onTrack: false, mixed: true })).toBe("Mixed weights · start at 100 next time");
     });
 });

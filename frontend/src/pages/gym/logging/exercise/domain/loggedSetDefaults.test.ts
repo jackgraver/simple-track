@@ -74,7 +74,20 @@ describe("initializeWeightAndReps", () => {
         });
     });
 
-    it("seeds from the heighest previous set when different weights", () => {
+    it("seeds from the final set's weight after a drop", () => {
+        const previous = [
+            loggedSet({ weight: 100, reps: 10, weight_setup: "belt", id: 1 }),
+            loggedSet({ weight: 90, reps: 8, id: 2 }),
+        ];
+        expect(initializeWeightAndReps(undefined, previous)).toEqual({
+            weight: 90,
+            reps: 8,
+            weightSetup: "",
+            notes: "",
+        });
+    });
+
+    it("seeds from the final (heaviest) set when ramping up", () => {
         const previous = [
             loggedSet({ weight: 80, reps: 6, id: 1 }),
             loggedSet({ weight: 100, reps: 5, weight_setup: "belt", id: 2 }),
@@ -112,7 +125,17 @@ describe("previousRepsForSetAtWeight", () => {
         expect(previousRepsForSetAtWeight(sets, 1, 100)).toBe(5);
     });
 
-    it("hides previous reps when the weight changed", () => {
+    it("hides previous reps when last time had no set at that weight", () => {
         expect(previousRepsForSetAtWeight(sets, 0, 105)).toBeNull();
+    });
+
+    it("falls back to the nearest set last time at that weight", () => {
+        const drop = [
+            { weight: 100, reps: 10 },
+            { weight: 90, reps: 8 },
+        ];
+        expect(previousRepsForSetAtWeight(drop, 0, 90)).toBe(8);
+        expect(previousRepsForSetAtWeight(drop, 1, 100)).toBe(10);
+        expect(previousRepsForSetAtWeight(drop, 1, 90)).toBe(8);
     });
 });

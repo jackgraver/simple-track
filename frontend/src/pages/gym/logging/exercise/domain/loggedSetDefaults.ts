@@ -31,15 +31,29 @@ export function initializeWeightAndReps(
     return { weight, reps, weightSetup, notes };
 }
 
+/**
+ * Last session's reps to beat for set `setIndex` at `weight`: the same set number if it was at that
+ * weight, else the nearest set last time at that weight (after a drop, today's set 1 at the dropped
+ * weight compares with last time's dropped set). Null when last time had no set at that weight.
+ */
 export function previousRepsForSetAtWeight(
     sets: readonly LoggedSetForDefaults[] | undefined,
     setIndex: number,
     weight: number,
 ): number | null {
-    const set = sets?.[setIndex];
-    if (!set || set.weight !== weight || !Number.isFinite(set.reps))
-        return null;
-    return set.reps;
+    let reps: number | null = null;
+    let bestDistance = Infinity;
+    const list = sets ?? [];
+    for (let i = 0; i < list.length; i++) {
+        const set = list[i];
+        if (set.weight !== weight || !Number.isFinite(set.reps)) continue;
+        const distance = Math.abs(i - setIndex);
+        if (distance < bestDistance) {
+            reps = set.reps;
+            bestDistance = distance;
+        }
+    }
+    return reps;
 }
 
 /**
@@ -58,18 +72,22 @@ export function pickBestLoggedSet<T extends { weight: number; reps: number }>(
     }, null);
 }
 
-/** Values to seed the current-set inputs when continuing from existing logged sets. */
+/**
+ * Values to seed the current-set inputs from last session: the final set's weight (the next session
+ * starts there, see `sessionOutcome`), with the best reps and the setup at that weight.
+ */
 export function defaultsFromLoggedSets(sets: readonly LoggedSetForDefaults[]): {
     weight: number;
     reps: number;
     weight_setup: string;
 } {
-    const maxSet = pickBestLoggedSet(sets);
-    if (maxSet) {
+    const last = sets[sets.length - 1];
+    const best = last ? pickBestLoggedSet(sets.filter((s) => s.weight === last.weight)) : null;
+    if (best) {
         return {
-            weight: maxSet.weight,
-            reps: maxSet.reps,
-            weight_setup: maxSet.weight_setup || "",
+            weight: best.weight,
+            reps: best.reps,
+            weight_setup: best.weight_setup || "",
         };
     }
     return { weight: 0, reps: 0, weight_setup: "" };

@@ -230,7 +230,6 @@ export function useExerciseLoggingSession(options: {
                 ? getWeightProgression(
                       group.previous?.sets,
                       group.previous?.exercise?.rep_rollover,
-                      weight,
                       WEIGHT_PROGRESSION_INCREASE_LBS,
                   )
                 : null;

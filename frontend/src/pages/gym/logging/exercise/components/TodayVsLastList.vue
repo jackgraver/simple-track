@@ -2,7 +2,7 @@
 import { RotateCcw, X } from "lucide-vue-next";
 import { IconButton, List, ListRow } from "~/shared/ui";
 import type { LoggedSetWithStatus } from "../../store/useWorkoutStore";
-import { setsTally, type ProgressVerdict } from "../domain/liveLogging";
+import { setsTally, verdictText, type ProgressVerdict } from "../domain/liveLogging";
 import { useOnline } from "~/api/online";
 
 // Below the fold: every set today next to the same set last session, and whether the weight goes up next time.
@@ -12,7 +12,6 @@ const props = defineProps<{
     editingIndex: number | null;
     previous: { weight: number; reps: number }[];
     verdict: ProgressVerdict | null;
-    weight: number;
     /** Planned number of sets, for the done/total count. */
     target: number;
 }>();
@@ -46,8 +45,7 @@ function diff(index: number): { text: string; tone: string } {
                 Sets <span class="tabular-nums">{{ setsTally(sets.length, target) }}</span>
             </p>
             <p v-if="verdict" class="m-0 text-sm" :class="verdict.onTrack ? 'text-success' : 'text-fg-muted'">
-                {{ verdict.hit }}/{{ verdict.total }} sets hit {{ verdict.rollover }}
-                {{ verdict.onTrack ? "· on track to go up" : `· stay at ${weight} next time` }}
+                {{ verdictText(verdict) }}
             </p>
         </div>
         <List class="rounded-card border border-line bg-surface">

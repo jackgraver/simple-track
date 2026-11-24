@@ -16,6 +16,10 @@ describe("openingWeight", () => {
         expect(openingWeight(group(1, "A", [[100, 10], [100, 10]]))).toBe(105);
         expect(openingWeight(group(1, "A", [[100, 10], [100, 9]]))).toBe(100);
     });
+    it("opens at the dropped weight, with no increase, after a drop", () => {
+        expect(openingWeight(group(1, "A", [[100, 10], [90, 10]]))).toBe(90);
+        expect(openingWeight(group(1, "A", [[90, 10], [90, 10]]))).toBe(95);
+    });
     it("uses today's last set once logging started", () => {
         expect(openingWeight(group(1, "A", [[100, 10]], [[110, 6]]))).toBe(110);
     });

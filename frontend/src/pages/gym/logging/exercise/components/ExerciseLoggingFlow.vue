@@ -83,7 +83,7 @@ const targetSets = computed(() => plannedSetCount(previousSets.value));
 const plannedDone = computed(() => loggedCount.value >= targetSets.value);
 const editing = computed(() => session.editingSetIndex != null);
 const overload = computed(() => overloadStatus(previousSets.value, repRollover.value, session.currentWeight));
-const verdict = computed(() => progressVerdict(session.loggedSets, repRollover.value, session.currentWeight));
+const verdict = computed(() => progressVerdict(session.loggedSets, repRollover.value));
 
 /* ---------- reps slider ---------- */
 const extraSetOpen = ref(false);
@@ -330,7 +330,6 @@ const goTo = (item: UpNextItem) => {
                     :sets="session.loggedSets"
                     :previous="previousSets"
                     :verdict="verdict"
-                    :weight="session.currentWeight"
                     :editing-index="session.editingSetIndex"
                     :target="targetSets"
                     @select="selectSet"
