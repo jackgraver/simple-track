@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { offsetToDate } from "~/api/workout/dates";
-import { computed } from "vue";
-import { ArrowLeftRight, Check, Moon, Plus } from "lucide-vue-next";
+import { computed, ref } from "vue";
+import { ArrowLeftRight, Check, ChevronDown, Moon, Plus } from "lucide-vue-next";
 import { useSwitchWorkoutPlan } from "~/api/workout/queries";
 import { dialogManager } from "~/composables/dialog/useDialog";
 import { toast } from "~/composables/toast/useToast";
@@ -32,6 +32,7 @@ const steps = computed(() =>
         loggedPostMobility: store.loggedPostMobility.value,
     }),
 );
+const listOpen = ref(false);
 const next = computed(() => nextStepIndex(steps.value));
 const doneCount = computed(() => steps.value.filter((s) => s.done).length);
 
@@ -139,7 +140,7 @@ const onMenu = async (key: string) => {
         </div>
         <div
             v-else
-            class="flex flex-col gap-5 lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:grid-rows-[auto_1fr] lg:gap-x-8"
+            class="flex flex-col gap-4 lg:grid lg:grid-cols-[minmax(0,1fr)_auto] lg:gap-x-8"
         >
             <!-- Heading: what day, what workout -->
             <header class="flex flex-col gap-1">
@@ -159,36 +160,8 @@ const onMenu = async (key: string) => {
                 </p>
             </header>
 
-            <!-- The session at a glance (desktop: right column) -->
-            <div v-if="steps.length" class="flex flex-col gap-3 lg:col-start-2 lg:row-span-2 lg:row-start-1">
-                <div v-if="phase !== 'fresh'" class="flex flex-col gap-1.5">
-                    <div class="flex items-baseline justify-between text-xs">
-                        <span class="font-medium" :class="phase === 'complete' ? 'text-success' : 'text-fg'">
-                            {{ phase === "complete" ? "All done" : "In progress" }}
-                        </span>
-                        <span class="text-fg-muted tabular-nums">{{ doneCount }} of {{ steps.length }}</span>
-                    </div>
-                    <StepProgress :steps="steps" :next="next" />
-                </div>
-                <ol class="m-0 flex list-none flex-col gap-2 p-0">
-                    <li v-for="(s, i) in steps" :key="s.key" class="flex min-w-0 items-center gap-3">
-                        <StepMarker :n="i + 1" :state="s.done ? 'done' : i === next ? 'next' : 'todo'" size="sm" />
-                        <span
-                            class="min-w-0 flex-1 truncate text-sm"
-                            :class="s.done ? 'text-fg-muted' : 'text-fg'"
-                        >
-                            {{ s.name }}
-                            <span class="sr-only">{{ s.done ? "(done)" : i === next ? "(up next)" : "" }}</span>
-                        </span>
-                        <span v-if="s.detail" class="max-w-[45%] shrink-0 truncate text-xs text-fg-muted tabular-nums">
-                            {{ s.detail }}
-                        </span>
-                    </li>
-                </ol>
-            </div>
-
-            <!-- Actions: thumb reach on mobile (last), under the heading on desktop -->
-            <div class="flex gap-2 lg:col-start-1 lg:row-start-2 lg:self-end">
+            <!-- Actions: under the heading on mobile, right of it on desktop -->
+            <div class="flex gap-2 lg:col-start-2 lg:row-start-1 lg:self-start">
                 <template v-if="phase === 'rest'">
                     <Menu :items="menuItems" align="start" @select="onMenu">
                         <Button variant="secondary" size="lg" class="flex-1 lg:flex-none" :loading="switchPlan.isPending.value">
@@ -214,6 +187,50 @@ const onMenu = async (key: string) => {
                         </Button>
                     </Menu>
                 </template>
+            </div>
+
+            <!-- The session at a glance: collapsed by default, full width under the heading and actions -->
+            <div v-if="steps.length" class="flex flex-col gap-3 lg:col-span-2">
+                <div v-if="phase !== 'fresh'" class="flex flex-col gap-1.5">
+                    <div class="flex items-baseline justify-between text-xs">
+                        <span class="font-medium" :class="phase === 'complete' ? 'text-success' : 'text-fg'">
+                            {{ phase === "complete" ? "All done" : "In progress" }}
+                        </span>
+                        <span class="text-fg-muted tabular-nums">{{ doneCount }} of {{ steps.length }}</span>
+                    </div>
+                    <StepProgress :steps="steps" :next="next" />
+                </div>
+                <Button
+                    variant="ghost"
+                    size="sm"
+                    class="-ml-3 self-start"
+                    :class="[listOpen ? '' : '-mb-3', phase === 'fresh' ? '-mt-3 lg:mt-0' : '']"
+                    :aria-expanded="listOpen"
+                    aria-controls="today-steps"
+                    @click="listOpen = !listOpen"
+                >
+                    {{ listOpen ? "Hide exercises" : "Show exercises" }}
+                    <ChevronDown
+                        aria-hidden="true"
+                        class="size-4 transition-transform duration-100"
+                        :class="listOpen ? 'rotate-180' : ''"
+                    />
+                </Button>
+                <ol v-show="listOpen" id="today-steps" class="m-0 flex list-none flex-col gap-2 p-0 lg:grid lg:grid-cols-2 lg:gap-x-8">
+                    <li v-for="(s, i) in steps" :key="s.key" class="flex min-w-0 items-center gap-3">
+                        <StepMarker :n="i + 1" :state="s.done ? 'done' : i === next ? 'next' : 'todo'" size="sm" />
+                        <span
+                            class="min-w-0 flex-1 truncate text-sm"
+                            :class="s.done ? 'text-fg-muted' : 'text-fg'"
+                        >
+                            {{ s.name }}
+                            <span class="sr-only">{{ s.done ? "(done)" : i === next ? "(up next)" : "" }}</span>
+                        </span>
+                        <span v-if="s.detail" class="max-w-[45%] shrink-0 truncate text-xs text-fg-muted tabular-nums">
+                            {{ s.detail }}
+                        </span>
+                    </li>
+                </ol>
             </div>
         </div>
     </Card>
