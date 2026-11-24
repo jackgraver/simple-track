@@ -27,18 +27,27 @@ import {
     initializeWeightAndReps,
     previousRepsForSetAtWeight,
 } from "../domain/loggedSetDefaults";
-import { weightSetupForExercise } from "../domain/weightSetup";
+import {
+    cleanPlates,
+    loadFromPlates,
+    plateConfigFor,
+    type PlateConfig,
+    type PlateCounts,
+    platesForWeight,
+    plateSetupText,
+    platesOfSet,
+    toPlateSetup,
+    weightStepFor,
+} from "../domain/plates";
 import {
     getWeightProgression,
     type WeightProgression,
-    WEIGHT_PROGRESSION_INCREASE_LBS,
 } from "../domain/weightProgression";
-import { useGymWeightPrefs } from "./useGymWeightPrefs";
 
 type StoredDraft = {
     weight: number;
     reps: number;
-    weightSetup: string;
+    plates: PlateCounts;
     notes: string;
     dirty: boolean;
     editingSetIndex: number | null;
@@ -52,10 +61,16 @@ export type ExerciseLoggingSessionViewModel = {
     loggedSets: LoggedSetWithStatus[];
     currentWeight: number;
     currentReps: number;
-    currentWeightSetup: string;
+    /** Plates for the next set (plate-loaded exercises; {} otherwise). */
+    currentPlates: PlateCounts;
+    /** Base weight and per-side/total, null when the exercise isn't plate-loaded. */
+    plateConfig: PlateConfig | null;
+    /** What `currentPlates` add up to, null when the exercise isn't plate-loaded. */
+    plateLoad: number | null;
     notes: string;
     weightProgression: WeightProgression | null;
     editingSetIndex: number | null;
+    /** The exercise's weight step (its own, else its load type's default). */
     weightIncrement: number;
     stepWeight: (direction: "plus" | "minus") => void;
     stepReps: (direction: "plus" | "minus") => void;
@@ -69,9 +84,9 @@ export type ExerciseLoggingSessionViewModel = {
     cancelEditingSet: () => void;
     goBackToList: () => void;
     updateNotes: (value: string) => void;
-    updateWeightSetup: (value: string) => void;
+    /** Set the plates; `setWeight` also moves the weight to what they add up to. */
+    updatePlates: (plates: PlateCounts, options?: { setWeight?: boolean }) => void;
     undoWeightProgression: () => void;
-    setWeightIncrement: (value: number) => void;
 };
 
 /**
@@ -108,10 +123,9 @@ export function useExerciseLoggingSession(options: {
 
     const currentWeight = ref(0);
     const currentReps = ref(0);
-    const currentWeightSetup = ref("");
+    const currentPlates = ref<PlateCounts>({});
     const weightProgression = ref<WeightProgression | null>(null);
     const editingSetIndex = ref<number | null>(null);
-    const { weightIncrement, setWeightIncrement } = useGymWeightPrefs();
 
     const draftDirty = ref(false);
     const notes = ref("");
@@ -151,22 +165,48 @@ export function useExerciseLoggingSession(options: {
         return group?.planned?.name ?? group?.logged?.exercise?.name ?? "";
     });
 
-    const exerciseLoadType = computed(
-        () =>
-            exerciseGroup.value?.planned?.load_type ??
-            exerciseGroup.value?.logged?.exercise?.load_type ??
-            "plate_loaded_with_bar",
+    const exercise = computed(
+        () => exerciseGroup.value?.planned ?? exerciseGroup.value?.logged?.exercise ?? null,
     );
+    const plateConfig = computed(() => plateConfigFor(exercise.value));
+    const plateLoad = computed(() =>
+        plateConfig.value ? loadFromPlates(plateConfig.value, currentPlates.value) : null,
+    );
+    const weightIncrement = computed(() => weightStepFor(exercise.value));
 
-    const weightSetupForSave = () =>
-        weightSetupForExercise(
-            exerciseLoadType.value,
-            currentWeightSetup.value,
-        );
+    /**
+     * Plates follow the weight: after any weight change (a step, a typed weight, the automatic
+     * increase or its undo) load that weight, changing as few plates as possible. A weight that
+     * can't be loaded keeps the nearest plates, and the screen shows the difference.
+     */
+    const syncPlatesToWeight = () => {
+        const config = plateConfig.value;
+        if (!config) return;
+        if (loadFromPlates(config, currentPlates.value) === currentWeight.value) return;
+        currentPlates.value = platesForWeight(currentWeight.value, config, currentPlates.value).plates;
+    };
+
+    const setupForSave = () => {
+        const config = plateConfig.value;
+        if (!config) return { weight_setup: "", plate_setup: null };
+        return {
+            weight_setup: plateSetupText(config, currentPlates.value),
+            plate_setup: toPlateSetup(config, currentPlates.value),
+        };
+    };
+
+    /** Copy a set's plates into the draft (after its weight). A set with no plates (logged before
+     *  they were stored) gets them worked out from its weight; a set whose plates don't match its
+     *  weight keeps them, so the mismatch stays visible. */
+    const takePlatesFrom = (set: SetFields) => {
+        const plates = platesOfSet({ weight_setup: set.weight_setup, plate_setup: set.plate_setup });
+        currentPlates.value = plates ?? {};
+        if (!plates) syncPlatesToWeight();
+    };
 
     const draftStorageKey = computed(
         () =>
-            `gym-draft:v2:date:${date.value}:exercise:${exerciseIdentity.value}`,
+            `gym-draft:v3:date:${date.value}:exercise:${exerciseIdentity.value}`,
     );
 
     const draftStorage = useWebStorageJsonSync<StoredDraft>({
@@ -175,7 +215,7 @@ export function useExerciseLoggingSession(options: {
         watchSources: [
             currentWeight,
             currentReps,
-            currentWeightSetup,
+            currentPlates,
             notes,
             draftDirty,
             editingSetIndex,
@@ -183,7 +223,7 @@ export function useExerciseLoggingSession(options: {
         getSnapshot: () => ({
             weight: currentWeight.value,
             reps: currentReps.value,
-            weightSetup: currentWeightSetup.value,
+            plates: currentPlates.value,
             notes: notes.value,
             dirty: draftDirty.value,
             editingSetIndex: editingSetIndex.value,
@@ -197,7 +237,9 @@ export function useExerciseLoggingSession(options: {
             }
             currentWeight.value = parsed.weight;
             currentReps.value = normalizeReps(parsed.reps ?? 0);
-            currentWeightSetup.value = parsed.weightSetup ?? "";
+            currentPlates.value = cleanPlates(
+                parsed.plates && typeof parsed.plates === "object" ? parsed.plates : {},
+            );
             if (typeof parsed.notes === "string" && parsed.notes.length > 0) {
                 notes.value = parsed.notes;
             }
@@ -221,7 +263,7 @@ export function useExerciseLoggingSession(options: {
         notes.value = group.logged?.notes ?? group.previous?.notes ?? "";
         editingSetIndex.value = null;
 
-        const { weight, reps, weightSetup } = initializeWeightAndReps(
+        const { weight, reps, plates } = initializeWeightAndReps(
             group.logged?.sets,
             group.previous?.sets,
         );
@@ -231,7 +273,7 @@ export function useExerciseLoggingSession(options: {
                       group.previous?.sets,
                       group.previous?.exercise?.rep_rollover,
                       weight,
-                      WEIGHT_PROGRESSION_INCREASE_LBS,
+                      weightIncrement.value,
                   )
                 : null;
         currentWeight.value = weightProgression.value?.nextWeight ?? weight;
@@ -239,7 +281,10 @@ export function useExerciseLoggingSession(options: {
             currentWeight.value === weight
                 ? normalizeReps(reps)
                 : DEFAULT_REPS_AFTER_WEIGHT_CHANGE;
-        currentWeightSetup.value = weightSetup;
+        // Start from the seed set's plates; if today's weight differs (the automatic increase) or
+        // the set has none (logged before plates were stored), load today's weight from them.
+        currentPlates.value = plates ?? {};
+        syncPlatesToWeight();
 
         draftDirty.value = false;
 
@@ -312,6 +357,7 @@ export function useExerciseLoggingSession(options: {
         if (value === currentWeight.value) return;
         draftDirty.value = true;
         currentWeight.value = value;
+        syncPlatesToWeight();
         if (editingSetIndex.value != null || loggedSets.value.length > 0) return;
         currentReps.value = normalizeReps(
             previousRepsForSetAtWeight(
@@ -332,7 +378,7 @@ export function useExerciseLoggingSession(options: {
         if (!row) return;
         currentWeight.value = row.weight;
         currentReps.value = normalizeReps(row.reps);
-        currentWeightSetup.value = row.weight_setup;
+        takePlatesFrom(row);
     };
 
     const stepWeight = (direction: "plus" | "minus") => {
@@ -382,7 +428,7 @@ export function useExerciseLoggingSession(options: {
         const fields = {
             weight: currentWeight.value,
             reps,
-            weight_setup: weightSetupForSave(),
+            ...setupForSave(),
         };
         const count = loggedSets.value.length;
 
@@ -489,7 +535,7 @@ export function useExerciseLoggingSession(options: {
 
         currentWeight.value = set.weight;
         currentReps.value = normalizeReps(set.reps);
-        currentWeightSetup.value = set.weight_setup;
+        takePlatesFrom(set);
         draftDirty.value = true;
 
         editingSetIndex.value = setIndex;
@@ -511,9 +557,11 @@ export function useExerciseLoggingSession(options: {
         if (exerciseIdentity.value) syncNotes(date.value, exerciseIdentity.value);
     };
 
-    const updateWeightSetup = (value: string) => {
-        currentWeightSetup.value = value;
+    const updatePlates = (plates: PlateCounts, options?: { setWeight?: boolean }) => {
+        currentPlates.value = cleanPlates(plates);
         draftDirty.value = true;
+        const config = plateConfig.value;
+        if (options?.setWeight && config) updateWeightAndDefaultReps(loadFromPlates(config, currentPlates.value));
     };
 
     const undoWeightProgression = () => {
@@ -528,7 +576,9 @@ export function useExerciseLoggingSession(options: {
         loggedSets,
         currentWeight,
         currentReps,
-        currentWeightSetup,
+        currentPlates,
+        plateConfig,
+        plateLoad,
         notes,
         weightProgression,
         editingSetIndex,
@@ -545,8 +595,7 @@ export function useExerciseLoggingSession(options: {
         cancelEditingSet,
         goBackToList,
         updateNotes,
-        updateWeightSetup,
+        updatePlates,
         undoWeightProgression,
-        setWeightIncrement,
     }) as ExerciseLoggingSessionViewModel;
 }

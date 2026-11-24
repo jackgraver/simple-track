@@ -316,6 +316,7 @@ export function useLogSet() {
                 reps: v.reps,
                 weight: v.weight,
                 weight_setup: v.weight_setup,
+                ...(v.plate_setup !== undefined && { plate_setup: v.plate_setup }),
             }),
         optimistic: (v) => [
             {
@@ -345,6 +346,7 @@ export function useUpdateSet() {
                 reps: v.reps,
                 weight: v.weight,
                 weight_setup: v.weight_setup,
+                ...(v.plate_setup !== undefined && { plate_setup: v.plate_setup }),
             }),
         optimistic: (v) => [
             {

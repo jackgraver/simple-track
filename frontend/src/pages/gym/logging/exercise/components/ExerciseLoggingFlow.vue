@@ -2,7 +2,6 @@
 import { computed, defineAsyncComponent, h, nextTick, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { dialogManager } from "~/composables/dialog/useDialog";
-import { DEFAULT_EXERCISE_LOAD_TYPE, type ExerciseLoadType } from "~/types/workout";
 import { ChartLine } from "lucide-vue-next";
 import { Button, IconButton, Skeleton } from "~/shared/ui";
 import { useWorkoutStore } from "../../store/useWorkoutStore";
@@ -10,16 +9,10 @@ import { useLoggingRouteContext } from "../../composables/useLoggingRouteContext
 import { buildWorkoutSteps, formatSets } from "../../domain/workoutSteps";
 import { findExerciseGroupByExerciseId, parseExerciseIdParam } from "../domain/exerciseRouteGroup";
 import { previousRepsForSetAtWeight } from "../domain/loggedSetDefaults";
-import {
-    formatExerciseWeightSetup,
-    isPlateLoadedExercise,
-    parseWeightSetup,
-    type WeightSetupDialogResult,
-} from "../domain/weightSetup";
+import { formatPlates, plateMismatch } from "../domain/plates";
 import { overloadStatus, plannedSetCount, progressVerdict, visibleMachineSettings } from "../domain/liveLogging";
 import { buildUpNext, type UpNextItem } from "../domain/upNext";
 import { useExerciseLoggingSession } from "../composables/useExerciseLoggingSession";
-import WeightSetupDialog from "../dialog/WeightSetupDialog.vue";
 import WeightSheet, { type WeightSheetResult } from "../dialog/WeightSheet.vue";
 import NotesSheet from "../dialog/NotesSheet.vue";
 import LoggingHeader from "./LoggingHeader.vue";
@@ -65,16 +58,19 @@ const repRollover = computed(() => {
     const rollover = g?.planned?.rep_rollover ?? g?.logged?.exercise?.rep_rollover ?? g?.previous?.exercise?.rep_rollover;
     return typeof rollover === "number" && Number.isFinite(rollover) && rollover > 0 ? rollover : undefined;
 });
-const loadType = computed<ExerciseLoadType>(
-    () => (exercise.value?.load_type ?? DEFAULT_EXERCISE_LOAD_TYPE) as ExerciseLoadType,
-);
+// Plates for the setup card: null when the exercise isn't plate-loaded.
 const plates = computed(() => {
-    if (!isPlateLoadedExercise(loadType.value)) return null;
-    const setup = session.currentWeightSetup.trim();
-    if (!setup) return "";
-    const parsed = parseWeightSetup(setup);
-    if (!parsed.parsed) return setup;
-    return formatExerciseWeightSetup(loadType.value, parsed.platesPerSide) || "No plates";
+    const config = session.plateConfig;
+    if (!config || session.plateLoad == null) return null;
+    const text = formatPlates(session.currentPlates);
+    const where = config.mode === "per_side" ? " a side" : "";
+    return {
+        plates: session.currentPlates,
+        perSide: config.mode === "per_side",
+        text: text ? `${text}${where}` : config.base > 0 ? "Empty bar" : "No plates",
+        mismatch: plateMismatch(session.currentWeight, session.plateLoad),
+        load: session.plateLoad,
+    };
 });
 
 /* ---------- sets ---------- */
@@ -142,22 +138,6 @@ const finish = () => {
     }
 };
 
-const openPlatesDialog = async () => {
-    const result = await dialogManager.custom<WeightSetupDialogResult>({
-        title: "Plates",
-        component: WeightSetupDialog,
-        componentProps: {
-            currentSetup: session.currentWeightSetup,
-            targetWeightLbs: session.currentWeight,
-            loadType: loadType.value,
-        },
-        wide: true,
-    });
-    if (result == null) return;
-    session.updateWeightSetup(result.weightSetup);
-    if (result.syncWeight) session.commitWeightFromInput(result.totalLbs);
-};
-
 // Today's weight is the automatic +5: offer to keep last session's weight (on screen and in the sheet).
 const canUndoProgression = computed(
     () => session.weightProgression != null && session.currentWeight === session.weightProgression.nextWeight,
@@ -172,7 +152,8 @@ const openWeightSheet = async () => {
             step: session.weightIncrement,
             overload: overload.value,
             canUndoProgression: canUndoProgression.value,
-            plates: plates.value,
+            plateConfig: session.plateConfig,
+            plates: { ...session.currentPlates },
             machineSettings: machineSettings.value,
             cues: cues.value,
         },
@@ -182,8 +163,10 @@ const openWeightSheet = async () => {
         session.undoWeightProgression();
         return;
     }
+    // Weight first (it moves the plates to match), then the sheet's plates, which win: they may
+    // be a deliberate mismatch.
     session.commitWeightFromInput(result.weight);
-    if (result.action === "plates") await openPlatesDialog();
+    if (session.plateConfig) session.updatePlates(result.plates);
 };
 
 const openNotes = async () => {

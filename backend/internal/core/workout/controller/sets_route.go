@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"be-simpletracker/internal/core/workout/models"
 	workoutrepo "be-simpletracker/internal/core/workout/repository"
 	"be-simpletracker/internal/core/workout/services"
 	"be-simpletracker/internal/utils/apierr"
@@ -28,6 +29,8 @@ type logSetRequest struct {
 	Reps        uint    `json:"reps"`
 	Weight      float32 `json:"weight"`
 	WeightSetup string  `json:"weight_setup"`
+	// PlateSetup: the plates for a plate-loaded exercise; omitted or null otherwise.
+	PlateSetup *models.PlateSetup `json:"plate_setup"`
 }
 
 // LogSet handles POST /workout/sets. Idempotent by client_id: a replay returns the stored set
@@ -56,6 +59,12 @@ func LogSet(c *gin.Context) {
 		apierr.BadRequest(c, "date must be YYYY-MM-DD")
 		return
 	}
+	if req.PlateSetup != nil {
+		if err := req.PlateSetup.Validate(); err != nil {
+			apierr.BadRequest(c, err.Error())
+			return
+		}
+	}
 
 	res, err := services.LogSet(c.Request.Context(), services.LogSetInput{
 		ClientID:    clientID,
@@ -64,6 +73,7 @@ func LogSet(c *gin.Context) {
 		Reps:        req.Reps,
 		Weight:      req.Weight,
 		WeightSetup: req.WeightSetup,
+		PlateSetup:  req.PlateSetup,
 	})
 	switch {
 	case errors.Is(err, services.ErrExerciseNotFound):
@@ -88,6 +98,8 @@ type updateSetRequest struct {
 	Reps        *uint    `json:"reps"`
 	Weight      *float32 `json:"weight"`
 	WeightSetup *string  `json:"weight_setup"`
+	// PlateSetup: absent leaves it alone, null clears it.
+	PlateSetup models.Optional[models.PlateSetup] `json:"plate_setup"`
 }
 
 // UpdateSet handles PATCH /workout/sets/:id, where :id is the numeric set id or its client_id.
@@ -103,10 +115,17 @@ func UpdateSet(c *gin.Context) {
 		apierr.BadRequest(c, "Invalid request body")
 		return
 	}
+	if req.PlateSetup.Value != nil {
+		if err := req.PlateSetup.Value.Validate(); err != nil {
+			apierr.BadRequest(c, err.Error())
+			return
+		}
+	}
 	set, exercise, err := services.UpdateSet(c.Request.Context(), ref, workoutrepo.SetPatch{
 		Reps:        req.Reps,
 		Weight:      req.Weight,
 		WeightSetup: req.WeightSetup,
+		PlateSetup:  req.PlateSetup,
 	})
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {

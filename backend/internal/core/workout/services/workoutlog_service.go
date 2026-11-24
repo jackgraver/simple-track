@@ -431,6 +431,7 @@ type LogSetInput struct {
 	Reps        uint
 	Weight      float32
 	WeightSetup string
+	PlateSetup  *models.PlateSetup
 }
 
 type LogSetResult struct {
@@ -461,6 +462,7 @@ func LogSet(ctx context.Context, in LogSetInput) (LogSetResult, error) {
 		Reps:         in.Reps,
 		Weight:       in.Weight,
 		WeightSetup:  in.WeightSetup,
+		PlateSetup:   in.PlateSetup,
 	})
 	if err != nil {
 		return LogSetResult{}, err
@@ -598,16 +600,54 @@ func ReorderPlanExercises(planID uint, exerciseIDs []uint) error {
 	return workoutrepo.ReorderPlanExercises(planID, exerciseIDs)
 }
 
+// ExerciseFields is what create/update write. BaseWeight and WeightStep are optional: unset
+// leaves them alone (or nil on create), null clears them back to the load type's default.
+type ExerciseFields struct {
+	Name        string
+	RepRollover uint
+	Cues        string
+	LoadType    models.ExerciseLoadType
+	BaseWeight  models.Optional[float32]
+	WeightStep  models.Optional[float32]
+}
+
+// ErrInvalidExercise wraps validation failures in ExerciseFields (bad base weight or step).
+var ErrInvalidExercise = errors.New("invalid exercise")
+
+// resolveWeights validates the optional weights and fills BaseWeight from a legacy load type
+// (plate_loaded_with_bar = 45, plate_loaded_without_bar = 0) when the client didn't send one.
+func (f ExerciseFields) resolveWeights() (ExerciseFields, error) {
+	if !f.BaseWeight.Set {
+		if legacy := models.LegacyLoadTypeBaseWeight(f.LoadType); legacy != nil {
+			f.BaseWeight = models.Some(*legacy)
+		}
+	}
+	if err := models.ValidateExerciseWeights(f.BaseWeight.Value, f.WeightStep.Value); err != nil {
+		return f, fmt.Errorf("%w: %v", ErrInvalidExercise, err)
+	}
+	return f, nil
+}
+
 func CreateExercise(name string, repRollover uint, cues string, loadTypes ...models.ExerciseLoadType) (*models.Exercise, error) {
-	loadType := models.ExerciseLoadType("")
+	f := ExerciseFields{Name: name, RepRollover: repRollover, Cues: cues}
 	if len(loadTypes) > 0 {
-		loadType = loadTypes[0]
+		f.LoadType = loadTypes[0]
+	}
+	return CreateExerciseWith(f)
+}
+
+func CreateExerciseWith(f ExerciseFields) (*models.Exercise, error) {
+	f, err := f.resolveWeights()
+	if err != nil {
+		return nil, err
 	}
 	exercise := models.Exercise{
-		Name:        name,
-		RepRollover: repRollover,
-		Cues:        cues,
-		LoadType:    models.NormalizeExerciseLoadType(loadType),
+		Name:        f.Name,
+		RepRollover: f.RepRollover,
+		Cues:        f.Cues,
+		LoadType:    models.NormalizeExerciseLoadType(f.LoadType),
+		BaseWeight:  f.BaseWeight.Value,
+		WeightStep:  f.WeightStep.Value,
 	}
 	if err := workoutrepo.CreateExercise(&exercise); err != nil {
 		return nil, err
@@ -616,7 +656,35 @@ func CreateExercise(name string, repRollover uint, cues string, loadTypes ...mod
 }
 
 func UpdateExercise(id uint, name string, repRollover uint, cues string, loadTypes ...models.ExerciseLoadType) (*models.Exercise, error) {
-	return workoutrepo.UpdateExercise(id, name, repRollover, cues, loadTypes...)
+	f := ExerciseFields{Name: name, RepRollover: repRollover, Cues: cues}
+	if len(loadTypes) > 0 {
+		f.LoadType = loadTypes[0]
+	}
+	return UpdateExerciseWith(id, f)
+}
+
+// UpdateExerciseWith writes every field in f; BaseWeight/WeightStep only when set. An empty
+// LoadType keeps the stored one.
+func UpdateExerciseWith(id uint, f ExerciseFields) (*models.Exercise, error) {
+	f, err := f.resolveWeights()
+	if err != nil {
+		return nil, err
+	}
+	updates := map[string]any{
+		"name":         f.Name,
+		"rep_rollover": f.RepRollover,
+		"cues":         f.Cues,
+	}
+	if f.LoadType != "" {
+		updates["load_type"] = models.NormalizeExerciseLoadType(f.LoadType)
+	}
+	if f.BaseWeight.Set {
+		updates["base_weight"] = f.BaseWeight.Value
+	}
+	if f.WeightStep.Set {
+		updates["weight_step"] = f.WeightStep.Value
+	}
+	return workoutrepo.UpdateExerciseColumns(id, updates)
 }
 
 func AssignPlanToDay(planID uint, dayOfWeek int) (*models.WorkoutPlan, error) {

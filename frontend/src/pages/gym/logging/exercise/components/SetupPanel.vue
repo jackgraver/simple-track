@@ -4,6 +4,8 @@ import { ChevronRight } from "lucide-vue-next";
 import { Badge, Card } from "~/shared/ui";
 import type { MachineSetting } from "~/types/workout";
 import { formatWeightDelta, type OverloadStatus } from "../domain/liveLogging";
+import type { PlateCounts } from "../domain/plates";
+import PlateBar from "./PlateBar.vue";
 
 // Today's weight + how to set the machine up. Open before the first set (that's when you set up),
 // one line after it. The whole card opens the weight & setup sheet.
@@ -14,8 +16,15 @@ const props = defineProps<{
     /** Last session's sets, e.g. "100 lb × 10, 10, 9"; empty when there's no history. */
     lastTime: string;
     machineSettings: MachineSetting[];
-    /** Plate summary for plate-loaded lifts, null otherwise. */
-    plates: string | null;
+    /** Plate-loaded lifts only (null otherwise): the plates, their text, and how far the weight is
+     *  off what they make (null when it matches). */
+    plates: {
+        plates: PlateCounts;
+        perSide: boolean;
+        text: string;
+        mismatch: number | null;
+        load: number;
+    } | null;
     cues: string;
 }>();
 
@@ -56,14 +65,20 @@ const lastLine = computed(() => {
                 </span>
                 <ChevronRight class="size-5 shrink-0 text-fg-subtle" aria-hidden="true" />
             </span>
+            <span v-if="plates" class="flex items-center gap-3 rounded-control bg-surface-2 px-3 py-2">
+                <PlateBar v-if="plates.perSide" :plates="plates.plates" size="md" />
+                <span class="flex min-w-0 flex-col">
+                    <span class="text-2xs tracking-wide text-fg-muted uppercase">Plates</span>
+                    <span class="text-lg font-semibold text-fg tabular-nums">{{ plates.text }}</span>
+                </span>
+                <Badge v-if="plates.mismatch != null" tone="warn" class="ml-auto shrink-0">
+                    Plates make {{ plates.load }}
+                </Badge>
+            </span>
             <span class="grid grid-cols-2 gap-2 sm:grid-cols-3">
                 <span v-for="s in machineSettings" :key="s.label" class="flex flex-col rounded-control bg-surface-2 px-3 py-2">
                     <span class="text-2xs tracking-wide text-fg-muted uppercase">{{ s.label }}</span>
                     <span class="text-lg font-semibold text-fg tabular-nums">{{ s.value.trim() || "—" }}</span>
-                </span>
-                <span v-if="plates" class="flex flex-col rounded-control bg-surface-2 px-3 py-2">
-                    <span class="text-2xs tracking-wide text-fg-muted uppercase">Plates</span>
-                    <span class="text-sm font-semibold text-fg tabular-nums">{{ plates }}</span>
                 </span>
                 <span
                     v-if="!machineSettings.length"
@@ -83,13 +98,16 @@ const lastLine = computed(() => {
         <span v-else class="flex items-center gap-3">
             <span class="text-xl font-semibold text-fg tabular-nums">{{ weight }} lb</span>
             <Badge v-if="badge" :tone="badge.tone">{{ badge.text }}</Badge>
+            <PlateBar v-if="plates?.perSide" :plates="plates.plates" />
             <!-- One line: badges that don't fit wrap to a second row, which the fixed height hides whole
                  (clipping one mid-word read as "at 4"). The sheet behind the chevron shows them all. -->
             <span class="flex h-6 min-w-0 flex-1 flex-wrap items-center justify-end gap-x-1.5 gap-y-2 overflow-hidden">
                 <Badge v-for="s in machineSettings.slice(0, 3)" :key="s.label" variant="outline">
                     {{ s.label }} {{ s.value.trim() || "—" }}
                 </Badge>
-                <Badge v-if="plates" variant="outline">{{ plates }}</Badge>
+                <Badge v-if="plates" variant="outline" :tone="plates.mismatch != null ? 'warn' : 'neutral'">
+                    {{ plates.text }}{{ plates.mismatch != null ? ` (makes ${plates.load})` : "" }}
+                </Badge>
             </span>
             <ChevronRight class="size-4 shrink-0 text-fg-subtle" aria-hidden="true" />
         </span>

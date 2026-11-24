@@ -1,4 +1,5 @@
 import type { LoggedSet } from "~/types/workout";
+import { platesOfSet, type PlateCounts } from "./plates";
 
 export const DEFAULT_REPS_AFTER_WEIGHT_CHANGE = 6;
 
@@ -6,29 +7,28 @@ export type LoggedSetForDefaults = {
     weight: number;
     reps: number;
     weight_setup?: string;
+    plate_setup?: LoggedSet["plate_setup"];
 };
 
+/** Seeds the draft from this session's last set, else last session's best. `plates` is that set's
+ *  plates (stored, or parsed from its text), null when it has none. */
 export function initializeWeightAndReps(
     loggedSets: readonly LoggedSet[] | undefined,
     previousSets: readonly LoggedSet[] | undefined,
-): { weight: number; reps: number; weightSetup: string; notes: string } {
-    let weight = 0;
-    let reps = 0;
-    let weightSetup = "";
-    let notes = "";
-
+): { weight: number; reps: number; weightSetup: string; notes: string; plates: PlateCounts | null } {
+    let seed: LoggedSetForDefaults | null = null;
     if (loggedSets && loggedSets.length > 0) {
-        weight = loggedSets[loggedSets.length - 1].weight;
-        reps = loggedSets[loggedSets.length - 1].reps;
-        weightSetup = loggedSets[loggedSets.length - 1].weight_setup || "";
+        seed = loggedSets[loggedSets.length - 1];
     } else if (previousSets) {
-        const dPrev = defaultsFromLoggedSets(previousSets);
-        weight = dPrev.weight;
-        reps = dPrev.reps;
-        weightSetup = dPrev.weight_setup;
+        seed = pickBestLoggedSet(previousSets);
     }
-
-    return { weight, reps, weightSetup, notes };
+    return {
+        weight: seed?.weight ?? 0,
+        reps: seed?.reps ?? 0,
+        weightSetup: seed?.weight_setup || "",
+        notes: "",
+        plates: seed ? platesOfSet({ weight_setup: seed.weight_setup ?? "", plate_setup: seed.plate_setup }) : null,
+    };
 }
 
 export function previousRepsForSetAtWeight(

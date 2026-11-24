@@ -90,12 +90,22 @@ func UpdateExercise(id uint, name string, repRollover uint, cues string, loadTyp
 	if len(loadTypes) > 0 {
 		loadType = models.NormalizeExerciseLoadType(loadTypes[0])
 	}
-	if err := conn().Model(&exercise).Updates(map[string]interface{}{
+	return UpdateExerciseColumns(id, map[string]any{
 		"name":         name,
 		"rep_rollover": repRollover,
 		"cues":         cues,
 		"load_type":    loadType,
-	}).Error; err != nil {
+	})
+}
+
+// UpdateExerciseColumns writes the given columns (a nil value stores NULL) and returns the
+// exercise as saved. gorm.ErrRecordNotFound if it doesn't exist.
+func UpdateExerciseColumns(id uint, updates map[string]any) (*models.Exercise, error) {
+	var exercise models.Exercise
+	if err := conn().First(&exercise, id).Error; err != nil {
+		return nil, err
+	}
+	if err := conn().Model(&exercise).Updates(updates).Error; err != nil {
 		return nil, err
 	}
 	if err := conn().First(&exercise, id).Error; err != nil {

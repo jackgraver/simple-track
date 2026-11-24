@@ -31,7 +31,7 @@ func TestCreateExercise_andGetAllExercises(t *testing.T) {
 	if len(excluded) != 0 {
 		t.Fatalf("expected empty list, got %+v", excluded)
 	}
-	if created.LoadType != models.ExerciseLoadTypePlateLoadedWithBar {
+	if created.LoadType != models.ExerciseLoadTypePlateLoadedPerSide || created.BaseWeight != nil {
 		t.Fatalf("expected default load type, got %q", created.LoadType)
 	}
 }
@@ -54,8 +54,9 @@ func TestUpdateExercise_andUpdateExerciseCues(t *testing.T) {
 	}
 	if updated.Name != "Barbell Row" ||
 		updated.RepRollover != 8 ||
-		updated.LoadType != models.ExerciseLoadTypePlateLoadedWithoutBar {
-		t.Fatalf("got %+v", updated)
+		updated.LoadType != models.ExerciseLoadTypePlateLoadedPerSide ||
+		updated.BaseWeight == nil || *updated.BaseWeight != 0 {
+		t.Fatalf("legacy without_bar should become per side with base 0, got %+v", updated)
 	}
 	updated, err = services.UpdateExercise(
 		created.ID,
