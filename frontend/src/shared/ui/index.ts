@@ -19,6 +19,7 @@ export { default as Skeleton } from "./Skeleton.vue";
 export { default as SkeletonList } from "./SkeletonList.vue";
 export { useDelayedFlag } from "./useDelayedFlag";
 export { default as Overlay } from "./Overlay.vue";
+export { default as Drawer } from "./Drawer.vue";
 export { useIsDesktop } from "./useIsDesktop";
 export { default as Toaster } from "./Toaster.vue";
 export type { ToastItem, ToastTone, ToastAction } from "./toastTypes";

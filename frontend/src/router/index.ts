@@ -18,8 +18,10 @@ declare module "vue-router" {
         breadcrumb?: string;
         /** Show the day picker (pages that read `?offset=`). Inherited by children. */
         dated?: boolean;
-        /** Page supplies its own header: hide the mobile top bar (tab bar and sidebar stay). */
+        /** Page supplies its own header: hide the mobile top bar (sidebar and drawer stay). */
         focus?: boolean;
+        /** Route name of this page's parent. Header Back goes there instead of through history. */
+        backTo?: string;
         /** Multi-column workspace: wider desktop content column (`spacing-content-wide`). */
         wide?: boolean;
         /**
@@ -125,6 +127,7 @@ const routes: RouteRecordRaw[] = [
                 meta: {
                     breadcrumb: "Logging",
                     dated: false,
+                    backTo: "gym",
                 },
             },
             {
@@ -143,14 +146,14 @@ const routes: RouteRecordRaw[] = [
                 name: "logging-cardio",
                 component: () =>
                     import("~/pages/gym/logging/exercise/[id].vue"),
-                meta: { breadcrumb: "Cardio" },
+                meta: { breadcrumb: "Cardio", focus: true },
             },
             {
                 path: "logging/mobility/:slot",
                 name: "logging-mobility",
                 component: () =>
                     import("~/pages/gym/logging/exercise/[id].vue"),
-                meta: { breadcrumb: "Mobility" },
+                meta: { breadcrumb: "Mobility", focus: true },
             },
             {
                 path: "progression",
