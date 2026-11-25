@@ -56,7 +56,7 @@ const route = useRoute();
         </nav>
 
         <div class="border-t border-line p-3">
-            <AccountMenu variant="row" />
+            <AccountMenu placement="sidenav" />
         </div>
     </aside>
 </template>

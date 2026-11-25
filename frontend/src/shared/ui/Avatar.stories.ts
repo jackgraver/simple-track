@@ -18,5 +18,4 @@ export const Sizes: Story = {
         template: `<div class="flex items-center gap-3 p-4"><Avatar v-bind="args" size="sm" /><Avatar v-bind="args" size="md" /><Avatar v-bind="args" size="lg" /></div>`,
     }),
 };
-/** A broken image falls back to the gradient. */
 export const BrokenImage: Story = { args: { src: "/does-not-exist.png", size: "lg" } };

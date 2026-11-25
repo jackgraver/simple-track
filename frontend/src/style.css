@@ -58,10 +58,11 @@
     --color-chart-4: hsl(270 85% 72%);
     --color-chart-5: hsl(330 80% 66%);
     --color-chart-grid: var(--color-line);
-    /* Avatar fill (gradient a->b) when there's no photo. Same in both themes. */
+    --color-chart-text: var(--color-fg-muted);
+
+    /* Not redefined for light: a person's colour shouldn't change with the theme. */
     --color-avatar-a: #e393f9;
     --color-avatar-b: hsl(282 70% 62%);
-    --color-chart-text: var(--color-fg-muted);
 
     --text-2xs: 0.6875rem;
     --text-2xs--line-height: 0.875rem;

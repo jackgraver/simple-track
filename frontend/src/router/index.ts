@@ -240,7 +240,7 @@ const routes: RouteRecordRaw[] = [
         path: "/settings/profile",
         name: "settings-profile",
         component: () => import("~/pages/settings/profile/index.vue"),
-        meta: { breadcrumb: "Profile" },
+        meta: { breadcrumb: "Body profile" },
     },
     {
         path: "/:pathMatch(.*)*",

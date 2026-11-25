@@ -118,6 +118,6 @@ onUnmounted(() => {
         <span v-if="isDevEnvironment" class="rounded-control bg-surface-3 px-1.5 text-xs text-fg-muted"
             >dev</span
         >
-        <AccountMenu variant="compact" />
+        <AccountMenu placement="header" />
     </header>
 </template>

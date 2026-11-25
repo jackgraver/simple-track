@@ -1,6 +1,4 @@
 <script setup lang="ts">
-// A person's avatar: their photo when `src` loads, otherwise a plain gradient disc (no text) with a
-// soft white highlight and inner ring. Reka Avatar handles the image load and fallback.
 import { AvatarFallback, AvatarImage, AvatarRoot } from "reka-ui";
 
 withDefaults(
@@ -8,7 +6,7 @@ withDefaults(
         name: string;
         src?: string | null;
         size?: "sm" | "md" | "lg";
-        /** Decorative when the name is already shown beside it (default). */
+        /** Set false when the avatar stands alone, without the name beside it. */
         decorative?: boolean;
     }>(),
     { size: "md", decorative: true },

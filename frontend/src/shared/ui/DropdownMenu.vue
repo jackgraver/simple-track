@@ -1,27 +1,26 @@
 <script setup lang="ts">
-// Reka DropdownMenu shell: focus, typeahead, arrow keys, Esc, portal and collision handling come
-// from the library. Build the content from MenuAction, MenuLabel, MenuSeparator and MenuRadioGroup.
-//
-// Trigger: either `#trigger` (as-child: pass one focusable element, e.g. an IconButton) or
-// `#trigger-content`, which renders inside a built-in unstyled-ish <button> sized by `trigger-class`
-// (for triggers that aren't a primitive, like the side nav account row).
+// `#trigger` is as-child, for an existing primitive (IconButton). `#trigger-content` is for triggers
+// no primitive covers (account row, avatar): the menu renders the button, styled by `shape`.
 import { DropdownMenuContent, DropdownMenuPortal, DropdownMenuRoot, DropdownMenuTrigger } from "reka-ui";
 
 withDefaults(
     defineProps<{
         align?: "start" | "center" | "end";
         side?: "top" | "right" | "bottom" | "left";
-        /** Accessible name for the built-in trigger button when its content has no text. */
-        triggerLabel?: string;
-        triggerClass?: string;
-        /** Tailwind min-width class for the panel. */
         width?: "sm" | "md";
+        shape?: "row" | "circle";
+        triggerLabel?: string;
+        active?: boolean;
     }>(),
-    { align: "end", side: "bottom", width: "sm" },
+    { align: "end", side: "bottom", width: "sm", shape: "row" },
 );
 const open = defineModel<boolean>("open", { default: false });
 
 const widths = { sm: "min-w-48", md: "min-w-64" } as const;
+const shapes = {
+    row: "w-full gap-2.5 rounded-control px-2 py-1.5",
+    circle: "size-touch justify-center rounded-full",
+} as const;
 </script>
 
 <template>
@@ -30,8 +29,8 @@ const widths = { sm: "min-w-48", md: "min-w-64" } as const;
         <DropdownMenuTrigger
             v-else
             :aria-label="triggerLabel"
-            class="m-0 flex cursor-pointer items-center rounded-control border-0 bg-transparent p-0 text-left text-fg transition-colors duration-100 outline-none hover:bg-surface-3 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent data-[state=open]:bg-surface-3"
-            :class="triggerClass"
+            class="m-0 flex cursor-pointer items-center border-0 text-left text-fg transition-colors duration-100 outline-none hover:bg-surface-3 focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-canvas data-[state=open]:bg-surface-3"
+            :class="[shapes[shape], active ? 'bg-surface-3' : 'bg-transparent']"
         >
             <slot name="trigger-content" />
         </DropdownMenuTrigger>

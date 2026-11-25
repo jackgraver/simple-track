@@ -123,7 +123,7 @@ reload. Add the module's API helpers to `fixtures/api.ts` as needed.
 - [x] **B7. Settings and auth**: login UI (no bypass cookie), logout, session expiry (via clock).
       Specs in `tests/auth/login.spec.ts` (`@auth`, `authenticated: false`): unauthenticated visit
       redirects to sign-in with `redirect=` and returns there after login (+ reload keeps session,
-      `@smoke`); wrong password shows an alert; logout (API call, no UI control) ends the session;
+      `@smoke`); wrong password shows an alert; logout (account menu) ends the session;
       expired session (server clock +366d) redirects to sign-in on direct load and on next full load.
       Not yet: settings profile (body profile form) save + reload, register flow, rate-limit lockout.
 - [x] **B8. Optimistic UI**: hold-based assertions of instant state and post-reload state.
@@ -178,8 +178,8 @@ reload. Add the module's API helpers to `fixtures/api.ts` as needed.
   scenario arranges via API and asserts the UI. Decide whether a UI delete is intended.
 - Grocery checkbox accessible name is the item name ("Milk"), not "Complete Milk" (the `label` prop is
   not exposed by `Checkbox` when the slot is used).
-- The UI has no logout control: `useAuth().logout` is never called from a component. The logout spec
-  calls `POST /api/auth/logout` instead. Add the button, then drive it through the UI.
+- ~~The UI has no logout control~~: fixed by the account menu (PR #87); the logout spec signs out
+  through it.
 - `ListRow` already sets `aria-busy="true"` on pending rows (grocery uses it), so the "mark pending
   rows" idea only needs extending to the other optimistic lists (gym sets, diet, finances) before
   specs there can drop `waitForApi`. Specs for grocery use it now.

@@ -1,14 +1,15 @@
 <script setup lang="ts">
-// One action in a DropdownMenu. With `to` it's a link (RouterLink), otherwise it emits `select`.
-// 44px rows below lg, compact from lg (PRINCIPLES §2).
 import { computed, type Component } from "vue";
 import { RouterLink, type RouteLocationRaw } from "vue-router";
 import { DropdownMenuItem } from "reka-ui";
+import { Loader2 } from "lucide-vue-next";
 
 const props = defineProps<{
     icon?: Component;
     tone?: "neutral" | "danger";
     disabled?: boolean;
+    /** Keeps the menu open with a spinner until the caller clears it. */
+    loading?: boolean;
     to?: RouteLocationRaw;
 }>();
 const emit = defineEmits<{ select: [event: Event] }>();
@@ -20,30 +21,28 @@ const tones = {
     danger: "text-danger data-[highlighted]:bg-danger-soft",
 } as const;
 const toneClass = computed(() => tones[props.tone === "danger" ? "danger" : "neutral"]);
+
+function onSelect(e: Event) {
+    if (props.loading) {
+        e.preventDefault();
+        return;
+    }
+    emit("select", e);
+}
 </script>
 
 <template>
     <DropdownMenuItem
-        :as-child="!!to"
+        :as="to ? RouterLink : 'div'"
+        v-bind="to ? { to } : {}"
         :disabled="disabled"
+        :aria-busy="loading || undefined"
         :class="[base, toneClass]"
-        @select="emit('select', $event)"
+        @select="onSelect"
     >
-        <RouterLink v-if="to" :to="to">
-            <component :is="icon" v-if="icon" aria-hidden="true" class="size-4 shrink-0 text-fg-muted" />
-            <span class="min-w-0 flex-1 truncate"><slot /></span>
-            <span v-if="$slots.trailing" class="shrink-0 text-xs text-fg-subtle"><slot name="trailing" /></span>
-        </RouterLink>
-        <template v-else>
-            <component
-                :is="icon"
-                v-if="icon"
-                aria-hidden="true"
-                class="size-4 shrink-0"
-                :class="tone === 'danger' ? '' : 'text-fg-muted'"
-            />
-            <span class="min-w-0 flex-1 truncate"><slot /></span>
-            <span v-if="$slots.trailing" class="shrink-0 text-xs text-fg-subtle"><slot name="trailing" /></span>
-        </template>
+        <Loader2 v-if="loading" aria-hidden="true" class="size-4 shrink-0 animate-spin" />
+        <component :is="icon" v-else-if="icon" aria-hidden="true" class="size-4 shrink-0" />
+        <span class="min-w-0 flex-1 truncate"><slot /></span>
+        <span v-if="$slots.trailing" class="shrink-0 text-xs text-fg-subtle"><slot name="trailing" /></span>
     </DropdownMenuItem>
 </template>

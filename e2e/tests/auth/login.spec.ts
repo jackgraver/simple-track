@@ -39,10 +39,12 @@ test('logout ends the session', { tag: '@auth' }, async ({ page }) => {
   await signIn(page);
   await expect(page).not.toHaveURL(/signin/);
 
-  // The UI has no logout control yet (see TASKS.md findings), so call the endpoint the way the
-  // app's useAuth().logout does, with the browser's cookies.
-  const r = await page.request.post('/api/auth/logout');
-  expect(r.ok()).toBe(true);
+  await page.getByRole('button', { name: 'Account menu for dev' }).click();
+  const loggedOut = page.waitForResponse((r) => r.url().includes('/api/auth/logout') && r.ok());
+  await page.getByRole('menuitem', { name: 'Sign out' }).click();
+  await loggedOut;
+  await expect(page).toHaveURL(/\/auth\/signin/);
+  await expect(page.getByText('Signed out', { exact: true })).toBeVisible();
 
   await page.goto('/gym');
   await expect(page).toHaveURL(/\/auth\/signin/);

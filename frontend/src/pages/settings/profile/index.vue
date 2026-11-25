@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import axios from 'axios';
 import { computed, ref, watch } from 'vue';
-import { Button, Card, ErrorState, PageHeader, Section, Skeleton, useDelayedFlag } from '~/shared/ui';
+import { Button, Card, ErrorState, PageHeader, Skeleton, useDelayedFlag } from '~/shared/ui';
 import { useProfile, useSaveProfile } from '~/api/tracking/queries';
 import { toast } from '~/composables/toast/useToast';
 import BodyProfileForm from './BodyProfileForm.vue';
@@ -47,8 +47,8 @@ async function save() {
 
 <template>
     <div class="mx-auto flex w-full max-w-md flex-col gap-6 pb-8">
-        <PageHeader title="Profile" />
-        <Section title="Body profile">
+        <PageHeader title="Body profile" />
+        <section class="flex flex-col gap-3">
             <p class="m-0 text-sm text-fg-muted">
                 Used for TDEE estimates on macro targets. Weight comes from your latest weight log.
             </p>
@@ -75,6 +75,6 @@ async function save() {
                     Save profile
                 </Button>
             </form>
-        </Section>
+        </section>
     </div>
 </template>

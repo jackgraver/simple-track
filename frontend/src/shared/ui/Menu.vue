@@ -1,7 +1,5 @@
 <script setup lang="ts">
-// A flat overflow action menu built from DropdownMenu + MenuAction. The trigger is whatever the
-// caller puts in the slot (usually an IconButton). For labels, separators or a radio group, compose
-// DropdownMenu directly.
+// For labels, separators or a radio group, compose DropdownMenu directly.
 import type { Component } from "vue";
 import DropdownMenu from "./DropdownMenu.vue";
 import MenuAction from "./MenuAction.vue";

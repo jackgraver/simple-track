@@ -1,6 +1,4 @@
 <script setup lang="ts">
-// Non-interactive text in a DropdownMenu: a small section heading, or (`variant="header"`) a block
-// at the top such as the signed-in account.
 import { DropdownMenuLabel } from "reka-ui";
 
 defineProps<{ variant?: "section" | "header" }>();
