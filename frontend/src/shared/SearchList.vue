@@ -108,16 +108,26 @@ const { activeIndex, handleKey, setEnterHandler, reset } = useListNavigation(
     globalNavActive,
 );
 
-// Row that was just picked: its + turns into a green check for 1.5s so a tap visibly "lands".
+const PICKED_CHECK_MS = 1500;
 const pickedKey = ref<string | null>(null);
+const pickedAnnouncement = ref("");
 let pickedTimer: ReturnType<typeof setTimeout> | undefined;
+let unmounted = false;
 const rowKey = (item: any, index: number) => `${item.entry_kind ?? "food"}-${item.id ?? item.ID ?? index}`;
-function flashPicked(key: string) {
+function flashPicked(key: string, name: string) {
     pickedKey.value = key;
     clearTimeout(pickedTimer);
-    pickedTimer = setTimeout(() => (pickedKey.value = null), 1500);
+    pickedTimer = setTimeout(() => (pickedKey.value = null), PICKED_CHECK_MS);
+    // Clear first so a repeat pick of the same row is announced again.
+    pickedAnnouncement.value = "";
+    nextTick(() => (pickedAnnouncement.value = name));
+    // The list is unfiltered once the search clears, so bring the picked row back into view.
+    nextTick(() => itemsContainer.value?.querySelector(`[data-key="${key}"]`)?.scrollIntoView({ block: "nearest" }));
 }
-onBeforeUnmount(() => clearTimeout(pickedTimer));
+onBeforeUnmount(() => {
+    unmounted = true;
+    clearTimeout(pickedTimer);
+});
 
 const handleFunctionCall = async <T extends (arg: any) => Promise<boolean>>(
     fn?: T,
@@ -126,8 +136,9 @@ const handleFunctionCall = async <T extends (arg: any) => Promise<boolean>>(
 ) => {
     if (!fn) return;
     const success = await fn(args);
+    if (unmounted) return;
     if (success) {
-        if (key) flashPicked(key);
+        if (key) flashPicked(key, args?.name ?? "");
         search.value = "";
         reset();
     }
@@ -186,7 +197,7 @@ watch(isPending, (pending) => {
         @mouseenter="isHovering = true"
         @mouseleave="isHovering = false"
     >
-        <span class="sr-only" role="status" aria-live="polite">{{ pickedKey ? "Added" : "" }}</span>
+        <span class="sr-only" role="status" aria-live="polite">{{ pickedAnnouncement }}</span>
         <Input
             ref="searchInput"
             v-model="search"
@@ -204,6 +215,7 @@ watch(isPending, (pending) => {
                 <ListRow
                     v-for="(item, index) in filteredList"
                     :key="rowKey(item, index)"
+                    :data-key="rowKey(item, index)"
                     :selected="activeIndex === index"
                     @click="handleFunctionCall(onSelect, item, rowKey(item, index))"
                 >
