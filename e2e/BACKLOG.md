@@ -21,6 +21,10 @@ Details and reasoning live in the Findings section of [TASKS.md](TASKS.md).
       client sends no `type` and the server answers 400 "cardio type is required when the plan has no planned
       cardio"; the optimistic "done" rolls back. Only reachable by URL today. Fix: default the type, or don't
       offer the route without a plan; then drop the `test.fail` in `tests/gym/cardio-mobility.spec.ts`.
+- [ ] **Gym: switching a day's plan returns 400 with the raw DB error.** `controller.SwitchPlan` maps every
+      error to 400 and puts `err.Error()` in the body, so the toast shows a Postgres message instead of
+      "Couldn’t switch the plan", and 5xx monitoring misses it. Fix: 404 for a missing plan, 500 otherwise;
+      then drop the `test.fail` and `allowedErrors` in `tests/gym/home.spec.ts`.
 - [ ] **Gym: cardio minutes input on the routine page is 0px wide** (desktop and mobile). The `NumberField`
       in a `w-36` box leaves no room for the input, so only +/- work. Fix: widen the box or drop the
       steppers/unit; then drop the `test.fail` in `tests/gym/plans.spec.ts` and type the value instead.
