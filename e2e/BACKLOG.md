@@ -16,6 +16,11 @@ Details and reasoning live in the Findings section of [TASKS.md](TASKS.md).
       error to internal). Decide the status (409?), then pin it in a spec.
 - [ ] **Diet meal edit is create-then-delete** (`replace_meal_id`). A failure between the two could lose or
       duplicate the meal. Needs a fault test, then probably a single server call.
+- [ ] **Gym: weight import error toast shows twice.** `ImportWeightDialog` toasts the error and the global
+      `MutationCache.onError` toasts it again (`useImportWeightCsv` has no `meta: { handled: true }`). Fix
+      that (and audit other mutations whose callers toast), then drop the `test.fail` in `weight.spec.ts`.
+- [ ] **Gym: progression empty state for "All" reads "No data in the this exercise".** Build the sentence per
+      range; then drop the `test.fail` in `progression.spec.ts`.
 
 ## Product decisions needed
 
@@ -23,6 +28,8 @@ Details and reasoning live in the Findings section of [TASKS.md](TASKS.md).
       posts `/api/auth/logout`. Add one, then drive it through the UI.
 - [ ] **Grocery delete control.** Only the API can delete; the spec arranges via API. Intended?
 - [ ] **No edit-transaction** in finances. Intended?
+- [ ] **Weight has no delete** (UI or API). Intended?
+- [ ] **The steps form doesn't prefill the day's saved value** (weight does). Intended?
 
 ## Test-suite follow-ups
 
@@ -37,3 +44,5 @@ Details and reasoning live in the Findings section of [TASKS.md](TASKS.md).
       fault/retry, targets, saved meals; gym scenario todos listed under B2 in TASKS.md.
 - [ ] Rollback-with-Retry is only covered by the grocery-add example; add it for gym, diet and finances.
 - [ ] Cleanup bug seen once: "missing template DB" errors from an `e2e-baseline-f8` run; a rerun passed.
+- [ ] Weight/steps charts have no accessible name or text summary (`Chart` gets no `label`), so specs and
+      screen readers can't read the history. Add a label or a short "recent entries" list.

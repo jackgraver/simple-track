@@ -50,6 +50,12 @@ reload. Add the module's API helpers to `fixtures/api.ts` as needed.
       - dropped response (hold after + drop): retry with the same client_id, exactly one set
       - todo: weight/plates edit, notes, finish + "Up next", cardio/mobility, add/remove exercise,
         offline log, persistent save failure ("Didn't save" + Retry), plans pages, progression, weight, steps
+      - [x] tracking (`tests/gym/weight.spec.ts`, `steps.spec.ts`, `progression.spec.ts`,
+            `tracking-load-errors.spec.ts`): weight save, Renpho import (+ rejected CSV), past day in
+            Toronto late evening; steps save + overwrite/cancel/invalid; progression list per range, empty
+            state, exercise switch; load errors + Retry. Weight and steps have no text history (canvas
+            only), so specs read the slider, the overwrite prompt and the DB. Not yet: steps on a past day,
+            save failure rollback, tab-separated/kg import.
 - [x] **B3. Diet**: specs in `tests/diet/quick-log.spec.ts` (Quick log, the simplest logged-meal path).
       Done: log (optimistic, persists after reload, `@smoke`); edit (replaces the row, exactly one logged
       meal left); delete via confirm dialog (other meal survives reload).
