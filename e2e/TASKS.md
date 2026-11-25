@@ -55,6 +55,13 @@ reload. Add the module's API helpers to `fixtures/api.ts` as needed.
             (+ Undo) exercises, rep rollover; day picker, move a taken day (confirm/cancel), drag (desktop);
             warmup/stretch items, cardio. Not yet: reorder exercises, rename program, write-failure
             rollbacks, offline, "Routine not found", "Couldn't load this routine".
+      - [x] session (`tests/gym/session.spec.ts`, `cardio-mobility.spec.ts`, helpers `tests/gym/logger.ts`):
+            session list, Up next, finish + summary, weight/plates setup, notes (with and before the first
+            set), persistent save failure + Retry, offline log, delete while saving, edit a saved set's
+            weight, planned cardio, warmup/stretching checklists. `logging.spec.ts` repaired after the
+            "Log Set N" rename. The logger keeps a draft in sessionStorage, so persistence checks clear it
+            before reloading (`freshReload`). Not yet: add/remove exercise from the session, `?offset=`
+            days, extra sets beyond the plan, Finish while a set didn't save.
 - [x] **B3. Diet**: specs in `tests/diet/quick-log.spec.ts` (Quick log, the simplest logged-meal path).
       Done: log (optimistic, persists after reload, `@smoke`); edit (replaces the row, exactly one logged
       meal left); delete via confirm dialog (other meal survives reload).
