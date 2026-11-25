@@ -10,12 +10,17 @@ Details and reasoning live in the Findings section of [TASKS.md](TASKS.md).
       `PUT .../balances`). If the second fails the transaction is saved, the balance is stale and a retry
       double-counts. Fix: one server endpoint in a DB transaction, then drop the `test.fail` in
       `tests/finances/transactions.spec.ts`.
-- [ ] **Gym reps slider races its smooth scroll.** A tap on 9 sometimes saved 11 (`NumberSlider`
-      `syncingScroll` clears after one frame). The spec waits for scrolling to stop as a workaround.
+- [ ] **Gym reps slider races its smooth scroll.** Looks fixed in `NumberSlider` (sync ends on reaching the
+      target / `scrollend`); 390/390 flake runs passed. Drop this and the `scrollSettled` wait in
+      `tests/gym/logger.ts` after a few more green runs.
 - [ ] **`POST /diet/foods` with a duplicate name returns 500** (`idx_foods_name`; `PostFood` maps every
       error to internal). Decide the status (409?), then pin it in a spec.
 - [ ] **Diet meal edit is create-then-delete** (`replace_meal_id`). A failure between the two could lose or
       duplicate the meal. Needs a fault test, then probably a single server call.
+- [ ] **Gym: unplanned cardio can't be saved.** `/gym/logging/cardio` opens without planned cardio, but the
+      client sends no `type` and the server answers 400 "cardio type is required when the plan has no planned
+      cardio"; the optimistic "done" rolls back. Only reachable by URL today. Fix: default the type, or don't
+      offer the route without a plan; then drop the `test.fail` in `tests/gym/cardio-mobility.spec.ts`.
 - [ ] **Gym: switching a day's plan returns 400 with the raw DB error.** `controller.SwitchPlan` maps every
       error to 400 and puts `err.Error()` in the body, so the toast shows a Postgres message instead of
       "Couldn’t switch the plan", and 5xx monitoring misses it. Fix: 404 for a missing plan, 500 otherwise;
@@ -27,10 +32,12 @@ Details and reasoning live in the Findings section of [TASKS.md](TASKS.md).
       posts `/api/auth/logout`. Add one, then drive it through the UI.
 - [ ] **Grocery delete control.** Only the API can delete; the spec arranges via API. Intended?
 - [ ] **No edit-transaction** in finances. Intended?
+- [ ] **Unplanned cardio/mobility.** The session list has no way to add cardio or mobility that the plan
+      doesn't have. Intended?
 
 ## Test-suite follow-ups
 
-- [ ] Extend `aria-busy` on pending rows (grocery has it via `ListRow`) to gym sets, diet and finances, so
+- [ ] Extend `aria-busy` on pending rows (grocery and gym sets have it via `ListRow`) to diet and finances, so
       those specs can stop using `waitForApi` before reloading.
 - [ ] `Checkbox.vue`: the slot replaces the `label` prop, so the accessible name is "Milk", not
       "Complete Milk". Fix the component or accept it.
