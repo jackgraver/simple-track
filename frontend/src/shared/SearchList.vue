@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { searchListKeys } from "~/shared/searchListKeys";
-import { Plus } from "lucide-vue-next";
-import { computed, nextTick, onMounted, ref, watch } from "vue";
+import { Check, Plus } from "lucide-vue-next";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import type { Component } from "vue";
 import { useQuery } from "@tanstack/vue-query";
 import { apiClient } from "~/api/client";
@@ -108,13 +108,26 @@ const { activeIndex, handleKey, setEnterHandler, reset } = useListNavigation(
     globalNavActive,
 );
 
+// Row that was just picked: its + turns into a green check for 1.5s so a tap visibly "lands".
+const pickedKey = ref<string | null>(null);
+let pickedTimer: ReturnType<typeof setTimeout> | undefined;
+const rowKey = (item: any, index: number) => `${item.entry_kind ?? "food"}-${item.id ?? item.ID ?? index}`;
+function flashPicked(key: string) {
+    pickedKey.value = key;
+    clearTimeout(pickedTimer);
+    pickedTimer = setTimeout(() => (pickedKey.value = null), 1500);
+}
+onBeforeUnmount(() => clearTimeout(pickedTimer));
+
 const handleFunctionCall = async <T extends (arg: any) => Promise<boolean>>(
     fn?: T,
     args?: any,
+    key?: string,
 ) => {
     if (!fn) return;
     const success = await fn(args);
     if (success) {
+        if (key) flashPicked(key);
         search.value = "";
         reset();
     }
@@ -127,6 +140,7 @@ function selectActive() {
         handleFunctionCall(
             props.onSelect,
             filteredList.value[activeIndex.value],
+            rowKey(filteredList.value[activeIndex.value], activeIndex.value),
         );
     } else if (showCreate.value) {
         handleFunctionCall(props.onCreate, search.value);
@@ -172,6 +186,7 @@ watch(isPending, (pending) => {
         @mouseenter="isHovering = true"
         @mouseleave="isHovering = false"
     >
+        <span class="sr-only" role="status" aria-live="polite">{{ pickedKey ? "Added" : "" }}</span>
         <Input
             ref="searchInput"
             v-model="search"
@@ -188,13 +203,16 @@ watch(isPending, (pending) => {
             <List v-else-if="!isPending">
                 <ListRow
                     v-for="(item, index) in filteredList"
-                    :key="`${item.entry_kind ?? 'food'}-${item.id ?? item.ID ?? index}`"
+                    :key="rowKey(item, index)"
                     :selected="activeIndex === index"
-                    @click="handleFunctionCall(onSelect, item)"
+                    @click="handleFunctionCall(onSelect, item, rowKey(item, index))"
                 >
                     <component :is="props.displayComponent" v-if="props.displayComponent" :item="item" />
                     <template v-else>{{ item.name || `#${item.id ?? item.ID}` }}</template>
-                    <template #trailing><Plus aria-hidden="true" class="size-4" /></template>
+                    <template #trailing>
+                        <Check v-if="pickedKey === rowKey(item, index)" aria-hidden="true" class="size-4 text-success" />
+                        <Plus v-else aria-hidden="true" class="size-4" />
+                    </template>
                 </ListRow>
                 <ListRow
                     v-if="showCreate"
