@@ -72,8 +72,8 @@ const lastLine = computed(() => {
                 <!-- No chevron here: the whole (big) card is the tap target, and the corner belongs to the
                      go-up/stay switch when it shows. -->
                 <span class="flex min-w-0 flex-col gap-1">
-                    <span class="text-xs font-semibold tracking-wide text-fg-muted uppercase">Setup</span>
-                    <span class="flex items-center gap-2">
+                    <span class="text-xs font-semibold tracking-wide text-fg-muted uppercase">Exercise Setup</span>
+                    <span class="flex items-baseline gap-2">
                         <span class="text-display font-semibold text-fg tabular-nums">{{ weight }} lb</span>
                         <Badge v-if="badge" :tone="badge.tone">{{ badge.text }}</Badge>
                     </span>
@@ -103,25 +103,28 @@ const lastLine = computed(() => {
                     <span class="line-clamp-3 text-sm whitespace-pre-wrap text-fg">{{ cues }}</span>
                 </span>
             </span>
-            <span v-else class="flex items-center gap-3">
-                <span class="text-xl font-semibold text-fg tabular-nums">{{ weight }} lb</span>
-                <Badge v-if="badge" :tone="badge.tone">{{ badge.text }}</Badge>
-                <!-- One line: badges that don't fit wrap to a second row, which the fixed height hides whole
-                     (clipping one mid-word read as "at 4"). The sheet behind the chevron shows them all. -->
-                <span class="flex h-6 min-w-0 flex-1 flex-wrap items-center justify-end gap-x-1.5 gap-y-2 overflow-hidden">
-                    <Badge v-for="s in machineSettings.slice(0, 3)" :key="s.label" variant="outline">
-                        {{ s.label }} {{ s.value.trim() || "—" }}
-                    </Badge>
-                    <Badge v-if="plates" variant="outline">{{ plates }}</Badge>
+            <span v-else class="flex flex-col gap-1">
+                <span class="text-xs font-semibold tracking-wide text-fg-muted uppercase">Exercise Setup</span>
+                <span class="flex items-center gap-3">
+                    <span class="text-xl font-semibold text-fg tabular-nums">{{ weight }} lb</span>
+                    <Badge v-if="badge" :tone="badge.tone">{{ badge.text }}</Badge>
+                    <!-- One line: badges that don't fit wrap to a second row, which the fixed height hides whole
+                         (clipping one mid-word read as "at 4"). The sheet behind the chevron shows them all. -->
+                    <span class="flex h-6 min-w-0 flex-1 flex-wrap items-center justify-end gap-x-1.5 gap-y-2 overflow-hidden">
+                        <Badge v-for="s in machineSettings.slice(0, 3)" :key="s.label" variant="outline">
+                            {{ s.label }} {{ s.value.trim() || "—" }}
+                        </Badge>
+                        <Badge v-if="plates" variant="outline">{{ plates }}</Badge>
+                    </span>
+                    <ChevronRight class="size-4 shrink-0 text-fg-subtle" aria-hidden="true" />
                 </span>
-                <ChevronRight class="size-4 shrink-0 text-fg-subtle" aria-hidden="true" />
             </span>
         </Card>
         <div
             v-if="showChoice"
             class="pointer-events-none col-start-1 row-start-1 flex flex-col gap-1 border border-transparent p-4 lg:p-5"
         >
-            <span class="invisible text-xs font-semibold uppercase" aria-hidden="true">Setup</span>
+            <span class="invisible text-xs font-semibold uppercase" aria-hidden="true">Exercise Setup</span>
             <span class="flex items-center justify-between gap-3">
                 <span class="invisible text-display font-semibold tabular-nums" aria-hidden="true">{{ weight }} lb</span>
                 <span class="pointer-events-auto">

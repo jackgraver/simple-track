@@ -1,9 +1,9 @@
 package services
 
 import (
+	"be-simpletracker/internal/clock"
 	"errors"
 	"fmt"
-	"time"
 
 	"be-simpletracker/internal/core/auth/models"
 	authrepo "be-simpletracker/internal/core/auth/repository"
@@ -118,7 +118,7 @@ func (s *AuthService) CurrentUser(username string) (models.User, error) {
 }
 
 func (s *AuthService) UpdateBirthYear(username string, birthYear int) (models.User, error) {
-	currentYear := time.Now().Year()
+	currentYear := clock.Now().Year()
 	if birthYear < 1900 || birthYear > currentYear {
 		return models.User{}, errors.New("birth_year must be between 1900 and the current year")
 	}

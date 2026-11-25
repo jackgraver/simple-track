@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"be-simpletracker/internal/clock"
 	"be-simpletracker/internal/env"
 	"crypto/hmac"
 	"crypto/sha256"
@@ -8,7 +9,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
-	"time"
 )
 
 type Claims struct {
@@ -19,7 +19,7 @@ type Claims struct {
 }
 
 func GenerateToken(username string) (string, error) {
-	now := time.Now().Unix()
+	now := clock.Now().Unix()
 	ttl := int64(CookieMaxAgeSeconds())
 	claims := Claims{
 		Username:  username,
@@ -83,7 +83,7 @@ func VerifyToken(token string) (*Claims, error) {
 		return nil, fmt.Errorf("invalid token claims: %v", err)
 	}
 
-	if claims.Exp > 0 && time.Now().Unix() > claims.Exp {
+	if claims.Exp > 0 && clock.Now().Unix() > claims.Exp {
 		return nil, fmt.Errorf("token expired")
 	}
 
@@ -92,11 +92,11 @@ func VerifyToken(token string) (*Claims, error) {
 
 func createSignature(data string) (string, error) {
 	secret, err := env.String("JWT_SECRET")
-	
+
 	if err != nil {
 		return "", err
 	}
-	
+
 	h := hmac.New(sha256.New, []byte(secret))
 	h.Write([]byte(data))
 

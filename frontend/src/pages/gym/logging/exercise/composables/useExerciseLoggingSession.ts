@@ -257,17 +257,6 @@ export function useExerciseLoggingSession(options: {
         draftStorage.setSaveEnabled(true);
     };
 
-    // Once the day has loaded, a missing group means a bad id or the exercise left the log (e.g. an
-    // add from the list that failed and rolled back; its toast says so): back to the list, replacing
-    // this entry so Back doesn't return to a page that no longer exists.
-    watch(
-        [() => exerciseGroup.value, () => pending.value],
-        ([group, isPending]) => {
-            if (!isPending && !group) void router.replace(loggingRoute());
-        },
-        { immediate: true },
-    );
-
     // Initialise once per (day, exercise), not on every cache change.
     const sessionKey = computed(() =>
         pending.value || !exerciseGroup.value

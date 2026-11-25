@@ -3,24 +3,19 @@ import { pickBestLoggedSet } from "./loggedSetDefaults";
 
 type SetLike = { weight: number; reps: number };
 
-/** Rest clock stages. It always counts up; the colour says "not yet" until 2:00, then "good to go". */
-export type RestStage = "idle" | "wait" | "near" | "ready";
+/** Rest clock stages. It always counts up; red <1:00, orange <1:30, yellow <2:00, green after. */
+export type RestStage = "idle" | "wait" | "near" | "soon" | "ready";
 
 export const REST_NEAR_MS = 60_000;
+export const REST_SOON_MS = 90_000;
 export const REST_READY_MS = 120_000;
-/** The bar's right edge. The global timer itself clears at 5:00. */
-export const REST_BAR_MAX_MS = 180_000;
 
 export function restStage(elapsedMs: number, active: boolean): RestStage {
     if (!active) return "idle";
     if (elapsedMs >= REST_READY_MS) return "ready";
+    if (elapsedMs >= REST_SOON_MS) return "soon";
     if (elapsedMs >= REST_NEAR_MS) return "near";
     return "wait";
-}
-
-export function restBarPercent(elapsedMs: number): number {
-    if (!Number.isFinite(elapsedMs) || elapsedMs <= 0) return 0;
-    return Math.min(100, (elapsedMs / REST_BAR_MAX_MS) * 100);
 }
 
 /** Plans don't store a set count yet: use last session's, else this. */

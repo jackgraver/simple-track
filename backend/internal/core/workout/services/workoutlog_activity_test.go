@@ -1,10 +1,10 @@
 package services_test
 
 import (
+	"be-simpletracker/internal/clock"
 	"be-simpletracker/internal/core/workout/models"
 	"be-simpletracker/internal/core/workout/services"
 	"be-simpletracker/internal/core/workout/testutil"
-	"be-simpletracker/internal/utils"
 	"context"
 	"errors"
 	"testing"
@@ -12,7 +12,7 @@ import (
 
 func TestGetWorkoutActivity_year_includesDayWithSet(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	today := utils.ZerodTime(0)
+	today := clock.ZerodTime(0)
 	ex := models.Exercise{Name: "Bench"}
 	if err := db.Create(&ex).Error; err != nil {
 		t.Fatal(err)
@@ -54,7 +54,7 @@ func TestGetWorkoutActivity_rolling_excludesOldDayOutsideWindow(t *testing.T) {
 	if err := db.Create(&ex).Error; err != nil {
 		t.Fatal(err)
 	}
-	old := utils.ZerodTime(400)
+	old := clock.ZerodTime(400)
 	wlOld := models.WorkoutLog{Date: old}
 	if err := db.Create(&wlOld).Error; err != nil {
 		t.Fatal(err)

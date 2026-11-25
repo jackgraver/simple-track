@@ -4,5 +4,5 @@ set -euo pipefail
 # Lets the migration integration tests create throwaway databases on the dev
 # Postgres; they're skipped if it isn't running.
 export TEST_DATABASE_URL="${TEST_DATABASE_URL:-$DATABASE_URL}"
-(cd backend && go test ./...)
+(cd backend && go test ./... && go test -tags e2e ./internal/e2e/...)
 (cd frontend && npm run test:run)

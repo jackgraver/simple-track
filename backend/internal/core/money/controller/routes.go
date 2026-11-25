@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"be-simpletracker/internal/clock"
 	"errors"
 	"net/http"
 	"strconv"
@@ -287,7 +288,7 @@ func (h *Handler) listContributionTypes(c *gin.Context) {
 	if !ok {
 		return
 	}
-	types, err := service.ListContributionTypes(h.db, birthYear, time.Now())
+	types, err := service.ListContributionTypes(h.db, birthYear, clock.Now())
 	if err != nil {
 		respondError(c, err)
 		return
@@ -304,7 +305,7 @@ func (h *Handler) getContributionType(c *gin.Context) {
 	if !ok {
 		return
 	}
-	contributionType, err := service.GetContributionType(h.db, id, birthYear, time.Now())
+	contributionType, err := service.GetContributionType(h.db, id, birthYear, clock.Now())
 	if err != nil {
 		respondError(c, err)
 		return

@@ -1,15 +1,14 @@
 package common
 
 import (
+	"be-simpletracker/internal/clock"
 	"time"
-
-	"be-simpletracker/internal/utils"
 )
 
 // ParseDateString parses YYYY-MM-DD in local time, or returns today at midnight if empty.
 func ParseDateString(dateStr string) (time.Time, error) {
 	if dateStr == "" {
-		return utils.ZerodTime(0), nil
+		return clock.ZerodTime(0), nil
 	}
 	t, err := time.ParseInLocation("2006-01-02", dateStr, time.Local)
 	if err != nil {

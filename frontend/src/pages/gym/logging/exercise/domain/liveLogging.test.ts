@@ -5,7 +5,6 @@ import {
     overloadStatus,
     plannedSetCount,
     progressVerdict,
-    restBarPercent,
     restStage,
     setsTally,
     visibleMachineSettings,
@@ -15,22 +14,15 @@ describe("restStage", () => {
     it("is idle without a running clock", () => {
         expect(restStage(90_000, false)).toBe("idle");
     });
-    it("goes wait → near → ready at 1:00 and 2:00", () => {
+    it("goes wait → near → soon → ready at 1:00, 1:30 and 2:00", () => {
         expect(restStage(0, true)).toBe("wait");
         expect(restStage(59_999, true)).toBe("wait");
         expect(restStage(60_000, true)).toBe("near");
-        expect(restStage(119_999, true)).toBe("near");
+        expect(restStage(89_999, true)).toBe("near");
+        expect(restStage(90_000, true)).toBe("soon");
+        expect(restStage(119_999, true)).toBe("soon");
         expect(restStage(120_000, true)).toBe("ready");
         expect(restStage(400_000, true)).toBe("ready");
-    });
-});
-
-describe("restBarPercent", () => {
-    it("fills to 3:00 and clamps", () => {
-        expect(restBarPercent(0)).toBe(0);
-        expect(restBarPercent(90_000)).toBe(50);
-        expect(restBarPercent(500_000)).toBe(100);
-        expect(restBarPercent(Number.NaN)).toBe(0);
     });
 });
 

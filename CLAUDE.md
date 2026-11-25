@@ -38,6 +38,9 @@ Never run bare `./bin/dev` (it opens an interactive TUI). Use the background com
 - Login: `dev` / `dev` (prefilled on the sign-in page in vite dev mode). The `devuser` step
   creates the account on every start. Browser/e2e flows can log in through
   `POST <frontend>/api/auth/login` with that account.
+- **e2e:** `./bin/dev e2e` (args go to `playwright test`, e.g. `--grep @smoke` or `tests/gym`). It is
+  self-contained (own Postgres container, DBs and backends), so it doesn't need `dev start`. How to
+  run, write and debug specs: `e2e/README.md`.
 - `dev api` uses the `DEV_AUTH_TOKEN` cookie bypass from `backend/.env` (`ALLOW_BYPASS` is
   forced on by `dev/env.sh`; the backend rejects both in production).
 - A fresh worktree starts with an empty DB: the one-shot `migrate` service applies every
