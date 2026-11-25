@@ -50,6 +50,13 @@ reload. Add the module's API helpers to `fixtures/api.ts` as needed.
       - dropped response (hold after + drop): retry with the same client_id, exactly one set
       - todo: weight/plates edit, notes, finish + "Up next", cardio/mobility, add/remove exercise,
         offline log, persistent save failure ("Didn't save" + Retry), plans pages, progression, weight, steps
+      - [x] session (`tests/gym/session.spec.ts`, `cardio-mobility.spec.ts`, helpers `tests/gym/logger.ts`):
+            session list, Up next, finish + summary, weight/plates setup, notes (with and before the first
+            set), persistent save failure + Retry, offline log, delete while saving, edit a saved set's
+            weight, planned cardio, warmup/stretching checklists. `logging.spec.ts` repaired after the
+            "Log Set N" rename. The logger keeps a draft in sessionStorage, so persistence checks clear it
+            before reloading (`freshReload`). Not yet: add/remove exercise from the session, `?offset=`
+            days, extra sets beyond the plan, Finish while a set didn't save.
 - [x] **B3. Diet**: specs in `tests/diet/quick-log.spec.ts` (Quick log, the simplest logged-meal path).
       Done: log (optimistic, persists after reload, `@smoke`); edit (replaces the row, exactly one logged
       meal left); delete via confirm dialog (other meal survives reload).
