@@ -56,7 +56,7 @@ function readCookie(): string | null {
     return null;
 }
 
-export function loadLastRouteEntry(now = Date.now()): LastRoute | null {
+export function loadLastRoute(now = Date.now()): LastRoute | null {
     let local: string | null = null;
     try {
         local = localStorage.getItem(KEY);
@@ -64,8 +64,4 @@ export function loadLastRouteEntry(now = Date.now()): LastRoute | null {
         // ignore
     }
     return parse(local, now) ?? parse(readCookie(), now);
-}
-
-export function loadLastRoute(now = Date.now()): string | null {
-    return loadLastRouteEntry(now)?.path ?? null;
 }

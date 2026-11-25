@@ -28,17 +28,17 @@ describe("lastRoute", () => {
     it("falls back to the cookie when localStorage is empty", () => {
         saveLastRoute("/finances", 1000);
         store.clear();
-        expect(loadLastRoute(2000)).toBe("/finances");
+        expect(loadLastRoute(2000)?.path).toBe("/finances");
     });
 
     it("round-trips a path with query", () => {
         saveLastRoute("/gym/plans?x=1", 1000);
-        expect(loadLastRoute(2000)).toBe("/gym/plans?x=1");
+        expect(loadLastRoute(2000)?.path).toBe("/gym/plans?x=1");
     });
     it("expires after a week", () => {
         saveLastRoute("/diet", 0);
         expect(loadLastRoute(LAST_ROUTE_MAX_AGE_MS + 1)).toBeNull();
-        expect(loadLastRoute(LAST_ROUTE_MAX_AGE_MS)).toBe("/diet");
+        expect(loadLastRoute(LAST_ROUTE_MAX_AGE_MS)?.path).toBe("/diet");
     });
     it("rejects garbage and protocol-relative paths", () => {
         localStorage.setItem("st:last-route", "nope");

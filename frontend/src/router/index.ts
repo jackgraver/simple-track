@@ -2,7 +2,7 @@ import { createRouter, createWebHistory, START_LOCATION } from "vue-router";
 import type { RouteRecordRaw } from "vue-router";
 import { authStatus } from "~/composables/auth/session";
 import { resolveAuthSession } from "~/composables/auth/useAuth";
-import { loadLastRouteEntry, saveLastRoute } from "~/utils/lastRoute";
+import { loadLastRoute, saveLastRoute } from "~/utils/lastRoute";
 import { dietQueries } from "~/api/diet/queries";
 import { mediaQueries } from "~/api/media/queries";
 import { moneyQueries } from "~/api/money/queries";
@@ -259,14 +259,12 @@ function isStandalone(): boolean {
 const LOGGING_RESUME_WINDOW_MS = 3 * 60 * 60 * 1000;
 
 function resolveSavedRoute(): string | null {
-    const entry = loadLastRouteEntry();
+    const entry = loadLastRoute();
     if (!entry) return null;
     const target = router.resolve(entry.path);
     if (!target.name || target.name === "not-found" || target.name === "signin" || target.name === "launch") {
         return null;
     }
-    // Logging pages are tied to a day's plan. Resume mid-workout if the app was closed moments ago,
-    // otherwise the plan is likely stale, so land on the gym home.
     const staleLogging =
         target.path.startsWith("/gym/logging") && Date.now() - entry.at > LOGGING_RESUME_WINDOW_MS;
     if (staleLogging) return router.resolve({ name: "gym" }).fullPath;

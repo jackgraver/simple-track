@@ -64,8 +64,6 @@ const emptyMessage = computed(() => {
     return "Logging item not found";
 });
 
-// An exercise that isn't in the day's plan or log (stale URL, resumed on a later day) has nothing to
-// show: leave for the gym home, rendering nothing meanwhile so the empty state never flashes.
 const staleExercise = computed(
     () => loggingKind.value === "exercise" && !pending.value && !error.value && !exerciseGroupForShell.value,
 );
