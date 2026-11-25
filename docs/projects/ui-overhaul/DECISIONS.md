@@ -181,3 +181,8 @@ Brief: pace the session (how long since the last set, ~2:00) and log each set so
 - **Avatar**: no photos yet, and no initials (owner preferred it text-free). One gradient fill from `#e393f9` (owner's pick) with a white highlight and inner ring, same in both themes. `src` is already a prop (Reka Avatar falls back to the gradient if the image fails), so photos or a user-picked colour only need a backend field.
 - Sign out keeps the menu open with a spinner on the item until the request finishes, then shows "Signed out". If the server doesn't confirm, an error toast with Retry says so (the cookie may still be valid). `/settings/profile` is titled "Body profile" to match the menu.
 - New primitives `DropdownMenu`, `MenuAction`, `MenuLabel`, `MenuSeparator`, `MenuRadioGroup` and `Avatar`; `Menu` is now built from `DropdownMenu` + `MenuAction` with the same API. New tokens `avatar-a`/`avatar-b`.
+
+## 2026-11-25: Account menu in the mobile drawer
+- The drawer footer uses the same `AccountMenu` as the desktop side nav (it was a username link), so the side menus match. The mobile header avatar is removed: the account lives only at the bottom of the side menu on both layouts.
+- `z-popover` moved from 50 to 65, above `z-overlay` (60): a portalled menu opened inside the drawer rendered under its scrim. No existing popover lived inside an overlay (`SearchList` renders inline), so nothing else changes. Toasts stay on top (70).
+

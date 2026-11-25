@@ -61,7 +61,7 @@ export const AccountRow: Story = {
     }),
 };
 
-/** `shape="circle"` with `active`: the mobile header avatar on the page the menu links to. */
+/** `shape="circle"`, shown `active`. */
 export const CircleTrigger: Story = {
     render: () => ({
         components: parts,

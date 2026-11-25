@@ -117,8 +117,8 @@ Overlay animations are tokens in `style.css` (`animate-overlay-in/out`, `animate
 |---|---|---|
 | `z-raised` | 10 | sticky headers, in-flow overlaps (NumberSlider markers) |
 | `z-nav` | 40 | SideNav, BottomTabBar, status-bar cover |
-| `z-popover` | 50 | Select/menu dropdowns outside dialogs |
-| `z-overlay` | 60 | Dialog, Sheet + scrim |
+| `z-overlay` | 60 | Dialog, Sheet, Drawer + scrim |
+| `z-popover` | 65 | Select/menu dropdowns, including ones opened inside a dialog or drawer |
 | `z-toast` | 70 | Toasts (above dialogs) |
 A popover inside a dialog stacks inside the dialog's context, so 50 < 60 isn't a problem.
 

@@ -7,8 +7,6 @@ import { toast } from "~/composables/toast/useToast";
 import { useTheme, type ThemeMode } from "~/composables/useTheme";
 import { Avatar, DropdownMenu, MenuAction, MenuLabel, MenuRadioGroup, MenuSeparator } from "~/shared/ui";
 
-defineProps<{ placement: "sidenav" | "header" }>();
-
 const route = useRoute();
 const { username, logout } = useAuth();
 const { mode, setThemeMode } = useTheme();
@@ -46,19 +44,17 @@ function report(confirmed: boolean) {
 <template>
     <DropdownMenu
         v-model:open="open"
-        :side="placement === 'sidenav' ? 'top' : 'bottom'"
-        :align="placement === 'sidenav' ? 'start' : 'end'"
-        :shape="placement === 'sidenav' ? 'row' : 'circle'"
+        side="top"
+        align="start"
+        shape="row"
         :active="onProfilePage"
         width="md"
         :trigger-label="username ? `Account menu for ${username}` : 'Account menu'"
     >
         <template #trigger-content>
             <Avatar :name="username ?? ''" size="sm" />
-            <template v-if="placement === 'sidenav'">
-                <span class="min-w-0 flex-1 truncate text-sm font-medium">{{ username }}</span>
-                <ChevronsUpDown aria-hidden="true" class="size-4 shrink-0 text-fg-muted" />
-            </template>
+            <span class="min-w-0 flex-1 truncate text-sm font-medium">{{ username }}</span>
+            <ChevronsUpDown aria-hidden="true" class="size-4 shrink-0 text-fg-muted" />
         </template>
 
         <MenuLabel v-if="username" variant="header">

@@ -34,11 +34,18 @@ test('wrong password shows an error and stays on sign-in', { tag: '@auth' }, asy
   await expect(page).toHaveURL(/\/auth\/signin/);
 });
 
-test('logout ends the session', { tag: '@auth' }, async ({ page }) => {
+test('logout ends the session', { tag: '@auth' }, async ({ page, isMobile }) => {
   await page.goto('/auth/signin');
   await signIn(page);
   await expect(page).not.toHaveURL(/signin/);
 
+  if (isMobile) {
+    // phones: the account menu sits at the bottom of the nav drawer.
+    await expect(async () => {
+      await page.getByRole('button', { name: 'Open menu' }).click();
+      await expect(page.getByRole('dialog')).toBeVisible({ timeout: 1_000 });
+    }).toPass();
+  }
   await page.getByRole('button', { name: 'Account menu for dev' }).click();
   const loggedOut = page.waitForResponse((r) => r.url().includes('/api/auth/logout') && r.ok());
   await page.getByRole('menuitem', { name: 'Sign out' }).click();

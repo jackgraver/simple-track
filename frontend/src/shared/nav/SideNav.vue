@@ -21,7 +21,7 @@ import NavTree from "./NavTree.vue";
         <NavTree class="flex-1 overflow-y-auto px-3 pb-4" />
 
         <div class="border-t border-line p-3">
-            <AccountMenu placement="sidenav" />
+            <AccountMenu />
         </div>
     </aside>
 </template>

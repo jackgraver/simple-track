@@ -179,8 +179,9 @@
 
 @utility z-raised { z-index: 10; }
 @utility z-nav { z-index: 40; }
-@utility z-popover { z-index: 50; }
 @utility z-overlay { z-index: 60; }
+/* Above overlays so a menu opened inside a dialog or drawer shows on top of it. */
+@utility z-popover { z-index: 65; }
 @utility z-toast { z-index: 70; }
 
 @utility pt-safe { padding-top: env(safe-area-inset-top); }

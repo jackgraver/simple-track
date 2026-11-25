@@ -3,7 +3,6 @@ import { ChevronLeft, Menu } from "lucide-vue-next";
 import { computed } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { isDevEnvironment } from "~/composables/auth/session";
-import AccountMenu from "../AccountMenu.vue";
 import { IconButton } from "~/shared/ui";
 import { activeItem, isNavRoot, itemLocation } from "../nav";
 import { useNavDrawer } from "./useNavDrawer";
@@ -55,6 +54,5 @@ function goBack() {
         <span v-if="isDevEnvironment" class="rounded-control bg-surface-3 px-1.5 text-xs text-fg-muted"
             >dev</span
         >
-        <AccountMenu placement="header" />
     </header>
 </template>
