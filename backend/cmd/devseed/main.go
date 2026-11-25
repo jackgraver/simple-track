@@ -61,7 +61,7 @@ func run() error {
 	return nil
 }
 
-// Local midnight, the same day boundary the API uses (utils.ZerodTime). UTC midnight lands on the
+// Local midnight, the same day boundary the API uses (clock.ZerodTime). UTC midnight lands on the
 // previous local day west of UTC, so seeded logs would show up a day early.
 func today() time.Time {
 	n := time.Now()

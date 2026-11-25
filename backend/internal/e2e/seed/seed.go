@@ -32,7 +32,7 @@ const (
 // the server clock and the browser clock to it. Mirrored in e2e/fixtures (E2E_EPOCH).
 func Epoch() time.Time { return time.Date(2026, 1, 15, 12, 0, 0, 0, time.Local) }
 
-// EpochDay is local midnight of Epoch, the day boundary the API uses (utils.ZerodTime).
+// EpochDay is local midnight of Epoch, the day boundary the API uses (clock.ZerodTime).
 func EpochDay() time.Time {
 	e := Epoch()
 	return time.Date(e.Year(), e.Month(), e.Day(), 0, 0, 0, 0, time.Local)

@@ -215,7 +215,7 @@ func CopyPlannedMeals(fromOffset int, toOffsets []int) (int, error) {
 }
 
 func ReorderPlannedMeals(offset int, orderedIDs []uint) error {
-	day, err := dietrepo.FindDayByDate(utils.ZerodTime(offset))
+	day, err := dietrepo.FindDayByDate(clock.ZerodTime(offset))
 	if err != nil {
 		return err
 	}
@@ -223,7 +223,7 @@ func ReorderPlannedMeals(offset int, orderedIDs []uint) error {
 }
 
 func DeletePlannedMeal(offset int, plannedMealID uint) error {
-	day, err := dietrepo.FindDayByDate(utils.ZerodTime(offset))
+	day, err := dietrepo.FindDayByDate(clock.ZerodTime(offset))
 	if err != nil {
 		return err
 	}
@@ -267,7 +267,7 @@ func FindMealPlanDayByRowIDOrToday(dayID uint) (*models.DietDay, error) {
 	if dayID != 0 {
 		return MealPlanDayByID(int(dayID))
 	}
-	return FindMealPlanDay(utils.ZerodTime(0))
+	return FindMealPlanDay(clock.ZerodTime(0))
 }
 
 func DayWithTotalsForDay(day *models.DietDay) DayWithTotals {

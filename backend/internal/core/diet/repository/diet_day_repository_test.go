@@ -1,6 +1,7 @@
 package dietrepo_test
 
 import (
+	"be-simpletracker/internal/clock"
 	"be-simpletracker/internal/core/diet/models"
 	dietrepo "be-simpletracker/internal/core/diet/repository"
 	"be-simpletracker/internal/core/diet/testutil"
@@ -279,8 +280,8 @@ func TestDayByIDGeneric_notFound(t *testing.T) {
 func TestCopyPlannedMeals_appendsInOrderWithOwnMeals(t *testing.T) {
 	db := testutil.SetupTestDB(t)
 	plan := testutil.SeedPlan(t, db, "P")
-	src := testutil.SeedDay(t, db, utils.ZerodTime(0), plan.ID)
-	dst := testutil.SeedDay(t, db, utils.ZerodTime(-1), plan.ID)
+	src := testutil.SeedDay(t, db, clock.ZerodTime(0), plan.ID)
+	dst := testutil.SeedDay(t, db, clock.ZerodTime(-1), plan.ID)
 	food := testutil.SeedFood(t, db, "Oats", models.Food{ServingAmount: 1, Calories: 100})
 	a := testutil.SeedMeal(t, db, "A", food.ID, 1)
 	b := testutil.SeedMeal(t, db, "B", food.ID, 2)

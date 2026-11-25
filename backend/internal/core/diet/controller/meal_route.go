@@ -1,10 +1,10 @@
 package controller
 
 import (
+	"be-simpletracker/internal/clock"
 	"be-simpletracker/internal/core/diet/models"
 	dietrepo "be-simpletracker/internal/core/diet/repository"
 	"be-simpletracker/internal/core/diet/services"
-	"be-simpletracker/internal/utils"
 	"be-simpletracker/internal/utils/apierr"
 	"errors"
 	"fmt"
@@ -388,7 +388,7 @@ func PostNewMeal(c *gin.Context) {
 		return
 	}
 	if req.Log {
-		day, err := services.FindMealPlanDay(utils.ZerodTime(req.Offset))
+		day, err := services.FindMealPlanDay(clock.ZerodTime(req.Offset))
 		if err != nil {
 			apierr.Internal(c, err)
 			return
@@ -591,7 +591,7 @@ func PostPlannedFromSaved(c *gin.Context) {
 		apierr.Internal(c, err)
 		return
 	}
-	day, err := services.FindMealPlanDay(utils.ZerodTime(req.Offset))
+	day, err := services.FindMealPlanDay(clock.ZerodTime(req.Offset))
 	if err != nil {
 		apierr.Internal(c, err)
 		return
@@ -655,7 +655,7 @@ func PostPlannedReorder(c *gin.Context) {
 		apierr.BadRequest(c, err.Error())
 		return
 	}
-	day, err := services.FindMealPlanDay(utils.ZerodTime(req.Offset))
+	day, err := services.FindMealPlanDay(clock.ZerodTime(req.Offset))
 	if err != nil {
 		apierr.Internal(c, err)
 		return
@@ -691,7 +691,7 @@ func DeletePlannedMeal(c *gin.Context) {
 		apierr.Internal(c, err)
 		return
 	}
-	day, err := services.FindMealPlanDay(utils.ZerodTime(req.Offset))
+	day, err := services.FindMealPlanDay(clock.ZerodTime(req.Offset))
 	if err != nil {
 		apierr.Internal(c, err)
 		return

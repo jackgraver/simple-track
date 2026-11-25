@@ -28,3 +28,9 @@ func Set(t time.Time) { offset.Store(int64(time.Until(t))) }
 
 // Reset makes Now the real time again.
 func Reset() { offset.Store(0) }
+
+// ZerodTime returns local midnight of the day offset days before today (per Now).
+func ZerodTime(offset int) time.Time {
+	now := Now()
+	return time.Date(now.Year(), now.Month(), now.Day()-offset, 0, 0, 0, 0, now.Location())
+}

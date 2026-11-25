@@ -4,7 +4,6 @@ import (
 	"be-simpletracker/internal/clock"
 	"be-simpletracker/internal/core/workout/models"
 	workoutrepo "be-simpletracker/internal/core/workout/repository"
-	"be-simpletracker/internal/utils"
 	"context"
 	"errors"
 	"fmt"
@@ -15,7 +14,7 @@ import (
 )
 
 func GetOrCreateToday(ctx context.Context, offset int) (models.WorkoutLog, error) {
-	return GetOrCreateDay(ctx, utils.ZerodTime(offset))
+	return GetOrCreateDay(ctx, clock.ZerodTime(offset))
 }
 
 // GetOrCreateDay loads the workout log for day (local midnight), creating it with the plan
@@ -380,7 +379,7 @@ func UpsertMobilityPre(ctx context.Context, offset int, checked []string) (*Mobi
 	if err := workoutrepo.UpdatePreMobilityChecked(ctx, t.ID, filtered); err != nil {
 		return nil, err
 	}
-	reloaded, err := workoutrepo.LoadByDate(ctx, utils.ZerodTime(offset))
+	reloaded, err := workoutrepo.LoadByDate(ctx, clock.ZerodTime(offset))
 	if err != nil {
 		return nil, err
 	}
@@ -403,7 +402,7 @@ func UpsertMobilityPost(ctx context.Context, offset int, checked []string) (*Mob
 	if err := workoutrepo.UpdatePostMobilityChecked(ctx, t.ID, filtered); err != nil {
 		return nil, err
 	}
-	reloaded, err := workoutrepo.LoadByDate(ctx, utils.ZerodTime(offset))
+	reloaded, err := workoutrepo.LoadByDate(ctx, clock.ZerodTime(offset))
 	if err != nil {
 		return nil, err
 	}
@@ -419,7 +418,7 @@ func UpdateLoggedExercise(exercise models.LoggedExercise) error {
 }
 
 func RemoveLoggedExerciseForDay(ctx context.Context, offset int, exerciseID uint) error {
-	return workoutrepo.RemoveLoggedExerciseForDay(ctx, utils.ZerodTime(offset), exerciseID)
+	return workoutrepo.RemoveLoggedExerciseForDay(ctx, clock.ZerodTime(offset), exerciseID)
 }
 
 // ErrExerciseNotFound is returned when a set is logged for an exercise id that doesn't exist.

@@ -1,10 +1,10 @@
 package services_test
 
 import (
+	"be-simpletracker/internal/clock"
 	"be-simpletracker/internal/core/workout/models"
 	"be-simpletracker/internal/core/workout/services"
 	"be-simpletracker/internal/core/workout/testutil"
-	"be-simpletracker/internal/utils"
 	"context"
 	"strings"
 	"testing"
@@ -12,7 +12,7 @@ import (
 
 func TestUpsertMobilityPre_persistsChecked(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	today := utils.ZerodTime(0)
+	today := clock.ZerodTime(0)
 	plan := models.WorkoutPlan{
 		Name:             "MobilityTestPlan",
 		PreMobilityItems: []string{"A", "B", "C"},
@@ -45,7 +45,7 @@ func TestUpsertMobilityPre_persistsChecked(t *testing.T) {
 
 func TestUpsertMobilityPost_persistsChecked(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	today := utils.ZerodTime(0)
+	today := clock.ZerodTime(0)
 	plan := models.WorkoutPlan{
 		Name:              "MobilityTestPlan",
 		PostMobilityItems: []string{"X", "Y"},
