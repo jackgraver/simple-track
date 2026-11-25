@@ -413,7 +413,6 @@ const primaryAction = computed(() => {
                 <div class="flex h-[22rem] flex-col gap-2 lg:h-auto lg:min-h-0 lg:flex-1">
                     <h2 class="m-0 text-lg font-semibold">Saved meals</h2>
                     <SearchList
-                        :key="meal.ID"
                         :route="'diet/meals/saved-meal/all'"
                         :on-select="setMeal"
                         :display-component="SavedMealDisplay"
