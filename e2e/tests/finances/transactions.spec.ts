@@ -72,11 +72,9 @@ test.describe('finances', { tag: ['@finances'] }, () => {
     await expect(page.getByRole('link', { name: /Old name/ })).toHaveCount(0);
   });
 
-  // Data-loss risk: the UI adds the transaction and then records the new balance as two separate
-  // requests. If the second fails, the transaction is saved but the balance is stale, and the user
-  // sees an error toast, so a retry would double-count the deposit.
-  test('deposit whose balance update fails leaves the transaction saved (non-atomic)', async ({ page, api, e2e, db }) => {
-    test.fail(true, 'known: two non-atomic requests; pins current behaviour, flip when made atomic');
+  // The deposit and the new balance are written in one request, so if the balance write fails the
+  // deposit is rolled back too and a retry cannot double-count it.
+  test('deposit whose balance update fails rolls the transaction back (atomic)', async ({ page, api, e2e, db }) => {
     const acct = await api.createAccount({ name: 'Savings', opening_balance: 100 });
     await e2e.fault({ table: 'account_balances', op: 'create', times: 1 });
     await page.goto(`/finances/accounts/${acct.ID}`);
@@ -84,6 +82,6 @@ test.describe('finances', { tag: ['@finances'] }, () => {
     await page.getByRole('button', { name: 'Add deposit' }).click();
     await expect(page.getByText(/e2e fault: create account_balances/)).toBeVisible();
     const { rows } = await db.query(`SELECT count(*)::int AS n FROM investment_deposits WHERE account_id = $1`, [acct.ID]);
-    expect(rows[0].n).toBe(0); // atomic would roll the deposit back
+    expect(rows[0].n).toBe(0);
   });
 });

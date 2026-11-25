@@ -53,14 +53,16 @@ test.describe('optimistic UI', { tag: ['@optimistic'] }, () => {
       const overwrite = page.getByRole('dialog').getByText(/You already logged 180 lbs/);
 
       const gate = await e2e.hold('POST /tracking/weight');
+      const answered = page.waitForResponse((r) => r.request().method() === 'POST' && r.url().includes('/tracking/weight'));
       await save.click();
       await gate.arrived();
+      await expect(page.getByText('Saved', { exact: true })).toBeVisible(); // the toast lives 3s, so check it first
       await save.click();
       await expect(overwrite).toBeVisible(); // today's log exists only optimistically
       await page.getByRole('dialog').getByRole('button', { name: 'Cancel' }).click();
 
       await gate.release();
-      await expect(page.getByText('Saved', { exact: true })).toBeVisible();
+      await answered;
       await page.reload();
       await save.click();
       await expect(overwrite).toBeVisible(); // now from the server

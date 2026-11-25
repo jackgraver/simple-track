@@ -6,10 +6,6 @@ Details and reasoning live in the Findings section of [TASKS.md](TASKS.md).
 
 ## App bugs (found by specs, not fixed)
 
-- [ ] **Finances: deposit + balance is not atomic.** Two client requests (`POST .../transactions`, then
-      `PUT .../balances`). If the second fails the transaction is saved, the balance is stale and a retry
-      double-counts. Fix: one server endpoint in a DB transaction, then drop the `test.fail` in
-      `tests/finances/transactions.spec.ts`.
 - [ ] **Gym reps slider races its smooth scroll.** Looks fixed in `NumberSlider` (sync ends on reaching the
       target / `scrollend`); 390/390 flake runs passed. Drop this and the `scrollSettled` wait in
       `tests/gym/logger.ts` after a few more green runs.
