@@ -231,6 +231,20 @@ type CreateExerciseRequest struct {
 	RepRollover uint                    `json:"rep_rollover"`
 	Cues        string                  `json:"cues"`
 	LoadType    models.ExerciseLoadType `json:"load_type"`
+	// BaseWeight / WeightStep: absent or null = the load type's default.
+	BaseWeight models.Optional[float32] `json:"base_weight"`
+	WeightStep models.Optional[float32] `json:"weight_step"`
+}
+
+func (r CreateExerciseRequest) fields() services.ExerciseFields {
+	return services.ExerciseFields{
+		Name:        r.Name,
+		RepRollover: r.RepRollover,
+		Cues:        r.Cues,
+		LoadType:    r.LoadType,
+		BaseWeight:  r.BaseWeight,
+		WeightStep:  r.WeightStep,
+	}
 }
 
 func CreateExercise(c *gin.Context) {
@@ -249,8 +263,12 @@ func CreateExercise(c *gin.Context) {
 		request.RepRollover = 10
 	}
 
-	exercise, err := services.CreateExercise(request.Name, request.RepRollover, request.Cues, request.LoadType)
+	exercise, err := services.CreateExerciseWith(request.fields())
 	if err != nil {
+		if errors.Is(err, services.ErrInvalidExercise) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -258,12 +276,9 @@ func CreateExercise(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"exercise": exercise})
 }
 
-type updateExerciseRequest struct {
-	Name        string                  `json:"name"`
-	RepRollover uint                    `json:"rep_rollover"`
-	Cues        string                  `json:"cues"`
-	LoadType    models.ExerciseLoadType `json:"load_type"`
-}
+// updateExerciseRequest: base_weight / weight_step are left alone when absent and reset to the
+// load type's default when null.
+type updateExerciseRequest = CreateExerciseRequest
 
 func UpdateExercise(c *gin.Context) {
 	idStr := c.Param("id")
@@ -284,8 +299,12 @@ func UpdateExercise(c *gin.Context) {
 	if req.RepRollover == 0 {
 		req.RepRollover = 10
 	}
-	exercise, err := services.UpdateExercise(uint(id64), req.Name, req.RepRollover, req.Cues, req.LoadType)
+	exercise, err := services.UpdateExerciseWith(uint(id64), req.fields())
 	if err != nil {
+		if errors.Is(err, services.ErrInvalidExercise) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Exercise not found"})
 			return

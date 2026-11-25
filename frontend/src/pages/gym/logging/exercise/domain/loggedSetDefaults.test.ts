@@ -30,6 +30,7 @@ describe("initializeWeightAndReps", () => {
             reps: 0,
             weightSetup: "",
             notes: "",
+            plates: null,
         });
     });
 
@@ -43,6 +44,7 @@ describe("initializeWeightAndReps", () => {
             reps: 5,
             weightSetup: "",
             notes: "",
+            plates: null,
         });
     });
 
@@ -57,6 +59,7 @@ describe("initializeWeightAndReps", () => {
             reps: 10,
             weightSetup: "last",
             notes: "",
+            plates: null,
         });
     });
 
@@ -71,6 +74,7 @@ describe("initializeWeightAndReps", () => {
             reps: 15,
             weightSetup: "",
             notes: "",
+            plates: null,
         });
     });
 
@@ -84,6 +88,7 @@ describe("initializeWeightAndReps", () => {
             reps: 5,
             weightSetup: "belt",
             notes: "",
+            plates: null,
         });
     });
 
@@ -97,6 +102,7 @@ describe("initializeWeightAndReps", () => {
             reps: 6,
             weightSetup: "",
             notes: "",
+            plates: null,
         });
     });
 });

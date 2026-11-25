@@ -83,22 +83,26 @@ func seedGym(tx *gorm.DB) error {
 		lt   workm.ExerciseLoadType
 	}
 	defs := []ex{
-		{"Barbell Bench Press", workm.ExerciseLoadTypePlateLoadedWithBar},
-		{"Overhead Press", workm.ExerciseLoadTypePlateLoadedWithBar},
+		{"Barbell Bench Press", workm.ExerciseLoadTypePlateLoadedPerSide},
+		{"Overhead Press", workm.ExerciseLoadTypePlateLoadedPerSide},
 		{"Incline Dumbbell Press", workm.ExerciseLoadTypeFreeWeights},
 		{"Triceps Pushdown", workm.ExerciseLoadTypeWeightStack},
-		{"Barbell Row", workm.ExerciseLoadTypePlateLoadedWithBar},
+		{"Barbell Row", workm.ExerciseLoadTypePlateLoadedPerSide},
 		{"Lat Pulldown", workm.ExerciseLoadTypeWeightStack},
 		{"Dumbbell Curl", workm.ExerciseLoadTypeFreeWeights},
 		{"Face Pull", workm.ExerciseLoadTypeWeightStack},
-		{"Back Squat", workm.ExerciseLoadTypePlateLoadedWithBar},
-		{"Romanian Deadlift", workm.ExerciseLoadTypePlateLoadedWithBar},
-		{"Leg Press", workm.ExerciseLoadTypePlateLoadedWithoutBar},
+		{"Back Squat", workm.ExerciseLoadTypePlateLoadedPerSide},
+		{"Romanian Deadlift", workm.ExerciseLoadTypePlateLoadedPerSide},
+		{"Leg Press", workm.ExerciseLoadTypePlateLoadedPerSide},
 		{"Leg Curl", workm.ExerciseLoadTypeWeightStack},
 	}
 	exs := make([]workm.Exercise, len(defs))
 	for i, d := range defs {
 		exs[i] = workm.Exercise{Name: d.name, LoadType: d.lt, RepRollover: 12, Cues: "Controlled tempo, full range of motion."}
+		if d.name == "Leg Press" {
+			sled := float32(0) // the sled isn't counted
+			exs[i].BaseWeight = &sled
+		}
 	}
 	if err := tx.Create(&exs).Error; err != nil {
 		return err

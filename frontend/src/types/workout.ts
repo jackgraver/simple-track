@@ -40,9 +40,22 @@ export interface LoggedSet extends BaseModel {
     logged_exercise_id: number;
     reps: number;
     weight: number;
+    /** Plate text (e.g. "45 + 2×10"), still written for plate-loaded sets; parsed for old sets. */
     weight_setup: string;
+    /** Plates the set was lifted with (plate-loaded exercises). Null before migration 0008. */
+    plate_setup?: PlateSetup | null;
     /** Client-generated uuid (POST /workout/sets). Null on sets logged before G1. */
     client_id?: string | null;
+}
+
+export type PlateMode = "per_side" | "total";
+
+/** How a set was loaded: `plates` maps a plate's weight ("45", "2.5") to its count (per side in
+ *  per_side mode). `base` is the bar/sled weight at the time. */
+export interface PlateSetup {
+    base: number;
+    mode: PlateMode;
+    plates: Record<string, number>;
 }
 
 export interface LoggedExercise extends BaseModel {
@@ -59,7 +72,11 @@ export interface Exercise extends BaseModel {
     name: string;
     rep_rollover: number;
     cues: string;
-    load_type?: ExerciseLoadType;
+    load_type?: ExerciseLoadType | LegacyExerciseLoadType;
+    /** Bar/sled/starting weight; null means the load type's default (see domain/plates.ts). */
+    base_weight?: number | null;
+    /** Weight change per step; null means the load type's default. */
+    weight_step?: number | null;
     /** Machine positions (seat, pad, pulley). Not editable yet; null/absent means none. */
     machine_settings?: MachineSetting[] | null;
 }
@@ -70,14 +87,16 @@ export interface MachineSetting {
 }
 
 export type ExerciseLoadType =
-    | "plate_loaded_with_bar"
-    | "plate_loaded_without_bar"
+    | "plate_loaded_per_side"
     | "plate_loaded_total"
     | "weight_stack"
     | "free_weights";
 
+/** Load types from before migration 0008 (per side with base 45 / 0). Only seen in stale caches. */
+export type LegacyExerciseLoadType = "plate_loaded_with_bar" | "plate_loaded_without_bar";
+
 export const DEFAULT_EXERCISE_LOAD_TYPE: ExerciseLoadType =
-    "plate_loaded_with_bar";
+    "plate_loaded_per_side";
 
 export interface Cardio extends BaseModel {
     workout_log_id: number;

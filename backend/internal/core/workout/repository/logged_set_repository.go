@@ -69,6 +69,7 @@ type CreateSetInput struct {
 	Reps         uint
 	Weight       float32
 	WeightSetup  string
+	PlateSetup   *models.PlateSetup
 }
 
 type CreateSetResult struct {
@@ -103,6 +104,7 @@ func CreateSet(ctx context.Context, in CreateSetInput) (CreateSetResult, error) 
 			Reps:             in.Reps,
 			Weight:           in.Weight,
 			WeightSetup:      in.WeightSetup,
+			PlateSetup:       in.PlateSetup,
 		}
 		res := tx.Clauses(clause.OnConflict{Columns: []clause.Column{{Name: "client_id"}}, DoNothing: true}).Create(&set)
 		if res.Error != nil {
@@ -186,6 +188,8 @@ type SetPatch struct {
 	Reps        *uint
 	Weight      *float32
 	WeightSetup *string
+	// PlateSetup: Set with a nil Value clears it.
+	PlateSetup models.Optional[models.PlateSetup]
 }
 
 // UpdateSet applies patch to one set and returns it. gorm.ErrRecordNotFound if it doesn't exist.
@@ -205,11 +209,21 @@ func UpdateSet(ctx context.Context, ref SetRef, patch SetPatch) (models.LoggedSe
 		if patch.WeightSetup != nil {
 			updates["weight_setup"] = *patch.WeightSetup
 		}
-		if len(updates) == 0 {
+		if len(updates) == 0 && !patch.PlateSetup.Set {
 			return nil
 		}
-		if err := tx.Model(&models.LoggedSet{}).Where("id = ?", set.ID).Updates(updates).Error; err != nil {
-			return err
+		if len(updates) > 0 {
+			if err := tx.Model(&models.LoggedSet{}).Where("id = ?", set.ID).Updates(updates).Error; err != nil {
+				return err
+			}
+		}
+		if patch.PlateSetup.Set {
+			// A struct update with Select runs the jsonb serializer and writes NULL for nil.
+			if err := tx.Model(&models.LoggedSet{}).Where("id = ?", set.ID).
+				Select("plate_setup").
+				Updates(&models.LoggedSet{PlateSetup: patch.PlateSetup.Value}).Error; err != nil {
+				return err
+			}
 		}
 		return tx.First(&set, set.ID).Error
 	})

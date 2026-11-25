@@ -37,6 +37,11 @@ type LoggedSet struct {
 	Reps        uint    `json:"reps"`
 	Weight      float32 `json:"weight"`
 	WeightSetup string  `json:"weight_setup"`
+	// PlateSetup is the plates the set was lifted with (plate-loaded exercises only). Weight stays
+	// the logged total and can differ from what the plates add up to (a typed override). NULL for
+	// sets logged before migration 0008 and for other load types; clients then fall back to
+	// parsing WeightSetup.
+	PlateSetup *PlateSetup `json:"plate_setup" gorm:"type:jsonb;serializer:json"`
 }
 
 func (l LoggedSet) GetID() uint       { return l.ID }
@@ -45,20 +50,42 @@ func (l LoggedSet) TableName() string { return "logged_sets" }
 type ExerciseLoadType string
 
 const (
+	// ExerciseLoadTypePlateLoadedPerSide: plates on each side, plus the exercise's base weight
+	// (bar or sled; 0 when it isn't counted).
+	ExerciseLoadTypePlateLoadedPerSide ExerciseLoadType = "plate_loaded_per_side"
+	// ExerciseLoadTypePlateLoadedTotal: every plate counted once (single-peg machines).
+	ExerciseLoadTypePlateLoadedTotal ExerciseLoadType = "plate_loaded_total"
+	ExerciseLoadTypeWeightStack      ExerciseLoadType = "weight_stack"
+	ExerciseLoadTypeFreeWeights      ExerciseLoadType = "free_weights"
+
+	// Legacy values from before migration 0008, still accepted from old clients. Both become
+	// plate_loaded_per_side with base weight 45 / 0 (see LegacyLoadTypeBaseWeight).
 	ExerciseLoadTypePlateLoadedWithBar    ExerciseLoadType = "plate_loaded_with_bar"
 	ExerciseLoadTypePlateLoadedWithoutBar ExerciseLoadType = "plate_loaded_without_bar"
-	ExerciseLoadTypePlateLoadedTotal      ExerciseLoadType = "plate_loaded_total"
-	ExerciseLoadTypeWeightStack           ExerciseLoadType = "weight_stack"
-	ExerciseLoadTypeFreeWeights           ExerciseLoadType = "free_weights"
 )
 
 func NormalizeExerciseLoadType(loadType ExerciseLoadType) ExerciseLoadType {
 	switch loadType {
-	case ExerciseLoadTypePlateLoadedWithoutBar, ExerciseLoadTypePlateLoadedTotal, ExerciseLoadTypeWeightStack, ExerciseLoadTypeFreeWeights:
+	case ExerciseLoadTypePlateLoadedTotal, ExerciseLoadTypeWeightStack, ExerciseLoadTypeFreeWeights:
 		return loadType
 	default:
-		return ExerciseLoadTypePlateLoadedWithBar
+		return ExerciseLoadTypePlateLoadedPerSide
 	}
+}
+
+// LegacyLoadTypeBaseWeight is the base weight a legacy load type implies (45 with the bar, 0
+// without), or nil for any other value.
+func LegacyLoadTypeBaseWeight(loadType ExerciseLoadType) *float32 {
+	var base float32
+	switch loadType {
+	case ExerciseLoadTypePlateLoadedWithBar:
+		base = 45
+	case ExerciseLoadTypePlateLoadedWithoutBar:
+		base = 0
+	default:
+		return nil
+	}
+	return &base
 }
 
 // Exercise represents a type of exercise that can be performed in workouts
@@ -68,7 +95,13 @@ type Exercise struct {
 	Name        string           `gorm:"uniqueIndex;not null" json:"name"`
 	RepRollover uint             `json:"rep_rollover"`
 	Cues        string           `json:"cues"`
-	LoadType    ExerciseLoadType `gorm:"type:text;not null;default:plate_loaded_with_bar" json:"load_type"`
+	LoadType    ExerciseLoadType `gorm:"type:text;not null;default:plate_loaded_per_side" json:"load_type"`
+	// BaseWeight is what's loaded before any plates: the bar, sled or machine's starting weight.
+	// nil means the load type's default (45 for plates per side, 0 otherwise).
+	BaseWeight *float32 `json:"base_weight"`
+	// WeightStep is the automatic increase (after every set hits the rollover) and the +/- step.
+	// nil means the client's default, 5 lb.
+	WeightStep *float32 `json:"weight_step"`
 	// MachineSettings holds per-exercise machine positions (seat 4, pad 2, pulley top),
 	// shown on the logging screen. Read-only for now: no endpoint writes it yet.
 	MachineSettings []MachineSetting `gorm:"type:jsonb;serializer:json" json:"machine_settings"`

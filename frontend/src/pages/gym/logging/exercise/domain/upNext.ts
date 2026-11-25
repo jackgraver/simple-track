@@ -2,7 +2,8 @@ import type { MachineSetting } from "~/types/workout";
 import type { ExerciseGroup } from "../../store/useWorkoutStore";
 import { formatSets, type WorkoutStep } from "../../domain/workoutSteps";
 import { initializeWeightAndReps } from "./loggedSetDefaults";
-import { getWeightProgression, WEIGHT_PROGRESSION_INCREASE_LBS } from "./weightProgression";
+import { getWeightProgression } from "./weightProgression";
+import { weightStepFor } from "./plates";
 import { overloadStatus, visibleMachineSettings, type OverloadStatus } from "./liveLogging";
 
 export type UpNextItem = {
@@ -20,7 +21,8 @@ export type UpNextItem = {
 
 const exerciseIdOf = (g: ExerciseGroup | undefined) => g?.planned?.ID ?? g?.logged?.exercise_id ?? null;
 
-/** Same rule the logging screen applies on open: last session's top weight, +5 if every set hit the rollover. */
+/** Same rule the logging screen applies on open: last session's top weight, plus the exercise's
+ *  weight step (default 5) if every set hit the rollover. */
 export function openingWeight(group: ExerciseGroup): number {
     const { weight } = initializeWeightAndReps(group.logged?.sets, group.previous?.sets);
     if (group.logged?.sets?.length) return weight;
@@ -28,7 +30,7 @@ export function openingWeight(group: ExerciseGroup): number {
         group.previous?.sets,
         group.previous?.exercise?.rep_rollover,
         weight,
-        WEIGHT_PROGRESSION_INCREASE_LBS,
+        weightStepFor(group.planned ?? group.logged?.exercise ?? group.previous?.exercise),
     );
     return progression?.nextWeight ?? weight;
 }

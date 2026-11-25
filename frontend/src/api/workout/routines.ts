@@ -220,7 +220,15 @@ export function exerciseKeys() {
     return [workoutKeys.exercises.all, searchListKeys.all, PROGRAMS, workoutKeys.plans.all, workoutKeys.days.all];
 }
 
-export type ExerciseInput = { name: string; rep_rollover: number; cues: string; load_type?: ExerciseLoadType };
+/** `base_weight` / `weight_step`: null resets to the load type's default; omitted leaves them alone. */
+export type ExerciseInput = {
+    name: string;
+    rep_rollover: number;
+    cues: string;
+    load_type?: ExerciseLoadType;
+    base_weight?: number | null;
+    weight_step?: number | null;
+};
 
 /** Unique names fail often, so this waits for the server; callers show the error inline. */
 export function useCreateExercise() {

@@ -23,10 +23,6 @@ vi.mock("@tanstack/vue-query", async (orig) => ({
     useQueryClient: () => qcRef.qc,
 }));
 vi.mock("~/composables/useGlobalRestTimer", () => ({ useGlobalRestTimer: () => ({ start: vi.fn() }) }));
-vi.mock("./useGymWeightPrefs", async () => {
-    const { ref } = await import("vue");
-    return { useGymWeightPrefs: () => ({ weightIncrement: ref(2.5), setWeightIncrement: vi.fn() }) };
-});
 vi.mock("~/composables/useWebStorageJsonSync", () => ({
     useWebStorageJsonSync: () => ({ restore: () => false, setSaveEnabled: vi.fn(), clear: vi.fn() }),
 }));
@@ -77,11 +73,11 @@ let qc: QueryClient;
 let scope: EffectScope;
 let unsubscribe: () => void;
 
-function openSession() {
+function openSession(exerciseId = BENCH) {
     // The page reads the group from the day query; mirror the cache into a ref the same way.
-    const group = shallowRef(findGroup(qc.getQueryData(KEY), BENCH) ?? null);
+    const group = shallowRef(findGroup(qc.getQueryData(KEY), exerciseId) ?? null);
     unsubscribe = qc.getQueryCache().subscribe(() => {
-        group.value = findGroup(qc.getQueryData(KEY), BENCH) ?? null;
+        group.value = findGroup(qc.getQueryData(KEY), exerciseId) ?? null;
     });
     return scope.run(() =>
         useExerciseLoggingSession({
@@ -264,5 +260,101 @@ describe("an exercise opened before its history is cached", () => {
         await nextTick();
         expect(s.currentWeight).toBe(0);
         expect(s.currentReps).toBe(5);
+    });
+});
+
+describe("plates follow the weight", () => {
+    // Its own id: the optimistic write scopes are module-global, and earlier tests leave the
+    // bench's scope held by writes that never settle.
+    const SQUAT = 8;
+    const barbell: Exercise = {
+        ...exercise,
+        ID: SQUAT,
+        name: "Squat",
+        load_type: "plate_loaded_per_side",
+        base_weight: 45,
+        rep_rollover: 10,
+    };
+    const lastTime = (weight: number, plates: Record<string, number> | null, weight_setup = ""): LoggedExercise =>
+        logged(
+            [1, 2, 3].map((n) => ({
+                ...set(n, `p${n}`, 10),
+                weight,
+                weight_setup,
+                plate_setup: plates ? { base: 45, mode: "per_side" as const, plates } : null,
+            })),
+            { exercise: barbell, exercise_id: SQUAT },
+        );
+    const openWith = (previous: LoggedExercise, planned: Exercise = barbell) => {
+        qc.setQueryData(KEY, { ...day(), planned_exercises: [{ planned, previous }] });
+        return openSession(SQUAT);
+    };
+
+    it("the automatic increase loads the new weight onto last time's plates, and undo takes it off", async () => {
+        const s = openWith(lastTime(135, { 45: 1 }));
+        await nextTick();
+        expect(s.weightProgression?.nextWeight).toBe(140);
+        expect(s.currentWeight).toBe(140);
+        expect(s.currentPlates).toEqual({ 45: 1, 2.5: 1 });
+        expect(s.plateLoad).toBe(140);
+
+        s.undoWeightProgression();
+        expect(s.currentWeight).toBe(135);
+        expect(s.currentPlates).toEqual({ 45: 1 });
+    });
+
+    it("works the plates out for sets logged before plates were stored", async () => {
+        const s = openWith(lastTime(225, null, "free text"));
+        await nextTick();
+        expect(s.currentWeight).toBe(230);
+        expect(s.currentPlates).toEqual({ 45: 2, 2.5: 1 });
+    });
+
+    it("uses the exercise's weight step for the increase and +/-, and saves the plates with the set", async () => {
+        http.apiPOST.mockImplementation(async (_url: string, body: LoggedSet & { client_id: string }) => {
+            const saved = { ...set(11, body.client_id, body.reps), weight: body.weight, plate_setup: body.plate_setup };
+            return {
+                exercise: logged([saved], { exercise: barbell, exercise_id: SQUAT }),
+                set: saved,
+                created: true,
+                first_set_of_day: false,
+            };
+        });
+        const s = openWith(lastTime(135, { 45: 1 }), { ...barbell, weight_step: 10 });
+        await nextTick();
+        // An exercise set to +10 goes up by 10 (5 a side) when it earns an increase...
+        expect(s.weightProgression).toMatchObject({ previousWeight: 135, nextWeight: 145, increase: 10 });
+        expect(s.currentPlates).toEqual({ 45: 1, 5: 1 });
+        // ...and +/- step by 10 too.
+        s.undoWeightProgression();
+        expect(s.currentPlates).toEqual({ 45: 1 });
+        expect(s.weightIncrement).toBe(10);
+        s.stepWeight("plus");
+        expect(s.currentWeight).toBe(145);
+        expect(s.currentPlates).toEqual({ 45: 1, 5: 1 });
+
+        expect(s.addNextSet()).toBe(true);
+        expect(s.loggedSets[0]).toMatchObject({ weight: 145, plate_setup: { plates: { 45: 1, 5: 1 } } });
+        await vi.advanceTimersByTimeAsync(0);
+        expect(s.loggedSets[0]).toMatchObject({ weight: 145, plate_setup: { plates: { 45: 1, 5: 1 } } });
+        expect(http.apiPOST).toHaveBeenCalledWith(
+            "/workout/sets",
+            expect.objectContaining({
+                weight: 145,
+                weight_setup: "45 + 5",
+                plate_setup: { base: 45, mode: "per_side", plates: { 45: 1, 5: 1 } },
+            }),
+        );
+    });
+
+    it("keeps hand-picked plates that don't match the weight", async () => {
+        const s = openWith(lastTime(135, { 45: 1 }));
+        await nextTick();
+        s.updatePlates({ 45: 1, 25: 1 });
+        expect(s.currentWeight).toBe(140);
+        expect(s.plateLoad).toBe(185);
+        s.updatePlates({ 45: 1, 25: 1 }, { setWeight: true });
+        expect(s.currentWeight).toBe(185);
+        expect(s.currentPlates).toEqual({ 45: 1, 25: 1 });
     });
 });
