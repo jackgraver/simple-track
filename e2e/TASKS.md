@@ -48,8 +48,7 @@ reload. Add the module's API helpers to `fixtures/api.ts` as needed.
       - history: last session's set shows as "Last" next to today's
       - mobile: on a short phone the Log button is pinned above the tab bar (mobile project only)
       - dropped response (hold after + drop): retry with the same client_id, exactly one set
-      - todo: weight/plates edit, notes, finish + "Up next", cardio/mobility, add/remove exercise,
-        offline log, persistent save failure ("Didn't save" + Retry), plans pages, progression, weight, steps
+      - todo: see "Not yet" in the lane entries below.
       - [x] tracking (`tests/gym/weight.spec.ts`, `steps.spec.ts`, `progression.spec.ts`,
             `tracking-load-errors.spec.ts`): weight save, Renpho import (+ rejected CSV), past day in
             Toronto late evening; steps save + overwrite/cancel/invalid; progression list per range, empty

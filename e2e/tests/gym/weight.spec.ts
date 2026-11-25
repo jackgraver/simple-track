@@ -1,5 +1,6 @@
 import type { Page } from '@playwright/test';
 import { expect, test, waitForApi } from '../../fixtures';
+import { scrollSettled } from './logger';
 
 // /gym/weight has no list: the history is a canvas chart. What the page shows as text is the slider's
 // value (prefilled with the selected day's log, else the latest one), the metrics card for the selected
@@ -11,24 +12,11 @@ const IMPORT = 'POST /tracking/weight/import';
 const sliderValue = (page: Page) => page.getByRole('paragraph').filter({ hasText: /^\s*[\d.]+\s*$/ }).first();
 const saveButton = (page: Page) => page.getByRole('button', { name: 'Save', exact: true });
 
-/** Click a slider tick and wait for its smooth scroll to settle (see logging.spec.ts, setReps). */
+/** Click a slider tick and wait for its smooth scroll to settle (see ./logger, pickSliderValue). */
 async function pickWeight(page: Page, value: string) {
   await page.getByRole('button', { name: value, exact: true }).click();
   await expect(sliderValue(page)).toHaveText(value);
-  await page.evaluate(
-    () =>
-      new Promise<void>((done) => {
-        let timer = setTimeout(done, 300);
-        document.addEventListener(
-          'scroll',
-          () => {
-            clearTimeout(timer);
-            timer = setTimeout(done, 300);
-          },
-          { capture: true },
-        );
-      }),
-  );
+  await scrollSettled(page);
   await expect(sliderValue(page)).toHaveText(value);
 }
 
