@@ -2,7 +2,7 @@ import { createRouter, createWebHistory, START_LOCATION } from "vue-router";
 import type { RouteRecordRaw } from "vue-router";
 import { authStatus } from "~/composables/auth/session";
 import { resolveAuthSession } from "~/composables/auth/useAuth";
-import { loadLastRoute, saveLastRoute } from "~/utils/lastRoute";
+import { isExpiredLoggingResume, loadLastRoute, saveLastRoute } from "~/utils/lastRoute";
 import { dietQueries } from "~/api/diet/queries";
 import { mediaQueries } from "~/api/media/queries";
 import { moneyQueries } from "~/api/money/queries";
@@ -18,8 +18,10 @@ declare module "vue-router" {
         breadcrumb?: string;
         /** Show the day picker (pages that read `?offset=`). Inherited by children. */
         dated?: boolean;
-        /** Page supplies its own header: hide the mobile top bar (tab bar and sidebar stay). */
+        /** Page supplies its own header: hide the mobile top bar (sidebar and drawer stay). */
         focus?: boolean;
+        /** Route name of this page's parent. Header Back goes there instead of through history. */
+        backTo?: string;
         /** Multi-column workspace: wider desktop content column (`spacing-content-wide`). */
         wide?: boolean;
         /**
@@ -125,6 +127,7 @@ const routes: RouteRecordRaw[] = [
                 meta: {
                     breadcrumb: "Logging",
                     dated: false,
+                    backTo: "gym",
                 },
             },
             {
@@ -143,14 +146,14 @@ const routes: RouteRecordRaw[] = [
                 name: "logging-cardio",
                 component: () =>
                     import("~/pages/gym/logging/exercise/[id].vue"),
-                meta: { breadcrumb: "Cardio" },
+                meta: { breadcrumb: "Cardio", focus: true },
             },
             {
                 path: "logging/mobility/:slot",
                 name: "logging-mobility",
                 component: () =>
                     import("~/pages/gym/logging/exercise/[id].vue"),
-                meta: { breadcrumb: "Mobility" },
+                meta: { breadcrumb: "Mobility", focus: true },
             },
             {
                 path: "progression",
@@ -257,12 +260,13 @@ function isStandalone(): boolean {
 }
 
 function resolveSavedRoute(): string | null {
-    const saved = loadLastRoute();
-    if (!saved) return null;
-    const target = router.resolve(saved);
+    const entry = loadLastRoute();
+    if (!entry) return null;
+    const target = router.resolve(entry.path);
     if (!target.name || target.name === "not-found" || target.name === "signin" || target.name === "launch") {
         return null;
     }
+    if (isExpiredLoggingResume(entry)) return router.resolve({ name: "gym" }).fullPath;
     return target.fullPath;
 }
 

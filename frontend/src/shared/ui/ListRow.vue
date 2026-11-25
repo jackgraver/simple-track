@@ -31,7 +31,7 @@ const interactive = computed(() => !props.disabled && (!!props.to || clickable.v
             class="flex min-h-touch min-w-0 flex-1 items-center gap-3 px-3 py-2 text-left text-base text-fg no-underline lg:min-h-row lg:px-4 lg:text-sm"
             :class="[
                 interactive
-                    ? 'cursor-pointer focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent'
+                    ? 'cursor-pointer active:bg-surface-3 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent'
                     : '',
                 disabled ? 'cursor-not-allowed' : '',
             ]"
