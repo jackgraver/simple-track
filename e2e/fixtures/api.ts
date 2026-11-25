@@ -96,4 +96,19 @@ export class Api {
   saveWeight(date: string, weight_lbs: number) {
     return this.post('/tracking/weight', { date, weight_lbs });
   }
+
+  // gym session
+
+  /** Planned cardio for a workout plan (an empty type clears it). */
+  async setPlannedCardio(planId: number, type: string, minutes: number) {
+    const path = `/workout/plans/${planId}/planned-cardio`;
+    await this.check(await this.request.put(this.baseUrl + path, { data: { type, minutes } }), `PUT ${path}`);
+  }
+
+  /** Planned warmup (pre) and stretching (post) checklists for a workout plan. */
+  async setPlannedMobility(planId: number, items: { pre?: string[]; post?: string[] }) {
+    const path = `/workout/plans/${planId}/planned-mobility`;
+    const data = { pre_mobility_items: items.pre ?? [], post_mobility_items: items.post ?? [] };
+    await this.check(await this.request.put(this.baseUrl + path, { data }), `PUT ${path}`);
+  }
 }
