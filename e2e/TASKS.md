@@ -50,6 +50,11 @@ reload. Add the module's API helpers to `fixtures/api.ts` as needed.
       - dropped response (hold after + drop): retry with the same client_id, exactly one set
       - todo: weight/plates edit, notes, finish + "Up next", cardio/mobility, add/remove exercise,
         offline log, persistent save failure ("Didn't save" + Retry), plans pages, progression, weight, steps
+      - [x] home (`tests/gym/home.spec.ts`): Today card states (fresh `@smoke`, in progress, complete),
+            Start workout; plan switching (swap, rest day + Train anyway, swap away and back keeps the sets,
+            switch failure rolls back); week strip status, streak, day navigation, week paging; load errors
+            recover with Retry. Not yet: "Other plans…" dialog, Log freestyle, switching a past/future day,
+            switch pending state, streak without a program.
 - [x] **B3. Diet**: specs in `tests/diet/quick-log.spec.ts` (Quick log, the simplest logged-meal path).
       Done: log (optimistic, persists after reload, `@smoke`); edit (replaces the row, exactly one logged
       meal left); delete via confirm dialog (other meal survives reload).

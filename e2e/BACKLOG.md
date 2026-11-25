@@ -16,6 +16,10 @@ Details and reasoning live in the Findings section of [TASKS.md](TASKS.md).
       error to internal). Decide the status (409?), then pin it in a spec.
 - [ ] **Diet meal edit is create-then-delete** (`replace_meal_id`). A failure between the two could lose or
       duplicate the meal. Needs a fault test, then probably a single server call.
+- [ ] **Gym: switching a day's plan returns 400 with the raw DB error.** `controller.SwitchPlan` maps every
+      error to 400 and puts `err.Error()` in the body, so the toast shows a Postgres message instead of
+      "Couldn’t switch the plan", and 5xx monitoring misses it. Fix: 404 for a missing plan, 500 otherwise;
+      then drop the `test.fail` and `allowedErrors` in `tests/gym/home.spec.ts`.
 
 ## Product decisions needed
 

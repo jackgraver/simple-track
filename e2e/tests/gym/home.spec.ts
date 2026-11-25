@@ -1,5 +1,6 @@
 import type { Page } from '@playwright/test';
 import { expect, test, waitForApi } from '../../fixtures';
+import type { E2E } from '../../fixtures/e2e';
 
 // The /gym home page: the Today card (state, plan switching) and the week strip (status, streak,
 // day and week navigation). Seed: the epoch is Thu 2026-01-15; the active program "Push Pull Legs"
@@ -132,19 +133,29 @@ test.describe('gym home: plan switching', { tag: ['@gym'] }, () => {
   test.describe(() => {
     // SwitchPlan maps every error to 400, so the browser logs a 4xx (see notes: bug).
     test.use({ allowedErrors: [/status of 400/] });
-    test('switch failure: error toast, the plan stays Legs', async ({ page, e2e }) => {
+    async function failSwitch(page: Page, e2e: E2E) {
       await openHome(page);
       await expect(planHeading(page, 'Legs')).toBeVisible();
       await e2e.fault({ table: 'workout_logs', op: 'update', times: 1 });
       await page.getByRole('button', { name: 'Change workout' }).click();
       await page.getByRole('menuitem', { name: 'Push' }).click();
-      // The toast shows the server's raw error text (see notes: SwitchPlan returns DB errors as 400).
-      await expect(page.getByText('e2e fault: update workout_logs', { exact: true })).toBeVisible();
+    }
+
+    test('switch failure: error toast, the plan stays Legs', async ({ page, e2e }) => {
+      await failSwitch(page, e2e);
+      // Today the toast carries the raw server error (BACKLOG); accept it or the intended copy.
+      await expect(page.getByText(/^(e2e fault: update workout_logs|Couldn’t switch the plan)$/)).toBeVisible();
       await expect(page.getByText('Workout plan updated')).toHaveCount(0);
       await expect(planHeading(page, 'Legs')).toBeVisible();
       await page.reload();
       await expect(planHeading(page, 'Legs')).toBeVisible();
       await expect(page.getByText('4 lifts', { exact: true })).toBeVisible();
+    });
+
+    test('switch failure: the toast says "Couldn’t switch the plan", not the server error', async ({ page, e2e }) => {
+      test.fail(true, 'bug: SwitchPlan returns the raw DB error as a 400 (e2e/BACKLOG.md)');
+      await failSwitch(page, e2e);
+      await expect(page.getByText('Couldn’t switch the plan', { exact: true })).toBeVisible({ timeout: 3_000 });
     });
   });
 });
