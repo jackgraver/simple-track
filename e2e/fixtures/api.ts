@@ -161,9 +161,36 @@ export class Api {
       .map((m) => m.meal?.name ?? m.name ?? '');
   }
 
+  /** Drink-size presets are stored in oz. */
   async createDrinkSize(name: string, amount_oz: number) {
-    const r = await this.post<{ preset: { ID: number; name: string } }>('/tracking/water/presets', { name, amount_oz });
-    return r.preset;
+    return (await this.post<{ preset: { ID: number; name: string; amount_oz: number } }>('/tracking/water/presets', { name, amount_oz })).preset;
+  }
+
+  // diet targets
+
+  /** Body profile (height, age, sex, activity). Gives /diet/targets a formula TDEE to anchor the goal chips on. */
+  saveProfile(p: { height_in: number; age: number; sex: 'male' | 'female'; activity_level?: string }) {
+    return this.request
+      .put(this.baseUrl + '/tracking/profile', { data: { activity_level: 'moderately_active', ...p } })
+      .then((r) => this.check(r, 'PUT /tracking/profile'));
+  }
+
+  /** The profile row (null before it is saved). */
+  async profile() {
+    return (await this.get<{ profile: { activity_level: string } | null }>('/tracking/profile')).profile;
+  }
+
+  /** Every diet plan row, as the targets history lists them. */
+  async dietPlans() {
+    return (
+      await this.get<{ plans: { ID: number; name: string; calories: number; protein: number; carbs: number; fat: number; fiber: number; effective_from: string }[] }>(
+        '/diet/plans/plan/all',
+      )
+    ).plans;
+  }
+
+  async drinkSizes() {
+    return (await this.get<{ presets: { ID: number; name: string; amount_oz: number }[] }>('/tracking/water/presets')).presets;
   }
 }
 
@@ -171,6 +198,7 @@ export class Api {
 export interface DietDayResponse {
   day: {
     ID: number;
+    plan: { ID: number; name: string; calories: number; protein: number };
     plannedMeals: { ID: number; meal_id: number; display_order?: number; name?: string; meal: { ID: number; name: string } }[];
     loggedMeals: { ID: number; meal_id: number; meal: { ID: number; name: string } }[];
   };
