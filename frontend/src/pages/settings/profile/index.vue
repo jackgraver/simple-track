@@ -4,8 +4,6 @@ import { computed, ref, watch } from 'vue';
 import { Button, Card, ErrorState, PageHeader, Section, Skeleton, useDelayedFlag } from '~/shared/ui';
 import { useProfile, useSaveProfile } from '~/api/tracking/queries';
 import { toast } from '~/composables/toast/useToast';
-import AccountSection from '../AccountSection.vue';
-import AppearanceSection from '../AppearanceSection.vue';
 import BodyProfileForm from './BodyProfileForm.vue';
 
 const { data: profileRow, isPending, isError, error, refetch } = useProfile();
@@ -49,8 +47,7 @@ async function save() {
 
 <template>
     <div class="mx-auto flex w-full max-w-md flex-col gap-6 pb-8">
-        <PageHeader title="Settings" />
-        <AppearanceSection />
+        <PageHeader title="Profile" />
         <Section title="Body profile">
             <p class="m-0 text-sm text-fg-muted">
                 Used for TDEE estimates on macro targets. Weight comes from your latest weight log.
@@ -79,6 +76,5 @@ async function save() {
                 </Button>
             </form>
         </Section>
-        <AccountSection />
     </div>
 </template>

@@ -1,12 +1,11 @@
 <script setup lang="ts">
 import { useRoute } from "vue-router";
-import { useAuth } from "~/composables/auth/useAuth";
 import { isDevEnvironment } from "~/composables/auth/session";
+import AccountMenu from "./AccountMenu.vue";
 import NavLink from "./NavLink.vue";
 import { isItemActive, itemLocation, navGroups } from "./nav";
 
 const route = useRoute();
-const { getUsername } = useAuth();
 </script>
 
 <template>
@@ -56,14 +55,8 @@ const { getUsername } = useAuth();
             </section>
         </nav>
 
-        <div class="flex items-center justify-between gap-2 border-t border-line px-5 py-3">
-            <NavLink
-                v-if="getUsername()"
-                :to="{ name: 'settings-profile' }"
-                class="truncate text-sm text-fg-muted hover:text-fg"
-                active-class="text-fg"
-                >{{ getUsername() }}</NavLink
-            >
+        <div class="border-t border-line p-3">
+            <AccountMenu variant="row" />
         </div>
     </aside>
 </template>

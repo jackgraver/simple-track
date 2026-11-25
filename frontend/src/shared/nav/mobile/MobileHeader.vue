@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { Check, ChevronDown, ChevronLeft, CircleUser } from "lucide-vue-next";
+import { Check, ChevronDown, ChevronLeft } from "lucide-vue-next";
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { isDevEnvironment } from "~/composables/auth/session";
+import AccountMenu from "../AccountMenu.vue";
 import NavLink from "../NavLink.vue";
 import { IconButton } from "~/shared/ui";
 import {
@@ -117,12 +118,6 @@ onUnmounted(() => {
         <span v-if="isDevEnvironment" class="rounded-control bg-surface-3 px-1.5 text-xs text-fg-muted"
             >dev</span
         >
-        <NavLink
-            :to="{ name: 'settings-profile' }"
-            class="flex size-touch items-center justify-center rounded-control text-fg-muted hover:bg-surface-3 hover:text-fg"
-            aria-label="Profile"
-        >
-            <CircleUser class="size-6" />
-        </NavLink>
+        <AccountMenu variant="compact" />
     </header>
 </template>
