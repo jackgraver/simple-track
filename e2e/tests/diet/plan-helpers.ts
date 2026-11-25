@@ -8,11 +8,11 @@ export const FOOD = { chicken: 1, rice: 2, egg: 3, oats: 4, banana: 5 } as const
 
 /** Saved meals with easy-to-read calories: Oats bowl 150, Banana 105, Chicken and rice 460. */
 export async function createSavedMeals(api: Api) {
-  const oats = await api.createSavedMeal('Oats bowl', [{ foodId: FOOD.oats, amount: 1 }]);
-  const banana = await api.createSavedMeal('Banana', [{ foodId: FOOD.banana, amount: 1 }]);
+  const oats = await api.createSavedMeal('Oats bowl', [{ food_id: FOOD.oats, amount: 1 }]);
+  const banana = await api.createSavedMeal('Banana', [{ food_id: FOOD.banana, amount: 1 }]);
   const chicken = await api.createSavedMeal('Chicken and rice', [
-    { foodId: FOOD.chicken, amount: 2 },
-    { foodId: FOOD.rice, amount: 1 },
+    { food_id: FOOD.chicken, amount: 2 },
+    { food_id: FOOD.rice, amount: 1 },
   ]);
   return { oats, banana, chicken };
 }
