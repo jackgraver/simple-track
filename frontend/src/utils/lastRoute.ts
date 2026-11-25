@@ -65,3 +65,9 @@ export function loadLastRoute(now = Date.now()): LastRoute | null {
     }
     return parse(local, now) ?? parse(readCookie(), now);
 }
+
+export const LOGGING_RESUME_WINDOW_MS = 3 * 60 * 60 * 1000;
+
+export function isExpiredLoggingResume(entry: LastRoute, now = Date.now()): boolean {
+    return entry.path.startsWith("/gym/logging") && now - entry.at > LOGGING_RESUME_WINDOW_MS;
+}

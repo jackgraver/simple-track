@@ -59,37 +59,31 @@ const mobilityLoggedForRoute = computed(() => {
     return null;
 });
 
-const emptyMessage = computed(() => {
-    if (loggingKind.value === "mobility") return "Mobility not found";
-    return "Logging item not found";
-});
-
-const staleExercise = computed(
+const exerciseNotInDay = computed(
     () => loggingKind.value === "exercise" && !pending.value && !error.value && !exerciseGroupForShell.value,
 );
+
 watch(
-    staleExercise,
-    (stale) => {
-        if (stale) router.replace({ name: "gym" });
+    exerciseNotInDay,
+    (notInDay) => {
+        if (notInDay) router.replace({ name: "gym" });
     },
     { immediate: true },
 );
 
-const isEmpty = computed(() => {
-    if (pending.value) return false;
-    if (loggingKind.value === "mobility") return !mobilityLoggedForRoute.value;
-    return false;
-});
+const isMobilityMissing = computed(
+    () => !pending.value && loggingKind.value === "mobility" && !mobilityLoggedForRoute.value,
+);
 </script>
 
 <template>
-    <template v-if="staleExercise" />
+    <template v-if="exerciseNotInDay" />
     <LoggingPageShell
         v-else-if="loggingKind === 'exercise'"
         :pending="pending"
         :error="error"
-        :empty="isEmpty"
-        :empty-message="emptyMessage"
+        :empty="isMobilityMissing"
+        empty-message="Mobility not found"
         @back="goBackToLogging"
         @retry="refetch()"
     >
@@ -99,8 +93,8 @@ const isEmpty = computed(() => {
         v-else
         :pending="pending"
         :error="error"
-        :empty="isEmpty"
-        :empty-message="emptyMessage"
+        :empty="isMobilityMissing"
+        empty-message="Mobility not found"
         @back="goBackToLogging"
         @retry="refetch()"
     >
