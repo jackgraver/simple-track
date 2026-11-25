@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { ChevronLeft, CircleUser, Menu } from "lucide-vue-next";
+import { ChevronLeft, Menu } from "lucide-vue-next";
 import { computed } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { isDevEnvironment } from "~/composables/auth/session";
-import NavLink from "../NavLink.vue";
+import AccountMenu from "../AccountMenu.vue";
 import { IconButton } from "~/shared/ui";
 import { activeItem, isNavRoot, itemLocation } from "../nav";
 import { useNavDrawer } from "./useNavDrawer";
@@ -55,12 +55,6 @@ function goBack() {
         <span v-if="isDevEnvironment" class="rounded-control bg-surface-3 px-1.5 text-xs text-fg-muted"
             >dev</span
         >
-        <NavLink
-            :to="{ name: 'settings-profile' }"
-            class="flex size-touch items-center justify-center rounded-control text-fg-muted hover:bg-surface-3 hover:text-fg"
-            aria-label="Profile"
-        >
-            <CircleUser class="size-6" />
-        </NavLink>
+        <AccountMenu placement="header" />
     </header>
 </template>

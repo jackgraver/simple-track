@@ -1,10 +1,8 @@
 <script setup lang="ts">
-import { useAuth } from "~/composables/auth/useAuth";
 import { isDevEnvironment } from "~/composables/auth/session";
+import AccountMenu from "./AccountMenu.vue";
 import NavLink from "./NavLink.vue";
 import NavTree from "./NavTree.vue";
-
-const { getUsername } = useAuth();
 </script>
 
 <template>
@@ -22,14 +20,8 @@ const { getUsername } = useAuth();
 
         <NavTree class="flex-1 overflow-y-auto px-3 pb-4" />
 
-        <div class="flex items-center justify-between gap-2 border-t border-line px-5 py-3">
-            <NavLink
-                v-if="getUsername()"
-                :to="{ name: 'settings-profile' }"
-                class="truncate text-sm text-fg-muted hover:text-fg"
-                active-class="text-fg"
-                >{{ getUsername() }}</NavLink
-            >
+        <div class="border-t border-line p-3">
+            <AccountMenu placement="sidenav" />
         </div>
     </aside>
 </template>

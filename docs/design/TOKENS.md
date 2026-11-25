@@ -48,6 +48,7 @@ never class names. Don't use Tailwind's `dark:` variant: the tokens flip on thei
 | `macro-water` | | `#38bdf8` | `#0284c7` | `blue` |
 | `chart-1..5` | series in order | blue, green, orange, violet, pink (below) | darker variants | hsl in `useProgressionCharts.ts` |
 | `chart-grid`, `chart-text` | axes | = `line`, `fg-muted` | | `readChartTheme()` fallbacks |
+| `avatar-a` / `avatar-b` | `Avatar` fill when there's no photo: gradient from `#e393f9` (owner's pick) to a deeper violet | same in both themes | | (new) |
 
 `*-soft` = `color-mix(in oklab, var(--color-X) 16%, transparent)`: tinted backgrounds for
 badges, banners and the gym "+2.5" chip. Text on a soft background uses the solid token

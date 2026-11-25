@@ -236,6 +236,20 @@ theme). Callers pass `type`, `data`, `options` and an accessible `label`.
 - `<Menu :items="[{ key, label, icon?, tone?: 'danger', disabled? }]" align @select="key">` with
   the trigger in the default slot: an overflow action menu (Reka DropdownMenu), 44px items below
   lg. `ModuleTitleBar` overflow uses it.
+- `<DropdownMenu :align :side width="sm|md">` is the composable shell under `Menu` (Reka
+  DropdownMenu). Trigger: `#trigger` (as-child, pass one focusable primitive such as an IconButton)
+  or `#trigger-content` inside a built-in button with `shape="row|circle"`, `trigger-label` and
+  `active` (highlighted, e.g. on the page the menu links to). Content: `MenuAction` (`icon`, `tone`,
+  `to` makes it a link, `loading` keeps the menu open with a spinner, `@select`), `MenuLabel`
+  (section overline, or `variant="header"`), `MenuSeparator`, `MenuRadioGroup` (`v-model`, options
+  with icons, a row of tiles that also answer Left/Right; picking one keeps the menu open). Stories:
+  `UI/DropdownMenu`. The account menu (`shared/nav/AccountMenu.vue`) uses all of them.
+
+## Avatar
+- `<Avatar :name :src? size="sm|md|lg" :decorative>`: Reka Avatar. The photo when `src` loads,
+  otherwise a text-free gradient disc (`avatar-a` → `avatar-b`) with a white highlight and inner
+  ring. Decorative (aria-hidden) by default because the name sits beside it; pass
+  `:decorative="false"` when it stands alone.
 
 ## Patterns without a primitive
 - **Radio cards / ratings / day pickers:** a `<fieldset>` of styled `<label>`s around `sr-only`

@@ -34,7 +34,7 @@
 
 ## Next up / gotchas
 - F1 done: `api/queryClient.ts` (defaults, `isClientError`, `STALE` tiers, cache `onError` toasts; cleared on logout/401). Hooks should pick `STALE.hot/catalog/static` explicitly where the 60 s default is wrong.
-- F2 done: `toast.push(msg, tone, { action: { label, onClick }, duration })` (key is `onClick`, not `run`). Dev demo: Settings > Appearance.
+- F2 done: `toast.push(msg, tone, { action: { label, onClick }, duration })` (key is `onClick`, not `run`). Action toast demo: the `Toaster` Storybook story.
 - F5 done (tracking/money/media/searchList keys). Remaining literal `queryKey: [` sites, if any, belong to F3/F4. `api/media/queries.ts` has read hooks only; M1 migrates the pages.
 - F4 (diet date keys, hooks in `api/diet/queries.ts`) done; mutations take `offset` in vars.
 - F3 (workout keys, date keys via `api/workout/dates.ts`) is done; mutation vars carry `date`, offset is derived at send time. Gym hooks no longer take an offset.

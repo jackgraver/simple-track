@@ -88,11 +88,14 @@ export function useAuth() {
         }
     }
 
-    async function logout() {
+    /** Resolves false when the server didn't confirm; the session is cleared locally either way. */
+    async function logout(): Promise<boolean> {
         try {
             await apiClient.post("/auth/logout");
+            return true;
         } catch (error) {
             console.error("Logout error:", error);
+            return false;
         } finally {
             queryClient.clear();
             markUnauthorized();

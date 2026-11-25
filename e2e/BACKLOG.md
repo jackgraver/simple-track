@@ -48,8 +48,7 @@ Details and reasoning live in the Findings section of [TASKS.md](TASKS.md).
 
 ## Product decisions needed
 
-- [ ] **Logout button.** None exists (`useAuth().logout` is never called from a component); the auth spec
-      posts `/api/auth/logout`. Add one, then drive it through the UI.
+- [x] **Logout button.** Added as "Sign out" in the account menu (PR #87); the auth spec uses it.
 - [ ] **Grocery delete control.** Only the API can delete; the spec arranges via API. Intended?
 - [ ] **No edit-transaction** in finances. Intended?
 - [ ] **Unplanned cardio/mobility.** The session list has no way to add cardio or mobility that the plan
