@@ -111,4 +111,61 @@ export class Api {
     const data = { pre_mobility_items: items.pre ?? [], post_mobility_items: items.post ?? [] };
     await this.check(await this.request.put(this.baseUrl + path, { data }), `PUT ${path}`);
   }
+
+  // diet home
+
+  /** A saved meal from catalogue foods (`amount` is a multiple of the food's serving). Returns its id. */
+  async createSavedMeal(name: string, items: { food_id: number; amount: number }[]) {
+    const r = await this.post<{ saved_meal_id: number }>('/diet/meals/saved-meal/new', { name, items });
+    return r.saved_meal_id;
+  }
+
+  /** Plan a saved meal on a day (offset 0 = today, positive = past). Returns the day as the app loads it. */
+  addPlannedFromSaved(savedMealId: number, offset = 0) {
+    return this.post<DietDayResponse>('/diet/meals/planned/from-saved', {
+      saved_meal_id: savedMealId,
+      offset,
+      client_id: crypto.randomUUID(),
+    });
+  }
+
+  /** Log a planned meal (by its `meal_id`) on a day row, as the Log button does. */
+  logPlannedMeal(mealId: number, dayId: number) {
+    return this.post<DietDayResponse>('/diet/meals/meal/log-planned', { meal_id: mealId, day_id: dayId });
+  }
+
+  quickLog(entry: { name: string; calories: number; protein?: number; carbs?: number; fat?: number; fiber?: number; offset?: number }) {
+    return this.post<DietDayResponse>('/diet/meals/quick-log', {
+      protein: 0,
+      carbs: 0,
+      fat: 0,
+      fiber: 0,
+      offset: 0,
+      client_id: crypto.randomUUID(),
+      ...entry,
+    });
+  }
+
+  /** The day as the diet page loads it. */
+  dietDay(offset = 0) {
+    return this.get<DietDayResponse>(`/diet/logs/today?offset=${offset}`);
+  }
+
+  async createDrinkSize(name: string, amount_oz: number) {
+    const r = await this.post<{ preset: { ID: number; name: string } }>('/tracking/water/presets', { name, amount_oz });
+    return r.preset;
+  }
+}
+
+/** The diet day response (`GET /diet/logs/today`, and every day write), loosely typed. */
+export interface DietDayResponse {
+  day: {
+    ID: number;
+    plannedMeals: { ID: number; meal_id: number; meal: { ID: number; name: string } }[];
+    loggedMeals: { ID: number; meal_id: number; meal: { ID: number; name: string } }[];
+  };
+  totalCalories: number;
+  totalProtein: number;
+  totalCarbs: number;
+  totalFat: number;
 }
