@@ -172,11 +172,8 @@ reload. Add the module's API helpers to `fixtures/api.ts` as needed.
 - Gym reps slider (`NumberSlider`): `syncingScroll` is cleared after one animation frame, but a
   smooth scroll outlasts it, so mid-scroll events can overwrite the tapped value (a tap on 9 saved 11 in
   ~1 of 3 runs before the spec waited for scrolling to stop). Worth making the tap deterministic.
-- Adding a transaction with "also update the balance" is two client requests (`POST .../transactions`
-  then `PUT .../balances`), not one atomic call. If the second fails, the transaction is saved, the
-  balance is stale and the user sees an error, so retrying double-counts the deposit. Pinned by a
-  `test.fail` spec in `tests/finances`; fix = one server endpoint doing both in a DB transaction, then
-  drop the `test.fail`.
+- Adding a transaction with "also update the balance" is now one atomic request; the spec in
+  `tests/finances` asserts the deposit is rolled back when the balance write fails.
 - Grocery has no delete control in the UI (only `DELETE /tracking/grocery/items/:id`), so the delete
   scenario arranges via API and asserts the UI. Decide whether a UI delete is intended.
 - Grocery checkbox accessible name is the item name ("Milk"), not "Complete Milk" (the `label` prop is
