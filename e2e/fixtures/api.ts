@@ -115,8 +115,11 @@ export class Api {
   // diet home
 
   /** A saved meal from catalogue foods (`amount` is a multiple of the food's serving). Returns its id. */
-  async createSavedMeal(name: string, items: { food_id: number; amount: number }[]) {
-    const r = await this.post<{ saved_meal_id: number }>('/diet/meals/saved-meal/new', { name, items });
+  async createSavedMeal(name: string, items: { food_id: number; amount: number; group_id?: string; group_label?: string }[]) {
+    const r = await this.post<{ saved_meal_id: number }>('/diet/meals/saved-meal/new', {
+      name,
+      items: items.map((i) => ({ group_id: '', group_label: '', composite_food_id: null, ...i })),
+    });
     return r.saved_meal_id;
   }
 
@@ -166,6 +169,29 @@ export class Api {
     return (await this.post<{ preset: { ID: number; name: string; amount_oz: number } }>('/tracking/water/presets', { name, amount_oz })).preset;
   }
 
+  // diet logmeal
+
+  savedMeals() {
+    return this.get<{
+      saved_meals: { ID: number; name: string; items: { food_id: number; amount: number; group_id: string; group_label: string }[] }[];
+    }>('/diet/meals/saved-meal/all');
+  }
+
+  /** A logged meal on a day (`offset` days in the past) built from catalogue foods, without the UI. */
+  async logCatalogueMeal(name: string, items: { food_id: number; amount: number }[], offset = 0) {
+    const r = await this.post<{ meal_id: number }>('/diet/meals/meal/new', {
+      meal: { name, items: items.map((i) => ({ group_id: '', group_label: '', composite_food_id: null, ...i })) },
+      log: true,
+      save_to_library: false,
+      offset,
+    });
+    return r.meal_id;
+  }
+
+  allFoods() {
+    return this.get<{ foods: { ID: number; name: string; calories: number }[] }>('/diet/meals/food/all');
+  }
+
   // diet targets
 
   /** Body profile (height, age, sex, activity). Gives /diet/targets a formula TDEE to anchor the goal chips on. */
@@ -194,13 +220,20 @@ export class Api {
   }
 }
 
+/** A meal inside a diet day (planned or logged). */
+export interface DietMeal {
+  ID: number;
+  name: string;
+  items: { food_id: number; amount: number; group_id: string; group_label: string }[];
+}
+
 /** The diet day response (`GET /diet/logs/today`, and every day write), loosely typed. */
 export interface DietDayResponse {
   day: {
     ID: number;
     plan: { ID: number; name: string; calories: number; protein: number };
-    plannedMeals: { ID: number; meal_id: number; display_order?: number; name?: string; meal: { ID: number; name: string } }[];
-    loggedMeals: { ID: number; meal_id: number; meal: { ID: number; name: string } }[];
+    plannedMeals: { ID: number; meal_id: number; display_order?: number; name?: string; meal: DietMeal }[];
+    loggedMeals: { ID: number; meal_id: number; meal: DietMeal }[];
   };
   totalCalories: number;
   totalProtein: number;
