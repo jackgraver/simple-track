@@ -158,10 +158,13 @@ const openPlatesDialog = async () => {
     if (result.syncWeight) session.commitWeightFromInput(result.totalLbs);
 };
 
-// Today's weight is the automatic +5: offer to keep last session's weight (on screen and in the sheet).
-const canUndoProgression = computed(
-    () => session.weightProgression != null && session.currentWeight === session.weightProgression.nextWeight,
-);
+// Today's weight is the automatic +5: the setup card offers "stay" vs "go up" until the first set.
+// A weight typed in the sheet that's neither of the two ends the choice.
+const progressionChoice = computed(() => {
+    const p = session.weightProgression;
+    if (!p || loggedCount.value > 0) return null;
+    return session.currentWeight === p.nextWeight || session.currentWeight === p.previousWeight ? p : null;
+});
 
 const openWeightSheet = async () => {
     const result = await dialogManager.custom<WeightSheetResult>({
@@ -171,17 +174,12 @@ const openWeightSheet = async () => {
             weight: session.currentWeight,
             step: session.weightIncrement,
             overload: overload.value,
-            canUndoProgression: canUndoProgression.value,
             plates: plates.value,
             machineSettings: machineSettings.value,
             cues: cues.value,
         },
     });
     if (result == null) return;
-    if (result.action === "undo-progression") {
-        session.undoWeightProgression();
-        return;
-    }
     session.commitWeightFromInput(result.weight);
     if (result.action === "plates") await openPlatesDialog();
 };
@@ -277,18 +275,10 @@ const goTo = (item: UpNextItem) => {
                 :machine-settings="machineSettings"
                 :plates="plates"
                 :cues="cues"
+                :progression="progressionChoice"
                 @edit="openWeightSheet"
+                @choose="session.chooseWeightProgression"
             />
-            <Button
-                v-if="session.weightProgression && canUndoProgression && loggedCount === 0"
-                variant="ghost"
-                size="sm"
-                class="self-start"
-                @click="session.undoWeightProgression"
-            >
-                Keep {{ session.weightProgression.previousWeight }} lb instead of +{{ session.weightProgression.increase }}
-            </Button>
-
             <section v-if="showSlider" class="flex flex-col gap-1" aria-label="Reps">
                 <p class="m-0 text-xs font-semibold tracking-wide uppercase" :class="editing ? 'text-accent' : 'text-fg-muted'">
                     {{ editing ? `Editing set ${(session.editingSetIndex ?? 0) + 1}` : "Reps" }}

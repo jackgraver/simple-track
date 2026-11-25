@@ -49,6 +49,9 @@ reload. Add the module's API helpers to `fixtures/api.ts` as needed.
       - mobile: on a short phone the Log button is pinned inside the viewport (mobile project only)
       - dropped response (hold after + drop): retry with the same client_id, exactly one set
       - todo: see "Not yet" in the lane entries below.
+      - [x] weight choice (`tests/gym/weight-choice.spec.ts`): the go-up/stay switch on the setup card after an
+            earned increase: default up, stay + flip back, logged with the set, gone after set 1, kept when
+            leaving before set 1, absent without an earned increase.
       - [x] tracking (`tests/gym/weight.spec.ts`, `steps.spec.ts`, `progression.spec.ts`,
             `tracking-load-errors.spec.ts`): weight save, Renpho import (+ rejected CSV), past day in
             Toronto late evening; steps save + overwrite/cancel/invalid; progression list per range, empty
