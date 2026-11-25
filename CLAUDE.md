@@ -100,17 +100,13 @@ server, which refuses to start while any are pending, and into `cmd/migrate`, wh
 
 ## Deployment
 
-Prod deployments go through j-cicd (`~/.local/bin/j-cicd`, config in `.cicd.yaml`). Don't build
-images or SSH to the VPS by hand. `docker-compose.vps.yml` is only the compose file j-cicd's
-VPS agent uses, not a deploy path.
+Prod deployments go through j-cicd (config in `.cicd.yaml`): run `j-cicd guide` for how it
+works, and `j-cicd run --plan` to preview what a deploy would do. Don't build images or SSH to
+the VPS by hand. `docker-compose.vps.yml` is only the compose file j-cicd's VPS agent uses, not
+a deploy path.
 
-1. Commit and push to `main`. Pipelines build main's latest commit, not the working tree.
-2. `j-cicd run` from the repo root. It runs vet and tests, builds and pushes both images,
-   backs up the DB, applies migrations, swaps the containers and waits for health checks
-   (about 45s). Prod is live when it reports `run succeeded`.
-3. If it fails, read `j-cicd logs simple-track`. `j-cicd rollback` reverts the images only,
-   not the database. Pre-deploy backups are in `~/backups` on the VPS.
-
-Run bare `j-cicd` or `j-cicd run -h` to see usage. Without a TTY it prints help instead of
-opening the dashboard. `-no-deploy` pushes images without deploying. Always ask the user
-before running a prod deploy unless they already told you to deploy.
+- Commit and push to `main` first. Pipelines build main's latest commit, not the working tree.
+- Always ask the user before running a prod deploy unless they already told you to deploy.
+- A run ends by checking `https://st.jackgraver.ca/version.json` for the deployed commit (the
+  `stamp-version` step bakes it into the frontend image).
+- Pre-deploy DB backups are in `~/backups` on the VPS; `rollback` never reverts the database.
