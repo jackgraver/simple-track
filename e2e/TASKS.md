@@ -72,18 +72,33 @@ reload. Add the module's API helpers to `fixtures/api.ts` as needed.
             "Log Set N" rename. The logger keeps a draft in sessionStorage, so persistence checks clear it
             before reloading (`freshReload`). Not yet: add/remove exercise from the session, `?offset=`
             days, extra sets beyond the plan, Finish while a set didn't save.
-- [x] **B3. Diet**: specs in `tests/diet/quick-log.spec.ts` (Quick log, the simplest logged-meal path).
-      Done: log (optimistic, persists after reload, `@smoke`); edit (replaces the row, exactly one logged
-      meal left); delete via confirm dialog (other meal survives reload).
-      Scenario list still open: log a catalogue-food meal via `/diet/log` (multi-item, amounts);
-      log a planned meal (one-tap Log, "Logged" badge, no double log); edit-and-log a planned meal;
-      day navigation (`?offset=`) logs to the right day; water log; macro totals/goals update after
-      log/delete; delete a still-saving row; retry after dropped response (no duplicate, `client_id`);
-      DB fault on log rolls the row back with a Retry toast; targets edit persists; plan week
-      (add/copy/delete planned meal); saved meals CRUD.
-      Data-loss risks to cover next: editing a logged meal is replace-by-id (`replace_meal_id`), so a
-      failure between create and delete could lose or duplicate it; deleting a logged meal must not
-      delete shared foods or saved meals.
+- [x] **B3. Diet**: Quick log in `tests/diet/quick-log.spec.ts` (log `@smoke`, edit, delete). Edits of a
+      logged meal (quick log and `/diet/log` Update) repoint the day log in one DB transaction, so the old
+      create-then-delete risk is gone (fault-tested in `logmeal-edit.spec.ts`).
+      - [x] home (`tests/diet/home-logging.spec.ts`, `home-day.spec.ts`, helpers `home-helpers.ts`): log a
+            planned meal, double tap (one request), dropped response (de-duped by day + meal), log fault rolls
+            back + Retry, delete a catalogue meal (foods and saved meal survive), delete a still-saving row,
+            totals move and restore; day navigation via the week strip (Log hidden off today), week strip labels,
+            average and paging; water preset + entries dialog delete; empty states; day load error + Retry;
+            `test.fail` for future day rows. Not yet: held water write, `ml` on the home page.
+      - [x] logmeal (`tests/diet/logmeal.spec.ts`, `logmeal-edit.spec.ts`, `logmeal-saved-foods.spec.ts`,
+            helpers `logmeal-helpers.ts`): catalogue meal (and `?offset=`), Log and save, start from a saved
+            meal, Update a logged meal, Update failing on either statement (no loss, no duplicate, retry), Edit
+            and log a planned meal, new saved meal + validation, create a food, duplicate food name (409 toast),
+            groups, quantity 0 / halve / double, draft kept across reload and failures, cleared after a log.
+            Not yet: composite foods, variant swap, Ungroup / Remove group, `?type=editsaved`, edit on another
+            day, load errors on the meal and pickers, double submit, the create-mode draft.
+      - [x] plan (`tests/diet/plan.spec.ts`, `plan-failures.spec.ts`, helpers `plan-helpers.ts`): add from a
+            saved meal, armed add (desktop only), remove, move earlier/later, copy to other days, copy from the
+            previous day, clear day, week paging + This week, past days editable (pinned), no-saved-meals empty
+            state, load error + Retry, add failure rolls back + Retry. Not yet: saved-meals load error, copy
+            failure, Move/Remove while saving, logged meals surviving Clear day.
+      - [x] targets (`tests/diet/targets.spec.ts`, `water-presets.spec.ts`): edit calories + split and save (new
+            plan snapshot, History "Current"), goal chip from the formula TDEE, today uses the new targets while
+            past days keep the old plan, dirty badge + Reset, save failure stays dirty + retry, load error + Retry,
+            activity level; water sizes add/edit/delete (+ on /diet), validation, daily goal (oz) and ml unit.
+            Not yet: g-per-lb presets, lock toggles, "Fill to" carbs, observed maintenance, Last 7 days intake
+            Retry, deleting a size that has water logs.
 - [x] **B4. Finances** (`tests/finances/transactions.spec.ts`, helpers `createAccount`/`addTransaction`).
       The product has no "edit transaction" (only add and delete); edit-shaped paths are account edit
       and re-recording a balance. Scenarios:
