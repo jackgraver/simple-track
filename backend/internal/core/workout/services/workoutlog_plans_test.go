@@ -1,10 +1,10 @@
 package services_test
 
 import (
+	"be-simpletracker/internal/clock"
 	"be-simpletracker/internal/core/workout/models"
 	"be-simpletracker/internal/core/workout/services"
 	"be-simpletracker/internal/core/workout/testutil"
-	"be-simpletracker/internal/utils"
 	"slices"
 	"strings"
 	"testing"
@@ -61,7 +61,7 @@ func TestAssignPlanToDay_andUnassign(t *testing.T) {
 	if err := db.Create(&plan).Error; err != nil {
 		t.Fatal(err)
 	}
-	today := utils.ZerodTime(0)
+	today := clock.ZerodTime(0)
 	dow := int(today.Weekday())
 	assigned, err := services.AssignPlanToDay(plan.ID, dow)
 	if err != nil {

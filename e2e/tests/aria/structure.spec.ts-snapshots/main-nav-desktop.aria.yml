@@ -1,0 +1,44 @@
+- navigation "Main":
+  - link "Fitness":
+    - /url: /gym
+    - img
+    - text: ""
+  - list:
+    - listitem:
+      - link "Plans":
+        - /url: /gym/plans
+    - listitem:
+      - link "Progression":
+        - /url: /gym/progression
+    - listitem:
+      - link "Weight":
+        - /url: /gym/weight
+    - listitem:
+      - link "Steps":
+        - /url: /gym/steps
+  - link "Food":
+    - /url: /diet
+    - img
+    - text: ""
+  - list:
+    - listitem:
+      - link "Targets":
+        - /url: /diet/targets
+    - listitem:
+      - link "Water presets":
+        - /url: /diet/water-presets
+    - listitem:
+      - link "Grocery":
+        - /url: /grocery
+  - link "Finance":
+    - /url: /finances
+    - img
+    - text: ""
+  - list:
+    - listitem:
+      - link "Contribution room":
+        - /url: /finances/rules
+  - link "Media":
+    - /url: /media
+    - img
+    - text: ""

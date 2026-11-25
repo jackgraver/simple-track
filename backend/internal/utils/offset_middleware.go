@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"be-simpletracker/internal/clock"
 	"net/http"
 	"time"
 
@@ -27,7 +28,7 @@ func DayOffsetMiddleware() gin.HandlerFunc {
 				c.Abort()
 				return
 			}
-			c.Set(ginContextKeyDayOffset, OffsetForDate(day, time.Now()))
+			c.Set(ginContextKeyDayOffset, OffsetForDate(day, clock.Now()))
 			c.Next()
 			return
 		}

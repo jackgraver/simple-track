@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+#MISE description="Run the Playwright e2e suite (args go to playwright test; see e2e/README.md)"
+set -euo pipefail
+# Self-contained: its own Postgres container, databases and backends. It never touches the dev
+# stack, so it runs whether or not `dev start` is up.
+cd e2e
+[[ -d node_modules ]] || npm ci --no-audit --no-fund
+npx playwright test "$@"

@@ -1,10 +1,10 @@
 package controller
 
 import (
+	"be-simpletracker/internal/clock"
 	"errors"
 	"net/http"
 	"strconv"
-	"time"
 
 	"be-simpletracker/internal/core/media/lookup"
 	"be-simpletracker/internal/core/media/models"
@@ -61,7 +61,7 @@ func (h *MediaHandler) meta(c *gin.Context) {
 }
 
 func (h *MediaHandler) stats(c *gin.Context) {
-	stats, err := service.GetMediaStats(h.db, time.Now())
+	stats, err := service.GetMediaStats(h.db, clock.Now())
 	if err != nil {
 		respondError(c, err)
 		return
@@ -88,7 +88,7 @@ func (h *MediaHandler) create(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	item, err := service.CreateMedia(h.db, body, time.Now())
+	item, err := service.CreateMedia(h.db, body, clock.Now())
 	if err != nil {
 		respondError(c, err)
 		return
@@ -106,7 +106,7 @@ func (h *MediaHandler) update(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	item, err := service.UpdateMedia(h.db, id, body, time.Now())
+	item, err := service.UpdateMedia(h.db, id, body, clock.Now())
 	if err != nil {
 		respondError(c, err)
 		return

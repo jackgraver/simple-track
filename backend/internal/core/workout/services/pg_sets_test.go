@@ -1,6 +1,7 @@
 package services_test
 
 import (
+	"be-simpletracker/internal/clock"
 	"context"
 	"database/sql"
 	"fmt"
@@ -16,7 +17,6 @@ import (
 	"be-simpletracker/internal/core/workout/services"
 	"be-simpletracker/internal/database"
 	"be-simpletracker/internal/migrate"
-	"be-simpletracker/internal/utils"
 	"be-simpletracker/migrations"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
@@ -154,7 +154,7 @@ func TestPostgres_setsMigrationAndConcurrency(t *testing.T) {
 			go func(d int) {
 				defer dayWG.Done()
 				<-gate
-				_, err := services.GetOrCreateDay(ctx, utils.ZerodTime(d))
+				_, err := services.GetOrCreateDay(ctx, clock.ZerodTime(d))
 				dayErrs <- err
 			}(d)
 		}
@@ -172,7 +172,7 @@ func TestPostgres_setsMigrationAndConcurrency(t *testing.T) {
 	}
 
 	// Fresh day (no workout log yet): 24 parallel requests, 8 distinct sets each sent 3 times.
-	day := utils.ZerodTime(0)
+	day := clock.ZerodTime(0)
 	var wg sync.WaitGroup
 	errs := make(chan error, 24)
 	firsts := make(chan bool, 24)
@@ -276,7 +276,7 @@ func TestPostgres_deleteLastSetDoesNotEatConcurrentCreate(t *testing.T) {
 	_, sqlDB := pgMigratedGorm(t)
 	ctx := context.Background()
 	mustExec(t, sqlDB, `INSERT INTO exercises (id, name) VALUES (1, 'Squat')`)
-	day := utils.ZerodTime(0)
+	day := clock.ZerodTime(0)
 
 	first, err := services.LogSet(ctx, services.LogSetInput{ClientID: clientID(1), Day: day, ExerciseID: 1, Reps: 5})
 	if err != nil {

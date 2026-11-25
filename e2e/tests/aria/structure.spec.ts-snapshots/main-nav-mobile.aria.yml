@@ -1,0 +1,13 @@
+- navigation "Main":
+  - button "Fitness":
+    - img
+    - text: ""
+  - button "Food":
+    - img
+    - text: ""
+  - button "Finance":
+    - img
+    - text: ""
+  - button "Media":
+    - img
+    - text: ""

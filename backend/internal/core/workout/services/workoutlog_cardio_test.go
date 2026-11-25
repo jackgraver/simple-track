@@ -1,10 +1,10 @@
 package services_test
 
 import (
+	"be-simpletracker/internal/clock"
 	"be-simpletracker/internal/core/workout/models"
 	"be-simpletracker/internal/core/workout/services"
 	"be-simpletracker/internal/core/workout/testutil"
-	"be-simpletracker/internal/utils"
 	"context"
 	"strings"
 	"testing"
@@ -12,7 +12,7 @@ import (
 
 func TestUpsertCardioForWorkoutLog_usesPlannedTypeWhenTypeEmpty(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	today := utils.ZerodTime(0)
+	today := clock.ZerodTime(0)
 	dow := int(today.Weekday())
 	plan := models.WorkoutPlan{Name: "Test", DayOfWeek: &dow, PlannedCardioType: "Bike"}
 	if err := db.Create(&plan).Error; err != nil {
@@ -33,7 +33,7 @@ func TestUpsertCardioForWorkoutLog_usesPlannedTypeWhenTypeEmpty(t *testing.T) {
 
 func TestUpsertCardio_updatesExistingRow(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	today := utils.ZerodTime(0)
+	today := clock.ZerodTime(0)
 	wl := models.WorkoutLog{Date: today}
 	if err := db.Create(&wl).Error; err != nil {
 		t.Fatal(err)
