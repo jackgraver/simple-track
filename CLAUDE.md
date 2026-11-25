@@ -81,6 +81,8 @@ and runs in `dev check` and the j-cicd pipeline.
   Env vars exported by `dev/env.sh` take precedence over it.
 - `cmd/devuser` creates or resets the dev login and refuses to run in production.
 - `dev db:reset` and `dev db:drop-worktree` are destructive to dev data.
+- Slot numbers are reused after a worktree is deleted; a reassigned slot's leftover containers/volumes
+  are purged automatically (`dev/purge-slot`). `dev db:gc [--dry-run]` removes any others with no live worktree.
 
 ### Database migrations
 

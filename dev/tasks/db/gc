@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+#MISE description="Remove containers/volumes of simple-track-wt<N> slots with no live worktree (--dry-run to list)"
+set -euo pipefail
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
+slots="${XDG_STATE_HOME:-$HOME/.local/state}/simple-track-dev/slots"
+live=" "
+if [[ -f "$slots" ]]; then
+  while read -r s p; do [[ -n "${p:-}" && -d "$p" ]] && live+="$s "; done < "$slots"
+fi
+orphans=$(
+  { docker ps -a --format '{{.Label "com.docker.compose.project"}}'
+    docker volume ls --format '{{.Label "com.docker.compose.project"}}'; } |
+    sed -n 's/^simple-track-wt\([0-9][0-9]*\)$/\1/p' | sort -un
+)
+found=0
+for n in $orphans; do
+  [[ "$live" == *" $n "* ]] && continue
+  found=1
+  if [[ "${1:-}" == --dry-run ]]; then echo "would remove slot $n (simple-track-wt$n)"
+  else "$ROOT/dev/purge-slot" "$n"; fi
+done
+[[ $found == 1 ]] || echo "dev: nothing to clean"
