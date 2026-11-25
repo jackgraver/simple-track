@@ -25,6 +25,9 @@ Details and reasoning live in the Findings section of [TASKS.md](TASKS.md).
       error to 400 and puts `err.Error()` in the body, so the toast shows a Postgres message instead of
       "Couldn’t switch the plan", and 5xx monitoring misses it. Fix: 404 for a missing plan, 500 otherwise;
       then drop the `test.fail` and `allowedErrors` in `tests/gym/home.spec.ts`.
+- [ ] **Gym: cardio minutes input on the routine page is 0px wide** (desktop and mobile). The `NumberField`
+      in a `w-36` box leaves no room for the input, so only +/- work. Fix: widen the box or drop the
+      steppers/unit; then drop the `test.fail` in `tests/gym/plans.spec.ts` and type the value instead.
 
 ## Product decisions needed
 
@@ -34,6 +37,10 @@ Details and reasoning live in the Findings section of [TASKS.md](TASKS.md).
 - [ ] **No edit-transaction** in finances. Intended?
 - [ ] **Unplanned cardio/mobility.** The session list has no way to add cardio or mobility that the plan
       doesn't have. Intended?
+- [ ] **No way to delete a workout program** (UI or API). Intended?
+- [ ] **Activating a program creates today's day with the old program's plan** (`ActivateWorkoutProgram`
+      calls `GetOrCreateToday` first). Should today switch to the new program?
+- [ ] **Cardio minutes stepper:** from empty, the first "+" gives 0, not 5. Intended?
 
 ## Test-suite follow-ups
 
