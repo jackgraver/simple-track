@@ -112,6 +112,60 @@ export class Api {
     await this.check(await this.request.put(this.baseUrl + path, { data }), `PUT ${path}`);
   }
 
+  // diet home
+
+  /** A saved meal from catalogue foods (`amount` is a multiple of the food's serving). Returns its id. */
+  async createSavedMeal(name: string, items: { food_id: number; amount: number }[]) {
+    const r = await this.post<{ saved_meal_id: number }>('/diet/meals/saved-meal/new', { name, items });
+    return r.saved_meal_id;
+  }
+
+  /** Plan a saved meal on a day (offset 0 = today, positive = past). Returns the day as the app loads it. */
+  addPlannedFromSaved(savedMealId: number, offset = 0) {
+    return this.post<DietDayResponse>('/diet/meals/planned/from-saved', {
+      saved_meal_id: savedMealId,
+      offset,
+      client_id: crypto.randomUUID(),
+    });
+  }
+
+  /** Log a planned meal (by its `meal_id`) on a day row, as the Log button does. */
+  logPlannedMeal(mealId: number, dayId: number) {
+    return this.post<DietDayResponse>('/diet/meals/meal/log-planned', { meal_id: mealId, day_id: dayId });
+  }
+
+  quickLog(entry: { name: string; calories: number; protein?: number; carbs?: number; fat?: number; fiber?: number; offset?: number }) {
+    return this.post<DietDayResponse>('/diet/meals/quick-log', {
+      protein: 0,
+      carbs: 0,
+      fat: 0,
+      fiber: 0,
+      offset: 0,
+      client_id: crypto.randomUUID(),
+      ...entry,
+    });
+  }
+
+  /** The day as the diet page loads it. */
+  dietDay(offset = 0) {
+    return this.get<DietDayResponse>(`/diet/logs/today?offset=${offset}`);
+  }
+
+  // diet plan
+
+  /** A day's planned meal names in display order, as the day view loads them. */
+  async plannedMeals(offset: number): Promise<string[]> {
+    const r = await this.dietDay(offset);
+    return [...(r.day.plannedMeals ?? [])]
+      .sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0) || a.ID - b.ID)
+      .map((m) => m.meal?.name ?? m.name ?? '');
+  }
+
+  /** Drink-size presets are stored in oz. */
+  async createDrinkSize(name: string, amount_oz: number) {
+    return (await this.post<{ preset: { ID: number; name: string; amount_oz: number } }>('/tracking/water/presets', { name, amount_oz })).preset;
+  }
+
   // diet targets
 
   /** Body profile (height, age, sex, activity). Gives /diet/targets a formula TDEE to anchor the goal chips on. */
@@ -126,13 +180,6 @@ export class Api {
     return (await this.get<{ profile: { activity_level: string } | null }>('/tracking/profile')).profile;
   }
 
-  /** A day's log (creates the day, with the plan in force for it, when it doesn't exist yet). `offset` = days in the past. */
-  dietDay(offset = 0) {
-    return this.get<{ day: { ID: number; plan: { ID: number; name: string; calories: number; protein: number } } }>(
-      `/diet/logs/today?offset=${offset}`,
-    );
-  }
-
   /** Every diet plan row, as the targets history lists them. */
   async dietPlans() {
     return (
@@ -142,12 +189,21 @@ export class Api {
     ).plans;
   }
 
-  /** Drink-size presets are stored in oz. */
-  async createDrinkSize(name: string, amount_oz: number) {
-    return (await this.post<{ preset: { ID: number; name: string; amount_oz: number } }>('/tracking/water/presets', { name, amount_oz })).preset;
-  }
-
   async drinkSizes() {
     return (await this.get<{ presets: { ID: number; name: string; amount_oz: number }[] }>('/tracking/water/presets')).presets;
   }
+}
+
+/** The diet day response (`GET /diet/logs/today`, and every day write), loosely typed. */
+export interface DietDayResponse {
+  day: {
+    ID: number;
+    plan: { ID: number; name: string; calories: number; protein: number };
+    plannedMeals: { ID: number; meal_id: number; display_order?: number; name?: string; meal: { ID: number; name: string } }[];
+    loggedMeals: { ID: number; meal_id: number; meal: { ID: number; name: string } }[];
+  };
+  totalCalories: number;
+  totalProtein: number;
+  totalCarbs: number;
+  totalFat: number;
 }
