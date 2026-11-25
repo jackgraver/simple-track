@@ -151,6 +151,16 @@ export class Api {
     return this.get<DietDayResponse>(`/diet/logs/today?offset=${offset}`);
   }
 
+  // diet plan
+
+  /** A day's planned meal names in display order, as the day view loads them. */
+  async plannedMeals(offset: number): Promise<string[]> {
+    const r = await this.dietDay(offset);
+    return [...(r.day.plannedMeals ?? [])]
+      .sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0) || a.ID - b.ID)
+      .map((m) => m.meal?.name ?? m.name ?? '');
+  }
+
   async createDrinkSize(name: string, amount_oz: number) {
     const r = await this.post<{ preset: { ID: number; name: string } }>('/tracking/water/presets', { name, amount_oz });
     return r.preset;
@@ -161,7 +171,7 @@ export class Api {
 export interface DietDayResponse {
   day: {
     ID: number;
-    plannedMeals: { ID: number; meal_id: number; meal: { ID: number; name: string } }[];
+    plannedMeals: { ID: number; meal_id: number; display_order?: number; name?: string; meal: { ID: number; name: string } }[];
     loggedMeals: { ID: number; meal_id: number; meal: { ID: number; name: string } }[];
   };
   totalCalories: number;
