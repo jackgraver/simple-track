@@ -111,4 +111,32 @@ export class Api {
     const data = { pre_mobility_items: items.pre ?? [], post_mobility_items: items.post ?? [] };
     await this.check(await this.request.put(this.baseUrl + path, { data }), `PUT ${path}`);
   }
+
+  // diet plan
+
+  /** A saved meal of seed foods (amount = servings of the food's serving size). Returns its id. */
+  async createSavedMeal(name: string, items: { foodId: number; amount: number }[]) {
+    const r = await this.post<{ saved_meal_id: number }>('/diet/meals/saved-meal/new', {
+      name,
+      items: items.map((i) => ({ food_id: i.foodId, amount: i.amount })),
+    });
+    return r.saved_meal_id;
+  }
+
+  /** Plan a saved meal on a day (`offset` days in the past, negative = future), like the plan page does. */
+  addPlannedFromSaved(savedMealId: number, offset: number) {
+    return this.post('/diet/meals/planned/from-saved', {
+      saved_meal_id: savedMealId,
+      offset,
+      client_id: crypto.randomUUID(),
+    });
+  }
+
+  /** A day's planned meal names in display order, as the day view loads them. */
+  async plannedMeals(offset: number): Promise<string[]> {
+    const r = await this.get<any>(`/diet/logs/today?offset=${offset}`);
+    return [...(r.day.plannedMeals ?? [])]
+      .sort((a: any, b: any) => (a.display_order ?? 0) - (b.display_order ?? 0) || a.ID - b.ID)
+      .map((m: any) => m.meal?.name ?? m.name);
+  }
 }
