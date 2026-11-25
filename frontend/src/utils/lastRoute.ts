@@ -10,14 +10,19 @@ function encode(path: string, now: number): string {
     return JSON.stringify({ path, at: now });
 }
 
-function parse(raw: string | null | undefined, now: number): string | null {
+export interface LastRoute {
+    path: string;
+    at: number;
+}
+
+function parse(raw: string | null | undefined, now: number): LastRoute | null {
     if (!raw) return null;
     try {
         const { path, at } = JSON.parse(raw) as { path?: unknown; at?: unknown };
         if (typeof path !== "string" || typeof at !== "number") return null;
         if (!path.startsWith("/") || path.startsWith("//")) return null;
         if (now - at > LAST_ROUTE_MAX_AGE_MS) return null;
-        return path;
+        return { path, at };
     } catch {
         return null;
     }
@@ -51,7 +56,7 @@ function readCookie(): string | null {
     return null;
 }
 
-export function loadLastRoute(now = Date.now()): string | null {
+export function loadLastRouteEntry(now = Date.now()): LastRoute | null {
     let local: string | null = null;
     try {
         local = localStorage.getItem(KEY);
@@ -59,4 +64,8 @@ export function loadLastRoute(now = Date.now()): string | null {
         // ignore
     }
     return parse(local, now) ?? parse(readCookie(), now);
+}
+
+export function loadLastRoute(now = Date.now()): string | null {
+    return loadLastRouteEntry(now)?.path ?? null;
 }

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useWorkoutStore } from "../store/useWorkoutStore";
-import { computed } from "vue";
+import { computed, watch } from "vue";
 import { useRoute } from "vue-router";
 import ExerciseLoggingFlow from "./components/ExerciseLoggingFlow.vue";
 import CardioLoggingView from "./components/CardioLoggingView.vue";
@@ -13,7 +13,7 @@ import {
 } from "./domain/exerciseRouteGroup";
 
 const route = useRoute();
-const { goBackToLogging, offset } = useLoggingRouteContext();
+const { goBackToLogging, offset, router } = useLoggingRouteContext();
 
 const {
     log,
@@ -60,23 +60,34 @@ const mobilityLoggedForRoute = computed(() => {
 });
 
 const emptyMessage = computed(() => {
-    if (loggingKind.value === "exercise") return "Exercise not found";
     if (loggingKind.value === "mobility") return "Mobility not found";
     return "Logging item not found";
 });
 
+// An exercise that isn't in the day's plan or log (stale URL, resumed on a later day) has nothing to
+// show: leave for the gym home, rendering nothing meanwhile so the empty state never flashes.
+const staleExercise = computed(
+    () => loggingKind.value === "exercise" && !pending.value && !error.value && !exerciseGroupForShell.value,
+);
+watch(
+    staleExercise,
+    (stale) => {
+        if (stale) router.replace({ name: "gym" });
+    },
+    { immediate: true },
+);
+
 const isEmpty = computed(() => {
     if (pending.value) return false;
-    if (loggingKind.value === "exercise") return !exerciseGroupForShell.value;
     if (loggingKind.value === "mobility") return !mobilityLoggedForRoute.value;
     return false;
 });
-
 </script>
 
 <template>
+    <template v-if="staleExercise" />
     <LoggingPageShell
-        v-if="loggingKind === 'exercise'"
+        v-else-if="loggingKind === 'exercise'"
         :pending="pending"
         :error="error"
         :empty="isEmpty"
