@@ -8,15 +8,16 @@ import DateAndBreadcrumbs from "./shared/DateAndBreadcrumbs.vue";
 // Breadcrumbs (./shared/Breadcrumbs.vue) are kept but not displayed for now.
 import SideNav from "./shared/nav/SideNav.vue";
 import MobileHeader from "./shared/nav/mobile/MobileHeader.vue";
-import BottomTabBar from "./shared/nav/mobile/BottomTabBar.vue";
-import { useNavMemory } from "./shared/nav/mobile/useNavMemory";
+import MobileDrawer from "./shared/nav/mobile/MobileDrawer.vue";
+import { useDrawerGesture } from "./shared/nav/mobile/useDrawerGesture";
+import { useIsDesktop } from "./shared/ui";
 
 const route = useRoute();
-useNavMemory();
+useDrawerGesture(useIsDesktop());
 
 const showNav = computed(() => isAuthenticated.value);
-// Focus pages (e.g. exercise logging) bring their own header, so only the
-// mobile top bar is dropped; tab bar and sidebar stay for navigation.
+// Focus pages (e.g. exercise logging) bring their own header, so the mobile top bar
+// (which holds the menu button for the nav drawer) is dropped there.
 const showMobileHeader = computed(
     () => showNav.value && route.meta.focus !== true,
 );
@@ -30,10 +31,7 @@ const wide = computed(() => route.meta.wide === true);
     <div class="pointer-events-none fixed inset-x-0 top-0 z-nav h-safe-top bg-canvas" aria-hidden="true"></div>
     <div class="min-h-dvh w-full">
         <SideNav v-if="showNav" class="max-lg:hidden" />
-        <main
-            class="w-full overflow-x-clip"
-            :class="{ 'pb-[4.5rem] lg:pb-0': showNav }"
-        >
+        <main class="w-full overflow-x-clip">
             <div
                 class="flex w-full flex-col items-stretch"
                 :class="[
@@ -49,8 +47,8 @@ const wide = computed(() => route.meta.wide === true);
                 <RouterView />
             </div>
         </main>
-        <BottomTabBar v-if="showNav" class="lg:hidden" />
     </div>
-    <ToastContainer :tab-bar="showNav" :top="route.meta.focus === true" />
+    <MobileDrawer v-if="showNav" />
+    <ToastContainer :top="route.meta.focus === true" />
     <DialogContainer />
 </template>
