@@ -16,6 +16,9 @@ Details and reasoning live in the Findings section of [TASKS.md](TASKS.md).
       error to internal). Decide the status (409?), then pin it in a spec.
 - [ ] **Diet meal edit is create-then-delete** (`replace_meal_id`). A failure between the two could lose or
       duplicate the meal. Needs a fault test, then probably a single server call.
+- [ ] **Gym: cardio minutes input on the routine page is 0px wide** (desktop and mobile). The `NumberField`
+      in a `w-36` box leaves no room for the input, so only +/- work. Fix: widen the box or drop the
+      steppers/unit; then drop the `test.fail` in `tests/gym/plans.spec.ts` and type the value instead.
 
 ## Product decisions needed
 
@@ -23,6 +26,10 @@ Details and reasoning live in the Findings section of [TASKS.md](TASKS.md).
       posts `/api/auth/logout`. Add one, then drive it through the UI.
 - [ ] **Grocery delete control.** Only the API can delete; the spec arranges via API. Intended?
 - [ ] **No edit-transaction** in finances. Intended?
+- [ ] **No way to delete a workout program** (UI or API). Intended?
+- [ ] **Activating a program creates today's day with the old program's plan** (`ActivateWorkoutProgram`
+      calls `GetOrCreateToday` first). Should today switch to the new program?
+- [ ] **Cardio minutes stepper:** from empty, the first "+" gives 0, not 5. Intended?
 
 ## Test-suite follow-ups
 

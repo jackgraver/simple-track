@@ -50,6 +50,11 @@ reload. Add the module's API helpers to `fixtures/api.ts` as needed.
       - dropped response (hold after + drop): retry with the same client_id, exactly one set
       - todo: weight/plates edit, notes, finish + "Up next", cardio/mobility, add/remove exercise,
         offline log, persistent save failure ("Didn't save" + Retry), plans pages, progression, weight, steps
+      - [x] plans (`tests/gym/plans.spec.ts`): create + activate a program (/gym follows it), empty state,
+            load error; routine create/rename/delete (+ Undo); add existing / "Create and add" / remove
+            (+ Undo) exercises, rep rollover; day picker, move a taken day (confirm/cancel), drag (desktop);
+            warmup/stretch items, cardio. Not yet: reorder exercises, rename program, write-failure
+            rollbacks, offline, "Routine not found", "Couldn't load this routine".
 - [x] **B3. Diet**: specs in `tests/diet/quick-log.spec.ts` (Quick log, the simplest logged-meal path).
       Done: log (optimistic, persists after reload, `@smoke`); edit (replaces the row, exactly one logged
       meal left); delete via confirm dialog (other meal survives reload).
