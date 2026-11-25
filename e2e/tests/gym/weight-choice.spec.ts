@@ -26,10 +26,10 @@ test.describe('gym weight choice', { tag: ['@gym'] }, () => {
     await option(page, 100).click();
     await expect(setupCard(page)).toHaveAccessibleName(/^Weight 100 pounds/);
     await expect(option(page, 100)).toHaveAttribute('aria-pressed', 'true');
-    await expect(page.getByRole('dialog')).toHaveCount(0); // the switch is not the card's tap target
 
     await option(page, 105).click();
     await expect(setupCard(page)).toHaveAccessibleName(/^Weight 105 pounds/);
+    await expect(page.getByRole('dialog')).toHaveCount(0); // the switch is not the card's tap target
   });
 
   test('the choice is logged with the set, and the switch goes away after set 1', async ({ page, db }) => {
@@ -40,8 +40,14 @@ test.describe('gym weight choice', { tag: ['@gym'] }, () => {
     await expect(setRow(page, 1)).toContainText('100 ×');
     await saved;
     await expect(weightSwitch(page)).toHaveCount(0);
-    const { rows } = await db.query(`SELECT weight FROM logged_sets ORDER BY id DESC LIMIT 1`);
-    expect(Number(rows[0].weight)).toBe(100);
+    const { rows } = await db.query(
+      `SELECT s.weight FROM logged_sets s
+         JOIN logged_exercises le ON le.id = s.logged_exercise_id
+         JOIN workout_logs l ON l.id = le.workout_log_id
+        WHERE le.exercise_id = $1 AND l.date = (SELECT max(date) FROM workout_logs)`,
+      [SQUAT.id],
+    );
+    expect(rows.map((r) => Number(r.weight))).toEqual([100]);
   });
 
   test('leaving and coming back before set 1 keeps the choice', async ({ page }) => {
