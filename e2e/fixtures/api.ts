@@ -111,4 +111,46 @@ export class Api {
     const data = { pre_mobility_items: items.pre ?? [], post_mobility_items: items.post ?? [] };
     await this.check(await this.request.put(this.baseUrl + path, { data }), `PUT ${path}`);
   }
+
+  // diet logmeal
+
+  /** A saved meal (the "Saved meals" picker on /diet/log). Items reference foods by id; amount is in servings. */
+  async createSavedMeal(name: string, items: { food_id: number; amount: number; group_id?: string; group_label?: string }[]) {
+    const r = await this.post<{ saved_meal_id: number }>('/diet/meals/saved-meal/new', {
+      name,
+      items: items.map((i) => ({ group_id: '', group_label: '', composite_food_id: null, ...i })),
+    });
+    return r.saved_meal_id;
+  }
+
+  savedMeals() {
+    return this.get<{
+      saved_meals: { ID: number; name: string; items: { food_id: number; amount: number; group_id: string; group_label: string }[] }[];
+    }>('/diet/meals/saved-meal/all');
+  }
+
+  /** A logged meal on a day (`offset` days in the past) built from catalogue foods, without the UI. */
+  async logCatalogueMeal(name: string, items: { food_id: number; amount: number }[], offset = 0) {
+    const r = await this.post<{ meal_id: number }>('/diet/meals/meal/new', {
+      meal: { name, items: items.map((i) => ({ group_id: '', group_label: '', composite_food_id: null, ...i })) },
+      log: true,
+      save_to_library: false,
+      offset,
+    });
+    return r.meal_id;
+  }
+
+  /** Put a saved meal on a day's plan (`offset` days in the past) as a planned meal. */
+  addPlannedFromSaved(savedMealId: number, offset = 0) {
+    return this.post('/diet/meals/planned/from-saved', { saved_meal_id: savedMealId, offset });
+  }
+
+  /** A day's diet log (planned + logged meals, totals). `offset` days in the past. */
+  dietDay(offset = 0) {
+    return this.get<any>(`/diet/logs/today?offset=${offset}`);
+  }
+
+  allFoods() {
+    return this.get<{ foods: { ID: number; name: string; calories: number }[] }>('/diet/meals/food/all');
+  }
 }
