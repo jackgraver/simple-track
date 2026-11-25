@@ -2,7 +2,7 @@ import { createRouter, createWebHistory, START_LOCATION } from "vue-router";
 import type { RouteRecordRaw } from "vue-router";
 import { authStatus } from "~/composables/auth/session";
 import { resolveAuthSession } from "~/composables/auth/useAuth";
-import { loadLastRoute, saveLastRoute } from "~/utils/lastRoute";
+import { isExpiredLoggingResume, loadLastRoute, saveLastRoute } from "~/utils/lastRoute";
 import { dietQueries } from "~/api/diet/queries";
 import { mediaQueries } from "~/api/media/queries";
 import { moneyQueries } from "~/api/money/queries";
@@ -257,12 +257,13 @@ function isStandalone(): boolean {
 }
 
 function resolveSavedRoute(): string | null {
-    const saved = loadLastRoute();
-    if (!saved) return null;
-    const target = router.resolve(saved);
+    const entry = loadLastRoute();
+    if (!entry) return null;
+    const target = router.resolve(entry.path);
     if (!target.name || target.name === "not-found" || target.name === "signin" || target.name === "launch") {
         return null;
     }
+    if (isExpiredLoggingResume(entry)) return router.resolve({ name: "gym" }).fullPath;
     return target.fullPath;
 }
 
