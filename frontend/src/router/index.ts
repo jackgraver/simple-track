@@ -18,7 +18,7 @@ declare module "vue-router" {
         breadcrumb?: string;
         /** Show the day picker (pages that read `?offset=`). Inherited by children. */
         dated?: boolean;
-        /** Page supplies its own header: hide the mobile top bar (tab bar and sidebar stay). */
+        /** Page supplies its own header: hide the mobile top bar (sidebar and drawer stay). */
         focus?: boolean;
         /** Route name of this page's parent. Header Back goes there instead of through history. */
         backTo?: string;

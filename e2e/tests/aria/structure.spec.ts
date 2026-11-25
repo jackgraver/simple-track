@@ -7,8 +7,15 @@ import { expect, test } from '../../fixtures';
 // Files: tests/aria/structure.spec.ts-snapshots/<name>-<project>.aria.yml (desktop and mobile differ).
 
 test.describe('structure', { tag: ['@aria'] }, () => {
-  test('main navigation', async ({ page }) => {
+  test('main navigation', async ({ page, isMobile }) => {
     await page.goto('/gym');
+    if (isMobile) {
+      // phones: the nav lives in the drawer. Retry the tap: an early click can land before the app hydrates.
+      await expect(async () => {
+        await page.getByRole('button', { name: 'Open menu' }).click();
+        await expect(page.getByRole('dialog')).toBeVisible({ timeout: 1_000 });
+      }).toPass();
+    }
     const nav = page.getByRole('navigation', { name: 'Main' }).filter({ visible: true });
     await expect(nav).toMatchAriaSnapshot({ name: 'main-nav.aria.yml' });
   });
