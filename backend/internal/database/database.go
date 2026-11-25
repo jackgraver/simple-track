@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"be-simpletracker/internal/clock"
 	"be-simpletracker/internal/env"
 
 	"gorm.io/driver/postgres"
@@ -40,7 +41,11 @@ func ConnectToPostgres() (*gorm.DB, error) {
 	var db *gorm.DB
 	// Try 3 times
 	for attempt := 1; attempt <= maxAttempts; attempt++ {
-		db, err = gorm.Open(postgres.Open(dsn), &gorm.Config{Logger: logger.Default.LogMode(logger.Silent)})
+		db, err = gorm.Open(postgres.Open(dsn), &gorm.Config{
+			Logger: logger.Default.LogMode(logger.Silent),
+			// created_at/updated_at follow the server clock (moved only by the e2e suite).
+			NowFunc: func() time.Time { return clock.Now().Local() },
+		})
 		if err == nil {
 			db_conn = db
 			log.Printf("postgres: connected successfully")

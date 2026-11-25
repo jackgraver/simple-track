@@ -1,0 +1,29 @@
+- list "Days this week":
+  - listitem:
+    - link /Sunday, January \d+, rest day/:
+      - /url: /gym?offset=4
+      - text: /Sun \d+ Rest/
+  - listitem:
+    - link /Monday, January \d+, Push, missed/:
+      - /url: /gym?offset=3
+      - text: /Mon \d+ Push/
+  - listitem:
+    - link /Tuesday, January \d+, rest day/:
+      - /url: /gym?offset=2
+      - text: /Tue \d+ Rest/
+  - listitem:
+    - link /Wednesday, January \d+, Pull, missed/:
+      - /url: /gym?offset=1
+      - text: /Wed \d+ Pull/
+  - listitem:
+    - link /Thursday, January \d+, Legs, planned/:
+      - /url: /gym
+      - text: /Today \d+ Legs/
+  - listitem:
+    - link /Friday, January \d+, rest day/:
+      - /url: /gym?offset=-1
+      - text: /Fri \d+ Rest/
+  - listitem:
+    - link /Saturday, January \d+, rest day/:
+      - /url: /gym?offset=-2
+      - text: /Sat \d+ Rest/

@@ -1,10 +1,10 @@
 package auth
 
 import (
+	"be-simpletracker/internal/clock"
 	"be-simpletracker/internal/env"
 	"crypto/subtle"
 	"log"
-	"time"
 
 	"github.com/gin-gonic/gin"
 )
@@ -21,7 +21,7 @@ func applyDevAuthUser(c *gin.Context) {
 	user := env.StringOr("DEV_AUTH_USER", "dev")
 	log.Printf("[auth] DEV_AUTH_TOKEN cookie bypass active (user=%q) — DO NOT USE IN PRODUCTION", user)
 	c.Set("username", user)
-	c.Set("timestamp", time.Now().Unix())
+	c.Set("timestamp", clock.Now().Unix())
 	c.Next()
 }
 

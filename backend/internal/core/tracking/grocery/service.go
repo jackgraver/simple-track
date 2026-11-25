@@ -1,9 +1,9 @@
 package grocery
 
 import (
+	"be-simpletracker/internal/clock"
 	"errors"
 	"strings"
-	"time"
 
 	"gorm.io/gorm"
 )
@@ -148,7 +148,7 @@ func CompleteItem(db *gorm.DB, ref itemRef) (*GroceryItem, error) {
 		return nil, err
 	}
 	if row.CompletedAt == nil {
-		now := time.Now()
+		now := clock.Now()
 		row.CompletedAt = &now
 		if err := db.Save(&row).Error; err != nil {
 			return nil, err

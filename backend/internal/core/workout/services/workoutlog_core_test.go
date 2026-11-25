@@ -1,10 +1,10 @@
 package services_test
 
 import (
+	"be-simpletracker/internal/clock"
 	"be-simpletracker/internal/core/workout/models"
 	"be-simpletracker/internal/core/workout/services"
 	"be-simpletracker/internal/core/workout/testutil"
-	"be-simpletracker/internal/utils"
 	"context"
 	"strings"
 	"testing"
@@ -12,7 +12,7 @@ import (
 
 func TestGetOrCreateToday_returnsExistingLog(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	today := utils.ZerodTime(0)
+	today := clock.ZerodTime(0)
 	wl := models.WorkoutLog{Date: today}
 	if err := db.Create(&wl).Error; err != nil {
 		t.Fatal(err)
@@ -28,7 +28,7 @@ func TestGetOrCreateToday_returnsExistingLog(t *testing.T) {
 
 func TestGetOrCreateToday_createsLogWithPlanForDay(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	today := utils.ZerodTime(0)
+	today := clock.ZerodTime(0)
 	dow := int(today.Weekday())
 	var program models.WorkoutProgram
 	if err := db.Where("is_active = ?", true).First(&program).Error; err != nil {
@@ -49,7 +49,7 @@ func TestGetOrCreateToday_createsLogWithPlanForDay(t *testing.T) {
 
 func TestSwitchPlan_updatesPlanAndReturnsView(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	today := utils.ZerodTime(0)
+	today := clock.ZerodTime(0)
 	dow := int(today.Weekday())
 	plan := models.WorkoutPlan{Name: "Legs", DayOfWeek: &dow, PlannedCardioType: "Run", PlannedCardioMinutes: 30}
 	if err := db.Create(&plan).Error; err != nil {
@@ -97,8 +97,8 @@ func TestSwitchPlan_rejectsMissingPlan(t *testing.T) {
 
 func TestGetPreviousWorkoutView_includesPreviousLog(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	today := utils.ZerodTime(0)
-	yesterday := utils.ZerodTime(1)
+	today := clock.ZerodTime(0)
+	yesterday := clock.ZerodTime(1)
 	ex := models.Exercise{Name: "Deadlift"}
 	if err := db.Create(&ex).Error; err != nil {
 		t.Fatal(err)
@@ -157,7 +157,7 @@ func TestGetPreviousWorkoutView_includesPreviousLog(t *testing.T) {
 
 func TestGetMonthWorkoutLogs_returnsLogsInRange(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	today := utils.ZerodTime(0)
+	today := clock.ZerodTime(0)
 	if err := db.Create(&models.WorkoutLog{Date: today}).Error; err != nil {
 		t.Fatal(err)
 	}

@@ -1,6 +1,7 @@
 package services
 
 import (
+	"be-simpletracker/internal/clock"
 	"context"
 	"time"
 
@@ -28,14 +29,14 @@ func MealPlanToday(ctx context.Context, offset int) (models.DietDay, dietrepo.Me
 }
 
 func MealPlanWeek(ctx context.Context) ([]models.DietDay, error) {
-	today := time.Now()
+	today := clock.Now()
 	start := today.AddDate(0, 0, -3)
 	end := today.AddDate(0, 0, 3)
 	return dietrepo.DaysByDateRange(ctx, start, end)
 }
 
 func MealPlanMonth(ctx context.Context, offset int) (days []models.DietDay, startOfMonth, endOfMonth time.Time, month time.Month, err error) {
-	today := time.Now()
+	today := clock.Now()
 	target := today.AddDate(0, offset, 0)
 	startOfMonth = time.Date(target.Year(), target.Month(), 1, 0, 0, 0, 0, target.Location())
 	endOfMonth = startOfMonth.AddDate(0, 1, -1)
@@ -47,7 +48,7 @@ func MealPlanMonth(ctx context.Context, offset int) (days []models.DietDay, star
 }
 
 func MonthPlannedSummary(_ context.Context, monthOffset int) ([]int, error) {
-	today := time.Now()
+	today := clock.Now()
 	target := today.AddDate(0, monthOffset, 0)
 	loc := target.Location()
 	startOfMonth := time.Date(target.Year(), target.Month(), 1, 0, 0, 0, 0, loc)
@@ -214,7 +215,7 @@ func CopyPlannedMeals(fromOffset int, toOffsets []int) (int, error) {
 }
 
 func ReorderPlannedMeals(offset int, orderedIDs []uint) error {
-	day, err := dietrepo.FindDayByDate(utils.ZerodTime(offset))
+	day, err := dietrepo.FindDayByDate(clock.ZerodTime(offset))
 	if err != nil {
 		return err
 	}
@@ -222,7 +223,7 @@ func ReorderPlannedMeals(offset int, orderedIDs []uint) error {
 }
 
 func DeletePlannedMeal(offset int, plannedMealID uint) error {
-	day, err := dietrepo.FindDayByDate(utils.ZerodTime(offset))
+	day, err := dietrepo.FindDayByDate(clock.ZerodTime(offset))
 	if err != nil {
 		return err
 	}
@@ -266,7 +267,7 @@ func FindMealPlanDayByRowIDOrToday(dayID uint) (*models.DietDay, error) {
 	if dayID != 0 {
 		return MealPlanDayByID(int(dayID))
 	}
-	return FindMealPlanDay(utils.ZerodTime(0))
+	return FindMealPlanDay(clock.ZerodTime(0))
 }
 
 func DayWithTotalsForDay(day *models.DietDay) DayWithTotals {

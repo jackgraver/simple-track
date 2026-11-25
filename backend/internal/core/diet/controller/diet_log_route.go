@@ -1,11 +1,11 @@
 package controller
 
 import (
+	"be-simpletracker/internal/clock"
 	"be-simpletracker/internal/core/diet/services"
 	"be-simpletracker/internal/utils"
 	"net/http"
 	"strconv"
-	"time"
 
 	"github.com/gin-gonic/gin"
 )
@@ -24,7 +24,7 @@ func GetMealPlanToday(c *gin.Context) {
 		"totalFiber":    tot.Fiber,
 		"totalCarbs":    tot.Carbs,
 		"totalFat":      tot.Fat,
-		"today":         time.Now(),
+		"today":         clock.Now(),
 	})
 }
 
@@ -36,7 +36,7 @@ func GetMealPlanWeek(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, gin.H{
 		"days":  data,
-		"today": time.Now(),
+		"today": clock.Now(),
 	})
 }
 
@@ -70,7 +70,7 @@ func GetMealPlanMonth(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, gin.H{
 		"days":  days,
-		"today": time.Now(),
+		"today": clock.Now(),
 		"range": gin.H{
 			"start": startOfMonth,
 			"end":   endOfMonth,

@@ -8,6 +8,7 @@ import (
 	tracking "be-simpletracker/internal/core/tracking"
 	workout "be-simpletracker/internal/core/workout"
 	"be-simpletracker/internal/database"
+	"be-simpletracker/internal/e2e"
 	"be-simpletracker/internal/env"
 	"be-simpletracker/internal/migrate"
 	"be-simpletracker/internal/utils"
@@ -68,6 +69,8 @@ func main() {
 		log.Fatalf("database schema: %v", err)
 	}
 
+	// Test-only /__e2e endpoints; a no-op unless built with -tags e2e (e2e/README.md).
+	e2e.Install(router, db)
 	CreateFeatures(db, router)
 	// Last, after the schema check: see healthHandler.
 	router.GET("/health", healthHandler(db))

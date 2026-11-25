@@ -1,10 +1,10 @@
 package services_test
 
 import (
+	"be-simpletracker/internal/clock"
 	"be-simpletracker/internal/core/workout/models"
 	"be-simpletracker/internal/core/workout/services"
 	"be-simpletracker/internal/core/workout/testutil"
-	"be-simpletracker/internal/utils"
 	"context"
 	"testing"
 )
@@ -104,7 +104,7 @@ func TestLogKeepsRoutineAfterDelete(t *testing.T) {
 	if err := services.AddExerciseToPlan(plan.ID, squat.ID); err != nil {
 		t.Fatal(err)
 	}
-	past := models.WorkoutLog{Date: utils.ZerodTime(3), WorkoutPlanID: &plan.ID}
+	past := models.WorkoutLog{Date: clock.ZerodTime(3), WorkoutPlanID: &plan.ID}
 	if err := db.Create(&past).Error; err != nil {
 		t.Fatal(err)
 	}

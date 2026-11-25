@@ -1,10 +1,10 @@
 package services_test
 
 import (
+	"be-simpletracker/internal/clock"
 	"be-simpletracker/internal/core/workout/models"
 	"be-simpletracker/internal/core/workout/services"
 	"be-simpletracker/internal/core/workout/testutil"
-	"be-simpletracker/internal/utils"
 	"context"
 	"testing"
 
@@ -110,7 +110,7 @@ func TestListExercises_paginates(t *testing.T) {
 
 func TestLogExercise_UpdateLoggedExercise_DeleteLoggedSet(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	today := utils.ZerodTime(0)
+	today := clock.ZerodTime(0)
 	ex, err := services.CreateExercise("Curl", 12, "")
 	if err != nil {
 		t.Fatal(err)
@@ -150,7 +150,7 @@ func TestLogExercise_UpdateLoggedExercise_DeleteLoggedSet(t *testing.T) {
 
 func TestRemoveLoggedExerciseForDay(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	today := utils.ZerodTime(0)
+	today := clock.ZerodTime(0)
 	ex, err := services.CreateExercise("Lat Raise", 15, "")
 	if err != nil {
 		t.Fatal(err)
@@ -185,7 +185,7 @@ func TestGetExerciseProgression(t *testing.T) {
 		{1, 50},
 		{0, 52.5},
 	} {
-		wl := models.WorkoutLog{Date: utils.ZerodTime(day.offset)}
+		wl := models.WorkoutLog{Date: clock.ZerodTime(day.offset)}
 		if err := db.Create(&wl).Error; err != nil {
 			t.Fatal(err)
 		}

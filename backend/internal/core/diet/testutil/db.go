@@ -1,9 +1,9 @@
 package testutil
 
 import (
+	"be-simpletracker/internal/clock"
 	"be-simpletracker/internal/core/diet/models"
 	"be-simpletracker/internal/database"
-	"be-simpletracker/internal/utils"
 	"testing"
 	"time"
 
@@ -130,7 +130,7 @@ func SeedPlannedMeal(t *testing.T, db *gorm.DB, dayID, mealID uint, order int, l
 }
 
 func Today() time.Time {
-	return utils.ZerodTime(0)
+	return clock.ZerodTime(0)
 }
 
 func DefaultMacros() models.Food {
