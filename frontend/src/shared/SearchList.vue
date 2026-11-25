@@ -110,7 +110,7 @@ const { activeIndex, handleKey, setEnterHandler, reset } = useListNavigation(
 );
 
 const rowKey = (item: any, index: number) => `${item.entry_kind ?? "food"}-${item.id ?? item.ID ?? index}`;
-const { pickedKey, announcement, flash: flashPicked, isUnmounted } = usePickedFlash(itemsContainer);
+const { isPicked, ariaAnnouncement, flash: flashPicked, isUnmounted } = usePickedFlash(itemsContainer);
 
 const handleFunctionCall = async <T extends (arg: any) => Promise<boolean>>(
     fn?: T,
@@ -180,7 +180,7 @@ watch(isPending, (pending) => {
         @mouseenter="isHovering = true"
         @mouseleave="isHovering = false"
     >
-        <span class="sr-only" role="status" aria-live="polite">{{ announcement }}</span>
+        <span class="sr-only" role="status" aria-live="polite">{{ ariaAnnouncement }}</span>
         <Input
             ref="searchInput"
             v-model="search"
@@ -205,7 +205,7 @@ watch(isPending, (pending) => {
                     <component :is="props.displayComponent" v-if="props.displayComponent" :item="item" />
                     <template v-else>{{ item.name || `#${item.id ?? item.ID}` }}</template>
                     <template #trailing>
-                        <Check v-if="pickedKey === rowKey(item, index)" aria-hidden="true" class="size-4 text-success" />
+                        <Check v-if="isPicked(rowKey(item, index))" aria-hidden="true" class="size-4 text-success" />
                         <Plus v-else aria-hidden="true" class="size-4" />
                     </template>
                 </ListRow>

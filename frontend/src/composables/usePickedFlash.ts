@@ -4,14 +4,14 @@ import type { Ref } from "vue";
 const PICKED_CHECK_MS = 1500;
 
 export function usePickedFlash(scrollContainer: Ref<HTMLElement | null>) {
-    const pickedKey = ref<string | null>(null);
-    const announcement = ref("");
-    let clearPickedTimer: ReturnType<typeof setTimeout> | undefined;
+    const pickedKey = ref("");
+    const ariaAnnouncement = ref("");
+    let clearPickedTimer: ReturnType<typeof setTimeout>;
     let unmounted = false;
 
     function resetAnnouncementThen(name: string) {
-        announcement.value = "";
-        nextTick(() => (announcement.value = name));
+        ariaAnnouncement.value = "";
+        nextTick(() => (ariaAnnouncement.value = name));
     }
 
     function scrollRowIntoView(key: string) {
@@ -21,7 +21,7 @@ export function usePickedFlash(scrollContainer: Ref<HTMLElement | null>) {
     function flash(key: string, name: string) {
         pickedKey.value = key;
         clearTimeout(clearPickedTimer);
-        clearPickedTimer = setTimeout(() => (pickedKey.value = null), PICKED_CHECK_MS);
+        clearPickedTimer = setTimeout(() => (pickedKey.value = ""), PICKED_CHECK_MS);
         resetAnnouncementThen(name);
         scrollRowIntoView(key);
     }
@@ -31,5 +31,5 @@ export function usePickedFlash(scrollContainer: Ref<HTMLElement | null>) {
         clearTimeout(clearPickedTimer);
     });
 
-    return { pickedKey, announcement, flash, isUnmounted: () => unmounted };
+    return { isPicked: (key: string) => pickedKey.value === key, ariaAnnouncement, flash, isUnmounted: () => unmounted };
 }
