@@ -213,3 +213,13 @@ opens a Tweakpane panel whose sliders change the values the page reads, so the o
 setting and hand back final numbers ("Copy values") instead of asking for one build per value.
 Tweakpane is a devDependency, loaded by a dynamic import behind `import.meta.env.DEV`; the
 production build contains none of it (checked by grepping `dist/`).
+
+## 2026-11-26: nav drawer on springs, sliding nav highlight
+- The mobile nav drawer's slide is a motion-v spring from wherever the panel is (`createSlideOver`),
+  replacing the CSS keyframes (`animate-drawer-in/out`, removed). A released swipe carries its speed
+  (fling above 400px/s, else open past half), and a panel still sliding can be caught.
+- Nav rows no longer paint their own hover/active background: `SlidingHighlight` draws a hover
+  pill (`surface-2`, was `surface-3`, so hover and current read apart) and an active pill
+  (`surface-3`) that slide between rows in 150ms, and a mouse press shrinks the row to 0.97.
+  Owner asked for "snappy"; 0.97 rather than 0.9 because a full-width row shrinking 10% reads as a
+  jump. Both are tunable with `?tune`.

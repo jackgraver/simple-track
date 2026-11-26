@@ -118,7 +118,7 @@ for live sliders (Tweakpane; `?tune=0` hides it), feel the motion, then "Copy va
 the new defaults. Production gets the plain defaults and no Tweakpane (`shared/ui/tune.ts`).
 `<MotionConfig reduced-motion="user">` in `App.vue` applies the OS setting to JS motion, which the
 CSS reduced-motion rule doesn't reach.
-Overlay animations are tokens in `style.css` (`animate-overlay-in/out`, `animate-sheet-in/out`; centred dialogs and their backdrop are deliberately instant: enter 250ms ease-out, exit 150ms ease-in). Reka waits for the exit animation before unmounting, so overlays use keyframes, not transitions.
+Overlay animations are tokens in `style.css` (`animate-overlay-in/out`, `animate-sheet-in/out`; centred dialogs and their backdrop are deliberately instant: enter 250ms ease-out, exit 150ms ease-in). Reka waits for the exit animation before unmounting, so overlays use keyframes, not transitions. The nav `Drawer` is the exception: a motion-v spring (`drawerSpring`), so a swipe's speed carries into it and it can be caught mid-slide.
 
 ### z-index (semantic utilities, nothing else)
 | Utility | Value | Layer |

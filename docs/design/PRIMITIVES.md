@@ -54,6 +54,8 @@ Shared conventions:
 | `Button`, `IconButton`, `Spinner`, `Field`, `Input`, `Textarea`, `Card`, `Badge`, `List`/`ListRow`, `EmptyState`, `ErrorState`, `Skeleton`, `PageHeader`, `Section` | **ours** | Plain Vue + Tailwind tokens |
 | `Chart` | **ours** | chart.js directly (PrimeVue chart is dropped) |
 | `WeekCarousel` | **motion-v** | Slide, swipe and the gliding outline. motion-v is imported only in `shared/ui/` (lint), like Reka |
+| `Drawer` | Reka `Dialog*` + **motion-v** | Reka for focus/Esc/scroll lock; the slide is a spring driven by a `SlideOver` (`createSlideOver`) |
+| `SlidingHighlight` | **motion-v** | Hover and active pills that slide between nav rows, plus the press shrink |
 
 ---
 
@@ -265,6 +267,21 @@ theme). Callers pass `type`, `data`, `options` and an accessible `label`.
 - Pages decide where a week lands (`weekLandingOffset`: Sunday, or today for the current week) and
   keep the carousel mounted while a new week loads (data fills in, no skeleton swap).
 - Used by the gym and diet week strips.
+
+## Drawer (mobile nav)
+- `<Drawer :panel title>` where `panel = createSlideOver(widthFn)` (one per drawer, usually module
+  level). `panel.open` is the state (set it, or `settle(open, velocity)`); a gesture calls
+  `panel.follow(px)` while a finger is down and `settle` on release, so the spring starts from the
+  finger and carries its speed. A sliding panel can be caught mid-way. Stays mounted (and modal)
+  until it is off screen. Tunable as "Nav drawer" (`?tune`).
+- The edge swipe lives in `shared/nav/mobile/useDrawerGesture.ts` (it needs the whole screen).
+
+## SlidingHighlight
+- `<SlidingHighlight as="nav">` around a list whose rows carry `data-highlight` and `relative` and
+  no background. It draws the hover pill (`surface-2`, mouse only, slides between rows, fades when
+  the pointer leaves) and the active pill (`surface-3`, on the row matching `active`, default
+  `[aria-current="page"]`, slides when it moves). A mouse press shrinks the row and its pills a
+  touch. Tunable as "Nav highlight" (`?tune`). Used by the nav tree (sidebar and drawer).
 
 ## Patterns without a primitive
 - **Radio cards / ratings / day pickers:** a `<fieldset>` of styled `<label>`s around `sr-only`
