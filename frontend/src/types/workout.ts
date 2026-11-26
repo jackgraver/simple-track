@@ -43,6 +43,8 @@ export interface LoggedSet extends BaseModel {
     weight_setup: string;
     /** "left"/"right" for one side of a unilateral exercise; null/absent for a bilateral set. */
     side?: SetSide | null;
+    /** Unilateral: the client_id of the side logged first, on both sides of a set number. */
+    pair_id?: string | null;
     /** Client-generated uuid (POST /workout/sets). Null on sets logged before G1. */
     client_id?: string | null;
 }

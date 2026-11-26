@@ -21,6 +21,54 @@ const L = (reps: number, weight = 30): SidedSet => ({ weight, reps, side: "left"
 const R = (reps: number, weight = 30): SidedSet => ({ weight, reps, side: "right" });
 const B = (reps: number, weight = 30): SidedSet => ({ weight, reps });
 
+/** A side with its own id (`key`) and the pair id it was logged with. */
+const side = (s: "left" | "right", key: string, pair: string, reps = 10): SidedSet => ({
+    weight: 30,
+    reps,
+    side: s,
+    key,
+    pair_id: pair,
+});
+
+describe("pairSets with stored pair ids", () => {
+    const today = [side("left", "a", "a"), side("right", "b", "a"), side("left", "c", "c"), side("right", "d", "c")];
+
+    it("pairs by pair_id", () => {
+        const pairs = pairSets(today);
+        expect(pairs.map((p) => [p.left?.set.key, p.right?.set.key])).toEqual([
+            ["a", "b"],
+            ["c", "d"],
+        ]);
+    });
+
+    it("deleting one side of an earlier set leaves every later pair alone", () => {
+        const pairs = pairSets(today.filter((s) => s.key !== "a"));
+        expect(pairs.map((p) => [p.left?.set.key, p.right?.set.key])).toEqual([
+            [undefined, "b"],
+            ["c", "d"],
+        ]);
+        expect(completePairCount(today.filter((s) => s.key !== "a"))).toBe(1);
+        // The next log starts set 3, on today's first side.
+        expect(nextPairNumber(today.filter((s) => s.key !== "a"))).toBe(3);
+    });
+
+    it("moving one side of a pair to the other side doesn't re-pair later sets", () => {
+        const moved = today.map((s) => (s.key === "a" ? { ...s, side: "right" as const } : s));
+        const pairs = pairSets(moved);
+        expect(pairs).toHaveLength(3);
+        expect(pairs.slice(1).map((p) => [p.left?.set.key, p.right?.set.key])).toEqual([
+            [undefined, "b"],
+            ["c", "d"],
+        ]);
+    });
+
+    it("joins a second side to a first side saved without a pair_id (by its own id)", () => {
+        const pairs = pairSets([{ weight: 30, reps: 10, side: "left", key: "a" }, side("right", "b", "a")]);
+        expect(pairs).toHaveLength(1);
+        expect(pairs[0].right?.set.key).toBe("b");
+    });
+});
+
 describe("pairSets", () => {
     it("pairs alternating sides in log order, whichever goes first", () => {
         const pairs = pairSets([R(10), L(9), R(8), L(8)]);

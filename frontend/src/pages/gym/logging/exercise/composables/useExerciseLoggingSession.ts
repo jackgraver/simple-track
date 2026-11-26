@@ -37,13 +37,16 @@ import { useGymWeightPrefs } from "./useGymWeightPrefs";
 import type { SetSide } from "~/types/workout";
 import {
     carriedSideWeight,
-    closesPair,
     defaultFirstSide,
     hasSides,
+    isOpen,
     nextPairNumber,
     nextSide,
+    openPairFor,
     otherSide,
+    pairIdOf,
     pairIndexOfRow,
+    pairSets,
     previousSideSet,
     setsForProgression,
 } from "../domain/unilateral";
@@ -463,19 +466,42 @@ export function useExerciseLoggingSession(options: {
         if (editingIndex != null) {
             const row = rows[editingIndex];
             if (!row) return false;
+            if (side && row.side && side !== row.side) {
+                const pairs = pairSets(rows);
+                const at = pairs.findIndex((p) => p.left?.index === editingIndex || p.right?.index === editingIndex);
+                const other = pairs[at]?.[side]?.set;
+                const before = pairs[at - 1];
+                if (!other && before && isOpen(before) && !before[side]) {
+                    // A lone side logged on the wrong side (Left twice): it completes the set before it.
+                    fields.pair_id = pairIdOf(before);
+                } else if (other) {
+                    // Moving a side of a full pair swaps the pair's sides, so it stays a pair.
+                    saveEditedSet(other, day, exerciseId, {
+                        weight: other.weight,
+                        reps: other.reps,
+                        weight_setup: other.weight_setup,
+                        side: row.side,
+                    });
+                }
+            }
             saveEditedSet(row, day, exerciseId, fields);
             // A fix to an earlier set isn't a new set: the rest clock keeps running.
         } else {
+            const clientId = newClientId();
+            const open = side ? openPairFor(rows, side) : undefined;
+            // Both sides of a set number carry the first side's id (stored, so pairs survive deletes).
+            const pairId = side ? ((open && pairIdOf(open)) ?? clientId) : null;
             logSet.mutate({
-                client_id: newClientId(),
+                client_id: clientId,
                 date: day,
                 exercise_id: exerciseId,
                 created_at: new Date().toISOString(),
                 ...fields,
+                ...(pairId && { pair_id: pairId }),
             });
             if (!side) {
                 globalTimer.start(exerciseDisplayName.value);
-            } else if (closesPair(rows, side)) {
+            } else if (open) {
                 // Second side: rest keeps counting from the first side.
                 globalTimer.endSwitch(exerciseDisplayName.value);
             } else {
@@ -558,12 +584,29 @@ export function useExerciseLoggingSession(options: {
      * behind it, and a failed delete leaves an unsaved row marked "Didn't save".
      */
     const deleteSet = (setIndex: number) => {
-        const row = loggedSets.value[setIndex];
+        const rows = loggedSets.value;
+        const row = rows[setIndex];
         const exerciseId = exerciseIdentity.value;
         if (!row || !exerciseId) return;
-        if (editingSetIndex.value === setIndex) editingSetIndex.value = null;
+        // The only side of the open pair: the switch wait it started is over (the clock keeps counting).
+        if (row.side) {
+            const pairs = pairSets(rows);
+            const last = pairs[pairs.length - 1];
+            if (last && isOpen(last) && last[row.side]?.index === setIndex) {
+                globalTimer.cancelSwitch(exerciseDisplayName.value);
+            }
+        }
+        const wasEditing = editingSetIndex.value === setIndex;
+        if (wasEditing) editingSetIndex.value = null;
         else if (editingSetIndex.value != null && editingSetIndex.value > setIndex) editingSetIndex.value--;
         deleteSetMutation.mutate({ client_id: row.key, date: date.value, exercise_id: exerciseId });
+        if (wasEditing) {
+            // Leave the deleted set's values behind: go back to this session's last set, as on cancel.
+            editingSide.value = null;
+            draftDirty.value = false;
+            const remaining = rows.filter((_, i) => i !== setIndex);
+            resumeFromLastSet(remaining[remaining.length - 1]);
+        }
     };
 
     const editSet = (setIndex: number) => {

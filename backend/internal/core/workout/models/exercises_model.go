@@ -40,6 +40,10 @@ type LoggedSet struct {
 	// Side is "left" or "right" for a set logged on one side of a unilateral exercise,
 	// nil for a bilateral set. A unilateral set number is a pair of rows, one per side.
 	Side *string `json:"side" gorm:"type:text"`
+	// PairID ties the two sides of one unilateral set number together: the client_id of the side
+	// logged first, on both rows. Stored rather than derived from log order so deleting or moving
+	// one side doesn't re-pair every later set. Nil on bilateral sets.
+	PairID *string `json:"pair_id" gorm:"type:uuid"`
 }
 
 func (l LoggedSet) GetID() uint       { return l.ID }

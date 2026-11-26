@@ -286,10 +286,7 @@ func UpdateExercise(c *gin.Context) {
 	if req.RepRollover == 0 {
 		req.RepRollover = 10
 	}
-	exercise, err := services.UpdateExercise(uint(id64), req.Name, req.RepRollover, req.Cues, req.LoadType)
-	if err == nil && req.Unilateral != nil {
-		exercise, err = services.SetExerciseUnilateral(uint(id64), *req.Unilateral)
-	}
+	exercise, err := services.UpdateExerciseWithUnilateral(uint(id64), req.Name, req.RepRollover, req.Cues, req.Unilateral, req.LoadType)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Exercise not found"})

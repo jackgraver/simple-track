@@ -31,6 +31,9 @@ type logSetRequest struct {
 	WeightSetup string  `json:"weight_setup"`
 	// Side is "left" or "right" for one side of a unilateral exercise; omitted or null for bilateral.
 	Side *string `json:"side"`
+	// PairID (a uuid, with a side) ties this side to the other side of the same set number. The
+	// first side sends its own client_id; the second sends the first side's.
+	PairID *string `json:"pair_id"`
 }
 
 // LogSet handles POST /workout/sets. Idempotent by client_id: a replay returns the stored set
@@ -64,6 +67,15 @@ func LogSet(c *gin.Context) {
 		apierr.BadRequest(c, "side must be left, right or null")
 		return
 	}
+	var pairID *string
+	if req.PairID != nil && *req.PairID != "" && side != nil {
+		id, ok := normalizeClientID(*req.PairID)
+		if !ok {
+			apierr.BadRequest(c, "pair_id must be a uuid")
+			return
+		}
+		pairID = &id
+	}
 
 	res, err := services.LogSet(c.Request.Context(), services.LogSetInput{
 		ClientID:    clientID,
@@ -73,6 +85,7 @@ func LogSet(c *gin.Context) {
 		Weight:      req.Weight,
 		WeightSetup: req.WeightSetup,
 		Side:        side,
+		PairID:      pairID,
 	})
 	switch {
 	case errors.Is(err, services.ErrExerciseNotFound):
@@ -99,6 +112,8 @@ type updateSetRequest struct {
 	WeightSetup *string  `json:"weight_setup"`
 	// Side, when present, moves the set to that side ("left"/"right"); "" makes it bilateral.
 	Side *string `json:"side"`
+	// PairID, when present, moves a side into another set number's pair (a uuid); "" clears it.
+	PairID *string `json:"pair_id"`
 }
 
 // UpdateSet handles PATCH /workout/sets/:id, where :id is the numeric set id or its client_id.
@@ -120,11 +135,20 @@ func UpdateSet(c *gin.Context) {
 			return
 		}
 	}
+	if req.PairID != nil && *req.PairID != "" {
+		id, ok := normalizeClientID(*req.PairID)
+		if !ok {
+			apierr.BadRequest(c, "pair_id must be a uuid or empty")
+			return
+		}
+		req.PairID = &id
+	}
 	set, exercise, err := services.UpdateSet(c.Request.Context(), ref, workoutrepo.SetPatch{
 		Reps:        req.Reps,
 		Weight:      req.Weight,
 		WeightSetup: req.WeightSetup,
 		Side:        req.Side,
+		PairID:      req.PairID,
 	})
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {

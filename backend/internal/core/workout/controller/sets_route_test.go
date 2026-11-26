@@ -157,6 +157,35 @@ func TestSetsRoutes_unilateralSides(t *testing.T) {
 		t.Fatalf("bad side: want 400, got %d", code)
 	}
 
+	// pair_id is stored on sided sets, ignored on bilateral ones, and must be a uuid.
+	postPair := func(cid, side, pair string) (int, map[string]any) {
+		body := map[string]any{"client_id": cid, "date": "2026-11-20", "exercise_id": ex.ID, "reps": 8, "weight": 30, "pair_id": pair}
+		if side != "" {
+			body["side"] = side
+		}
+		b, _ := json.Marshal(body)
+		return do(t, r, http.MethodPost, "/workout/sets", string(b))
+	}
+	const paired = "0193a1b2-c3d4-7e5f-8a9b-000000000005"
+	if code, out := postPair(paired, "left", left); code != http.StatusOK || out["set"].(map[string]any)["pair_id"] != left {
+		t.Fatalf("pair_id: %d %v", code, out)
+	}
+	if code, out := postPair("0193a1b2-c3d4-7e5f-8a9b-000000000006", "", left); code != http.StatusOK || out["set"].(map[string]any)["pair_id"] != nil {
+		t.Fatalf("bilateral pair_id must be dropped: %d %v", code, out)
+	}
+	if code, _ := postPair("0193a1b2-c3d4-7e5f-8a9b-000000000007", "left", "nope"); code != http.StatusBadRequest {
+		t.Fatalf("bad pair_id: want 400, got %d", code)
+	}
+	if code, out := do(t, r, http.MethodPatch, "/workout/sets/"+paired, `{"pair_id": "`+right+`"}`); code != http.StatusOK || out["set"].(map[string]any)["pair_id"] != right {
+		t.Fatalf("PATCH pair_id: %d %v", code, out)
+	}
+	if code, out := do(t, r, http.MethodPatch, "/workout/sets/"+paired, `{"pair_id": ""}`); code != http.StatusOK || out["set"].(map[string]any)["pair_id"] != nil {
+		t.Fatalf("PATCH pair_id clear: %d %v", code, out)
+	}
+	if code, _ := do(t, r, http.MethodPatch, "/workout/sets/"+paired, `{"pair_id": "x"}`); code != http.StatusBadRequest {
+		t.Fatalf("PATCH bad pair_id: want 400, got %d", code)
+	}
+
 	if code, out := do(t, r, http.MethodPatch, "/workout/sets/"+left, `{"side": "right"}`); code != http.StatusOK || out["set"].(map[string]any)["side"] != "right" {
 		t.Fatalf("PATCH side: %d %v", code, out)
 	}

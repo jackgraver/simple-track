@@ -108,6 +108,48 @@ test.describe('gym unilateral logging', { tag: ['@gym'] }, () => {
     expect(await sides(db)).toEqual([{ side: 'left', weight: 100, reps: 8 }]);
   });
 
+  test('delete: removing one side of set 1 leaves set 2 paired as it was', async ({ page, db }) => {
+    await makeUnilateral(db);
+    await openExercise(page, SQUAT);
+    await setReps(page, 8);
+    let saved = waitForApi(page, SETS);
+    await logFirst(page, 'Left');
+    await saved;
+    for (const [n, side] of [[1, 'Right'], [2, 'Left'], [2, 'Right']] as const) {
+      saved = waitForApi(page, SETS);
+      await logSide(page, n, side).click();
+      await saved;
+    }
+    // Both sides of a set number share the first side's id.
+    const { rows } = await db.query(`SELECT client_id::text AS cid, pair_id::text AS pair FROM logged_sets ORDER BY logged_sets.id`);
+    expect(rows.map((r: any) => r.pair)).toEqual([rows[0].cid, rows[0].cid, rows[2].cid, rows[2].cid]);
+
+    await half(page, 1, 'left').click();
+    const deleted = waitForApi(page, 'DELETE /workout/sets/:id');
+    await page.getByRole('button', { name: 'Delete left side' }).click();
+    await deleted;
+    await expect(half(page, 1, 'left')).toHaveCount(0);
+    await expect(half(page, 1, 'right')).toContainText('8 reps');
+    await expect(half(page, 2, 'left')).toContainText('8 reps');
+    await expect(half(page, 2, 'right')).toContainText('8 reps');
+    await expect(logSide(page, 3, 'Left')).toBeVisible();
+    await page.reload();
+    await expect(half(page, 2, 'left')).toContainText('8 reps');
+    await expect(half(page, 2, 'right')).toContainText('8 reps');
+  });
+
+  test('delete: a bilateral set among paired cards can be deleted from edit mode', async ({ page, api, db }) => {
+    await makeUnilateral(db);
+    await api.logSet({ exerciseId: SQUAT.id, reps: 8, weight: 100, date: TODAY });
+    await api.logSet({ exerciseId: SQUAT.id, reps: 8, weight: 100, date: TODAY, side: 'left' });
+    await openExercise(page, SQUAT);
+    await half(page, 1, 'left').click();
+    const deleted = waitForApi(page, 'DELETE /workout/sets/:id');
+    await page.getByRole('button', { name: 'Delete set 1', exact: true }).click();
+    await deleted;
+    expect(await sides(db)).toEqual([{ side: 'left', weight: 100, reps: 8 }]);
+  });
+
   test('history: the first side defaults to last session\'s, compared side by side', async ({ page, api, db }) => {
     await makeUnilateral(db);
     await api.logSet({ exerciseId: SQUAT.id, reps: 10, weight: 100, date: LAST_WEEK, side: 'right' });

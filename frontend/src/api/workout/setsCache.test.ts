@@ -289,8 +289,8 @@ describe("deriveSetRows", () => {
 
     it("maps cached sets to saved rows", () => {
         expect(deriveSetRows([set(1, "a"), set(0, "c1")], EMPTY_SET_INTENTS, target)).toEqual([
-            { key: "a", weight: 100, reps: 8, weight_setup: "", side: null, status: "success", id: 1, failed: null },
-            { key: "c1", weight: 100, reps: 8, weight_setup: "", side: null, status: "success", id: null, failed: null },
+            { key: "a", weight: 100, reps: 8, weight_setup: "", side: null, pair_id: null, status: "success", id: 1, failed: null },
+            { key: "c1", weight: 100, reps: 8, weight_setup: "", side: null, pair_id: null, status: "success", id: null, failed: null },
         ]);
     });
 
@@ -315,7 +315,7 @@ describe("deriveSetRows", () => {
         );
         expect(rows).toEqual([
             expect.objectContaining({ key: "a", status: "success" }),
-            { key: "c1", weight: 110, reps: 4, weight_setup: "", side: null, status: "error", id: null, failed: "create" },
+            { key: "c1", weight: 110, reps: 4, weight_setup: "", side: null, pair_id: null, status: "error", id: null, failed: "create" },
         ]);
     });
 

@@ -6,7 +6,7 @@ import type { SetSide } from "~/types/workout";
 import type { LoggedSetWithStatus } from "../../store/useWorkoutStore";
 import { setsTally, type ProgressVerdict } from "../domain/liveLogging";
 import { useOnline } from "~/api/online";
-import { hasSides, pairSets, sideSet, type SetPair } from "../domain/unilateral";
+import { hasSides, pairSets, setsForProgression, sideSet, type SetPair } from "../domain/unilateral";
 import UnilateralSetCard from "./UnilateralSetCard.vue";
 
 // Below the fold: every set today next to the same set last session, and whether the weight goes up next time.
@@ -32,8 +32,12 @@ const emit = defineEmits<{
 const online = useOnline();
 
 function diff(index: number): { text: string; tone: string } {
-    return diffOf(props.sets[index], props.previous[index]);
+    return diffOf(props.sets[index], previousFlat.value[index]);
 }
+
+// The plain list (no sides today) compares set N with last session's set N. Sided history counts one
+// set per pair (its weaker side), so set 2 isn't compared with set 1's right side.
+const previousFlat = computed(() => setsForProgression(props.previous));
 
 function diffOf(
     set: { weight: number; reps: number } | undefined,
@@ -99,7 +103,7 @@ function lastFor(p: number) {
                 <span class="tabular-nums">Set {{ index + 1 }} · {{ set.weight }} × {{ set.reps }}</span>
                 <template #subtitle>
                     <span class="tabular-nums">
-                        Last {{ previous[index] ? `${previous[index].weight} × ${previous[index].reps}` : "—" }}
+                        Last {{ previousFlat[index] ? `${previousFlat[index].weight} × ${previousFlat[index].reps}` : "—" }}
                     </span>
                 </template>
                 <template #trailing>

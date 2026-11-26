@@ -5,8 +5,6 @@ import (
 	"time"
 
 	"be-simpletracker/internal/core/workout/models"
-
-	"gorm.io/gorm"
 )
 
 type ExerciseListResult struct {
@@ -18,6 +16,10 @@ type ExerciseProgressionEntry struct {
 	Date   time.Time `json:"date"`
 	Weight float32   `json:"weight"`
 	Reps   uint      `json:"reps"`
+	// Unilateral sets: each side is its own entry; the client pairs them by pair_id (or client_id).
+	Side     *string `json:"side"`
+	PairID   *string `json:"pair_id"`
+	ClientID *string `json:"client_id"`
 }
 
 func FindAllExercises(excludeIDs []uint) ([]models.Exercise, error) {
@@ -61,12 +63,12 @@ func GetExerciseProgression(exerciseID uint) ([]ExerciseProgressionEntry, error)
 
 	err := conn().
 		Table("logged_exercises").
-		Select("workout_logs.date, logged_sets.weight, logged_sets.reps").
+		Select("workout_logs.date, logged_sets.weight, logged_sets.reps, logged_sets.side, logged_sets.pair_id, logged_sets.client_id").
 		Joins("JOIN workout_logs ON workout_logs.id = logged_exercises.workout_log_id").
 		Joins("JOIN logged_sets ON logged_sets.logged_exercise_id = logged_exercises.id").
 		Where("logged_exercises.exercise_id = ?", exerciseID).
 		Where("logged_sets.weight > 0 AND logged_sets.reps > 0").
-		Order("workout_logs.date ASC").
+		Order("workout_logs.date ASC, logged_sets.id ASC").
 		Scan(&entries).Error
 
 	if err != nil {
@@ -84,6 +86,12 @@ func CreateExercise(exercise *models.Exercise) error {
 }
 
 func UpdateExercise(id uint, name string, repRollover uint, cues string, loadTypes ...models.ExerciseLoadType) (*models.Exercise, error) {
+	return UpdateExerciseWithUnilateral(id, name, repRollover, cues, nil, loadTypes...)
+}
+
+// UpdateExerciseWithUnilateral is UpdateExercise that can also turn one-side-at-a-time logging on
+// or off (nil keeps it), in the same single write.
+func UpdateExerciseWithUnilateral(id uint, name string, repRollover uint, cues string, unilateral *bool, loadTypes ...models.ExerciseLoadType) (*models.Exercise, error) {
 	var exercise models.Exercise
 	if err := conn().First(&exercise, id).Error; err != nil {
 		return nil, err
@@ -92,38 +100,22 @@ func UpdateExercise(id uint, name string, repRollover uint, cues string, loadTyp
 	if len(loadTypes) > 0 {
 		loadType = models.NormalizeExerciseLoadType(loadTypes[0])
 	}
-	if err := conn().Model(&exercise).Updates(map[string]interface{}{
+	updates := map[string]interface{}{
 		"name":         name,
 		"rep_rollover": repRollover,
 		"cues":         cues,
 		"load_type":    loadType,
-	}).Error; err != nil {
+	}
+	if unilateral != nil {
+		updates["unilateral"] = *unilateral
+	}
+	if err := conn().Model(&exercise).Updates(updates).Error; err != nil {
 		return nil, err
 	}
 	if err := conn().First(&exercise, id).Error; err != nil {
 		return nil, err
 	}
 	return &exercise, nil
-}
-
-func FindExerciseByID(id uint) (*models.Exercise, error) {
-	var exercise models.Exercise
-	if err := conn().First(&exercise, id).Error; err != nil {
-		return nil, err
-	}
-	return &exercise, nil
-}
-
-// SetExerciseUnilateral turns one-side-at-a-time logging on or off for an exercise.
-func SetExerciseUnilateral(id uint, unilateral bool) error {
-	res := conn().Model(&models.Exercise{}).Where("id = ?", id).Update("unilateral", unilateral)
-	if res.Error != nil {
-		return res.Error
-	}
-	if res.RowsAffected == 0 {
-		return gorm.ErrRecordNotFound
-	}
-	return nil
 }
 
 func UpdateExerciseCues(exerciseID uint, cues string) (*models.Exercise, error) {

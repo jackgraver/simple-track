@@ -12,15 +12,26 @@ import type { LoggedExercise, LoggedSet, SetSide } from "~/types/workout";
 
 type Day = WorkoutLogsPreviousResponse;
 
-/** `side`: "left"/"right" for one side of a unilateral exercise, null for bilateral. On an edit,
- *  `undefined` leaves the side alone. */
-export type SetFields = { reps: number; weight: number; weight_setup: string; side?: SetSide | null };
+/** `side`: "left"/"right" for one side of a unilateral exercise, null for bilateral. `pair_id`: the
+ *  id both sides of a unilateral set number share (see `LoggedSet.pair_id`). On an edit, `undefined`
+ *  leaves either alone. */
+export type SetFields = {
+    reps: number;
+    weight: number;
+    weight_setup: string;
+    side?: SetSide | null;
+    pair_id?: string | null;
+};
 
 /** The writable fields of a set, as stored in the cache. */
 function fieldsOf(v: SetFields): SetFields {
-    return v.side === undefined
-        ? { reps: v.reps, weight: v.weight, weight_setup: v.weight_setup }
-        : { reps: v.reps, weight: v.weight, weight_setup: v.weight_setup, side: v.side };
+    return {
+        reps: v.reps,
+        weight: v.weight,
+        weight_setup: v.weight_setup,
+        ...(v.side !== undefined && { side: v.side }),
+        ...(v.pair_id !== undefined && { pair_id: v.pair_id }),
+    };
 }
 
 /** `POST /workout/sets`. `created_at` is fixed at tap time so re-applying the patch is idempotent. */
@@ -259,6 +270,8 @@ export type SetRow = {
     weight_setup: string;
     /** "left"/"right" on a unilateral set, null on a bilateral one. */
     side: SetSide | null;
+    /** Unilateral: the id both sides of its set number share (see `LoggedSet.pair_id`). */
+    pair_id: string | null;
     status: SetRowStatus;
     /** Server id, null while unsaved. */
     id: number | null;
@@ -308,6 +321,7 @@ export function deriveSetRows(
         reps: s.reps,
         weight_setup: s.weight_setup || "",
         side: s.side ?? null,
+        pair_id: s.pair_id ?? null,
         status: "success",
         id: s.ID > 0 ? s.ID : null,
         failed: null,
@@ -322,6 +336,7 @@ export function deriveSetRows(
             reps: v.reps,
             weight_setup: v.weight_setup,
             side: v.side ?? null,
+            pair_id: v.pair_id ?? null,
             status: "success",
             id: null,
             failed: null,

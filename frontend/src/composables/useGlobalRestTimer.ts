@@ -69,13 +69,21 @@ function start(name: string, switchSide: SetSide | null = null) {
 
 /**
  * The second side of a unilateral set was logged: keep counting from the first side (the rest is
- * measured from it), just leave the switch wait. Starts the clock if it isn't running.
+ * measured from it), just leave the switch wait. Restarts the clock instead when it isn't waiting on
+ * this exercise's switch (stopped, restarted since, or another exercise's).
  */
 function endSwitch(name: string) {
-    if (startedAt.value === null) {
+    if (startedAt.value === null || switchTo.value === null || timerExerciseName.value !== name) {
         start(name);
         return;
     }
+    switchTo.value = null;
+    persist();
+}
+
+/** The first side this switch wait was for was deleted: leave the switch wait, keep counting. */
+function cancelSwitch(name: string) {
+    if (switchTo.value === null || timerExerciseName.value !== name) return;
     switchTo.value = null;
     persist();
 }
@@ -137,6 +145,7 @@ export function useGlobalRestTimer() {
         switchTo,
         start,
         endSwitch,
+        cancelSwitch,
         clear,
     };
 }

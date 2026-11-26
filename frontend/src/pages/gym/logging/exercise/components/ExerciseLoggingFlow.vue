@@ -19,7 +19,7 @@ import {
 } from "../domain/weightSetup";
 import { overloadStatus, plannedSetCount, progressVerdict, visibleMachineSettings } from "../domain/liveLogging";
 import { buildUpNext, type UpNextItem } from "../domain/upNext";
-import { completePairCount, isOpen, pairSets, previousSideSet, setsForProgression, sideLabel } from "../domain/unilateral";
+import { completePairCount, hasSides, isOpen, pairSets, previousSideSet, setsForProgression, sideLabel } from "../domain/unilateral";
 import { useExerciseLoggingSession } from "../composables/useExerciseLoggingSession";
 import WeightSetupDialog from "../dialog/WeightSetupDialog.vue";
 import WeightSheet, { type WeightSheetResult } from "../dialog/WeightSheet.vue";
@@ -61,7 +61,13 @@ const exerciseName = computed(() => exercise.value?.name ?? "");
 const cues = computed(() => exercise.value?.cues ?? "");
 const machineSettings = computed(() => visibleMachineSettings(exercise.value?.machine_settings));
 const previousSets = computed(() =>
-    (session.exerciseGroup?.previous?.sets ?? []).map((set) => ({ weight: set.weight, reps: set.reps, side: set.side ?? null })),
+    (session.exerciseGroup?.previous?.sets ?? []).map((set) => ({
+        weight: set.weight,
+        reps: set.reps,
+        side: set.side ?? null,
+        pair_id: set.pair_id ?? null,
+        client_id: set.client_id ?? null,
+    })),
 );
 // Unilateral sets count one per pair (its weaker side) for targets, overload and the verdict.
 const previousForProgression = computed(() => setsForProgression(previousSets.value));
@@ -172,6 +178,8 @@ const logSet = async () => {
 const editingRow = computed(() =>
     session.editingSetIndex != null ? session.loggedSets[session.editingSetIndex] : undefined,
 );
+/** Today's list shows paired cards (any set has a side), same rule as TodayVsLastList. */
+const pairedView = computed(() => hasSides(session.loggedSets));
 const deleteEditedSide = () => {
     if (session.editingSetIndex != null) session.deleteSet(session.editingSetIndex);
 };
@@ -255,7 +263,7 @@ const openProgression = () => {
     void dialogManager.custom<void>({
         title: `${exerciseName.value} Progression`,
         component: ExerciseProgressionChartPanel,
-        componentProps: { exerciseId: id, lastTimeSets: previousSets.value, initialRange: "6m" },
+        componentProps: { exerciseId: id, lastTimeSets: previousForProgression.value, initialRange: "6m" },
         wide: true,
     });
 };
@@ -382,9 +390,13 @@ const goTo = (item: UpNextItem) => {
                 <Button v-if="extraSetOpen && !editing" variant="ghost" class="self-center" @click="extraSetOpen = false">
                     Cancel extra set
                 </Button>
-                <!-- Unilateral sets have no ✕ on the card: a side is deleted from its edit mode. -->
-                <Button v-if="editing && editingRow?.side" variant="danger" size="lg" block @click="deleteEditedSide">
-                    Delete {{ sideLabel(editingRow.side).toLowerCase() }} side
+                <!-- The paired cards have no ✕: a side (or a bilateral set among them) is deleted from its edit mode. -->
+                <Button v-if="editing && editingRow && pairedView" variant="danger" size="lg" block @click="deleteEditedSide">
+                    {{
+                        editingRow.side
+                            ? `Delete ${sideLabel(editingRow.side).toLowerCase()} side`
+                            : `Delete set ${session.currentSetNumber}`
+                    }}
                 </Button>
             </div>
 
