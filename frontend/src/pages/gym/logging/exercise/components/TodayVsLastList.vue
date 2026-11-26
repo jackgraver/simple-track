@@ -4,7 +4,7 @@ import { computed } from "vue";
 import { IconButton, List, ListRow } from "~/shared/ui";
 import type { SetSide } from "~/types/workout";
 import type { LoggedSetWithStatus } from "../../store/useWorkoutStore";
-import { setsTally, type ProgressVerdict } from "../domain/liveLogging";
+import { setsTally, verdictText, type ProgressVerdict } from "../domain/liveLogging";
 import { useOnline } from "~/api/online";
 import { hasSides, pairSets, setsForProgression, sideSet, type SetPair } from "../domain/unilateral";
 import UnilateralSetCard from "./UnilateralSetCard.vue";
@@ -16,7 +16,6 @@ const props = defineProps<{
     editingIndex: number | null;
     previous: { weight: number; reps: number; side?: SetSide | null }[];
     verdict: ProgressVerdict | null;
-    weight: number;
     /** Planned number of sets, for the done/total count. */
     target: number;
     /** Sets done (complete pairs when unilateral); defaults to the number of rows. */
@@ -76,8 +75,7 @@ function lastFor(p: number) {
                 Sets <span class="tabular-nums">{{ setsTally(done ?? sets.length, target) }}</span>
             </p>
             <p v-if="verdict" class="m-0 text-sm" :class="verdict.onTrack ? 'text-success' : 'text-fg-muted'">
-                {{ verdict.hit }}/{{ verdict.total }} sets hit {{ verdict.rollover }}
-                {{ verdict.onTrack ? "· on track to go up" : `· stay at ${weight} next time` }}
+                {{ verdictText(verdict) }}
             </p>
         </div>
         <div v-if="paired" class="flex flex-col gap-3">

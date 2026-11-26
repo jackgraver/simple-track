@@ -21,7 +21,7 @@ export type UpNextItem = {
 
 const exerciseIdOf = (g: ExerciseGroup | undefined) => g?.planned?.ID ?? g?.logged?.exercise_id ?? null;
 
-/** Same rule the logging screen applies on open: last session's top weight, +5 if every set hit the rollover. */
+/** Same rule the logging screen applies on open: last session's final set weight, +5 if earned (see `sessionOutcome`). */
 export function openingWeight(group: ExerciseGroup): number {
     // Unilateral history counts one set per pair (its weaker side), as on the logging screen.
     const previous = setsForProgression(group.previous?.sets);
@@ -30,7 +30,6 @@ export function openingWeight(group: ExerciseGroup): number {
     const progression = getWeightProgression(
         previous,
         group.previous?.exercise?.rep_rollover,
-        weight,
         WEIGHT_PROGRESSION_INCREASE_LBS,
     );
     return progression?.nextWeight ?? weight;

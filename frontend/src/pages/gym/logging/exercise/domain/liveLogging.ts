@@ -1,5 +1,5 @@
 import type { MachineSetting } from "~/types/workout";
-import { pickBestLoggedSet } from "./loggedSetDefaults";
+import { sessionOutcome } from "./weightProgression";
 
 type SetLike = { weight: number; reps: number };
 
@@ -36,20 +36,25 @@ export function setsTally(done: number, planned: number): string {
     return done > planned ? String(done) : `${done}/${planned}`;
 }
 
-/** Today's weight against last session's top weight, with the rollover tally that explains it. */
+/** Today's weight against where last session left off (its final set), with the rollover tally that explains it. */
 export type OverloadStatus =
     | { kind: "none" }
     | {
           kind: "up" | "same" | "down";
+          /** Last session's final set weight: where today starts before any increase. */
           previousWeight: number;
           /** currentWeight - previousWeight. */
           delta: number;
-          /** Sets last time at previousWeight that reached the rollover (null when no rollover is set). */
+          /** Sets last time that reached the rollover (null when no rollover is set). */
           hit: number | null;
           total: number;
           rollover: number | null;
-          /** True when every set last time hit the rollover, i.e. the increase was earned. */
+          /** Every set last time was at one weight and hit the rollover, i.e. the increase was earned. */
           earned: boolean;
+          /** Last time dropped weight partway: previousWeight is the dropped weight. */
+          dropped: boolean;
+          /** Last time's sets weren't all at one weight. */
+          mixed: boolean;
       };
 
 export function overloadStatus(
@@ -57,21 +62,19 @@ export function overloadStatus(
     repRollover: number | null | undefined,
     currentWeight: number,
 ): OverloadStatus {
-    const best = pickBestLoggedSet(previousSets ?? []);
-    if (!best || !(best.weight > 0) || !(currentWeight > 0)) return { kind: "none" };
-    const previousWeight = best.weight;
-    const atWeight = (previousSets ?? []).filter((s) => s.weight === previousWeight);
-    const rollover = typeof repRollover === "number" && repRollover > 0 ? repRollover : null;
-    const hit = rollover == null ? null : atWeight.filter((s) => s.reps >= rollover).length;
-    const delta = currentWeight - previousWeight;
+    const outcome = sessionOutcome(previousSets, repRollover);
+    if (!outcome || !(currentWeight > 0)) return { kind: "none" };
+    const delta = currentWeight - outcome.startWeight;
     return {
         kind: delta > 0 ? "up" : delta < 0 ? "down" : "same",
-        previousWeight,
+        previousWeight: outcome.startWeight,
         delta,
-        hit,
-        total: atWeight.length,
-        rollover,
-        earned: hit != null && hit === atWeight.length && atWeight.length > 0,
+        hit: outcome.hit,
+        total: outcome.total,
+        rollover: outcome.rollover,
+        earned: outcome.earned,
+        dropped: outcome.dropped,
+        mixed: !outcome.sameWeight,
     };
 }
 
@@ -81,19 +84,43 @@ export function formatWeightDelta(delta: number): string {
     return `${delta > 0 ? "+" : "−"}${Math.abs(delta)}`;
 }
 
-/** Live check of today's sets: will the weight go up next time? */
-export type ProgressVerdict = { hit: number; total: number; rollover: number; onTrack: boolean };
+/** Live check of today's sets: where does the next session start, and does it go up? */
+export type ProgressVerdict = {
+    hit: number;
+    total: number;
+    rollover: number;
+    /** Every set at one weight and every set hit the rollover. */
+    onTrack: boolean;
+    /** Today's final set weight: where the next session starts (before any increase). */
+    nextWeight: number;
+    dropped: boolean;
+    mixed: boolean;
+};
 
 export function progressVerdict(
     loggedSets: readonly SetLike[],
     repRollover: number | null | undefined,
-    weight: number,
 ): ProgressVerdict | null {
-    if (typeof repRollover !== "number" || !(repRollover > 0)) return null;
-    const atWeight = loggedSets.filter((s) => s.weight === weight);
-    if (!atWeight.length) return null;
-    const hit = atWeight.filter((s) => s.reps >= repRollover).length;
-    return { hit, total: atWeight.length, rollover: repRollover, onTrack: hit === atWeight.length };
+    const outcome = sessionOutcome(loggedSets, repRollover);
+    if (!outcome || outcome.rollover == null || outcome.hit == null) return null;
+    return {
+        hit: outcome.hit,
+        total: outcome.total,
+        rollover: outcome.rollover,
+        onTrack: outcome.earned,
+        nextWeight: outcome.startWeight,
+        dropped: outcome.dropped,
+        mixed: !outcome.sameWeight,
+    };
+}
+
+/** The verdict line: live while logging, or `finished` on the "Up next" screen. */
+export function verdictText(v: ProgressVerdict, finished = false): string {
+    if (v.dropped) return `Dropped to ${v.nextWeight} lb · start at ${v.nextWeight} next time`;
+    if (v.mixed) return `Mixed weights · start at ${v.nextWeight} next time`;
+    const tally = `${v.hit}/${v.total} sets hit ${v.rollover}`;
+    if (v.onTrack) return `${tally} · ${finished ? "goes up next time" : "on track to go up"}`;
+    return `${tally} · ${finished ? "same weight next time" : `stay at ${v.nextWeight} next time`}`;
 }
 
 /** Only settings with a label; values may be blank (shown as a placeholder). */
@@ -111,6 +138,9 @@ export function overloadReason(status: OverloadStatus): string {
             : `+${delta} lb on last time (${prev} lb).`;
     }
     if (status.kind === "down") return `${formatWeightDelta(delta)} lb on last time (${prev} lb).`;
+    const toGoUp = rollover == null ? "" : ` Keep every set at ${prev} lb and hit ${rollover} to go up.`;
+    if (status.dropped) return `Dropped to ${prev} lb last time, so starting there.${toGoUp}`;
+    if (status.mixed) return `Mixed weights last time, ending at ${prev} lb.${toGoUp}`;
     if (hit == null || rollover == null) return `Same as last time (${prev} lb).`;
     return status.earned
         ? `Last time ${hit}/${total} sets hit ${rollover} at ${prev} lb. You earned an increase today.`

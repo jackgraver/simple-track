@@ -104,16 +104,7 @@ const targetSets = computed(() => plannedSetCount(previousForProgression.value))
 const plannedDone = computed(() => loggedCount.value >= targetSets.value && !pairOpen.value);
 const editing = computed(() => session.editingSetIndex != null);
 const overload = computed(() => overloadStatus(previousForProgression.value, repRollover.value, session.currentWeight));
-// Unilateral: the draft can sit at one side's lower weight (uneven sides), so judge against the
-// working weight, today's heaviest set.
-const verdictWeight = computed(() =>
-    session.unilateral && session.loggedSets.length
-        ? Math.max(...session.loggedSets.map((s) => s.weight))
-        : session.currentWeight,
-);
-const verdict = computed(() =>
-    progressVerdict(setsForProgression(session.loggedSets), repRollover.value, verdictWeight.value),
-);
+const verdict = computed(() => progressVerdict(setsForProgression(session.loggedSets), repRollover.value));
 
 /* ---------- reps slider ---------- */
 const extraSetOpen = ref(false);
@@ -406,7 +397,6 @@ const goTo = (item: UpNextItem) => {
                     :previous="previousSets"
                     :done="loggedCount"
                     :verdict="verdict"
-                    :weight="verdictWeight"
                     :editing-index="session.editingSetIndex"
                     :target="targetSets"
                     @select="selectSet"

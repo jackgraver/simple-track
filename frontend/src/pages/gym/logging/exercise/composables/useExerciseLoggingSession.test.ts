@@ -48,6 +48,15 @@ describe("defaultsFromLoggedSets (initialization defaults)", () => {
         });
     });
 
+    it("starts from the final set's weight after a drop", () => {
+        expect(
+            defaultsFromLoggedSets([
+                { weight: 100, reps: 10, weight_setup: "belt" },
+                { weight: 90, reps: 8 },
+            ]),
+        ).toEqual({ weight: 90, reps: 8, weight_setup: "" });
+    });
+
     it("maps the best set and normalizes weight_setup", () => {
         expect(
             defaultsFromLoggedSets([

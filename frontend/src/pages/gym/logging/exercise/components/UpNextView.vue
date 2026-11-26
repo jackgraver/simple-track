@@ -2,7 +2,7 @@
 import { computed } from "vue";
 import { Check, ChevronRight, PartyPopper } from "lucide-vue-next";
 import { Badge, Button, Card, EmptyState, List, ListRow } from "~/shared/ui";
-import { formatWeightDelta, type ProgressVerdict } from "../domain/liveLogging";
+import { formatWeightDelta, verdictText, type ProgressVerdict } from "../domain/liveLogging";
 import type { UpNextItem } from "../domain/upNext";
 
 // Shown in place after "Finish": what you just did, then pick what's next without going back to the list.
@@ -45,8 +45,7 @@ const settingsLine = (item: UpNextItem) =>
                     <span class="shrink-0 text-sm text-fg-muted tabular-nums">{{ finishedSets }}</span>
                 </div>
                 <p v-if="verdict" class="m-0 text-sm" :class="verdict.onTrack ? 'text-success' : 'text-fg-muted'">
-                    {{ verdict.hit }}/{{ verdict.total }} sets hit {{ verdict.rollover }}
-                    {{ verdict.onTrack ? "· goes up next time" : "· same weight next time" }}
+                    {{ verdictText(verdict, true) }}
                 </p>
             </div>
         </Card>
