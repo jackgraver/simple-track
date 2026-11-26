@@ -52,6 +52,10 @@ reload. Add the module's API helpers to `fixtures/api.ts` as needed.
       - [x] weight choice (`tests/gym/weight-choice.spec.ts`): the go-up/stay switch on the setup card after an
             earned increase: default up, stay + flip back, logged with the set, gone after set 1, kept when
             leaving before set 1, absent without an earned increase.
+      - [x] drop progression (`tests/gym/drop-progression.spec.ts`): a drop last session opens at the dropped
+            weight with no increase and the weight sheet says why; a drop today shows "start at 90 next time".
+            Not covered: sets loading in logged order after an edit (a HOT update keeps index order, so the
+            unordered preload only misorders under a seq scan); the backend orders the preloads by id.
       - [x] tracking (`tests/gym/weight.spec.ts`, `steps.spec.ts`, `progression.spec.ts`,
             `tracking-load-errors.spec.ts`): weight save, Renpho import (+ rejected CSV), past day in
             Toronto late evening; steps save + overwrite/cancel/invalid; progression list per range, empty
