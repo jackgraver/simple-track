@@ -16,7 +16,13 @@ export type Knobs = Record<string, Knob>;
 export type TuneGroup = { name: string; knobs: Knobs; values: Record<string, number> };
 
 const STORAGE_KEY = "tune:values";
-const groups = new Map<string, TuneGroup>();
+// Kept on globalThis so hot reloads of this file (or of the files declaring knobs) reuse the same
+// groups instead of registering them again.
+const store = globalThis as { __tuneGroups?: Map<string, TuneGroup> };
+const groups = (store.__tuneGroups ??= new Map<string, TuneGroup>());
+
+/** Every registered group, in declaration order (the panel shows one folder each). */
+export const tuneGroups = (): TuneGroup[] => [...groups.values()];
 
 function enabled(): boolean {
     try {
@@ -62,6 +68,6 @@ export function tunable<K extends Knobs>(name: string, knobs: K): Readonly<{ [P 
     for (const k of Object.keys(defaults)) if (typeof stored[k] === "number") values[k] = stored[k]!;
     const group: TuneGroup = { name, knobs, values };
     groups.set(name, group);
-    void import("./tunePanel").then((panel) => panel.addGroup(group));
+    void import("./tunePanel").then((panel) => panel.render());
     return values as { [P in keyof K]: number };
 }
