@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
+import { computed } from "vue";
 import { Check, ChevronLeft, ChevronRight, Flame } from "lucide-vue-next";
-import { Badge, Card, ErrorState, IconButton, Skeleton, useDelayedFlag } from "~/shared/ui";
+import { Badge, Card, ErrorState, IconButton, Skeleton, useDelayedFlag, WeekCarousel } from "~/shared/ui";
+import { weekLandingOffset } from "~/utils/dateUtil";
 import type { useGymWeek, WeekDay } from "./useGymWeek";
 
 const props = defineProps<{ week: ReturnType<typeof useGymWeek>; offset: number }>();
@@ -34,25 +35,9 @@ const rangeLabel = computed(() => {
     return `${fmt(first)} – ${fmt(last)}`;
 });
 
-// Slide the days the way the week moved: later weeks come in from the right. Keyed on the week's
-// first day, so picking a day inside the same week doesn't animate.
-const weekKey = computed(() => days.value[0]?.key ?? "");
-const direction = ref<"next" | "prev">("next");
-watch(weekKey, (next, prev) => {
-    if (next && prev) direction.value = next > prev ? "next" : "prev";
-});
-
-// The arrows land on the new week's first day (Sunday), or on today when that week is this one.
-// A week runs Sunday (days[0], the largest offset) to Saturday (offset 6 smaller).
-const goToWeek = (step: 1 | -1) => {
-    const sunday = (days.value[0]?.offset ?? props.offset) - 7 * step;
-    emit("update:offset", sunday >= 0 && sunday - 6 <= 0 ? 0 : sunday);
-};
-
-// One outline for the selected day that slides between tiles. Each step is a tile width plus the
-// gap-1 between tiles; percentages in translate are of the outline's own (one-tile) width.
-const selectedIndex = computed(() => days.value.findIndex((d) => d.isSelected));
-const outlineStyle = computed(() => ({ translate: `calc(${selectedIndex.value} * (100% + 0.25rem)) 0` }));
+// The arrows (and swipes) land on the new week's Sunday, or today for the current week.
+const goToWeek = (step: 1 | -1) =>
+    emit("update:offset", weekLandingOffset(days.value[0]?.offset ?? props.offset, step));
 
 const tileClass = (d: WeekDay) => [
     d.isSelected ? "" : "hover:bg-surface-3",
@@ -104,66 +89,36 @@ const tileClass = (d: WeekDay) => [
             <template v-else-if="week.isPending.value">
                 <Skeleton v-if="showSkeleton" shape="block" height="4.75rem" />
             </template>
-            <!--
-                A carousel track: both weeks share one grid cell and move together by one week plus the
-                tile gap, so the new week arrives right behind the old one, like one continuous row of
-                days. Same duration and easing on both sides keep them locked together. The clip (with
-                room for focus rings) hides them past the card edge.
-            -->
-            <div v-else class="relative -mx-1 grid overflow-x-clip px-1">
-                <!--
-                    The selected-day outline stays out of the sliding weeks: it only moves between
-                    columns, so on a week change it glides to the new day while the weeks slide under
-                    it, with the same duration so both land together. left-1 and the extra 0.5rem in
-                    the width undo this wrapper's px-1. Painted under the tiles, since the week
-                    wrappers are positioned and come later.
-                -->
-                <div
-                    v-if="selectedIndex >= 0"
-                    aria-hidden="true"
-                    class="pointer-events-none absolute inset-y-0 left-1 w-[calc((100%-2rem)/7)] rounded-control border border-accent bg-accent-soft transition-[translate] duration-350 ease-out"
-                    :style="outlineStyle"
-                />
-                <Transition
-                    enter-active-class="transition-transform duration-350 ease-out"
-                    leave-active-class="transition-transform duration-350 ease-out"
-                    :enter-from-class="direction === 'next' ? 'translate-x-[calc(100%+0.25rem)]' : '-translate-x-[calc(100%+0.25rem)]'"
-                    :leave-to-class="direction === 'next' ? '-translate-x-[calc(100%+0.25rem)]' : 'translate-x-[calc(100%+0.25rem)]'"
-                >
-                    <div :key="weekKey" class="relative col-start-1 row-start-1">
-                        <ol class="relative m-0 grid list-none grid-cols-7 gap-1 p-0" aria-label="Days this week">
-                            <li v-for="d in days" :key="d.key" class="min-w-0">
-                                <router-link
-                                    :to="to(d)"
-                                    :aria-label="dayLabel(d)"
-                                    :aria-current="d.isToday ? 'date' : undefined"
-                                    class="flex min-h-touch flex-col items-center gap-0.5 rounded-control border border-transparent px-0.5 py-2 no-underline transition-colors duration-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-                                    :class="tileClass(d)"
-                                >
-                                    <span
-                                        class="text-2xs font-medium uppercase tracking-wide"
-                                        :class="d.isToday ? 'text-accent' : 'text-fg-muted'"
-                                    >
-                                        {{ d.isToday ? "Today" : d.weekday }}
-                                    </span>
-                                    <span class="text-base font-semibold tabular-nums">{{ d.dayOfMonth }}</span>
-                                    <span class="w-full truncate text-center text-2xs">
-                                        {{ d.scheduled?.name ?? "Rest" }}
-                                    </span>
-                                    <span class="flex h-4 items-center" aria-hidden="true">
-                                        <Check v-if="status(d) === 'done'" class="size-3.5 text-success" stroke-width="3" />
-                                        <span v-else-if="status(d) === 'planned'" class="size-1.5 rounded-full bg-fg-muted" />
-                                        <span
-                                            v-else-if="status(d) === 'missed'"
-                                            class="size-1.5 rounded-full border border-fg-subtle"
-                                        />
-                                    </span>
-                                </router-link>
-                            </li>
-                        </ol>
-                    </div>
-                </Transition>
-            </div>
+            <WeekCarousel v-else :days="days" label="Days this week" @prev="goToWeek(-1)" @next="goToWeek(1)">
+                <template #day="{ day: d }">
+                    <router-link
+                        :to="to(d)"
+                        :aria-label="dayLabel(d)"
+                        :aria-current="d.isToday ? 'date' : undefined"
+                        class="flex min-h-touch flex-col items-center gap-0.5 rounded-control border border-transparent px-0.5 py-2 no-underline transition-colors duration-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                        :class="tileClass(d)"
+                    >
+                        <span
+                            class="text-2xs font-medium uppercase tracking-wide"
+                            :class="d.isToday ? 'text-accent' : 'text-fg-muted'"
+                        >
+                            {{ d.isToday ? "Today" : d.weekday }}
+                        </span>
+                        <span class="text-base font-semibold tabular-nums">{{ d.dayOfMonth }}</span>
+                        <span class="w-full truncate text-center text-2xs">
+                            {{ d.scheduled?.name ?? "Rest" }}
+                        </span>
+                        <span class="flex h-4 items-center" aria-hidden="true">
+                            <Check v-if="status(d) === 'done'" class="size-3.5 text-success" stroke-width="3" />
+                            <span v-else-if="status(d) === 'planned'" class="size-1.5 rounded-full bg-fg-muted" />
+                            <span
+                                v-else-if="status(d) === 'missed'"
+                                class="size-1.5 rounded-full border border-fg-subtle"
+                            />
+                        </span>
+                    </router-link>
+                </template>
+            </WeekCarousel>
         </div>
     </Card>
 </template>

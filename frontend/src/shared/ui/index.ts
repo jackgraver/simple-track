@@ -36,3 +36,5 @@ export { default as MenuRadioGroup } from "./MenuRadioGroup.vue";
 export { default as Avatar } from "./Avatar.vue";
 export { default as Combobox } from "./Combobox.vue";
 export type { ComboboxOption } from "./Combobox.vue";
+export { default as WeekCarousel } from "./WeekCarousel.vue";
+export { MotionConfig } from "./motion";

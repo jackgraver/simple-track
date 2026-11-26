@@ -53,6 +53,7 @@ Shared conventions:
 | `Select` | **native `<select>`** | The OS picker wins on mobile. Reka `Select` only if a module needs custom option rendering |
 | `Button`, `IconButton`, `Spinner`, `Field`, `Input`, `Textarea`, `Card`, `Badge`, `List`/`ListRow`, `EmptyState`, `ErrorState`, `Skeleton`, `PageHeader`, `Section` | **ours** | Plain Vue + Tailwind tokens |
 | `Chart` | **ours** | chart.js directly (PrimeVue chart is dropped) |
+| `WeekCarousel` | **motion-v** | Slide, swipe and the gliding outline. motion-v is imported only in `shared/ui/` (lint), like Reka |
 
 ---
 
@@ -250,6 +251,17 @@ theme). Callers pass `type`, `data`, `options` and an accessible `label`.
   otherwise a text-free gradient disc (`avatar-a` → `avatar-b`) with a white highlight and inner
   ring. Decorative (aria-hidden) by default because the name sits beside it; pass
   `:decorative="false"` when it stands alone.
+
+## WeekCarousel
+- `<WeekCarousel :days :label @prev @next>` with a `#day="{ day }"` slot per tile. `days` are seven
+  `{ key: "YYYY-MM-DD", isSelected }` (Sunday first; the key orders weeks for the slide direction).
+- A new week slides in as one continuous row with the old one; one selected-day outline glides
+  between columns, also across a week change. Swiping sideways emits `prev`/`next` (far or fast
+  enough, see `shared/ui/motion.ts`); a swipe never selects a day.
+- Tiles draw no selected state of their own: a transparent border, `rounded-control`, a hover fill.
+- Pages decide where a week lands (`weekLandingOffset`: Sunday, or today for the current week) and
+  keep the carousel mounted while a new week loads (data fills in, no skeleton swap).
+- Used by the gym and diet week strips.
 
 ## Patterns without a primitive
 - **Radio cards / ratings / day pickers:** a `<fieldset>` of styled `<label>`s around `sr-only`
