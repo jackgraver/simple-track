@@ -3,13 +3,21 @@ import { computed } from "vue";
 import { Check, ChevronLeft, ChevronRight, Flame } from "lucide-vue-next";
 import { Badge, Card, ErrorState, IconButton, Skeleton, useDelayedFlag, WeekCarousel } from "~/shared/ui";
 import { weekLandingOffset } from "~/utils/dateUtil";
-import type { useGymWeek, WeekDay } from "./useGymWeek";
+import { useGymWeek, type WeekDay } from "./useGymWeek";
 
 const props = defineProps<{ week: ReturnType<typeof useGymWeek>; offset: number }>();
 const emit = defineEmits<{ "update:offset": [offset: number] }>();
 
 const showSkeleton = useDelayedFlag(() => props.week.isPending.value);
 const days = computed(() => props.week.days.value);
+
+// The weeks either side, for the carousel to show while swiping and sliding. Built from the same
+// cached programs + activity, so no extra requests. Their selection is the current week's job.
+const unselect = (ds: WeekDay[]) => ds.map((d) => ({ ...d, isSelected: false }));
+const prevWeek = useGymWeek(() => props.offset + 7);
+const nextWeek = useGymWeek(() => props.offset - 7);
+const prevDays = computed(() => unselect(prevWeek.days.value));
+const nextDays = computed(() => unselect(nextWeek.days.value));
 
 const status = (d: WeekDay): "done" | "missed" | "planned" | "rest" => {
     if (d.trained) return "done";
@@ -89,7 +97,15 @@ const tileClass = (d: WeekDay) => [
             <template v-else-if="week.isPending.value">
                 <Skeleton v-if="showSkeleton" shape="block" height="4.75rem" />
             </template>
-            <WeekCarousel v-else :days="days" label="Days this week" @prev="goToWeek(-1)" @next="goToWeek(1)">
+            <WeekCarousel
+                v-else
+                :days="days"
+                :prev-days="prevDays"
+                :next-days="nextDays"
+                label="Days this week"
+                @prev="goToWeek(-1)"
+                @next="goToWeek(1)"
+            >
                 <template #day="{ day: d }">
                     <router-link
                         :to="to(d)"

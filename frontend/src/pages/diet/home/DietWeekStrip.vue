@@ -38,6 +38,13 @@ const tiles = computed<Tile[]>(() =>
     }),
 );
 
+// The weeks either side, for the carousel to show while swiping and sliding: dates only (no
+// fetch, and future diet days must not be fetched early); numbers fill in once a week is shown.
+const emptyTiles = (offset: number): Tile[] =>
+    dietWeek(offset).map((d) => ({ ...d, isSelected: false, kcal: null, target: 0, fill: 0, over: false }));
+const prevTiles = computed(() => emptyTiles(props.offset + 7));
+const nextTiles = computed(() => emptyTiles(props.offset - 7));
+
 const isCurrentWeek = computed(() => week.value.some((d) => d.isToday));
 const fmtShort = (d: Date) => d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
 const title = computed(() => {
@@ -105,7 +112,15 @@ const tileClass = (t: Tile) => [
             <template v-else-if="firstLoad">
                 <Skeleton v-if="showSkeleton" shape="block" height="4.5rem" />
             </template>
-            <WeekCarousel v-else :days="tiles" label="Days this week" @prev="goToWeek(-1)" @next="goToWeek(1)">
+            <WeekCarousel
+                v-else
+                :days="tiles"
+                :prev-days="prevTiles"
+                :next-days="nextTiles"
+                label="Days this week"
+                @prev="goToWeek(-1)"
+                @next="goToWeek(1)"
+            >
                 <template #day="{ day: t }">
                     <router-link
                         :to="to(t)"

@@ -253,11 +253,14 @@ theme). Callers pass `type`, `data`, `options` and an accessible `label`.
   `:decorative="false"` when it stands alone.
 
 ## WeekCarousel
-- `<WeekCarousel :days :label @prev @next>` with a `#day="{ day }"` slot per tile. `days` are seven
-  `{ key: "YYYY-MM-DD", isSelected }` (Sunday first; the key orders weeks for the slide direction).
-- A new week slides in as one continuous row with the old one; one selected-day outline glides
-  between columns, also across a week change. Swiping sideways emits `prev`/`next` (far or fast
-  enough, see `shared/ui/motion.ts`); a swipe never selects a day.
+- `<WeekCarousel :days :prev-days :next-days :label @prev @next>` with a `#day="{ day }"` slot per
+  tile. Each week is seven `{ key: "YYYY-MM-DD", isSelected }` (Sunday first; the key orders weeks).
+- A carousel track: the neighbour weeks sit just past either edge, so a swipe drags real days into
+  view and a week change slides the row as one. Pass neighbours with `isSelected: false`, built
+  without fetching (gym: cached program + activity; diet: dates only, numbers fill in on arrival).
+- One selected-day outline rides along while dragging, then glides to its column, also across a
+  week change. Swiping emits `prev`/`next` (far or fast enough, see `shared/ui/motion.ts`); a swipe
+  never selects a day.
 - Tiles draw no selected state of their own: a transparent border, `rounded-control`, a hover fill.
 - Pages decide where a week lands (`weekLandingOffset`: Sunday, or today for the current week) and
   keep the carousel mounted while a new week loads (data fills in, no skeleton swap).
