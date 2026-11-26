@@ -6,7 +6,7 @@
 // transparent border and a hover state.
 import { animate, motion, useMotionValue, type PanInfo } from "motion-v";
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
-import { carouselSpring, SWIPE_DISTANCE, SWIPE_VELOCITY } from "./motion";
+import { carousel, carouselSpring } from "./motion";
 
 const props = defineProps<{
     /** Seven days, Sunday first. `key` must be the day's `YYYY-MM-DD` date (it orders weeks). */
@@ -47,7 +47,7 @@ const x = useMotionValue(0);
 let settle: ReturnType<typeof animate> | null = null;
 const slideTo0 = () => {
     settle?.stop();
-    settle = animate(x, 0, carouselSpring);
+    settle = animate(x, 0, carouselSpring());
 };
 watch(weekKey, (next, prev) => {
     if (!next || !prev || next === prev) return;
@@ -95,9 +95,9 @@ const onDragStart = () => {
 const onDragEnd = (_e: PointerEvent, info: PanInfo) => {
     setTimeout(() => (dragged = false));
     stopMirror?.();
-    animate(outlineShift, 0, carouselSpring);
-    const far = Math.abs(info.offset.x) > step() * SWIPE_DISTANCE;
-    const fast = Math.abs(info.velocity.x) > SWIPE_VELOCITY;
+    animate(outlineShift, 0, carouselSpring());
+    const far = Math.abs(info.offset.x) > step() * carousel.swipeDistance;
+    const fast = Math.abs(info.velocity.x) > carousel.swipeVelocity;
     const dir = info.offset.x < 0 ? "next" : "prev";
     if (!(far || fast) || !(dir === "next" ? props.nextDays : props.prevDays)?.length) {
         slideTo0();
@@ -142,7 +142,7 @@ const swallowClickAfterDrag = (e: MouseEvent) => {
                 class="absolute inset-y-0 left-0 rounded-control border border-accent bg-accent-soft"
                 :initial="false"
                 :animate="{ x: outline.x, width: outline.width }"
-                :transition="carouselSpring"
+                :transition="carouselSpring()"
             />
         </motion.div>
         <motion.div

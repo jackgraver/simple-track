@@ -206,3 +206,10 @@ Worked out with the owner. Per exercise (Edit dialog toggle, `exercises.unilater
 - First user: `WeekCarousel` (gym + diet week strips). It replaces #90's hand-written transition and `calc()` outline: the outline is measured from the selected tile, the weeks can be swiped, and a new week starts right behind wherever the old one is (after a swipe or quick taps), so the row stays continuous.
 - Diet's week strip no longer swaps to a skeleton while a new week loads (that unmounted the carousel mid-slide); only the first load shows one, and calorie bars fill in with a width transition.
 - Both strips land on Sunday of the new week (today for the current week) via `weekLandingOffset`.
+
+## 2026-11-26: live motion tuning with `?tune` (dev only)
+Motion numbers in `shared/ui/motion.ts` are declared with `tunable(...)`. Under `npm run dev`, `?tune`
+opens a Tweakpane panel whose sliders change the values the page reads, so the owner can feel a
+setting and hand back final numbers ("Copy values") instead of asking for one build per value.
+Tweakpane is a devDependency, loaded by a dynamic import behind `import.meta.env.DEV`; the
+production build contains none of it (checked by grepping `dist/`).

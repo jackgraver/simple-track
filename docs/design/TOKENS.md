@@ -113,6 +113,9 @@ inside primitives. A global reduced-motion rule clamps all transitions and anima
 JS motion (motion-v, inside `shared/ui/` only) takes its values from `shared/ui/motion.ts`: springs
 with `bounce: 0` (they settle like ease-out and keep a swipe's velocity), sized by `visualDuration`.
 `carouselSpring` (0.35s) drives `WeekCarousel`: a full-width move reads as rushed at 250ms.
+Values in `motion.ts` are declared with `tunable(...)`: in `npm run dev`, add `?tune` to any URL
+for live sliders (Tweakpane; `?tune=0` hides it), feel the motion, then "Copy values" and make them
+the new defaults. Production gets the plain defaults and no Tweakpane (`shared/ui/tune.ts`).
 `<MotionConfig reduced-motion="user">` in `App.vue` applies the OS setting to JS motion, which the
 CSS reduced-motion rule doesn't reach.
 Overlay animations are tokens in `style.css` (`animate-overlay-in/out`, `animate-sheet-in/out`; centred dialogs and their backdrop are deliberately instant: enter 250ms ease-out, exit 150ms ease-in). Reka waits for the exit animation before unmounting, so overlays use keyframes, not transitions.
