@@ -94,26 +94,39 @@ case "$cmd" in
       # The socket appears a moment after the detached server forks.
       for _ in $(seq 1 50); do is_running && break; sleep 0.2; done
     fi
-    if ! timeout 300 process-compose -U project is-ready --wait >/dev/null 2>&1; then
-      echo "dev: stack did not become ready; see 'dev status' and 'dev logs <proc>'" >&2
-      pc process list 2>/dev/null >&2 || true
-      exit 1
-    fi
-    # is-ready only covers readiness probes; also wait for one-shot processes
-    # (no probe, e.g. devuser) to finish, and fail if one exited non-zero.
+    # Poll until every process is up (probes passed, one-shots finished). A
+    # one-shot that exits non-zero (migrate, devuser, devseed) fails fast with
+    # its last log lines instead of waiting out the readiness timeout.
+    state=waiting
     for _ in $(seq 1 300); do
-      state="$(pc process list -o json | python3 -c '
+      state="$(pc process list -o json 2>/dev/null | python3 -c '
 import json, sys
 ps = json.load(sys.stdin)
-failed = [p["name"] for p in ps if p["status"] == "Completed" and p.get("exit_code", 0) != 0]
+failed = [p["name"] for p in ps if p["status"] in ("Completed", "Error") and p.get("exit_code", 0) != 0]
 waiting = [p["name"] for p in ps if p["status"] in ("Pending", "Launching", "Restarting")
-           or (p["status"] == "Running" and p.get("is_ready") == "-")]
-print("failed " + " ".join(failed) if failed else "waiting" if waiting else "ok")')"
+           or (p["status"] == "Running" and p.get("is_ready") in ("-", "Not Ready"))]
+print("failed " + " ".join(failed) if failed else "waiting" if waiting else "ok")' 2>/dev/null || echo waiting)"
       [[ "$state" == waiting ]] || break
       sleep 1
     done
     if [[ "$state" != ok ]]; then
-      echo "dev: ${state:-timed out waiting for one-shot processes}; see 'dev logs <proc>'" >&2
+      if [[ "$state" == failed* ]]; then
+        for proc in ${state#failed }; do
+          echo "dev: $proc failed; last log lines:" >&2
+          pc process logs "$proc" -n 15 >&2 || true
+          if pc process logs "$proc" -n 50 2>/dev/null | grep -q "edited after running"; then
+            if [[ "$DEV_SLOT" != 0 ]]; then
+              echo "dev: this database has an older version of an applied migration (slot $DEV_SLOT reused?)." >&2
+              echo "dev: reset it with: ./bin/dev stop && ./bin/dev db:drop-worktree && ./bin/dev start" >&2
+            else
+              echo "dev: put the change in a new migration (or './bin/dev migrate redo' if it is the latest)." >&2
+            fi
+          fi
+        done
+      else
+        echo "dev: timed out waiting for the stack; see 'dev status' and 'dev logs <proc>'" >&2
+        pc process list 2>/dev/null >&2 || true
+      fi
       exit 1
     fi
     print_env

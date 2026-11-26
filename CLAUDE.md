@@ -2,6 +2,10 @@
 
 Go API (`backend/`, gin + gorm, Postgres) and Vue 3 + Vite frontend (`frontend/`).
 
+Production topology (Caddy on the VPS, nginx in the frontend image, `/api` routing, `TRUSTED_PROXIES`)
+is in `docs/ARCHITECTURE.md`. Read it before touching `frontend/nginx.conf`, the compose files,
+proxy/CORS/cookie settings or anything about client IPs, and update it when that changes.
+
 ## Dev environment (mise + process-compose)
 
 Tooling is managed by [mise](https://mise.jdx.dev) via `mise.toml` (Node, air, process-compose,
@@ -23,6 +27,10 @@ the same time. **Never hardcode ports; ask `./bin/dev env`.**
 
 ### Verifying changes as an agent
 
+Starting a stack is cheap and safe: do it whenever a change needs to be seen or exercised (UI work,
+API behaviour, anything a type-check can't prove), preferably from your own worktree (own slot, ports
+and DB). Skip it for docs, config or pure refactors that tests cover. Only `stop` a stack you started.
+
 Never run bare `./bin/dev` (it opens an interactive TUI). Use the background commands:
 
 ```
@@ -38,6 +46,9 @@ Never run bare `./bin/dev` (it opens an interactive TUI). Use the background com
 - Login: `dev` / `dev` (prefilled on the sign-in page in vite dev mode). The `devuser` step
   creates the account on every start. Browser/e2e flows can log in through
   `POST <frontend>/api/auth/login` with that account.
+- **e2e:** `./bin/dev e2e` (args go to `playwright test`, e.g. `--grep @smoke` or `tests/gym`). It is
+  self-contained (own Postgres container, DBs and backends), so it doesn't need `dev start`. How to
+  run, write and debug specs: `e2e/README.md`.
 - `dev api` uses the `DEV_AUTH_TOKEN` cookie bypass from `backend/.env` (`ALLOW_BYPASS` is
   forced on by `dev/env.sh`; the backend rejects both in production).
 - A fresh worktree starts with an empty DB: the one-shot `migrate` service applies every
@@ -78,6 +89,8 @@ and runs in `dev check` and the j-cicd pipeline.
   Env vars exported by `dev/env.sh` take precedence over it.
 - `cmd/devuser` creates or resets the dev login and refuses to run in production.
 - `dev db:reset` and `dev db:drop-worktree` are destructive to dev data.
+- Slot numbers are reused after a worktree is deleted; a reassigned slot's leftover containers/volumes
+  are purged automatically (`dev/purge-slot`). `dev db:gc [--dry-run]` removes any others with no live worktree.
 
 ### Database migrations
 
@@ -95,17 +108,13 @@ server, which refuses to start while any are pending, and into `cmd/migrate`, wh
 
 ## Deployment
 
-Prod deployments go through j-cicd (`~/.local/bin/j-cicd`, config in `.cicd.yaml`). Don't build
-images or SSH to the VPS by hand. `docker-compose.vps.yml` is only the compose file j-cicd's
-VPS agent uses, not a deploy path.
+Prod deployments go through j-cicd (config in `.cicd.yaml`): run `j-cicd guide` for how it
+works, and `j-cicd run --plan` to preview what a deploy would do. Don't build images or SSH to
+the VPS by hand. `docker-compose.vps.yml` is only the compose file j-cicd's VPS agent uses, not
+a deploy path.
 
-1. Commit and push to `main`. Pipelines build main's latest commit, not the working tree.
-2. `j-cicd run` from the repo root. It runs vet and tests, builds and pushes both images,
-   backs up the DB, applies migrations, swaps the containers and waits for health checks
-   (about 45s). Prod is live when it reports `run succeeded`.
-3. If it fails, read `j-cicd logs simple-track`. `j-cicd rollback` reverts the images only,
-   not the database. Pre-deploy backups are in `~/backups` on the VPS.
-
-Run bare `j-cicd` or `j-cicd run -h` to see usage. Without a TTY it prints help instead of
-opening the dashboard. `-no-deploy` pushes images without deploying. Always ask the user
-before running a prod deploy unless they already told you to deploy.
+- Commit and push to `main` first. Pipelines build main's latest commit, not the working tree.
+- Always ask the user before running a prod deploy unless they already told you to deploy.
+- A run ends by checking `https://st.jackgraver.ca/version.json` for the deployed commit (the
+  `stamp-version` step bakes it into the frontend image).
+- Pre-deploy DB backups are in `~/backups` on the VPS; `rollback` never reverts the database.

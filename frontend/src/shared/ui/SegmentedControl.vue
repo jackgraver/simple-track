@@ -2,13 +2,22 @@
 // 2-5 mutually exclusive options. Reka ToggleGroup (single) gives the roving focus and ARIA.
 import { ToggleGroupItem, ToggleGroupRoot } from "reka-ui";
 
-defineProps<{ options: { label: string; value: T }[]; label: string }>();
+type Option = { label: string; value: T };
+// `sm`: a slim inline switch (next to a value, not a form row). It looks 30px tall, but each item's
+// hit area reaches 44px, so it still meets the mobile touch-target rule.
+withDefaults(defineProps<{ options: Option[]; label: string; size?: "md" | "sm" }>(), { size: "md" });
+defineSlots<{ option?: (props: { option: Option }) => unknown }>();
 const model = defineModel<T>({ required: true });
 
 // ToggleGroup lets the active item be un-pressed (emits ""); a segmented control always has one.
 function onUpdate(v: unknown) {
     if (typeof v === "string" && v) model.value = v as T;
 }
+
+const sizes = {
+    md: "min-h-10 px-3 text-base lg:min-h-8 lg:text-sm",
+    sm: "relative min-h-6 px-2 text-sm after:absolute after:inset-x-0 after:-inset-y-2.5",
+} as const;
 </script>
 
 <template>
@@ -23,9 +32,10 @@ function onUpdate(v: unknown) {
             v-for="o in options"
             :key="o.value"
             :value="o.value"
-            class="min-h-10 flex-1 rounded-control-inner px-3 text-base text-fg-muted transition-colors duration-150 hover:text-fg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent data-[state=on]:bg-thumb data-[state=on]:text-fg data-[state=on]:shadow-thumb lg:min-h-8 lg:text-sm"
+            class="flex-1 rounded-control-inner text-fg-muted transition-colors duration-150 hover:text-fg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent data-[state=on]:bg-thumb data-[state=on]:text-fg data-[state=on]:shadow-thumb"
+            :class="sizes[size]"
         >
-            {{ o.label }}
+            <slot name="option" :option="o">{{ o.label }}</slot>
         </ToggleGroupItem>
     </ToggleGroupRoot>
 </template>

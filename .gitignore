@@ -92,3 +92,7 @@ dev/.disabled
 
 # Playwright MCP plugin snapshots/screenshots
 .playwright-mcp/
+
+# git worktrees
+.claude/worktrees/
+.claude/e2e-scenarios/

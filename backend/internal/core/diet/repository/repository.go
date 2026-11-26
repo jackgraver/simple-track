@@ -1,6 +1,7 @@
 package dietrepo
 
 import (
+	"be-simpletracker/internal/clock"
 	"context"
 	"errors"
 	"fmt"
@@ -487,7 +488,7 @@ func loadDietDayWithPreloads(id uint) (models.DietDay, error) {
 }
 
 func DayMealPlanToday(offset int) (models.DietDay, error) {
-	d, err := findOrCreateDietDayForCalendarDate(utils.ZerodTime(offset))
+	d, err := findOrCreateDietDayForCalendarDate(clock.ZerodTime(offset))
 	if err != nil {
 		return models.DietDay{}, err
 	}
@@ -576,7 +577,7 @@ func AllMealDays() ([]models.DietDay, error) {
 }
 
 func GoalsToday() (*models.Plan, error) {
-	todayDay, err := findOrCreateDietDayForCalendarDate(utils.ZerodTime(0))
+	todayDay, err := findOrCreateDietDayForCalendarDate(clock.ZerodTime(0))
 	if err != nil {
 		return nil, err
 	}
@@ -703,7 +704,7 @@ func CompositeFoodByID(id uint) (*models.CompositeFood, error) {
 }
 
 func UpdatePlanMacros(id uint, calories, protein, fiber, carbs, fat float32) (*models.Plan, error) {
-	effectiveStart, _ := calendarDayRange(utils.ZerodTime(0))
+	effectiveStart, _ := calendarDayRange(clock.ZerodTime(0))
 	var plan models.Plan
 
 	if err := conn().Transaction(func(tx *gorm.DB) error {
@@ -769,7 +770,7 @@ func nilIfEmpty(s string) *string {
 // idempotent: when a planned meal with that id exists, nothing is created.
 func AddPlannedMealFromSavedMeal(offset int, savedMealID uint, meal *models.Meal, clientID string) error {
 	return conn().Transaction(func(tx *gorm.DB) error {
-		day, err := findOrCreateDietDayForCalendarDateInTx(tx, utils.ZerodTime(offset))
+		day, err := findOrCreateDietDayForCalendarDateInTx(tx, clock.ZerodTime(offset))
 		if err != nil {
 			return err
 		}
@@ -861,7 +862,7 @@ type QuickLogParams struct {
 
 func QuickLogMeal(params QuickLogParams) (dayID uint, err error) {
 	err = conn().Transaction(func(tx *gorm.DB) error {
-		day, derr := findOrCreateDietDayForCalendarDateInTx(tx, utils.ZerodTime(params.Offset))
+		day, derr := findOrCreateDietDayForCalendarDateInTx(tx, clock.ZerodTime(params.Offset))
 		if derr != nil {
 			return derr
 		}
@@ -953,7 +954,7 @@ func EditLoggedMeal(dayID uint, oldMealID uint, meal *models.Meal) error {
 func CopyPlannedMeals(fromOffset int, toOffsets []int) (int, error) {
 	var n int
 	err := conn().Transaction(func(tx *gorm.DB) error {
-		src, err := findOrCreateDietDayForCalendarDateInTx(tx, utils.ZerodTime(fromOffset))
+		src, err := findOrCreateDietDayForCalendarDateInTx(tx, clock.ZerodTime(fromOffset))
 		if err != nil {
 			return err
 		}
@@ -974,7 +975,7 @@ func CopyPlannedMeals(fromOffset int, toOffsets []int) (int, error) {
 				continue
 			}
 			seen[off] = true
-			day, err := findOrCreateDietDayForCalendarDateInTx(tx, utils.ZerodTime(off))
+			day, err := findOrCreateDietDayForCalendarDateInTx(tx, clock.ZerodTime(off))
 			if err != nil {
 				return err
 			}

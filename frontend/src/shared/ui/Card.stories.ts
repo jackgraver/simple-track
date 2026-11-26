@@ -30,3 +30,18 @@ export const HeaderAndFooter: Story = {
         </Card></div>`,
     }),
 };
+
+export const Tab: Story = {
+    args: { padding: "none" },
+    render: (args) => ({
+        components: { Card },
+        setup: () => ({ args }),
+        template: `<div class="max-w-sm"><Card v-bind="args">
+            <template #tab><span class="tabular-nums">Set 1 · 30 lb</span></template>
+            <div class="grid grid-cols-2 divide-x divide-line">
+                <p class="m-0 p-3 text-sm">Left · 10 reps</p>
+                <p class="m-0 p-3 text-sm">Right · 9 reps</p>
+            </div>
+        </Card></div>`,
+    }),
+};

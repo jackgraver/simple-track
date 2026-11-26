@@ -6,7 +6,6 @@ import { overloadReason, type OverloadStatus } from "../domain/liveLogging";
 
 export type WeightSheetResult =
     | { action: "set"; weight: number }
-    | { action: "undo-progression" }
     | { action: "plates"; weight: number };
 
 // Weight and everything that depends on it, in one sheet: reachable from the screen, never in the way.
@@ -14,7 +13,6 @@ const props = defineProps<{
     weight: number;
     step: number;
     overload: OverloadStatus;
-    canUndoProgression: boolean;
     /** Stored plate summary for plate-loaded lifts, null otherwise. */
     plates: string | null;
     machineSettings: MachineSetting[];
@@ -37,18 +35,7 @@ const done = () => {
         <Field label="Weight (lb)">
             <NumberField v-model="draft" label="weight" :step="step" :min="0" :decimals="1" size="lg" unit="lb" />
         </Field>
-        <div class="flex flex-col gap-1">
-            <p class="m-0 text-sm text-fg-muted">{{ reason }}</p>
-            <Button
-                v-if="canUndoProgression"
-                variant="ghost"
-                size="sm"
-                class="self-start"
-                @click="onResolve?.({ action: 'undo-progression' })"
-            >
-                Undo the increase
-            </Button>
-        </div>
+        <p class="m-0 text-sm text-fg-muted">{{ reason }}</p>
         <section v-if="plates !== null" class="flex flex-col gap-2">
             <p class="m-0 text-xs font-semibold tracking-wide text-fg-muted uppercase">Plates</p>
             <Button variant="secondary" block @click="onResolve?.({ action: 'plates', weight: draft })">

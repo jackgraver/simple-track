@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useWorkoutStore } from "../store/useWorkoutStore";
-import { computed } from "vue";
+import { computed, watch } from "vue";
 import { useRoute } from "vue-router";
 import ExerciseLoggingFlow from "./components/ExerciseLoggingFlow.vue";
 import CardioLoggingView from "./components/CardioLoggingView.vue";
@@ -13,7 +13,7 @@ import {
 } from "./domain/exerciseRouteGroup";
 
 const route = useRoute();
-const { goBackToLogging, offset } = useLoggingRouteContext();
+const { goBackToLogging, offset, router } = useLoggingRouteContext();
 
 const {
     log,
@@ -59,28 +59,31 @@ const mobilityLoggedForRoute = computed(() => {
     return null;
 });
 
-const emptyMessage = computed(() => {
-    if (loggingKind.value === "exercise") return "Exercise not found";
-    if (loggingKind.value === "mobility") return "Mobility not found";
-    return "Logging item not found";
-});
+const exerciseNotInDay = computed(
+    () => loggingKind.value === "exercise" && !pending.value && !error.value && !exerciseGroupForShell.value,
+);
 
-const isEmpty = computed(() => {
-    if (pending.value) return false;
-    if (loggingKind.value === "exercise") return !exerciseGroupForShell.value;
-    if (loggingKind.value === "mobility") return !mobilityLoggedForRoute.value;
-    return false;
-});
+watch(
+    exerciseNotInDay,
+    (notInDay) => {
+        if (notInDay) router.replace({ name: "gym" });
+    },
+    { immediate: true },
+);
 
+const isMobilityMissing = computed(
+    () => !pending.value && loggingKind.value === "mobility" && !mobilityLoggedForRoute.value,
+);
 </script>
 
 <template>
+    <template v-if="exerciseNotInDay" />
     <LoggingPageShell
-        v-if="loggingKind === 'exercise'"
+        v-else-if="loggingKind === 'exercise'"
         :pending="pending"
         :error="error"
-        :empty="isEmpty"
-        :empty-message="emptyMessage"
+        :empty="isMobilityMissing"
+        empty-message="Mobility not found"
         @back="goBackToLogging"
         @retry="refetch()"
     >
@@ -90,8 +93,8 @@ const isEmpty = computed(() => {
         v-else
         :pending="pending"
         :error="error"
-        :empty="isEmpty"
-        :empty-message="emptyMessage"
+        :empty="isMobilityMissing"
+        empty-message="Mobility not found"
         @back="goBackToLogging"
         @retry="refetch()"
     >

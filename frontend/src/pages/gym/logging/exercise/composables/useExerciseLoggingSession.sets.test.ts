@@ -266,3 +266,38 @@ describe("an exercise opened before its history is cached", () => {
         expect(s.currentReps).toBe(5);
     });
 });
+
+describe("weight progression choice", () => {
+    // Last session: every set at 100 hit the rollover (10), so today opens at 105.
+    const earned = () => {
+        const d = day();
+        d.planned_exercises![0].previous = logged([set(1, null, 10), set(2, null, 10)]);
+        return d;
+    };
+
+    it("opens on the increase and flips between stay and go up before the first set", () => {
+        qc.setQueryData(KEY, earned());
+        const s = openSession();
+        expect(s.currentWeight).toBe(105);
+        expect(s.weightProgression).toMatchObject({ previousWeight: 100, nextWeight: 105 });
+
+        s.chooseWeightProgression("stay");
+        expect(s.currentWeight).toBe(100);
+        expect(s.currentReps).toBe(10); // last session's reps at that weight
+        expect(s.weightProgression).not.toBeNull(); // still reversible
+
+        s.chooseWeightProgression("up");
+        expect(s.currentWeight).toBe(105);
+    });
+
+    it("does nothing once a set is logged", async () => {
+        qc.setQueryData(KEY, earned());
+        http.apiPOST.mockReturnValue(new Promise(() => {}));
+        const s = openSession();
+        s.addNextSet();
+        await vi.advanceTimersByTimeAsync(0);
+
+        s.chooseWeightProgression("stay");
+        expect(s.currentWeight).toBe(105);
+    });
+});

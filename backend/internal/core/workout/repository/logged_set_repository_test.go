@@ -1,10 +1,10 @@
 package workoutrepo_test
 
 import (
+	"be-simpletracker/internal/clock"
 	"be-simpletracker/internal/core/workout/models"
 	workoutrepo "be-simpletracker/internal/core/workout/repository"
 	"be-simpletracker/internal/core/workout/testutil"
-	"be-simpletracker/internal/utils"
 	"testing"
 
 	"gorm.io/gorm"
@@ -12,7 +12,7 @@ import (
 
 func TestDeleteLoggedSet_removesOrphanExercise(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	today := utils.ZerodTime(0)
+	today := clock.ZerodTime(0)
 	ex := models.Exercise{Name: "Fly"}
 	if err := db.Create(&ex).Error; err != nil {
 		t.Fatal(err)

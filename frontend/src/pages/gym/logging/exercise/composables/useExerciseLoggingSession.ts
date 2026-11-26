@@ -34,6 +34,22 @@ import {
     WEIGHT_PROGRESSION_INCREASE_LBS,
 } from "../domain/weightProgression";
 import { useGymWeightPrefs } from "./useGymWeightPrefs";
+import type { SetSide } from "~/types/workout";
+import {
+    carriedSideWeight,
+    defaultFirstSide,
+    hasSides,
+    isOpen,
+    nextPairNumber,
+    nextSide,
+    openPairFor,
+    otherSide,
+    pairIdOf,
+    pairIndexOfRow,
+    pairSets,
+    previousSideSet,
+    setsForProgression,
+} from "../domain/unilateral";
 
 type StoredDraft = {
     weight: number;
@@ -47,7 +63,14 @@ type StoredDraft = {
 /** Plain shape for templates (refs unwrapped via reactive session object). */
 export type ExerciseLoggingSessionViewModel = {
     exerciseGroup: ExerciseGroup | null;
+    /** Set number being logged or edited. Unilateral: a set number is a left + right pair. */
     currentSetNumber: number;
+    /** Logged one side at a time: the exercise's setting, or today's sets already have sides. */
+    unilateral: boolean;
+    /** Side of the next log (or of the set being edited); null when bilateral. */
+    currentSide: SetSide | null;
+    /** Pick the side: the first side before set 1, a correction later, or a fix while editing. */
+    setSide: (side: SetSide) => void;
     /** Derived from the query cache + pending/failed set mutations; never a local copy. */
     loggedSets: LoggedSetWithStatus[];
     currentWeight: number;
@@ -70,7 +93,8 @@ export type ExerciseLoggingSessionViewModel = {
     goBackToList: () => void;
     updateNotes: (value: string) => void;
     updateWeightSetup: (value: string) => void;
-    undoWeightProgression: () => void;
+    /** Before the first set: go up to the earned weight, or stay at last session's. Reversible. */
+    chooseWeightProgression: (choice: "up" | "stay") => void;
     setWeightIncrement: (value: number) => void;
 };
 
@@ -140,11 +164,41 @@ export function useExerciseLoggingSession(options: {
         }),
     );
 
-    const currentSetNumber = computed(() =>
-        editingSetIndex.value != null
+    /* ---------- unilateral ---------- */
+    const unilateral = computed(() => {
+        const group = exerciseGroup.value;
+        const flag = group?.planned?.unilateral ?? group?.logged?.exercise?.unilateral ?? false;
+        return flag || hasSides(loggedSets.value);
+    });
+    /** A side picked by hand for the next log; cleared once it's logged. */
+    const chosenSide = ref<SetSide | null>(null);
+    /** Side of the set being edited (changeable, to fix a set logged on the wrong side). */
+    const editingSide = ref<SetSide | null>(null);
+    const currentSide = computed<SetSide | null>(() => {
+        if (!unilateral.value) return null;
+        if (editingSetIndex.value != null) return editingSide.value;
+        return chosenSide.value ?? nextSide(loggedSets.value, defaultFirstSide(exerciseGroup.value?.previous?.sets));
+    });
+    const setSide = (side: SetSide) => {
+        if (!unilateral.value) return;
+        if (editingSetIndex.value != null) {
+            if (editingSide.value == null) return; // a bilateral set stays bilateral
+            editingSide.value = side;
+        } else {
+            chosenSide.value = side;
+        }
+    };
+
+    const currentSetNumber = computed(() => {
+        if (unilateral.value) {
+            return editingSetIndex.value != null
+                ? pairIndexOfRow(loggedSets.value, editingSetIndex.value) + 1
+                : nextPairNumber(loggedSets.value);
+        }
+        return editingSetIndex.value != null
             ? editingSetIndex.value + 1
-            : loggedSets.value.length + 1,
-    );
+            : loggedSets.value.length + 1;
+    });
 
     const exerciseDisplayName = computed(() => {
         const group = exerciseGroup.value;
@@ -212,6 +266,15 @@ export function useExerciseLoggingSession(options: {
         },
     });
 
+    /** After an uneven pair the next side starts at its own weight (see `carriedSideWeight`). */
+    const applyCarriedSideWeight = () => {
+        const side = currentSide.value;
+        const carried = side ? carriedSideWeight(loggedSets.value, side) : null;
+        if (!carried) return;
+        currentWeight.value = carried.weight;
+        currentWeightSetup.value = carried.weight_setup;
+    };
+
     /** Fill the draft for a newly opened exercise. Cache updates afterwards (optimistic patches,
      *  reconciles, refetches) only change the rows, never the draft. */
     const initializeExercise = () => {
@@ -220,15 +283,19 @@ export function useExerciseLoggingSession(options: {
 
         notes.value = group.logged?.notes ?? group.previous?.notes ?? "";
         editingSetIndex.value = null;
+        editingSide.value = null;
+        chosenSide.value = null;
 
+        // Unilateral history counts one set per pair (its weaker side) for progression.
+        const previousForProgression = setsForProgression(group.previous?.sets);
         const { weight, reps, weightSetup } = initializeWeightAndReps(
             group.logged?.sets,
-            group.previous?.sets,
+            previousForProgression,
         );
         weightProgression.value =
             (group.logged?.sets?.length ?? 0) === 0
                 ? getWeightProgression(
-                      group.previous?.sets,
+                      previousForProgression,
                       group.previous?.exercise?.rep_rollover,
                       WEIGHT_PROGRESSION_INCREASE_LBS,
                   )
@@ -239,28 +306,31 @@ export function useExerciseLoggingSession(options: {
                 ? normalizeReps(reps)
                 : DEFAULT_REPS_AFTER_WEIGHT_CHANGE;
         currentWeightSetup.value = weightSetup;
+        applyCarriedSideWeight();
 
         draftDirty.value = false;
 
         if (draftStorage.restore()) {
-            weightProgression.value = null;
+            // Coming back before set 1 with one of the two weights (go up / stay): keep the choice.
+            const p = weightProgression.value;
+            const stillChoosing =
+                p != null && loggedSets.value.length === 0 && [p.previousWeight, p.nextWeight].includes(currentWeight.value);
+            if (!stillChoosing) weightProgression.value = null;
             if (editingSetIndex.value != null && !loggedSets.value[editingSetIndex.value]) {
                 editingSetIndex.value = null;
             }
+            if (editingSetIndex.value != null) editingSide.value = loggedSets.value[editingSetIndex.value]?.side ?? null;
         }
         draftStorage.setSaveEnabled(true);
     };
 
-    // Once the day has loaded, a missing group means a bad id or the exercise left the log (e.g. an
-    // add from the list that failed and rolled back; its toast says so): back to the list, replacing
-    // this entry so Back doesn't return to a page that no longer exists.
-    watch(
-        [() => exerciseGroup.value, () => pending.value],
-        ([group, isPending]) => {
-            if (!isPending && !group) void router.replace(loggingRoute());
-        },
-        { immediate: true },
-    );
+    // Unilateral: when the next side changes (a log lands, a delete, a side picked by hand), start it
+    // at that side's own weight if the last pair was uneven.
+    watch(currentSide, (side, before) => {
+        if (side && before && side !== before && editingSetIndex.value == null && sessionKey.value != null) {
+            applyCarriedSideWeight();
+        }
+    });
 
     // Initialise once per (day, exercise), not on every cache change.
     const sessionKey = computed(() =>
@@ -312,12 +382,13 @@ export function useExerciseLoggingSession(options: {
         draftDirty.value = true;
         currentWeight.value = value;
         if (editingSetIndex.value != null || loggedSets.value.length > 0) return;
+        const previous = exerciseGroup.value?.previous?.sets;
+        const side = currentSide.value;
+        const lastTime = side
+            ? previousSideSet(previous, currentSetNumber.value - 1, side)
+            : previous?.[currentSetNumber.value - 1];
         currentReps.value = normalizeReps(
-            previousRepsForSetAtWeight(
-                exerciseGroup.value?.previous?.sets,
-                currentSetNumber.value - 1,
-                value,
-            ) ?? DEFAULT_REPS_AFTER_WEIGHT_CHANGE,
+            previousRepsForSetAtWeight(lastTime ? [lastTime] : [], 0, value) ?? DEFAULT_REPS_AFTER_WEIGHT_CHANGE,
         );
     };
 
@@ -332,7 +403,9 @@ export function useExerciseLoggingSession(options: {
         currentWeight.value = row.weight;
         currentReps.value = normalizeReps(row.reps);
         currentWeightSetup.value = row.weight_setup;
+        applyCarriedSideWeight();
     };
+
 
     const stepWeight = (direction: "plus" | "minus") => {
         if (direction === "plus") {
@@ -378,35 +451,71 @@ export function useExerciseLoggingSession(options: {
         const exerciseId = exerciseIdentity.value;
         if (!exerciseId) return false;
         const day = date.value;
-        const fields = {
+        const side = currentSide.value;
+        const fields: SetFields = {
             weight: currentWeight.value,
             reps,
             weight_setup: weightSetupForSave(),
+            ...(side && { side }),
         };
-        const count = loggedSets.value.length;
+        const rows = loggedSets.value;
+        const count = rows.length;
 
         const editingIndex = editingSetIndex.value;
         if (editingIndex != null) {
-            const row = loggedSets.value[editingIndex];
+            const row = rows[editingIndex];
             if (!row) return false;
+            if (side && row.side && side !== row.side) {
+                const pairs = pairSets(rows);
+                const at = pairs.findIndex((p) => p.left?.index === editingIndex || p.right?.index === editingIndex);
+                const other = pairs[at]?.[side]?.set;
+                const before = pairs[at - 1];
+                if (!other && before && isOpen(before) && !before[side]) {
+                    // A lone side logged on the wrong side (Left twice): it completes the set before it.
+                    fields.pair_id = pairIdOf(before);
+                } else if (other) {
+                    // Moving a side of a full pair swaps the pair's sides, so it stays a pair.
+                    saveEditedSet(other, day, exerciseId, {
+                        weight: other.weight,
+                        reps: other.reps,
+                        weight_setup: other.weight_setup,
+                        side: row.side,
+                    });
+                }
+            }
             saveEditedSet(row, day, exerciseId, fields);
             // A fix to an earlier set isn't a new set: the rest clock keeps running.
         } else {
+            const clientId = newClientId();
+            const open = side ? openPairFor(rows, side) : undefined;
+            // Both sides of a set number carry the first side's id (stored, so pairs survive deletes).
+            const pairId = side ? ((open && pairIdOf(open)) ?? clientId) : null;
             logSet.mutate({
-                client_id: newClientId(),
+                client_id: clientId,
                 date: day,
                 exercise_id: exerciseId,
                 created_at: new Date().toISOString(),
                 ...fields,
+                ...(pairId && { pair_id: pairId }),
             });
-            globalTimer.start(exerciseDisplayName.value);
+            if (!side) {
+                globalTimer.start(exerciseDisplayName.value);
+            } else if (open) {
+                // Second side: rest keeps counting from the first side.
+                globalTimer.endSwitch(exerciseDisplayName.value);
+            } else {
+                globalTimer.start(exerciseDisplayName.value, otherSide(side));
+            }
         }
         syncNotes(day, exerciseId, true);
 
         draftDirty.value = false;
         editingSetIndex.value = null;
+        editingSide.value = null;
+        chosenSide.value = null;
         // A new set leaves the draft at what was just logged. After fixing a set, go back to this
         // session's last set (the edited values if that was the last one: rows update a tick later).
+        // (Unilateral: the watch on `currentSide` moves the weight to the next side's own if uneven.)
         if (editingIndex != null) resumeFromLastSet(editingIndex === count - 1 ? fields : undefined);
         return true;
     };
@@ -474,12 +583,29 @@ export function useExerciseLoggingSession(options: {
      * behind it, and a failed delete leaves an unsaved row marked "Didn't save".
      */
     const deleteSet = (setIndex: number) => {
-        const row = loggedSets.value[setIndex];
+        const rows = loggedSets.value;
+        const row = rows[setIndex];
         const exerciseId = exerciseIdentity.value;
         if (!row || !exerciseId) return;
-        if (editingSetIndex.value === setIndex) editingSetIndex.value = null;
+        // The only side of the open pair: the switch wait it started is over (the clock keeps counting).
+        if (row.side) {
+            const pairs = pairSets(rows);
+            const last = pairs[pairs.length - 1];
+            if (last && isOpen(last) && last[row.side]?.index === setIndex) {
+                globalTimer.cancelSwitch(exerciseDisplayName.value);
+            }
+        }
+        const wasEditing = editingSetIndex.value === setIndex;
+        if (wasEditing) editingSetIndex.value = null;
         else if (editingSetIndex.value != null && editingSetIndex.value > setIndex) editingSetIndex.value--;
         deleteSetMutation.mutate({ client_id: row.key, date: date.value, exercise_id: exerciseId });
+        if (wasEditing) {
+            // Leave the deleted set's values behind: go back to this session's last set, as on cancel.
+            editingSide.value = null;
+            draftDirty.value = false;
+            const remaining = rows.filter((_, i) => i !== setIndex);
+            resumeFromLastSet(remaining[remaining.length - 1]);
+        }
     };
 
     const editSet = (setIndex: number) => {
@@ -492,11 +618,13 @@ export function useExerciseLoggingSession(options: {
         draftDirty.value = true;
 
         editingSetIndex.value = setIndex;
+        editingSide.value = set.side ?? null;
     };
 
     const cancelEditingSet = () => {
         if (editingSetIndex.value == null) return;
         editingSetIndex.value = null;
+        editingSide.value = null;
         resumeFromLastSet();
     };
 
@@ -515,15 +643,19 @@ export function useExerciseLoggingSession(options: {
         draftDirty.value = true;
     };
 
-    const undoWeightProgression = () => {
-        if (!weightProgression.value) return;
-        updateWeightAndDefaultReps(weightProgression.value.previousWeight);
-        weightProgression.value = null;
+    // Keeps `weightProgression` so the choice can be flipped back until the first set is logged.
+    const chooseWeightProgression = (choice: "up" | "stay") => {
+        const p = weightProgression.value;
+        if (!p || loggedSets.value.length > 0) return;
+        updateWeightAndDefaultReps(choice === "up" ? p.nextWeight : p.previousWeight);
     };
 
     return reactive({
         exerciseGroup,
         currentSetNumber,
+        unilateral,
+        currentSide,
+        setSide,
         loggedSets,
         currentWeight,
         currentReps,
@@ -545,7 +677,7 @@ export function useExerciseLoggingSession(options: {
         goBackToList,
         updateNotes,
         updateWeightSetup,
-        undoWeightProgression,
+        chooseWeightProgression,
         setWeightIncrement,
     }) as ExerciseLoggingSessionViewModel;
 }

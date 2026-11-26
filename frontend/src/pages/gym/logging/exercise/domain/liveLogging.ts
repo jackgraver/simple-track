@@ -3,24 +3,25 @@ import { sessionOutcome } from "./weightProgression";
 
 type SetLike = { weight: number; reps: number };
 
-/** Rest clock stages. It always counts up; the colour says "not yet" until 2:00, then "good to go". */
-export type RestStage = "idle" | "wait" | "near" | "ready";
+/** Rest clock stages. It always counts up; red <1:00, orange <1:30, yellow <2:00, green after. */
+export type RestStage = "idle" | "wait" | "near" | "soon" | "ready";
 
 export const REST_NEAR_MS = 60_000;
+export const REST_SOON_MS = 90_000;
 export const REST_READY_MS = 120_000;
-/** The bar's right edge. The global timer itself clears at 5:00. */
-export const REST_BAR_MAX_MS = 180_000;
 
-export function restStage(elapsedMs: number, active: boolean): RestStage {
+/** Unilateral, between sides: yellow from 0:15, green from 0:25. */
+export const SWITCH_SOON_MS = 15_000;
+export const SWITCH_READY_MS = 25_000;
+
+/** `switching`: between the two sides of a unilateral set, red < 0:15, yellow < 0:25, green after. */
+export function restStage(elapsedMs: number, active: boolean, switching = false): RestStage {
     if (!active) return "idle";
+    if (switching) return elapsedMs >= SWITCH_READY_MS ? "ready" : elapsedMs >= SWITCH_SOON_MS ? "soon" : "wait";
     if (elapsedMs >= REST_READY_MS) return "ready";
+    if (elapsedMs >= REST_SOON_MS) return "soon";
     if (elapsedMs >= REST_NEAR_MS) return "near";
     return "wait";
-}
-
-export function restBarPercent(elapsedMs: number): number {
-    if (!Number.isFinite(elapsedMs) || elapsedMs <= 0) return 0;
-    return Math.min(100, (elapsedMs / REST_BAR_MAX_MS) * 100);
 }
 
 /** Plans don't store a set count yet: use last session's, else this. */

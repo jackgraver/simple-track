@@ -7,6 +7,7 @@
 # Slots are recorded in $DEV_STATE/slots ("<slot> <path>" per line) and reused
 # by the same path; entries for deleted worktrees are pruned automatically.
 
+DEV_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DEV_STATE="${XDG_STATE_HOME:-$HOME/.local/state}/simple-track-dev"
 mkdir -p "$DEV_STATE" "${XDG_CONFIG_HOME:-$HOME/.config}/process-compose"  # latter silences a process-compose debug warning
 
@@ -33,6 +34,9 @@ _dev_slot() {
       while awk -v s="$n" '$1 == s { found = 1 } END { exit !found }' "$file"; do n=$((n + 1)); done
       slot=$n
       echo "$slot $root" >> "$file"
+      # A freed slot number may still have the previous worktree's database;
+      # drop it so this worktree starts empty and applies migrations cleanly.
+      "$DEV_ROOT/dev/purge-slot" "$slot" >&2
     fi
     echo "$slot"
   ) 9> "$DEV_STATE/slots.lock"

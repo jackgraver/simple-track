@@ -1,9 +1,9 @@
 package services
 
 import (
+	"be-simpletracker/internal/clock"
 	"be-simpletracker/internal/core/workout/models"
 	workoutrepo "be-simpletracker/internal/core/workout/repository"
-	"be-simpletracker/internal/utils"
 	"context"
 	"errors"
 	"fmt"
@@ -14,7 +14,7 @@ import (
 )
 
 func GetOrCreateToday(ctx context.Context, offset int) (models.WorkoutLog, error) {
-	return GetOrCreateDay(ctx, utils.ZerodTime(offset))
+	return GetOrCreateDay(ctx, clock.ZerodTime(offset))
 }
 
 // GetOrCreateDay loads the workout log for day (local midnight), creating it with the plan
@@ -188,7 +188,7 @@ func plannedCardioFromPlan(plan *models.WorkoutPlan) any {
 }
 
 func GetMonthWorkoutLogs(ctx context.Context, monthOffset int) (MonthWorkoutLogsResponse, error) {
-	today := time.Now()
+	today := clock.Now()
 	target := today.AddDate(0, monthOffset, 0)
 	startOfMonth := time.Date(target.Year(), target.Month(), 1, 0, 0, 0, 0, target.Location())
 	endOfMonth := startOfMonth.AddDate(0, 1, -1)
@@ -224,7 +224,7 @@ func GetWorkoutActivity(ctx context.Context, mode string, weeks int) (WorkoutAct
 	if mode != "year" && mode != "rolling" {
 		return WorkoutActivityResponse{}, ErrInvalidActivityMode
 	}
-	now := time.Now()
+	now := clock.Now()
 	loc := now.Location()
 	end := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, loc)
 	var start time.Time
@@ -379,7 +379,7 @@ func UpsertMobilityPre(ctx context.Context, offset int, checked []string) (*Mobi
 	if err := workoutrepo.UpdatePreMobilityChecked(ctx, t.ID, filtered); err != nil {
 		return nil, err
 	}
-	reloaded, err := workoutrepo.LoadByDate(ctx, utils.ZerodTime(offset))
+	reloaded, err := workoutrepo.LoadByDate(ctx, clock.ZerodTime(offset))
 	if err != nil {
 		return nil, err
 	}
@@ -402,7 +402,7 @@ func UpsertMobilityPost(ctx context.Context, offset int, checked []string) (*Mob
 	if err := workoutrepo.UpdatePostMobilityChecked(ctx, t.ID, filtered); err != nil {
 		return nil, err
 	}
-	reloaded, err := workoutrepo.LoadByDate(ctx, utils.ZerodTime(offset))
+	reloaded, err := workoutrepo.LoadByDate(ctx, clock.ZerodTime(offset))
 	if err != nil {
 		return nil, err
 	}
@@ -418,7 +418,7 @@ func UpdateLoggedExercise(exercise models.LoggedExercise) error {
 }
 
 func RemoveLoggedExerciseForDay(ctx context.Context, offset int, exerciseID uint) error {
-	return workoutrepo.RemoveLoggedExerciseForDay(ctx, utils.ZerodTime(offset), exerciseID)
+	return workoutrepo.RemoveLoggedExerciseForDay(ctx, clock.ZerodTime(offset), exerciseID)
 }
 
 // ErrExerciseNotFound is returned when a set is logged for an exercise id that doesn't exist.
@@ -431,6 +431,8 @@ type LogSetInput struct {
 	Reps        uint
 	Weight      float32
 	WeightSetup string
+	Side        *string
+	PairID      *string
 }
 
 type LogSetResult struct {
@@ -461,6 +463,8 @@ func LogSet(ctx context.Context, in LogSetInput) (LogSetResult, error) {
 		Reps:         in.Reps,
 		Weight:       in.Weight,
 		WeightSetup:  in.WeightSetup,
+		Side:         in.Side,
+		PairID:       in.PairID,
 	})
 	if err != nil {
 		return LogSetResult{}, err
@@ -617,6 +621,12 @@ func CreateExercise(name string, repRollover uint, cues string, loadTypes ...mod
 
 func UpdateExercise(id uint, name string, repRollover uint, cues string, loadTypes ...models.ExerciseLoadType) (*models.Exercise, error) {
 	return workoutrepo.UpdateExercise(id, name, repRollover, cues, loadTypes...)
+}
+
+// UpdateExerciseWithUnilateral is UpdateExercise that can also turn one-side-at-a-time logging on
+// or off (nil keeps it) in the same write. Logged sets keep their sides.
+func UpdateExerciseWithUnilateral(id uint, name string, repRollover uint, cues string, unilateral *bool, loadTypes ...models.ExerciseLoadType) (*models.Exercise, error) {
+	return workoutrepo.UpdateExerciseWithUnilateral(id, name, repRollover, cues, unilateral, loadTypes...)
 }
 
 func AssignPlanToDay(planID uint, dayOfWeek int) (*models.WorkoutPlan, error) {

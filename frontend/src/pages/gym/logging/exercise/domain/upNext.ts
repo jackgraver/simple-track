@@ -4,6 +4,7 @@ import { formatSets, type WorkoutStep } from "../../domain/workoutSteps";
 import { initializeWeightAndReps } from "./loggedSetDefaults";
 import { getWeightProgression, WEIGHT_PROGRESSION_INCREASE_LBS } from "./weightProgression";
 import { overloadStatus, visibleMachineSettings, type OverloadStatus } from "./liveLogging";
+import { setsForProgression } from "./unilateral";
 
 export type UpNextItem = {
     key: string;
@@ -22,10 +23,12 @@ const exerciseIdOf = (g: ExerciseGroup | undefined) => g?.planned?.ID ?? g?.logg
 
 /** Same rule the logging screen applies on open: last session's final set weight, +5 if earned (see `sessionOutcome`). */
 export function openingWeight(group: ExerciseGroup): number {
-    const { weight } = initializeWeightAndReps(group.logged?.sets, group.previous?.sets);
+    // Unilateral history counts one set per pair (its weaker side), as on the logging screen.
+    const previous = setsForProgression(group.previous?.sets);
+    const { weight } = initializeWeightAndReps(group.logged?.sets, previous);
     if (group.logged?.sets?.length) return weight;
     const progression = getWeightProgression(
-        group.previous?.sets,
+        previous,
         group.previous?.exercise?.rep_rollover,
         WEIGHT_PROGRESSION_INCREASE_LBS,
     );
@@ -56,7 +59,7 @@ export function buildUpNext(
                 kind: step.kind,
                 name: step.name,
                 weight: weight > 0 ? weight : null,
-                overload: overloadStatus(group.previous?.sets, rollover, weight),
+                overload: overloadStatus(setsForProgression(group.previous?.sets), rollover, weight),
                 detail: last ? `Last ${last}` : "No history",
                 machineSettings: visibleMachineSettings(group.planned?.machine_settings),
                 exerciseId,

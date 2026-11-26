@@ -15,29 +15,31 @@
         "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol",
         "Noto Color Emoji";
 
-    --color-canvas: hsl(0 0% 5%);
-    --color-surface: hsl(0 0% 9%);
-    --color-surface-2: hsl(0 0% 13%);
-    --color-surface-3: hsl(0 0% 18%);
+    /* Neutrals are derived from one base (--n-h/--n-c/--n-l, set per theme below) by stepping
+       OKLCH lightness: surfaces step up from the canvas, lines sit just above them. */
+    --color-canvas: oklch(var(--n-l) var(--n-c) var(--n-h));
+    --color-surface: oklch(calc(var(--n-l) + 0.026) var(--n-c) var(--n-h));
+    --color-surface-2: oklch(calc(var(--n-l) + 0.052) var(--n-c) var(--n-h));
+    --color-surface-3: oklch(calc(var(--n-l) + 0.09) var(--n-c) var(--n-h));
     --color-overlay: hsl(0 0% 0% / 0.6);
-    --color-line: hsl(0 0% 20%);
-    --color-line-strong: hsl(0 0% 28%);
-    --color-fg: hsl(0 0% 95%);
-    --color-fg-muted: hsl(0 0% 68%);
-    --color-fg-subtle: hsl(0 0% 50%);
+    --color-line: oklch(calc(var(--n-l) + 0.08) var(--n-c) var(--n-h));
+    --color-line-strong: oklch(calc(var(--n-l) + 0.152) var(--n-c) var(--n-h));
+    --color-fg: oklch(0.916 var(--t-c) var(--n-h));
+    --color-fg-muted: oklch(0.709 var(--t-c) var(--n-h));
+    --color-fg-subtle: oklch(0.61 var(--t-c) var(--n-h));
     --color-fg-inverse: hsl(0 0% 7%);
     --color-on-solid: hsl(0 0% 100%);
 
     --color-accent: hsl(212 92% 62%);
     --color-primary: hsl(214 70% 48%);
     --color-on-primary: hsl(0 0% 100%);
-    --color-thumb: hsl(0 0% 22%);
+    --color-thumb: oklch(calc(var(--n-l) + 0.095) var(--n-c) var(--n-h));
     --color-accent-soft: color-mix(in oklab, var(--color-accent) 16%, transparent);
     --color-success: hsl(142 65% 48%);
     --color-success-soft: color-mix(in oklab, var(--color-success) 16%, transparent);
     --color-warn: hsl(38 92% 55%);
     --color-warn-soft: color-mix(in oklab, var(--color-warn) 16%, transparent);
-    /* Gym rest clock before 2:00: orange just after a set, yellow getting close; success = good to go. */
+    /* Gym rest clock: danger (red) <1:00, rest-wait (orange) <1:30, rest-near (yellow) <2:00, success after. */
     --color-rest-wait: hsl(24 92% 60%);
     --color-rest-near: hsl(50 95% 55%);
     --color-danger: hsl(0 80% 66%);
@@ -60,6 +62,10 @@
     --color-chart-grid: var(--color-line);
     --color-chart-text: var(--color-fg-muted);
 
+    /* Not redefined for light: a person's colour shouldn't change with the theme. */
+    --color-avatar-a: #e393f9;
+    --color-avatar-b: hsl(282 70% 62%);
+
     --text-2xs: 0.6875rem;
     --text-2xs--line-height: 0.875rem;
     --text-display: 2rem;
@@ -68,7 +74,9 @@
     --spacing-touch: 2.75rem;
     --spacing-row: 2.5rem;
     --spacing-control-sm: 2rem;
-    --spacing-tabbar: 4rem;
+    /* No tab bar any more (mobile nav is the drawer). Kept at 0 so the bottom-offset utilities below
+       still resolve to just the safe area. */
+    --spacing-tabbar: 0rem;
     --spacing-sidenav: 14rem;
     --spacing-content: 56rem;
     --spacing-content-wide: 80rem;
@@ -88,6 +96,8 @@
     --animate-overlay-out: overlay-out 150ms ease-in;
     --animate-sheet-in: sheet-in 250ms ease-out;
     --animate-sheet-out: sheet-out 150ms ease-in;
+    --animate-drawer-in: drawer-in 250ms ease-out;
+    --animate-drawer-out: drawer-out 150ms ease-in;
     --animate-toast-in: toast-in 250ms ease-out;
     --animate-toast-out: toast-out 150ms ease-in;
     @keyframes overlay-in {
@@ -103,6 +113,13 @@
         from { transform: translateY(var(--sheet-drag, 0px)); }
         to { transform: translateY(100%); }
     }
+    @keyframes drawer-in {
+        from { transform: translateX(-100%); }
+    }
+    @keyframes drawer-out {
+        from { transform: translateX(var(--drawer-drag, 0px)); }
+        to { transform: translateX(-100%); }
+    }
     @keyframes toast-in {
         from { opacity: 0; transform: translateY(0.5rem); }
     }
@@ -114,20 +131,24 @@
 
 :root[data-theme="light"] {
     color-scheme: light;
-    --color-canvas: hsl(0 0% 97%);
-    --color-surface: hsl(0 0% 100%);
-    --color-surface-2: hsl(0 0% 95%);
-    --color-surface-3: hsl(0 0% 91%);
+    /* Light base (Chalk). Cards sit just above the canvas; the rest step down from it. */
+    --n-l: 0.94;
+    --n-c: 0.005;
+    --t-c: 0.009;
+    --color-canvas: oklch(var(--n-l) var(--n-c) var(--n-h));
+    --color-surface: oklch(calc(var(--n-l) + 0.028) var(--n-c) var(--n-h));
+    --color-surface-2: oklch(calc(var(--n-l) + 0.05) var(--n-c) var(--n-h));
+    --color-surface-3: oklch(calc(var(--n-l) + 0.058) var(--n-c) var(--n-h));
     --color-overlay: hsl(0 0% 0% / 0.3);
-    --color-line: hsl(0 0% 87%);
-    --color-line-strong: hsl(0 0% 78%);
-    --color-fg: hsl(0 0% 9%);
-    --color-fg-muted: hsl(0 0% 38%);
-    --color-fg-subtle: hsl(0 0% 50%);
-    --color-fg-inverse: hsl(0 0% 98%);
+    --color-line: oklch(calc(var(--n-l) - 0.04) var(--n-c) var(--n-h));
+    --color-line-strong: oklch(calc(var(--n-l) - 0.1) var(--n-c) var(--n-h));
+    --color-fg: oklch(0.23 var(--t-c) var(--n-h));
+    --color-fg-muted: oklch(0.48 var(--t-c) var(--n-h));
+    --color-fg-subtle: oklch(0.6 var(--t-c) var(--n-h));
+    --color-fg-inverse: var(--color-canvas);
     --color-accent: hsl(217 85% 46%);
     --color-primary: hsl(217 85% 46%);
-    --color-thumb: hsl(0 0% 100%);
+    --color-thumb: var(--color-surface-2);
     --color-accent-soft: color-mix(in oklab, var(--color-accent) 12%, transparent);
     --color-success: hsl(142 70% 27%);
     --color-success-soft: color-mix(in oklab, var(--color-success) 12%, transparent);
@@ -157,6 +178,11 @@
 
 :root {
     color-scheme: dark;
+    /* Neutral base: hue, chroma, and canvas lightness (dark = Near black). t-c is the text chroma. */
+    --n-h: 90;
+    --n-c: 0.004;
+    --n-l: 0.204;
+    --t-c: 0.01;
     --duration-fast: 100ms;
     --duration-base: 150ms;
     --duration-slow: 250ms;
@@ -164,8 +190,9 @@
 
 @utility z-raised { z-index: 10; }
 @utility z-nav { z-index: 40; }
-@utility z-popover { z-index: 50; }
 @utility z-overlay { z-index: 60; }
+/* Above overlays so a menu opened inside a dialog or drawer shows on top of it. */
+@utility z-popover { z-index: 65; }
 @utility z-toast { z-index: 70; }
 
 @utility pt-safe { padding-top: env(safe-area-inset-top); }

@@ -1,11 +1,17 @@
 import { computed, type Ref } from "vue";
 import { chartTheme } from "~/shared/chart/theme";
 import type { ChartData, ChartOptions } from "chart.js";
+import type { SetSide } from "~/types/workout";
+import { setsForProgression } from "../logging/exercise/domain/unilateral";
 
 export type ProgressionEntry = {
     date: string;
     weight: number;
     reps: number;
+    /** Unilateral sides: each side is its own entry; pairs collapse to one set (see `normalizeEntries`). */
+    side?: SetSide | null;
+    pair_id?: string | null;
+    client_id?: string | null;
 };
 
 export type ProgressionRange = "1m" | "3m" | "6m" | "1y" | "all";
@@ -76,8 +82,16 @@ type NormalizedSet = {
     reps: number;
 };
 
+/** One set per set number: a unilateral day's left + right pairs collapse to their weaker side. */
 function normalizeEntries(entries: ProgressionEntry[]): NormalizedSet[] {
-    return entries.map((e) => ({
+    const byDay = new Map<string, ProgressionEntry[]>();
+    for (const e of entries) {
+        const key = progressionDayKeyFromApi(e.date);
+        const list = byDay.get(key);
+        if (list) list.push(e);
+        else byDay.set(key, [e]);
+    }
+    return [...byDay.values()].flatMap(setsForProgression).map((e) => ({
         dayKey: progressionDayKeyFromApi(e.date),
         weightRounded: roundWeightHalfLb(Number(e.weight)),
         reps: Number(e.reps),

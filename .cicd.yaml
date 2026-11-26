@@ -10,10 +10,10 @@ steps:
   - name: stamp-version
     run: echo "{\"commit\":\"$(git rev-parse --short=12 HEAD)\"}" > frontend/public/version.json
   - name: backend-vet
-    run: go vet ./...
+    run: go vet ./... && go vet -tags e2e ./...
     dir: backend
   - name: backend-test
-    run: go test ./...
+    run: go test ./... && go test -tags e2e ./internal/e2e/...
     dir: backend
   - name: frontend-install
     run: mise exec node@22 -- npm ci --no-audit --no-fund
@@ -24,6 +24,11 @@ steps:
   - name: frontend-test
     run: mise exec node@22 -- npx vitest run
     dir: frontend
+  # Playwright suite against the real stack (e2e/README.md). Blocking: a red or flaky suite stops
+  # the deploy. ci.sh also records every run (npm run ci:history). Needs Docker.
+  - name: e2e
+    run: E2E_BLOCKING=1 mise exec node@22 -- ./ci.sh
+    dir: e2e
 images:
   - name: backend
     repository: ghcr.io/jackgraver/st-backend

@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+# Remove the docker containers and volumes of dev slot N's compose project
+# (simple-track-wt<N>). Used by env.sh when a slot number is handed to a new
+# worktree (so it can't inherit the previous owner's database) and by `dev db:gc`.
+# Never call it for a slot whose worktree still exists.
+set -uo pipefail
+slot="${1:?usage: purge-slot <slot>}"
+[[ "$slot" =~ ^[1-9][0-9]*$ ]] || { echo "purge-slot: refusing slot '$slot'" >&2; exit 1; }
+command -v docker >/dev/null 2>&1 || exit 0
+project="simple-track-wt$slot"
+filter="label=com.docker.compose.project=$project"
+mapfile -t cs < <(docker ps -aq --filter "$filter" 2>/dev/null)
+mapfile -t vs < <(docker volume ls -q --filter "$filter" 2>/dev/null)
+[[ -n "${cs[0]:-}" ]] && docker rm -f -v "${cs[@]}" >/dev/null 2>&1
+[[ -n "${vs[0]:-}" ]] && docker volume rm "${vs[@]}" >/dev/null 2>&1
+if [[ -n "${cs[0]:-}" || -n "${vs[0]:-}" ]]; then
+  echo "dev: removed leftover database of unused slot $slot ($project)" >&2
+fi
+exit 0
