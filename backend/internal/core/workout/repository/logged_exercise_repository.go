@@ -154,7 +154,7 @@ func RemoveLoggedExerciseForDay(ctx context.Context, day time.Time, exerciseID u
 func LoadLoggedExercise(id uint) (models.LoggedExercise, error) {
 	var exercise models.LoggedExercise
 	err := conn().Preload("Exercise").
-		Preload("Sets", func(db *gorm.DB) *gorm.DB { return db.Order("id ASC") }).
+		Preload("Sets", setsInLoggedOrder).
 		Where("id = ?", id).First(&exercise).Error
 	if err != nil {
 		return models.LoggedExercise{}, err
@@ -186,7 +186,7 @@ func GetPreviousExerciseLog(ctx context.Context, day time.Time, exercise string,
 		Where("exercises.name = ?", exercise).
 		Where("workout_logs.date != ?", day).
 		Where("workout_logs.date < ?", day).
-		Preload("Sets").
+		Preload("Sets", setsInLoggedOrder).
 		Preload("Exercise").
 		Order("workout_logs.date DESC").
 		Offset(offset).
@@ -216,7 +216,7 @@ func GetMaxExerciseLog(ctx context.Context, day time.Time, exercise string) (mod
 		Where("workout_logs.deleted_at IS NULL").
 		Where("exercises.deleted_at IS NULL").
 		Where("logged_sets.deleted_at IS NULL").
-		Preload("Sets").
+		Preload("Sets", setsInLoggedOrder).
 		Preload("Exercise").
 		Order("logged_sets.weight DESC").
 		Order("logged_sets.reps DESC").
@@ -234,3 +234,7 @@ func GetMaxExerciseLog(ctx context.Context, day time.Time, exercise string) (mod
 	}
 	return exerciseLog, nil
 }
+
+// setsInLoggedOrder preloads sets in the order they were logged. Progression reads the final set as
+// where the next session starts, and Postgres returns unordered rows in heap order, which an edit can change.
+func setsInLoggedOrder(db *gorm.DB) *gorm.DB { return db.Order("id ASC") }
