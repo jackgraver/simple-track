@@ -2,6 +2,10 @@
 
 Go API (`backend/`, gin + gorm, Postgres) and Vue 3 + Vite frontend (`frontend/`).
 
+Production topology (Caddy on the VPS, nginx in the frontend image, `/api` routing, `TRUSTED_PROXIES`)
+is in `docs/ARCHITECTURE.md`. Read it before touching `frontend/nginx.conf`, the compose files,
+proxy/CORS/cookie settings or anything about client IPs, and update it when that changes.
+
 ## Dev environment (mise + process-compose)
 
 Tooling is managed by [mise](https://mise.jdx.dev) via `mise.toml` (Node, air, process-compose,

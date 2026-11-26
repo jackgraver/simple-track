@@ -1,0 +1,23 @@
+# j-cicd pipeline for the VPS Caddyfile (deploy/Caddyfile). Registered separately from the app:
+#
+#   j-cicd add ~/Projects/simple-track --config ~/Projects/simple-track/.cicd-caddy.yaml
+#
+# Validates the file, sends it to the VPS agent, which installs it atomically, restarts
+# caddy.service, checks the site still answers over HTTPS, and puts the previous file back if not.
+# The VPS side (directory, symlink, sudoers rule, agent config) is in docs/ARCHITECTURE.md, "Caddy".
+name: simple-track-caddy
+branch: main
+steps:
+  # Same minor version as the VPS (`caddy version` there, v2.11.7 on 2026-11-26); bump together.
+  # The file goes in over stdin: bind mounts are refused by SELinux on the build host.
+  - name: validate
+    run: docker run --rm -i caddy:2.11 sh -c 'cat > /tmp/Caddyfile && caddy validate --config /tmp/Caddyfile --adapter caddyfile' < deploy/Caddyfile
+  - name: fmt
+    run: docker run --rm -i caddy:2.11 sh -c 'cat > /tmp/Caddyfile && caddy fmt /tmp/Caddyfile | diff -u /tmp/Caddyfile -' < deploy/Caddyfile
+artifacts:
+  - name: Caddyfile
+    path: deploy/Caddyfile
+deploy:
+  host: st-vps
+  command: J_CICD_AGENT_CONFIG=/home/jack/.config/j-cicd-agent.yaml /home/jack/.local/bin/j-cicd-agent
+  project: simple-track-caddy
