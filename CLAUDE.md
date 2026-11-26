@@ -27,6 +27,10 @@ the same time. **Never hardcode ports; ask `./bin/dev env`.**
 
 ### Verifying changes as an agent
 
+Starting a stack is cheap and safe: do it whenever a change needs to be seen or exercised (UI work,
+API behaviour, anything a type-check can't prove), preferably from your own worktree (own slot, ports
+and DB). Skip it for docs, config or pure refactors that tests cover. Only `stop` a stack you started.
+
 Never run bare `./bin/dev` (it opens an interactive TUI). Use the background commands:
 
 ```

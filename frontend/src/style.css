@@ -15,23 +15,25 @@
         "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol",
         "Noto Color Emoji";
 
-    --color-canvas: hsl(0 0% 5%);
-    --color-surface: hsl(0 0% 9%);
-    --color-surface-2: hsl(0 0% 13%);
-    --color-surface-3: hsl(0 0% 18%);
+    /* Neutrals are derived from one base (--n-h/--n-c/--n-l, set per theme below) by stepping
+       OKLCH lightness: surfaces step up from the canvas, lines sit just above them. */
+    --color-canvas: oklch(var(--n-l) var(--n-c) var(--n-h));
+    --color-surface: oklch(calc(var(--n-l) + 0.026) var(--n-c) var(--n-h));
+    --color-surface-2: oklch(calc(var(--n-l) + 0.052) var(--n-c) var(--n-h));
+    --color-surface-3: oklch(calc(var(--n-l) + 0.09) var(--n-c) var(--n-h));
     --color-overlay: hsl(0 0% 0% / 0.6);
-    --color-line: hsl(0 0% 20%);
-    --color-line-strong: hsl(0 0% 28%);
-    --color-fg: hsl(0 0% 95%);
-    --color-fg-muted: hsl(0 0% 68%);
-    --color-fg-subtle: hsl(0 0% 50%);
+    --color-line: oklch(calc(var(--n-l) + 0.08) var(--n-c) var(--n-h));
+    --color-line-strong: oklch(calc(var(--n-l) + 0.152) var(--n-c) var(--n-h));
+    --color-fg: oklch(0.916 var(--t-c) var(--n-h));
+    --color-fg-muted: oklch(0.709 var(--t-c) var(--n-h));
+    --color-fg-subtle: oklch(0.61 var(--t-c) var(--n-h));
     --color-fg-inverse: hsl(0 0% 7%);
     --color-on-solid: hsl(0 0% 100%);
 
     --color-accent: hsl(212 92% 62%);
     --color-primary: hsl(214 70% 48%);
     --color-on-primary: hsl(0 0% 100%);
-    --color-thumb: hsl(0 0% 22%);
+    --color-thumb: oklch(calc(var(--n-l) + 0.095) var(--n-c) var(--n-h));
     --color-accent-soft: color-mix(in oklab, var(--color-accent) 16%, transparent);
     --color-success: hsl(142 65% 48%);
     --color-success-soft: color-mix(in oklab, var(--color-success) 16%, transparent);
@@ -129,20 +131,24 @@
 
 :root[data-theme="light"] {
     color-scheme: light;
-    --color-canvas: hsl(0 0% 97%);
-    --color-surface: hsl(0 0% 100%);
-    --color-surface-2: hsl(0 0% 95%);
-    --color-surface-3: hsl(0 0% 91%);
+    /* Light base (Chalk). Cards sit just above the canvas; the rest step down from it. */
+    --n-l: 0.94;
+    --n-c: 0.005;
+    --t-c: 0.009;
+    --color-canvas: oklch(var(--n-l) var(--n-c) var(--n-h));
+    --color-surface: oklch(calc(var(--n-l) + 0.028) var(--n-c) var(--n-h));
+    --color-surface-2: oklch(calc(var(--n-l) + 0.05) var(--n-c) var(--n-h));
+    --color-surface-3: oklch(calc(var(--n-l) + 0.058) var(--n-c) var(--n-h));
     --color-overlay: hsl(0 0% 0% / 0.3);
-    --color-line: hsl(0 0% 87%);
-    --color-line-strong: hsl(0 0% 78%);
-    --color-fg: hsl(0 0% 9%);
-    --color-fg-muted: hsl(0 0% 38%);
-    --color-fg-subtle: hsl(0 0% 50%);
-    --color-fg-inverse: hsl(0 0% 98%);
+    --color-line: oklch(calc(var(--n-l) - 0.04) var(--n-c) var(--n-h));
+    --color-line-strong: oklch(calc(var(--n-l) - 0.1) var(--n-c) var(--n-h));
+    --color-fg: oklch(0.23 var(--t-c) var(--n-h));
+    --color-fg-muted: oklch(0.48 var(--t-c) var(--n-h));
+    --color-fg-subtle: oklch(0.6 var(--t-c) var(--n-h));
+    --color-fg-inverse: var(--color-canvas);
     --color-accent: hsl(217 85% 46%);
     --color-primary: hsl(217 85% 46%);
-    --color-thumb: hsl(0 0% 100%);
+    --color-thumb: var(--color-surface-2);
     --color-accent-soft: color-mix(in oklab, var(--color-accent) 12%, transparent);
     --color-success: hsl(142 70% 27%);
     --color-success-soft: color-mix(in oklab, var(--color-success) 12%, transparent);
@@ -172,6 +178,11 @@
 
 :root {
     color-scheme: dark;
+    /* Neutral base: hue, chroma, and canvas lightness (dark = Near black). t-c is the text chroma. */
+    --n-h: 90;
+    --n-c: 0.004;
+    --n-l: 0.204;
+    --t-c: 0.01;
     --duration-fast: 100ms;
     --duration-base: 150ms;
     --duration-slow: 250ms;
