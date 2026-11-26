@@ -47,7 +47,15 @@ export class Api {
   // --- gym ---
 
   /** Log a set through the real per-set endpoint (idempotent by client_id). `date` is YYYY-MM-DD. */
-  logSet(set: { exerciseId: number; reps: number; weight: number; date: string; clientId?: string }) {
+  logSet(set: {
+    exerciseId: number;
+    reps: number;
+    weight: number;
+    date: string;
+    clientId?: string;
+    /** One side of a unilateral exercise; omitted for a bilateral set. */
+    side?: 'left' | 'right';
+  }) {
     return this.post<{ set: { ID: number; reps: number; weight: number }; created: boolean }>('/workout/sets', {
       client_id: set.clientId ?? crypto.randomUUID(),
       date: set.date,
@@ -55,6 +63,7 @@ export class Api {
       reps: set.reps,
       weight: set.weight,
       weight_setup: '',
+      ...(set.side && { side: set.side }),
     });
   }
 

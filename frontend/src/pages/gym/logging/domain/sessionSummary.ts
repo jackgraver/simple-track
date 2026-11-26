@@ -1,4 +1,5 @@
 import type { ExerciseGroup } from "~/api/workout/api";
+import { setsForProgression } from "../exercise/domain/unilateral";
 
 type SetLike = { weight: number; reps: number };
 
@@ -47,14 +48,17 @@ export function buildSessionSummary(log: ExerciseGroup[]): SessionSummary {
     let comparedPrev = 0;
 
     log.forEach((g, i) => {
-        const today = g.logged?.sets ?? [];
+        // A unilateral set number (left + right) counts as one set, at its weaker side, the same as
+        // progression does and as a bilateral set from before the toggle counts. So sets, reps and
+        // volume compare evenly with a bilateral session.
+        const today = setsForProgression(g.logged?.sets);
         const top = topSet(today);
         if (!top) return;
         sets += today.length;
         reps += today.reduce((n, s) => n + s.reps, 0);
         volume += volumeOf(today);
 
-        const prevSets = g.previous?.sets ?? [];
+        const prevSets = setsForProgression(g.previous?.sets);
         const prevTop = topSet(prevSets);
         if (prevTop) {
             comparedNow += volumeOf(today);

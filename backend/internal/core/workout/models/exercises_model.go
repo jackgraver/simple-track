@@ -37,10 +37,36 @@ type LoggedSet struct {
 	Reps        uint    `json:"reps"`
 	Weight      float32 `json:"weight"`
 	WeightSetup string  `json:"weight_setup"`
+	// Side is "left" or "right" for a set logged on one side of a unilateral exercise,
+	// nil for a bilateral set. A unilateral set number is a pair of rows, one per side.
+	Side *string `json:"side" gorm:"type:text"`
+	// PairID ties the two sides of one unilateral set number together: the client_id of the side
+	// logged first, on both rows. Stored rather than derived from log order so deleting or moving
+	// one side doesn't re-pair every later set. Nil on bilateral sets.
+	PairID *string `json:"pair_id" gorm:"type:uuid"`
 }
 
 func (l LoggedSet) GetID() uint       { return l.ID }
 func (l LoggedSet) TableName() string { return "logged_sets" }
+
+const (
+	SideLeft  = "left"
+	SideRight = "right"
+)
+
+// NormalizeSide returns side as stored ("left", "right" or nil for bilateral) and whether it was valid.
+// An empty string means bilateral.
+func NormalizeSide(side *string) (*string, bool) {
+	if side == nil || *side == "" {
+		return nil, true
+	}
+	switch *side {
+	case SideLeft, SideRight:
+		s := *side
+		return &s, true
+	}
+	return nil, false
+}
 
 type ExerciseLoadType string
 
@@ -69,6 +95,8 @@ type Exercise struct {
 	RepRollover uint             `json:"rep_rollover"`
 	Cues        string           `json:"cues"`
 	LoadType    ExerciseLoadType `gorm:"type:text;not null;default:plate_loaded_with_bar" json:"load_type"`
+	// Unilateral exercises are logged one side at a time (see LoggedSet.Side).
+	Unilateral bool `gorm:"not null;default:false" json:"unilateral"`
 	// MachineSettings holds per-exercise machine positions (seat 4, pad 2, pulley top),
 	// shown on the logging screen. Read-only for now: no endpoint writes it yet.
 	MachineSettings []MachineSetting `gorm:"type:jsonb;serializer:json" json:"machine_settings"`

@@ -431,6 +431,8 @@ type LogSetInput struct {
 	Reps        uint
 	Weight      float32
 	WeightSetup string
+	Side        *string
+	PairID      *string
 }
 
 type LogSetResult struct {
@@ -461,6 +463,8 @@ func LogSet(ctx context.Context, in LogSetInput) (LogSetResult, error) {
 		Reps:         in.Reps,
 		Weight:       in.Weight,
 		WeightSetup:  in.WeightSetup,
+		Side:         in.Side,
+		PairID:       in.PairID,
 	})
 	if err != nil {
 		return LogSetResult{}, err
@@ -617,6 +621,12 @@ func CreateExercise(name string, repRollover uint, cues string, loadTypes ...mod
 
 func UpdateExercise(id uint, name string, repRollover uint, cues string, loadTypes ...models.ExerciseLoadType) (*models.Exercise, error) {
 	return workoutrepo.UpdateExercise(id, name, repRollover, cues, loadTypes...)
+}
+
+// UpdateExerciseWithUnilateral is UpdateExercise that can also turn one-side-at-a-time logging on
+// or off (nil keeps it) in the same write. Logged sets keep their sides.
+func UpdateExerciseWithUnilateral(id uint, name string, repRollover uint, cues string, unilateral *bool, loadTypes ...models.ExerciseLoadType) (*models.Exercise, error) {
+	return workoutrepo.UpdateExerciseWithUnilateral(id, name, repRollover, cues, unilateral, loadTypes...)
 }
 
 func AssignPlanToDay(planID uint, dayOfWeek int) (*models.WorkoutPlan, error) {

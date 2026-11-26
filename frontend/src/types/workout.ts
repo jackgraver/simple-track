@@ -41,9 +41,15 @@ export interface LoggedSet extends BaseModel {
     reps: number;
     weight: number;
     weight_setup: string;
+    /** "left"/"right" for one side of a unilateral exercise; null/absent for a bilateral set. */
+    side?: SetSide | null;
+    /** Unilateral: the client_id of the side logged first, on both sides of a set number. */
+    pair_id?: string | null;
     /** Client-generated uuid (POST /workout/sets). Null on sets logged before G1. */
     client_id?: string | null;
 }
+
+export type SetSide = "left" | "right";
 
 export interface LoggedExercise extends BaseModel {
     workout_log_id: number;
@@ -60,6 +66,8 @@ export interface Exercise extends BaseModel {
     rep_rollover: number;
     cues: string;
     load_type?: ExerciseLoadType;
+    /** Logged one side at a time (each set is a left + right pair). */
+    unilateral?: boolean;
     /** Machine positions (seat, pad, pulley). Not editable yet; null/absent means none. */
     machine_settings?: MachineSetting[] | null;
 }

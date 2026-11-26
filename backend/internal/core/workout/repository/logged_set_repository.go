@@ -69,6 +69,8 @@ type CreateSetInput struct {
 	Reps         uint
 	Weight       float32
 	WeightSetup  string
+	Side         *string
+	PairID       *string
 }
 
 type CreateSetResult struct {
@@ -103,6 +105,8 @@ func CreateSet(ctx context.Context, in CreateSetInput) (CreateSetResult, error) 
 			Reps:             in.Reps,
 			Weight:           in.Weight,
 			WeightSetup:      in.WeightSetup,
+			Side:             in.Side,
+			PairID:           in.PairID,
 		}
 		res := tx.Clauses(clause.OnConflict{Columns: []clause.Column{{Name: "client_id"}}, DoNothing: true}).Create(&set)
 		if res.Error != nil {
@@ -186,6 +190,10 @@ type SetPatch struct {
 	Reps        *uint
 	Weight      *float32
 	WeightSetup *string
+	// Side "" stores NULL (bilateral); "left"/"right" set the side. Validated by the caller.
+	Side *string
+	// PairID "" stores NULL; a uuid moves the set into that pair. Validated by the caller.
+	PairID *string
 }
 
 // UpdateSet applies patch to one set and returns it. gorm.ErrRecordNotFound if it doesn't exist.
@@ -204,6 +212,17 @@ func UpdateSet(ctx context.Context, ref SetRef, patch SetPatch) (models.LoggedSe
 		}
 		if patch.WeightSetup != nil {
 			updates["weight_setup"] = *patch.WeightSetup
+		}
+		if patch.Side != nil {
+			side, _ := models.NormalizeSide(patch.Side)
+			updates["side"] = side
+		}
+		if patch.PairID != nil {
+			if *patch.PairID == "" {
+				updates["pair_id"] = nil
+			} else {
+				updates["pair_id"] = *patch.PairID
+			}
 		}
 		if len(updates) == 0 {
 			return nil
