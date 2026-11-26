@@ -110,6 +110,8 @@ Durations come from bare utilities: `duration-100` (hover, press), `duration-150
 change, default), `duration-250` (enter and exit). Easing: `ease-out` to enter, `ease-in` to
 exit (Tailwind defaults). CSS vars `--duration-fast|base|slow` exist for `<Transition>` CSS
 inside primitives. A global reduced-motion rule clamps all transitions and animations.
+Carousel slides (the gym week strip) use `duration-350 ease-out` on both the incoming and outgoing
+panel, so the two move as one row: a full-width move reads as rushed at 250.
 Overlay animations are tokens in `style.css` (`animate-overlay-in/out`, `animate-sheet-in/out`; centred dialogs and their backdrop are deliberately instant: enter 250ms ease-out, exit 150ms ease-in). Reka waits for the exit animation before unmounting, so overlays use keyframes, not transitions.
 
 ### z-index (semantic utilities, nothing else)

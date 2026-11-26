@@ -92,7 +92,8 @@ const routes: RouteRecordRaw[] = [
         component: () => import("~/pages/gym/index.vue"),
         meta: {
             breadcrumb: "Gym",
-            dated: true,
+            // No dated: the home page's week strip is its day picker. Children that log or read a
+            // day opt back in.
             // The week strip and heatmap read programs + activity: start them with the day so they
             // don't land after first paint and push the Today card down.
             queries: (to) => [
@@ -146,14 +147,14 @@ const routes: RouteRecordRaw[] = [
                 name: "logging-cardio",
                 component: () =>
                     import("~/pages/gym/logging/exercise/[id].vue"),
-                meta: { breadcrumb: "Cardio", focus: true },
+                meta: { breadcrumb: "Cardio", dated: true, focus: true },
             },
             {
                 path: "logging/mobility/:slot",
                 name: "logging-mobility",
                 component: () =>
                     import("~/pages/gym/logging/exercise/[id].vue"),
-                meta: { breadcrumb: "Mobility", focus: true },
+                meta: { breadcrumb: "Mobility", dated: true, focus: true },
             },
             {
                 path: "progression",
@@ -166,13 +167,13 @@ const routes: RouteRecordRaw[] = [
                 path: "weight",
                 name: "gym-weight",
                 component: () => import("~/pages/gym/weight/index.vue"),
-                meta: { breadcrumb: "Weight" },
+                meta: { breadcrumb: "Weight", dated: true },
             },
             {
                 path: "steps",
                 name: "gym-steps",
                 component: () => import("~/pages/gym/steps/index.vue"),
-                meta: { breadcrumb: "Steps" },
+                meta: { breadcrumb: "Steps", dated: true },
             },
         ],
     },
