@@ -5,6 +5,8 @@ import (
 	"time"
 
 	"be-simpletracker/internal/core/workout/models"
+
+	"gorm.io/gorm"
 )
 
 type ExerciseListResult struct {
@@ -102,6 +104,26 @@ func UpdateExercise(id uint, name string, repRollover uint, cues string, loadTyp
 		return nil, err
 	}
 	return &exercise, nil
+}
+
+func FindExerciseByID(id uint) (*models.Exercise, error) {
+	var exercise models.Exercise
+	if err := conn().First(&exercise, id).Error; err != nil {
+		return nil, err
+	}
+	return &exercise, nil
+}
+
+// SetExerciseUnilateral turns one-side-at-a-time logging on or off for an exercise.
+func SetExerciseUnilateral(id uint, unilateral bool) error {
+	res := conn().Model(&models.Exercise{}).Where("id = ?", id).Update("unilateral", unilateral)
+	if res.Error != nil {
+		return res.Error
+	}
+	if res.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
 }
 
 func UpdateExerciseCues(exerciseID uint, cues string) (*models.Exercise, error) {

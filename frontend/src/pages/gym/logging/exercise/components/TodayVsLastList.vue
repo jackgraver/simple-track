@@ -1,20 +1,26 @@
 <script setup lang="ts">
 import { RotateCcw, X } from "lucide-vue-next";
+import { computed } from "vue";
 import { IconButton, List, ListRow } from "~/shared/ui";
+import type { SetSide } from "~/types/workout";
 import type { LoggedSetWithStatus } from "../../store/useWorkoutStore";
 import { setsTally, type ProgressVerdict } from "../domain/liveLogging";
 import { useOnline } from "~/api/online";
+import { hasSides, pairSets, sideSet, type SetPair } from "../domain/unilateral";
+import UnilateralSetCard from "./UnilateralSetCard.vue";
 
 // Below the fold: every set today next to the same set last session, and whether the weight goes up next time.
 // Tap a saved set to edit it with the slider above; tap it again to go back to the current set.
 const props = defineProps<{
     sets: LoggedSetWithStatus[];
     editingIndex: number | null;
-    previous: { weight: number; reps: number }[];
+    previous: { weight: number; reps: number; side?: SetSide | null }[];
     verdict: ProgressVerdict | null;
     weight: number;
     /** Planned number of sets, for the done/total count. */
     target: number;
+    /** Sets done (complete pairs when unilateral); defaults to the number of rows. */
+    done?: number;
 }>();
 
 const emit = defineEmits<{
@@ -26,8 +32,13 @@ const emit = defineEmits<{
 const online = useOnline();
 
 function diff(index: number): { text: string; tone: string } {
-    const set = props.sets[index];
-    const prev = props.previous[index];
+    return diffOf(props.sets[index], props.previous[index]);
+}
+
+function diffOf(
+    set: { weight: number; reps: number } | undefined,
+    prev: { weight: number; reps: number } | undefined,
+): { text: string; tone: string } {
     if (!set || !prev) return { text: "new", tone: "text-fg-subtle" };
     if (set.weight !== prev.weight) {
         const d = set.weight - prev.weight;
@@ -37,20 +48,47 @@ function diff(index: number): { text: string; tone: string } {
     if (d === 0) return { text: "=", tone: "text-fg-subtle" };
     return { text: `${d > 0 ? "+" : "−"}${Math.abs(d)} rep${Math.abs(d) === 1 ? "" : "s"}`, tone: d > 0 ? "text-success" : "text-warn" };
 }
+
+/* ---------- unilateral: one card per set number, split Left | Right ---------- */
+// Each side is its own logged set. Tap a side to edit it; deleting a side is in edit mode.
+type Row = LoggedSetWithStatus;
+const paired = computed(() => hasSides(props.sets));
+const pairs = computed(() => pairSets(props.sets));
+const previousPairs = computed(() => pairSets(props.previous));
+
+function pairKey(pair: SetPair<Row>): string {
+    return [pair.left, pair.right, pair.both].map((e) => e?.set.key ?? "").join("+");
+}
+function lastFor(p: number) {
+    const prev = previousPairs.value[p];
+    return { left: sideSet(prev, "left"), right: sideSet(prev, "right") };
+}
 </script>
 
 <template>
     <section v-if="sets.length" class="flex flex-col gap-2" aria-label="Sets">
         <div class="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
             <p class="m-0 text-xs font-semibold tracking-wide text-fg-muted uppercase">
-                Sets <span class="tabular-nums">{{ setsTally(sets.length, target) }}</span>
+                Sets <span class="tabular-nums">{{ setsTally(done ?? sets.length, target) }}</span>
             </p>
             <p v-if="verdict" class="m-0 text-sm" :class="verdict.onTrack ? 'text-success' : 'text-fg-muted'">
                 {{ verdict.hit }}/{{ verdict.total }} sets hit {{ verdict.rollover }}
                 {{ verdict.onTrack ? "· on track to go up" : `· stay at ${weight} next time` }}
             </p>
         </div>
-        <List class="rounded-card border border-line bg-surface">
+        <div v-if="paired" class="flex flex-col gap-3">
+            <UnilateralSetCard
+                v-for="(pair, p) in pairs"
+                :key="pairKey(pair)"
+                :number="p + 1"
+                :pair="pair"
+                :last="lastFor(p)"
+                :editing-index="editingIndex"
+                @select="(index, el) => emit('select', index, el)"
+                @retry="(index) => emit('retry', index)"
+            />
+        </div>
+        <List v-else class="rounded-card border border-line bg-surface">
             <ListRow
                 v-for="(set, index) in sets"
                 :key="set.key"

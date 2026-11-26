@@ -24,6 +24,13 @@ describe("restStage", () => {
         expect(restStage(120_000, true)).toBe("ready");
         expect(restStage(400_000, true)).toBe("ready");
     });
+    it("between unilateral sides: red until 0:15, yellow until 0:25, then green", () => {
+        expect(restStage(14_999, true, true)).toBe("wait");
+        expect(restStage(15_000, true, true)).toBe("soon");
+        expect(restStage(24_999, true, true)).toBe("soon");
+        expect(restStage(25_000, true, true)).toBe("ready");
+        expect(restStage(25_000, false, true)).toBe("idle");
+    });
 });
 
 describe("plannedSetCount", () => {

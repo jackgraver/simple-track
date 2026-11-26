@@ -34,6 +34,19 @@ import {
     WEIGHT_PROGRESSION_INCREASE_LBS,
 } from "../domain/weightProgression";
 import { useGymWeightPrefs } from "./useGymWeightPrefs";
+import type { SetSide } from "~/types/workout";
+import {
+    carriedSideWeight,
+    closesPair,
+    defaultFirstSide,
+    hasSides,
+    nextPairNumber,
+    nextSide,
+    otherSide,
+    pairIndexOfRow,
+    previousSideSet,
+    setsForProgression,
+} from "../domain/unilateral";
 
 type StoredDraft = {
     weight: number;
@@ -47,7 +60,14 @@ type StoredDraft = {
 /** Plain shape for templates (refs unwrapped via reactive session object). */
 export type ExerciseLoggingSessionViewModel = {
     exerciseGroup: ExerciseGroup | null;
+    /** Set number being logged or edited. Unilateral: a set number is a left + right pair. */
     currentSetNumber: number;
+    /** Logged one side at a time: the exercise's setting, or today's sets already have sides. */
+    unilateral: boolean;
+    /** Side of the next log (or of the set being edited); null when bilateral. */
+    currentSide: SetSide | null;
+    /** Pick the side: the first side before set 1, a correction later, or a fix while editing. */
+    setSide: (side: SetSide) => void;
     /** Derived from the query cache + pending/failed set mutations; never a local copy. */
     loggedSets: LoggedSetWithStatus[];
     currentWeight: number;
@@ -141,11 +161,41 @@ export function useExerciseLoggingSession(options: {
         }),
     );
 
-    const currentSetNumber = computed(() =>
-        editingSetIndex.value != null
+    /* ---------- unilateral ---------- */
+    const unilateral = computed(() => {
+        const group = exerciseGroup.value;
+        const flag = group?.planned?.unilateral ?? group?.logged?.exercise?.unilateral ?? false;
+        return flag || hasSides(loggedSets.value);
+    });
+    /** A side picked by hand for the next log; cleared once it's logged. */
+    const chosenSide = ref<SetSide | null>(null);
+    /** Side of the set being edited (changeable, to fix a set logged on the wrong side). */
+    const editingSide = ref<SetSide | null>(null);
+    const currentSide = computed<SetSide | null>(() => {
+        if (!unilateral.value) return null;
+        if (editingSetIndex.value != null) return editingSide.value;
+        return chosenSide.value ?? nextSide(loggedSets.value, defaultFirstSide(exerciseGroup.value?.previous?.sets));
+    });
+    const setSide = (side: SetSide) => {
+        if (!unilateral.value) return;
+        if (editingSetIndex.value != null) {
+            if (editingSide.value == null) return; // a bilateral set stays bilateral
+            editingSide.value = side;
+        } else {
+            chosenSide.value = side;
+        }
+    };
+
+    const currentSetNumber = computed(() => {
+        if (unilateral.value) {
+            return editingSetIndex.value != null
+                ? pairIndexOfRow(loggedSets.value, editingSetIndex.value) + 1
+                : nextPairNumber(loggedSets.value);
+        }
+        return editingSetIndex.value != null
             ? editingSetIndex.value + 1
-            : loggedSets.value.length + 1,
-    );
+            : loggedSets.value.length + 1;
+    });
 
     const exerciseDisplayName = computed(() => {
         const group = exerciseGroup.value;
@@ -213,6 +263,15 @@ export function useExerciseLoggingSession(options: {
         },
     });
 
+    /** After an uneven pair the next side starts at its own weight (see `carriedSideWeight`). */
+    const applyCarriedSideWeight = () => {
+        const side = currentSide.value;
+        const carried = side ? carriedSideWeight(loggedSets.value, side) : null;
+        if (!carried) return;
+        currentWeight.value = carried.weight;
+        currentWeightSetup.value = carried.weight_setup;
+    };
+
     /** Fill the draft for a newly opened exercise. Cache updates afterwards (optimistic patches,
      *  reconciles, refetches) only change the rows, never the draft. */
     const initializeExercise = () => {
@@ -221,15 +280,19 @@ export function useExerciseLoggingSession(options: {
 
         notes.value = group.logged?.notes ?? group.previous?.notes ?? "";
         editingSetIndex.value = null;
+        editingSide.value = null;
+        chosenSide.value = null;
 
+        // Unilateral history counts one set per pair (its weaker side) for progression.
+        const previousForProgression = setsForProgression(group.previous?.sets);
         const { weight, reps, weightSetup } = initializeWeightAndReps(
             group.logged?.sets,
-            group.previous?.sets,
+            previousForProgression,
         );
         weightProgression.value =
             (group.logged?.sets?.length ?? 0) === 0
                 ? getWeightProgression(
-                      group.previous?.sets,
+                      previousForProgression,
                       group.previous?.exercise?.rep_rollover,
                       weight,
                       WEIGHT_PROGRESSION_INCREASE_LBS,
@@ -241,6 +304,7 @@ export function useExerciseLoggingSession(options: {
                 ? normalizeReps(reps)
                 : DEFAULT_REPS_AFTER_WEIGHT_CHANGE;
         currentWeightSetup.value = weightSetup;
+        applyCarriedSideWeight();
 
         draftDirty.value = false;
 
@@ -253,9 +317,18 @@ export function useExerciseLoggingSession(options: {
             if (editingSetIndex.value != null && !loggedSets.value[editingSetIndex.value]) {
                 editingSetIndex.value = null;
             }
+            if (editingSetIndex.value != null) editingSide.value = loggedSets.value[editingSetIndex.value]?.side ?? null;
         }
         draftStorage.setSaveEnabled(true);
     };
+
+    // Unilateral: when the next side changes (a log lands, a delete, a side picked by hand), start it
+    // at that side's own weight if the last pair was uneven.
+    watch(currentSide, (side, before) => {
+        if (side && before && side !== before && editingSetIndex.value == null && sessionKey.value != null) {
+            applyCarriedSideWeight();
+        }
+    });
 
     // Initialise once per (day, exercise), not on every cache change.
     const sessionKey = computed(() =>
@@ -307,12 +380,13 @@ export function useExerciseLoggingSession(options: {
         draftDirty.value = true;
         currentWeight.value = value;
         if (editingSetIndex.value != null || loggedSets.value.length > 0) return;
+        const previous = exerciseGroup.value?.previous?.sets;
+        const side = currentSide.value;
+        const lastTime = side
+            ? previousSideSet(previous, currentSetNumber.value - 1, side)
+            : previous?.[currentSetNumber.value - 1];
         currentReps.value = normalizeReps(
-            previousRepsForSetAtWeight(
-                exerciseGroup.value?.previous?.sets,
-                currentSetNumber.value - 1,
-                value,
-            ) ?? DEFAULT_REPS_AFTER_WEIGHT_CHANGE,
+            previousRepsForSetAtWeight(lastTime ? [lastTime] : [], 0, value) ?? DEFAULT_REPS_AFTER_WEIGHT_CHANGE,
         );
     };
 
@@ -327,7 +401,9 @@ export function useExerciseLoggingSession(options: {
         currentWeight.value = row.weight;
         currentReps.value = normalizeReps(row.reps);
         currentWeightSetup.value = row.weight_setup;
+        applyCarriedSideWeight();
     };
+
 
     const stepWeight = (direction: "plus" | "minus") => {
         if (direction === "plus") {
@@ -373,16 +449,19 @@ export function useExerciseLoggingSession(options: {
         const exerciseId = exerciseIdentity.value;
         if (!exerciseId) return false;
         const day = date.value;
-        const fields = {
+        const side = currentSide.value;
+        const fields: SetFields = {
             weight: currentWeight.value,
             reps,
             weight_setup: weightSetupForSave(),
+            ...(side && { side }),
         };
-        const count = loggedSets.value.length;
+        const rows = loggedSets.value;
+        const count = rows.length;
 
         const editingIndex = editingSetIndex.value;
         if (editingIndex != null) {
-            const row = loggedSets.value[editingIndex];
+            const row = rows[editingIndex];
             if (!row) return false;
             saveEditedSet(row, day, exerciseId, fields);
             // A fix to an earlier set isn't a new set: the rest clock keeps running.
@@ -394,14 +473,24 @@ export function useExerciseLoggingSession(options: {
                 created_at: new Date().toISOString(),
                 ...fields,
             });
-            globalTimer.start(exerciseDisplayName.value);
+            if (!side) {
+                globalTimer.start(exerciseDisplayName.value);
+            } else if (closesPair(rows, side)) {
+                // Second side: rest keeps counting from the first side.
+                globalTimer.endSwitch(exerciseDisplayName.value);
+            } else {
+                globalTimer.start(exerciseDisplayName.value, otherSide(side));
+            }
         }
         syncNotes(day, exerciseId, true);
 
         draftDirty.value = false;
         editingSetIndex.value = null;
+        editingSide.value = null;
+        chosenSide.value = null;
         // A new set leaves the draft at what was just logged. After fixing a set, go back to this
         // session's last set (the edited values if that was the last one: rows update a tick later).
+        // (Unilateral: the watch on `currentSide` moves the weight to the next side's own if uneven.)
         if (editingIndex != null) resumeFromLastSet(editingIndex === count - 1 ? fields : undefined);
         return true;
     };
@@ -487,11 +576,13 @@ export function useExerciseLoggingSession(options: {
         draftDirty.value = true;
 
         editingSetIndex.value = setIndex;
+        editingSide.value = set.side ?? null;
     };
 
     const cancelEditingSet = () => {
         if (editingSetIndex.value == null) return;
         editingSetIndex.value = null;
+        editingSide.value = null;
         resumeFromLastSet();
     };
 
@@ -520,6 +611,9 @@ export function useExerciseLoggingSession(options: {
     return reactive({
         exerciseGroup,
         currentSetNumber,
+        unilateral,
+        currentSide,
+        setSide,
         loggedSets,
         currentWeight,
         currentReps,

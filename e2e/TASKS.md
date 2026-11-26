@@ -68,6 +68,10 @@ reload. Add the module's API helpers to `fixtures/api.ts` as needed.
             switch failure rolls back); week strip status, streak, day navigation, week paging; load errors
             recover with Retry. Not yet: "Other plans…" dialog, Log freestyle, switching a past/future day,
             switch pending state, streak without a program.
+      - [x] unilateral (`tests/gym/unilateral.spec.ts`): Edit dialog toggle, first-side dialog on Log Set 1
+            (defaults to last session's; Esc logs nothing), switch clock (red, yellow at 0:15, green at 0:25),
+            second side keeps the clock, pairs persist with sides, bilateral history counts for both sides,
+            uneven weights carry per side, edit moves a side or deletes it. Not yet: finish with one side logged.
       - [x] session (`tests/gym/session.spec.ts`, `cardio-mobility.spec.ts`, helpers `tests/gym/logger.ts`):
             session list, Up next, finish + summary, weight/plates setup, notes (with and before the first
             set), persistent save failure + Retry, offline log, delete while saving, edit a saved set's

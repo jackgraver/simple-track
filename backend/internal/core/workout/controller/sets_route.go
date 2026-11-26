@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"be-simpletracker/internal/core/workout/models"
 	workoutrepo "be-simpletracker/internal/core/workout/repository"
 	"be-simpletracker/internal/core/workout/services"
 	"be-simpletracker/internal/utils/apierr"
@@ -28,6 +29,8 @@ type logSetRequest struct {
 	Reps        uint    `json:"reps"`
 	Weight      float32 `json:"weight"`
 	WeightSetup string  `json:"weight_setup"`
+	// Side is "left" or "right" for one side of a unilateral exercise; omitted or null for bilateral.
+	Side *string `json:"side"`
 }
 
 // LogSet handles POST /workout/sets. Idempotent by client_id: a replay returns the stored set
@@ -56,6 +59,11 @@ func LogSet(c *gin.Context) {
 		apierr.BadRequest(c, "date must be YYYY-MM-DD")
 		return
 	}
+	side, ok := models.NormalizeSide(req.Side)
+	if !ok {
+		apierr.BadRequest(c, "side must be left, right or null")
+		return
+	}
 
 	res, err := services.LogSet(c.Request.Context(), services.LogSetInput{
 		ClientID:    clientID,
@@ -64,6 +72,7 @@ func LogSet(c *gin.Context) {
 		Reps:        req.Reps,
 		Weight:      req.Weight,
 		WeightSetup: req.WeightSetup,
+		Side:        side,
 	})
 	switch {
 	case errors.Is(err, services.ErrExerciseNotFound):
@@ -88,6 +97,8 @@ type updateSetRequest struct {
 	Reps        *uint    `json:"reps"`
 	Weight      *float32 `json:"weight"`
 	WeightSetup *string  `json:"weight_setup"`
+	// Side, when present, moves the set to that side ("left"/"right"); "" makes it bilateral.
+	Side *string `json:"side"`
 }
 
 // UpdateSet handles PATCH /workout/sets/:id, where :id is the numeric set id or its client_id.
@@ -103,10 +114,17 @@ func UpdateSet(c *gin.Context) {
 		apierr.BadRequest(c, "Invalid request body")
 		return
 	}
+	if req.Side != nil {
+		if _, ok := models.NormalizeSide(req.Side); !ok {
+			apierr.BadRequest(c, "side must be left, right or empty")
+			return
+		}
+	}
 	set, exercise, err := services.UpdateSet(c.Request.Context(), ref, workoutrepo.SetPatch{
 		Reps:        req.Reps,
 		Weight:      req.Weight,
 		WeightSetup: req.WeightSetup,
+		Side:        req.Side,
 	})
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {

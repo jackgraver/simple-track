@@ -9,6 +9,12 @@ Details and reasoning live in the Findings section of [TASKS.md](TASKS.md).
 - [ ] **Gym reps slider races its smooth scroll.** Looks fixed in `NumberSlider` (sync ends on reaching the
       target / `scrollend`); 390/390 flake runs passed. Drop this and the `scrollSettled` wait in
       `tests/gym/logger.ts` after a few more green runs.
+      2026-11-25: seen 3-4 times by hand in the dev stack (unilateral work): the value jumped +4 ticks
+      (10 → 14, i.e. one side pad's width, ~173px at 390) right after the page re-rendered, each time
+      shortly after a vite hot reload or a viewport resize. Not reproducible on demand, and
+      `tests/gym/unilateral.spec.ts` (asserts reps on edit) passed 140/140. Suspect: the pad changes
+      width after the strip is scrolled, scroll anchoring shifts `scrollLeft` by the pad, and that scroll
+      event lands after the sync ended.
 - [ ] **Diet: viewing /diet creates day rows for future days.** `DietWeekStrip` loads all 7 days and
       `GET /diet/logs/today` creates a missing day with the plan in force now, so opening /diet on a Thursday
       pins Fri and Sat to today's plan (`prefetchDays.ts` skips future days for this reason). Fix: don't fetch

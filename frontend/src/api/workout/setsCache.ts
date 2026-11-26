@@ -8,11 +8,20 @@
  * so `usePendingIds` and the helper's `retry`/`dismiss` work for both kinds.
  */
 import type { ExerciseGroup, WorkoutLogsPreviousResponse } from "~/api/workout/api";
-import type { LoggedExercise, LoggedSet } from "~/types/workout";
+import type { LoggedExercise, LoggedSet, SetSide } from "~/types/workout";
 
 type Day = WorkoutLogsPreviousResponse;
 
-export type SetFields = { reps: number; weight: number; weight_setup: string };
+/** `side`: "left"/"right" for one side of a unilateral exercise, null for bilateral. On an edit,
+ *  `undefined` leaves the side alone. */
+export type SetFields = { reps: number; weight: number; weight_setup: string; side?: SetSide | null };
+
+/** The writable fields of a set, as stored in the cache. */
+function fieldsOf(v: SetFields): SetFields {
+    return v.side === undefined
+        ? { reps: v.reps, weight: v.weight, weight_setup: v.weight_setup }
+        : { reps: v.reps, weight: v.weight, weight_setup: v.weight_setup, side: v.side };
+}
 
 /** `POST /workout/sets`. `created_at` is fixed at tap time so re-applying the patch is idempotent. */
 export type LogSetVars = SetFields & { client_id: string; date: string; exercise_id: number; created_at: string };
@@ -101,7 +110,7 @@ function dropIfEmptyLocal(group: ExerciseGroup, logged: LoggedExercise): Exercis
 export function appendSet(day: Day, v: LogSetVars): Day {
     return withGroup(day, v.exercise_id, (g) => {
         const logged = g.logged ?? emptyLogged(day, g, v.exercise_id, v.created_at);
-        const fields = { reps: v.reps, weight: v.weight, weight_setup: v.weight_setup };
+        const fields = fieldsOf(v);
         const existing = logged.sets.findIndex((s) => s.client_id === v.client_id);
         const sets = [...logged.sets];
         if (existing >= 0) {
@@ -135,7 +144,7 @@ export function patchSet(day: Day, v: UpdateSetVars): Day {
     return withGroup(day, v.exercise_id, (g) => {
         if (!g.logged || !g.logged.sets.some((s) => setKey(s) === v.client_id)) return g;
         const sets = g.logged.sets.map((s) =>
-            setKey(s) === v.client_id ? { ...s, reps: v.reps, weight: v.weight, weight_setup: v.weight_setup } : s,
+            setKey(s) === v.client_id ? { ...s, ...fieldsOf(v) } : s,
         );
         return { ...g, logged: { ...g.logged, sets } };
     });
@@ -208,7 +217,7 @@ export function mergeLoggedExercise(
             const mine = local.get(key);
             sets.push(
                 mine && intents.keepFields.has(key)
-                    ? { ...s, reps: mine.reps, weight: mine.weight, weight_setup: mine.weight_setup }
+                    ? { ...s, ...fieldsOf({ ...mine, side: mine.side ?? null }) }
                     : s,
             );
         }
@@ -248,6 +257,8 @@ export type SetRow = {
     weight: number;
     reps: number;
     weight_setup: string;
+    /** "left"/"right" on a unilateral set, null on a bilateral one. */
+    side: SetSide | null;
     status: SetRowStatus;
     /** Server id, null while unsaved. */
     id: number | null;
@@ -296,6 +307,7 @@ export function deriveSetRows(
         weight: s.weight,
         reps: s.reps,
         weight_setup: s.weight_setup || "",
+        side: s.side ?? null,
         status: "success",
         id: s.ID > 0 ? s.ID : null,
         failed: null,
@@ -309,6 +321,7 @@ export function deriveSetRows(
             weight: v.weight,
             reps: v.reps,
             weight_setup: v.weight_setup,
+            side: v.side ?? null,
             status: "success",
             id: null,
             failed: null,
@@ -317,7 +330,7 @@ export function deriveSetRows(
     for (const v of intents.updates) {
         if (!mine(v)) continue;
         const row = rows.find((r) => r.key === v.client_id);
-        if (row) Object.assign(row, { weight: v.weight, reps: v.reps, weight_setup: v.weight_setup });
+        if (row) Object.assign(row, fieldsOf(v));
     }
     return rows
         .filter((r) => !intents.deleting.has(r.key))
@@ -350,7 +363,7 @@ export type SetWritePlan =
 export function planSetRetry(failed: FailedSetWrites, fields?: SetFields): SetWritePlan {
     if (failed.create) {
         const fromEdit = failed.update
-            ? { reps: failed.update.reps, weight: failed.update.weight, weight_setup: failed.update.weight_setup }
+            ? fieldsOf(failed.update)
             : {};
         return {
             kind: "create",

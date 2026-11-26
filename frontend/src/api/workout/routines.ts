@@ -220,7 +220,14 @@ export function exerciseKeys() {
     return [workoutKeys.exercises.all, searchListKeys.all, PROGRAMS, workoutKeys.plans.all, workoutKeys.days.all];
 }
 
-export type ExerciseInput = { name: string; rep_rollover: number; cues: string; load_type?: ExerciseLoadType };
+export type ExerciseInput = {
+    name: string;
+    rep_rollover: number;
+    cues: string;
+    load_type?: ExerciseLoadType;
+    /** Update only: omitted keeps the current value. */
+    unilateral?: boolean;
+};
 
 /** Unique names fail often, so this waits for the server; callers show the error inline. */
 export function useCreateExercise() {

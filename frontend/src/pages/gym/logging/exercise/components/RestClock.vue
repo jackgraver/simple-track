@@ -4,10 +4,14 @@ import { useGlobalRestTimer } from "~/composables/useGlobalRestTimer";
 import { restStage, type RestStage } from "../domain/liveLogging";
 
 // Counts up from the last logged set (any exercise). Red until 1:00, orange until 1:30, yellow until 2:00, green after.
-// Just the time, no bar or stage words (owner, 2026-11-23).
-const { elapsedMs, isActive, displayText } = useGlobalRestTimer();
+// Just the time, no bar or stage words (owner, 2026-11-23). Unilateral: after the first side it is
+// the switch wait (red < 0:15, yellow < 0:25, green after); the second side doesn't restart it, so
+// rest counts from the first side with the normal stages.
+const { elapsedMs, isActive, displayText, switchTo } = useGlobalRestTimer();
 
-const stage = computed(() => restStage(elapsedMs.value, isActive.value));
+
+const switching = computed(() => isActive.value && switchTo.value != null);
+const stage = computed(() => restStage(elapsedMs.value, isActive.value, switching.value));
 
 const textTone: Record<RestStage, string> = {
     idle: "text-fg-subtle",

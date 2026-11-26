@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"testing"
 
 	"be-simpletracker/internal/core/workout"
@@ -127,5 +128,62 @@ func TestLegacyLogExercise_doubleTapNoDuplicate(t *testing.T) {
 		if len(sets) != 1 {
 			t.Fatalf("POST %d: want 1 set, got %d", i, len(sets))
 		}
+	}
+}
+
+func TestSetsRoutes_unilateralSides(t *testing.T) {
+	r, ex := setsRouter(t)
+	post := func(cid, side string) (int, map[string]any) {
+		body := map[string]any{"client_id": cid, "date": "2026-11-20", "exercise_id": ex.ID, "reps": 8, "weight": 30}
+		if side != "" {
+			body["side"] = side
+		}
+		b, _ := json.Marshal(body)
+		return do(t, r, http.MethodPost, "/workout/sets", string(b))
+	}
+	const left = "0193a1b2-c3d4-7e5f-8a9b-000000000001"
+	const right = "0193a1b2-c3d4-7e5f-8a9b-000000000002"
+	const both = "0193a1b2-c3d4-7e5f-8a9b-000000000003"
+	if code, out := post(left, "left"); code != http.StatusOK || out["set"].(map[string]any)["side"] != "left" {
+		t.Fatalf("left: %d %v", code, out)
+	}
+	if code, out := post(right, "right"); code != http.StatusOK || out["set"].(map[string]any)["side"] != "right" {
+		t.Fatalf("right: %d %v", code, out)
+	}
+	if code, out := post(both, ""); code != http.StatusOK || out["set"].(map[string]any)["side"] != nil {
+		t.Fatalf("no side should be bilateral (null): %d %v", code, out)
+	}
+	if code, _ := post("0193a1b2-c3d4-7e5f-8a9b-000000000004", "middle"); code != http.StatusBadRequest {
+		t.Fatalf("bad side: want 400, got %d", code)
+	}
+
+	if code, out := do(t, r, http.MethodPatch, "/workout/sets/"+left, `{"side": "right"}`); code != http.StatusOK || out["set"].(map[string]any)["side"] != "right" {
+		t.Fatalf("PATCH side: %d %v", code, out)
+	}
+	if code, out := do(t, r, http.MethodPatch, "/workout/sets/"+left, `{"side": ""}`); code != http.StatusOK || out["set"].(map[string]any)["side"] != nil {
+		t.Fatalf("PATCH side to bilateral: %d %v", code, out)
+	}
+	if code, out := do(t, r, http.MethodPatch, "/workout/sets/"+right, `{"reps": 9}`); code != http.StatusOK || out["set"].(map[string]any)["side"] != "right" {
+		t.Fatalf("PATCH without side must keep it: %d %v", code, out)
+	}
+	if code, _ := do(t, r, http.MethodPatch, "/workout/sets/"+right, `{"side": "up"}`); code != http.StatusBadRequest {
+		t.Fatalf("PATCH bad side: want 400, got %d", code)
+	}
+}
+
+func TestUpdateExercise_unilateralToggle(t *testing.T) {
+	r, ex := setsRouter(t)
+	path := "/workout/exercises/" + strconv.FormatUint(uint64(ex.ID), 10)
+	code, out := do(t, r, http.MethodPut, path, `{"name": "Squat", "rep_rollover": 10, "unilateral": true}`)
+	if code != http.StatusOK || out["exercise"].(map[string]any)["unilateral"] != true {
+		t.Fatalf("turn on: %d %v", code, out)
+	}
+	code, out = do(t, r, http.MethodPut, path, `{"name": "Squat", "rep_rollover": 10}`)
+	if code != http.StatusOK || out["exercise"].(map[string]any)["unilateral"] != true {
+		t.Fatalf("omitting unilateral must keep it: %d %v", code, out)
+	}
+	code, out = do(t, r, http.MethodPut, path, `{"name": "Squat", "rep_rollover": 10, "unilateral": false}`)
+	if code != http.StatusOK || out["exercise"].(map[string]any)["unilateral"] != false {
+		t.Fatalf("turn off: %d %v", code, out)
 	}
 }

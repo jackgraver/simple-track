@@ -10,8 +10,14 @@ export const REST_NEAR_MS = 60_000;
 export const REST_SOON_MS = 90_000;
 export const REST_READY_MS = 120_000;
 
-export function restStage(elapsedMs: number, active: boolean): RestStage {
+/** Unilateral, between sides: yellow from 0:15, green from 0:25. */
+export const SWITCH_SOON_MS = 15_000;
+export const SWITCH_READY_MS = 25_000;
+
+/** `switching`: between the two sides of a unilateral set, red < 0:15, yellow < 0:25, green after. */
+export function restStage(elapsedMs: number, active: boolean, switching = false): RestStage {
     if (!active) return "idle";
+    if (switching) return elapsedMs >= SWITCH_READY_MS ? "ready" : elapsedMs >= SWITCH_SOON_MS ? "soon" : "wait";
     if (elapsedMs >= REST_READY_MS) return "ready";
     if (elapsedMs >= REST_SOON_MS) return "soon";
     if (elapsedMs >= REST_NEAR_MS) return "near";

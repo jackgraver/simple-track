@@ -4,7 +4,8 @@ import { useRoute, useRouter } from "vue-router";
 import { dialogManager } from "~/composables/dialog/useDialog";
 import { DEFAULT_EXERCISE_LOAD_TYPE, type ExerciseLoadType } from "~/types/workout";
 import { ChartLine } from "lucide-vue-next";
-import { Button, IconButton, Skeleton } from "~/shared/ui";
+import { Button, IconButton, SegmentedControl, Skeleton } from "~/shared/ui";
+import type { SetSide } from "~/types/workout";
 import { useWorkoutStore } from "../../store/useWorkoutStore";
 import { useLoggingRouteContext } from "../../composables/useLoggingRouteContext";
 import { buildWorkoutSteps, formatSets } from "../../domain/workoutSteps";
@@ -18,10 +19,12 @@ import {
 } from "../domain/weightSetup";
 import { overloadStatus, plannedSetCount, progressVerdict, visibleMachineSettings } from "../domain/liveLogging";
 import { buildUpNext, type UpNextItem } from "../domain/upNext";
+import { completePairCount, isOpen, pairSets, previousSideSet, setsForProgression, sideLabel } from "../domain/unilateral";
 import { useExerciseLoggingSession } from "../composables/useExerciseLoggingSession";
 import WeightSetupDialog from "../dialog/WeightSetupDialog.vue";
 import WeightSheet, { type WeightSheetResult } from "../dialog/WeightSheet.vue";
 import NotesSheet from "../dialog/NotesSheet.vue";
+import FirstSideDialog from "../dialog/FirstSideDialog.vue";
 import LoggingHeader from "./LoggingHeader.vue";
 import NumberSlider from "./NumberSlider.vue";
 import RestClock from "./RestClock.vue";
@@ -58,8 +61,10 @@ const exerciseName = computed(() => exercise.value?.name ?? "");
 const cues = computed(() => exercise.value?.cues ?? "");
 const machineSettings = computed(() => visibleMachineSettings(exercise.value?.machine_settings));
 const previousSets = computed(() =>
-    (session.exerciseGroup?.previous?.sets ?? []).map((set) => ({ weight: set.weight, reps: set.reps })),
+    (session.exerciseGroup?.previous?.sets ?? []).map((set) => ({ weight: set.weight, reps: set.reps, side: set.side ?? null })),
 );
+// Unilateral sets count one per pair (its weaker side) for targets, overload and the verdict.
+const previousForProgression = computed(() => setsForProgression(previousSets.value));
 const repRollover = computed(() => {
     const g = session.exerciseGroup;
     const rollover = g?.planned?.rep_rollover ?? g?.logged?.exercise?.rep_rollover ?? g?.previous?.exercise?.rep_rollover;
@@ -78,19 +83,54 @@ const plates = computed(() => {
 });
 
 /* ---------- sets ---------- */
-const loggedCount = computed(() => session.loggedSets.length);
-const targetSets = computed(() => plannedSetCount(previousSets.value));
-const plannedDone = computed(() => loggedCount.value >= targetSets.value);
+// Unilateral: complete left + right pairs. A pair with one side logged isn't done yet.
+const loggedCount = computed(() =>
+    session.unilateral ? completePairCount(session.loggedSets) : session.loggedSets.length,
+);
+/** One side of the latest set is logged and the other isn't yet. */
+const pairOpen = computed(() => {
+    if (!session.unilateral) return false;
+    const pairs = pairSets(session.loggedSets);
+    const last = pairs[pairs.length - 1];
+    return !!last && isOpen(last);
+});
+const targetSets = computed(() => plannedSetCount(previousForProgression.value));
+const plannedDone = computed(() => loggedCount.value >= targetSets.value && !pairOpen.value);
 const editing = computed(() => session.editingSetIndex != null);
-const overload = computed(() => overloadStatus(previousSets.value, repRollover.value, session.currentWeight));
-const verdict = computed(() => progressVerdict(session.loggedSets, repRollover.value, session.currentWeight));
+const overload = computed(() => overloadStatus(previousForProgression.value, repRollover.value, session.currentWeight));
+// Unilateral: the draft can sit at one side's lower weight (uneven sides), so judge against the
+// working weight, today's heaviest set.
+const verdictWeight = computed(() =>
+    session.unilateral && session.loggedSets.length
+        ? Math.max(...session.loggedSets.map((s) => s.weight))
+        : session.currentWeight,
+);
+const verdict = computed(() =>
+    progressVerdict(setsForProgression(session.loggedSets), repRollover.value, verdictWeight.value),
+);
 
 /* ---------- reps slider ---------- */
 const extraSetOpen = ref(false);
 const showSlider = computed(() => editing.value || !plannedDone.value || extraSetOpen.value);
-const previousRep = computed(() =>
-    previousRepsForSetAtWeight(previousSets.value, session.currentSetNumber - 1, session.currentWeight),
+const previousRep = computed(() => {
+    const side = session.currentSide;
+    if (!side) return previousRepsForSetAtWeight(previousSets.value, session.currentSetNumber - 1, session.currentWeight);
+    const lastTime = previousSideSet(previousSets.value, session.currentSetNumber - 1, side);
+    return previousRepsForSetAtWeight(lastTime ? [lastTime] : [], 0, session.currentWeight);
+});
+
+/* ---------- side (unilateral) ---------- */
+const sideOptions: { label: string; value: SetSide }[] = [
+    { label: "Left", value: "left" },
+    { label: "Right", value: "right" },
+];
+// The first side is asked for when Set 1 is logged (FirstSideDialog), so until then no side is shown.
+const askFirstSide = computed(() => session.unilateral && !editing.value && session.loggedSets.length === 0);
+const sideSuffix = computed(() =>
+    session.currentSide && !askFirstSide.value ? ` · ${sideLabel(session.currentSide)}` : "",
 );
+// Only to fix a logged set's side: new sides just alternate.
+const showSidePicker = computed(() => editing.value && session.currentSide != null);
 const sliderMarkers = computed(() => {
     const markers: { value: number; label: string; color?: "orange"; labelPosition?: "bottom" }[] = [];
     if (previousRep.value != null) {
@@ -103,7 +143,7 @@ const sliderMarkers = computed(() => {
 /* ---------- view: logging, or "Up next" after finishing ---------- */
 const view = ref<"log" | "next">("log");
 const setupOpen = ref(false);
-const setupExpanded = computed(() => loggedCount.value === 0 || setupOpen.value);
+const setupExpanded = computed(() => session.loggedSets.length === 0 || setupOpen.value);
 watch(exerciseId, () => {
     view.value = "log";
     setupOpen.value = false;
@@ -116,8 +156,24 @@ const scrollToTop = () => window.scrollTo({ top: 0, behavior: "instant" });
 // No scrolling after a log: the clock is already at the top, and a jump on top of the setup card
 // collapsing read as a flicker on the phone. No busy state either: the set appears on tap
 // (optimistic, saved in the background; a failed save is marked in the list below).
-const logSet = () => {
+const logSet = async () => {
+    if (askFirstSide.value && session.currentSide) {
+        const side = await dialogManager.custom<SetSide>({
+            title: "Which side was that?",
+            component: FirstSideDialog,
+            componentProps: { side: session.currentSide },
+        });
+        if (side == null) return;
+        session.setSide(side);
+    }
     if (session.addNextSet()) extraSetOpen.value = false;
+};
+
+const editingRow = computed(() =>
+    session.editingSetIndex != null ? session.loggedSets[session.editingSetIndex] : undefined,
+);
+const deleteEditedSide = () => {
+    if (session.editingSetIndex != null) session.deleteSet(session.editingSetIndex);
 };
 
 // Tap a set in the list below to edit it with the slider; tap it again (or "Back to set N") to stop.
@@ -162,7 +218,7 @@ const openPlatesDialog = async () => {
 // A weight typed in the sheet that's neither of the two ends the choice.
 const progressionChoice = computed(() => {
     const p = session.weightProgression;
-    if (!p || loggedCount.value > 0) return null;
+    if (!p || session.loggedSets.length > 0) return null;
     return session.currentWeight === p.nextWeight || session.currentWeight === p.previousWeight ? p : null;
 });
 
@@ -240,12 +296,12 @@ const goTo = (item: UpNextItem) => {
                 view === 'next'
                     ? `${doneCount} of ${steps.length} done`
                     : editing
-                      ? `Editing set ${(session.editingSetIndex ?? 0) + 1}`
+                      ? `Editing set ${session.currentSetNumber}${sideSuffix}`
                       : plannedDone
                         ? loggedCount > targetSets
                           ? `${loggedCount} sets · done`
                           : `${loggedCount} of ${targetSets} sets · done`
-                        : `Set ${session.currentSetNumber} of ${targetSets}`
+                        : `Set ${session.currentSetNumber} of ${targetSets}${sideSuffix}`
             "
             @back="goBackToLogging"
         >
@@ -279,9 +335,19 @@ const goTo = (item: UpNextItem) => {
                 @edit="openWeightSheet"
                 @choose="session.chooseWeightProgression"
             />
+            <!-- Unilateral, editing a logged side: fix which side it was. -->
+            <section v-if="showSidePicker && session.currentSide" class="flex flex-col gap-1" aria-label="Side">
+                <p class="m-0 text-xs font-semibold tracking-wide text-fg-muted uppercase">Side</p>
+                <SegmentedControl
+                    :model-value="session.currentSide"
+                    :options="sideOptions"
+                    label="Side"
+                    @update:model-value="session.setSide"
+                />
+            </section>
             <section v-if="showSlider" class="flex flex-col gap-1" aria-label="Reps">
                 <p class="m-0 text-xs font-semibold tracking-wide uppercase" :class="editing ? 'text-accent' : 'text-fg-muted'">
-                    {{ editing ? `Editing set ${(session.editingSetIndex ?? 0) + 1}` : "Reps" }}
+                    {{ editing ? `Editing set ${session.currentSetNumber}${sideSuffix}` : "Reps" }}
                 </p>
                 <NumberSlider
                     label=""
@@ -296,7 +362,11 @@ const goTo = (item: UpNextItem) => {
             <!-- Pinned above the tab bar so Log/Finish stays on screen on short phones. -->
             <div class="sticky bottom-at-tabbar z-raised -mx-4 flex flex-col gap-2 bg-canvas px-4 py-2 lg:static lg:mx-0 lg:p-0">
                 <Button v-if="showSlider" variant="primary" size="lg" block @click="logSet">
-                    {{ editing ? `Save Set ${(session.editingSetIndex ?? 0) + 1}` : `Log Set ${session.currentSetNumber}` }}
+                    {{
+                        editing
+                            ? `Save Set ${session.currentSetNumber}${sideSuffix}`
+                            : `Log Set ${session.currentSetNumber}${sideSuffix}`
+                    }}
                 </Button>
                 <Button v-if="plannedDone && !editing && !extraSetOpen" variant="primary" size="lg" block @click="finish">
                     Finish {{ exerciseName }}
@@ -312,14 +382,19 @@ const goTo = (item: UpNextItem) => {
                 <Button v-if="extraSetOpen && !editing" variant="ghost" class="self-center" @click="extraSetOpen = false">
                     Cancel extra set
                 </Button>
+                <!-- Unilateral sets have no ✕ on the card: a side is deleted from its edit mode. -->
+                <Button v-if="editing && editingRow?.side" variant="danger" size="lg" block @click="deleteEditedSide">
+                    Delete {{ sideLabel(editingRow.side).toLowerCase() }} side
+                </Button>
             </div>
 
             <div class="mt-4 flex flex-col gap-4 border-t border-dashed border-line pt-6">
                 <TodayVsLastList
                     :sets="session.loggedSets"
                     :previous="previousSets"
+                    :done="loggedCount"
                     :verdict="verdict"
-                    :weight="session.currentWeight"
+                    :weight="verdictWeight"
                     :editing-index="session.editingSetIndex"
                     :target="targetSets"
                     @select="selectSet"
@@ -328,7 +403,7 @@ const goTo = (item: UpNextItem) => {
                 />
                 <div class="flex flex-wrap gap-x-2 gap-y-1">
                     <Button
-                        v-if="loggedCount > 0 && !plannedDone && !editing"
+                        v-if="session.loggedSets.length > 0 && !plannedDone && !editing"
                         variant="ghost"
                         size="sm"
                         @click="finish"
@@ -336,7 +411,7 @@ const goTo = (item: UpNextItem) => {
                         Finish early
                     </Button>
                     <Button variant="ghost" size="sm" @click="openNotes">{{ session.notes ? "Edit notes" : "Add notes" }}</Button>
-                    <Button v-if="loggedCount > 0" variant="ghost" size="sm" @click="setupOpen = !setupOpen">
+                    <Button v-if="session.loggedSets.length > 0" variant="ghost" size="sm" @click="setupOpen = !setupOpen">
                         {{ setupOpen ? "Hide setup" : "Show setup" }}
                     </Button>
                 </div>

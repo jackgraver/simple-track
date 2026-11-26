@@ -13,6 +13,15 @@ describe("formatSets", () => {
         expect(formatSets([])).toBe("");
         expect(formatSets(undefined)).toBe("");
     });
+    it("reads unilateral sets per pair, and spells out uneven weights", () => {
+        const side = (weight: number, reps: number, s: "left" | "right") => ({ weight, reps, side: s });
+        expect(formatSets([side(30, 10, "left"), side(30, 9, "right"), side(30, 10, "left"), side(30, 10, "right")])).toBe(
+            "30 lb × L10 R9, L10 R10",
+        );
+        expect(formatSets([side(30, 10, "left"), side(30, 9, "right"), side(30, 8, "left"), side(25, 10, "right")])).toBe(
+            "30 lb × L10 R9 · L 30 lb × 8 R 25 lb × 10",
+        );
+    });
 });
 
 describe("buildWorkoutSteps", () => {

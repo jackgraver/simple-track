@@ -4,7 +4,7 @@ import type { Exercise, ExerciseLoadType } from "~/types/workout";
 import { DEFAULT_EXERCISE_LOAD_TYPE } from "~/types/workout";
 import { toast } from "~/composables/toast/useToast";
 import { useUpdateExercise } from "~/api/workout/routines";
-import { Button, Field, Input, NumberField, Select, Textarea } from "~/shared/ui";
+import { Button, Field, Input, NumberField, Select, Textarea, Toggle } from "~/shared/ui";
 import { ref, watch } from "vue";
 
 const props = defineProps<{
@@ -16,6 +16,7 @@ const updateExercise = useUpdateExercise();
 const name = ref("");
 const repRollover = ref<number | null>(10);
 const cues = ref("");
+const unilateral = ref(false);
 const loadType = ref<ExerciseLoadType>(DEFAULT_EXERCISE_LOAD_TYPE);
 const submitting = ref(false);
 const loadTypeOptions: { label: string; value: ExerciseLoadType }[] = [
@@ -33,6 +34,7 @@ watch(
         repRollover.value = e.rep_rollover || 10;
         cues.value = e.cues ?? "";
         loadType.value = e.load_type ?? DEFAULT_EXERCISE_LOAD_TYPE;
+        unilateral.value = e.unilateral ?? false;
     },
     { immediate: true },
 );
@@ -51,6 +53,7 @@ const submit = async () => {
             rep_rollover: repRollover.value || 10,
             cues: cues.value.trim(),
             load_type: loadType.value,
+            unilateral: unilateral.value,
         });
         toast.push(`Updated ${n}`, "success");
         props.onResolve?.(true);
@@ -74,6 +77,10 @@ const submit = async () => {
         <Field label="Weight type">
             <Select v-model="loadType" :options="loadTypeOptions" />
         </Field>
+        <div class="flex flex-col gap-1">
+            <Toggle v-model="unilateral" label="Unilateral" />
+            <p class="m-0 text-sm text-fg-muted">Log left and right separately, with a short switch timer between sides.</p>
+        </div>
         <Field label="Cues">
             <Textarea v-model="cues" :rows="4" placeholder="Optional cues (e.g. bullet points)" />
         </Field>

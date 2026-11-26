@@ -263,6 +263,8 @@ type updateExerciseRequest struct {
 	RepRollover uint                    `json:"rep_rollover"`
 	Cues        string                  `json:"cues"`
 	LoadType    models.ExerciseLoadType `json:"load_type"`
+	// Unilateral, when present, turns one-side-at-a-time logging on or off.
+	Unilateral *bool `json:"unilateral"`
 }
 
 func UpdateExercise(c *gin.Context) {
@@ -285,6 +287,9 @@ func UpdateExercise(c *gin.Context) {
 		req.RepRollover = 10
 	}
 	exercise, err := services.UpdateExercise(uint(id64), req.Name, req.RepRollover, req.Cues, req.LoadType)
+	if err == nil && req.Unilateral != nil {
+		exercise, err = services.SetExerciseUnilateral(uint(id64), *req.Unilateral)
+	}
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Exercise not found"})

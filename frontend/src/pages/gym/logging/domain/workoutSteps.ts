@@ -1,4 +1,5 @@
 import type { ExerciseGroup } from "~/api/workout/api";
+import { formatPair, formatWeight, hasSides, pairSets, type SidedSet } from "../exercise/domain/unilateral";
 import type { Cardio, MobilityLogged, MobilityRoutine, PlannedCardio } from "~/types/workout";
 
 /** One thing to do in a gym session, in the order it's done: warmup, lifts, cardio, cooldown. */
@@ -23,18 +24,27 @@ export type WorkoutStepsInput = {
     loggedPostMobility?: MobilityLogged | null;
 };
 
-type SetLike = { weight: number; reps: number };
+type SetLike = SidedSet;
 
-/** "135 lb × 8, 8, 7 · 140 lb × 6": consecutive sets at the same weight share one weight. Weight 0 is bodyweight. */
+/**
+ * "135 lb × 8, 8, 7 · 140 lb × 6": consecutive sets at the same weight share one weight. Weight 0 is
+ * bodyweight. Unilateral sets read per pair: "30 lb × L10 R9, L10 R10", and a pair with a different
+ * weight on each side spells both out ("L 30 lb × 10 R 25 lb × 9").
+ */
 export function formatSets(sets: SetLike[] | null | undefined): string {
     if (!sets?.length) return "";
-    const groups: { weight: number; reps: number[] }[] = [];
-    for (const s of sets) {
+    const items = hasSides(sets)
+        ? pairSets(sets).map(formatPair)
+        : sets.map((s) => ({ weight: s.weight as number | null, text: String(s.reps) }));
+    const groups: { weight: number | null; reps: string[] }[] = [];
+    for (const item of items) {
         const last = groups[groups.length - 1];
-        if (last && last.weight === s.weight) last.reps.push(s.reps);
-        else groups.push({ weight: s.weight, reps: [s.reps] });
+        if (last && item.weight != null && last.weight === item.weight) last.reps.push(item.text);
+        else groups.push({ weight: item.weight, reps: [item.text] });
     }
-    return groups.map((g) => `${g.weight > 0 ? `${g.weight} lb` : "BW"} × ${g.reps.join(", ")}`).join(" · ");
+    return groups
+        .map((g) => (g.weight == null ? g.reps.join(", ") : `${formatWeight(g.weight)} × ${g.reps.join(", ")}`))
+        .join(" · ");
 }
 
 function mobilityStep(

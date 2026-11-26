@@ -431,6 +431,7 @@ type LogSetInput struct {
 	Reps        uint
 	Weight      float32
 	WeightSetup string
+	Side        *string
 }
 
 type LogSetResult struct {
@@ -461,6 +462,7 @@ func LogSet(ctx context.Context, in LogSetInput) (LogSetResult, error) {
 		Reps:         in.Reps,
 		Weight:       in.Weight,
 		WeightSetup:  in.WeightSetup,
+		Side:         in.Side,
 	})
 	if err != nil {
 		return LogSetResult{}, err
@@ -617,6 +619,14 @@ func CreateExercise(name string, repRollover uint, cues string, loadTypes ...mod
 
 func UpdateExercise(id uint, name string, repRollover uint, cues string, loadTypes ...models.ExerciseLoadType) (*models.Exercise, error) {
 	return workoutrepo.UpdateExercise(id, name, repRollover, cues, loadTypes...)
+}
+
+// SetExerciseUnilateral turns one-side-at-a-time logging on or off. Logged sets keep their sides.
+func SetExerciseUnilateral(id uint, unilateral bool) (*models.Exercise, error) {
+	if err := workoutrepo.SetExerciseUnilateral(id, unilateral); err != nil {
+		return nil, err
+	}
+	return workoutrepo.FindExerciseByID(id)
 }
 
 func AssignPlanToDay(planID uint, dayOfWeek int) (*models.WorkoutPlan, error) {

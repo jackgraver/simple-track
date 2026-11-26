@@ -316,6 +316,8 @@ export function useLogSet() {
                 reps: v.reps,
                 weight: v.weight,
                 weight_setup: v.weight_setup,
+                // Omitted for a bilateral set.
+                ...(v.side && { side: v.side }),
             }),
         optimistic: (v) => [
             {
@@ -345,6 +347,8 @@ export function useUpdateSet() {
                 reps: v.reps,
                 weight: v.weight,
                 weight_setup: v.weight_setup,
+                // "" makes it bilateral; omitted leaves the side alone.
+                ...(v.side !== undefined && { side: v.side ?? "" }),
             }),
         optimistic: (v) => [
             {
