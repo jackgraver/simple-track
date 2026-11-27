@@ -40,7 +40,7 @@ Nothing Critical was found. Prod today has one account, so most multi-user findi
 | 17 | Low | API responses carry no `Cache-Control`; personal data may sit in browser/bfcache on shared devices | H1: **done** |
 | 18 | Low | Default CORS list (used when `CORS_ORIGINS` is unset) hard-codes home LAN IPs | H1: **done** |
 | 19 | Low | Request logs include full query strings; login logs record attempted usernames | S1: login part **done**; request logs: C6 |
-| 20 | Low | No Go vulnerability scan in CI | B3 |
+| 20 | Low | No Go vulnerability scan in CI | S4: manual run **done** (bumped x/net, x/text, Go 1.26); pipeline step: B3 |
 | 21 | Info | Dev stack: backend listens on 0.0.0.0, `/benchmark` unauthenticated, dev/dev login on LAN | none |
 | 22 | Info | Postgres `sslmode=disable` inside the compose network | none |
 | 23 | Low | Owner DB password is in the backend container env (j-cicd pre_swap runs in the backend service) | j-cicd + deploy config (after D1) |
@@ -390,7 +390,8 @@ node v22.23.5 / npm 10.9.9.
 - Bumped (backend/go.mod): x/net v0.55.0 to v0.60.0, x/text v0.37.0 to v0.42.0 (v0.60.0
   requires it), x/crypto v0.52.0 to v0.57.0 and x/sync, x/sys (forced by x/net v0.60.0). x/net
   v0.60.0 requires Go 1.26, so the `go` directive went 1.25.0 to 1.26.0 and
-  `backend/Dockerfile` went `golang:1.25-alpine` to `golang:1.26-alpine`.
+  `backend/Dockerfile` went `golang:1.25-alpine` to `golang:1.26-alpine` (image build checked
+  locally; pipeline steps run on the host's Go 1.27).
 - After: `govulncheck ./...` reports 0 reachable vulnerabilities.
 - Left: x/net GO-2026-6866 and 6860 (imported, not called; fix v0.62.0 needs x/crypto v0.58.0
   and x/text v0.43.0), x/crypto GO-2026-5932 (openpgp is unused; no tagged fix). Re-check with
