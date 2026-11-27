@@ -1,7 +1,6 @@
 package models
 
 import (
-	"be-simpletracker/internal/database/repository"
 	"time"
 
 	"gorm.io/gorm"
@@ -22,9 +21,7 @@ type LoggedExercise struct {
 	LogDate       time.Time   `json:"log_date,omitempty" gorm:"-"`
 }
 
-func (l LoggedExercise) GetID() uint        { return l.ID }
-func (l LoggedExercise) TableName() string  { return "logged_exercises" }
-func (l LoggedExercise) Preloads() []string { return []string{"Exercise", "Sets"} }
+func (l LoggedExercise) TableName() string { return "logged_exercises" }
 
 // LoggedSet represents a single set of an exercise performed during a workout
 // Contains reps, weight, and weight setup information for tracking progression
@@ -46,7 +43,6 @@ type LoggedSet struct {
 	PairID *string `json:"pair_id" gorm:"type:uuid"`
 }
 
-func (l LoggedSet) GetID() uint       { return l.ID }
 func (l LoggedSet) TableName() string { return "logged_sets" }
 
 const (
@@ -109,9 +105,7 @@ type MachineSetting struct {
 	Value string `json:"value"`
 }
 
-func (e Exercise) GetID() uint        { return e.ID }
-func (e Exercise) TableName() string  { return "exercises" }
-func (e Exercise) Preloads() []string { return []string{} }
+func (e Exercise) TableName() string { return "exercises" }
 
 // Cardio represents cardiovascular exercise data for a workout session
 // Stores duration and type of cardio activity performed
@@ -123,14 +117,4 @@ type Cardio struct {
 	Notes        string `json:"notes"`
 }
 
-func (c Cardio) GetID() uint       { return c.ID }
 func (c Cardio) TableName() string { return "cardios" }
-
-// Verify interface implementations at compile time
-var (
-	_ repository.Entity      = (*LoggedExercise)(nil)
-	_ repository.Preloadable = (*LoggedExercise)(nil)
-	_ repository.Entity      = (*LoggedSet)(nil)
-	_ repository.Entity      = (*Exercise)(nil)
-	_ repository.Entity      = (*Cardio)(nil)
-)

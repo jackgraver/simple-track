@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"be-simpletracker/internal/core/workout/models"
-	dbrepo "be-simpletracker/internal/database/repository"
 
 	"gorm.io/gorm"
 )
@@ -57,8 +56,15 @@ func CreateMinimalIfMissing(ctx context.Context, log *models.WorkoutLog) error {
 }
 
 func GetByDateRange(ctx context.Context, start, end time.Time) ([]models.WorkoutLog, error) {
-	repo := dbrepo.NewGormRepository[models.WorkoutLog](conn())
-	return repo.GetByDateRange(ctx, start, end, dbrepo.WithDefaultPreloads())
+	var logs []models.WorkoutLog
+	err := conn().WithContext(ctx).
+		Preload("Cardio").
+		Preload("Exercises.Sets").
+		Preload("Exercises.Exercise").
+		Where("date >= ? AND date <= ?", start, end).
+		Order("date ASC").
+		Find(&logs).Error
+	return logs, err
 }
 
 func UpdateWorkoutPlanID(ctx context.Context, workoutLogID uint, planID *uint) error {

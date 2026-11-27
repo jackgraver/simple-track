@@ -32,3 +32,18 @@ Newest at the bottom. One entry per decision: what, why, and who/when.
 
 Agents merge A1 (dead-code cleanup) and A3 (audit doc) themselves. The owner reviews and merges
 every other lane, since nothing is reviewed again before the single deploy at D1.
+
+## 2026-11-27: A1 dead DB code removed
+
+- `internal/generics`, `internal/database/repository` and `internal/database/dumps` (a one-off
+  Python import script with hard-coded exercise IDs) are gone.
+- Their last users are plain gorm on `conn()`: `dietrepo.DaysByDateRange` / `DayByIDGeneric`,
+  `workoutrepo.GetByDateRange`. B2 swaps `conn()` for `database.From(ctx)` like everywhere else.
+- `GET /diet/plans/plan/all` (the only `?page=&orderBy=&<filter>=` endpoint) uses `utils.List[T]`, a small
+  plain-gorm helper next to `ParseQueryParams`. Field names still come only from a
+  `QueryPolicy` allowlist. B3's `database.Owned(ctx)` scope goes on the `*gorm.DB` passed in.
+- Models lost `GetID()` / `GetDate()` / `Preloads()` (they only served the repository
+  interfaces). `TableName()` stays.
+- One visible difference: `GET /diet/logs/day/:id` for a missing ID still answers 500, but the
+  message is gorm's `record not found` instead of `entity not found`.
+

@@ -1,7 +1,6 @@
 package models
 
 import (
-	"be-simpletracker/internal/database/repository"
 	"time"
 
 	"gorm.io/gorm"
@@ -20,16 +19,4 @@ type WorkoutLog struct {
 	PostMobilityChecked []string         `json:"post_mobility_checked,omitempty" gorm:"type:jsonb;serializer:json"`
 }
 
-func (w WorkoutLog) GetID() uint        { return w.ID }
-func (w WorkoutLog) TableName() string  { return "workout_logs" }
-func (w WorkoutLog) GetDate() time.Time { return w.Date }
-func (w WorkoutLog) Preloads() []string {
-	// WorkoutPlan preload handled separately since it's in different package
-	return []string{"Cardio", "Exercises.Sets", "Exercises.Exercise"}
-}
-
-// Verify interface implementations at compile time
-var (
-	_ repository.Entity      = (*WorkoutLog)(nil)
-	_ repository.Preloadable = (*WorkoutLog)(nil)
-)
+func (w WorkoutLog) TableName() string { return "workout_logs" }
