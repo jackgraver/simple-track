@@ -288,3 +288,54 @@ injected by the e2e fault hooks never reach Postgres, so e2e can't catch this; r
 
 Not done here: money's birth-year lookup still goes by the `username` gin key (C4). No BACKLOG
 entry was tagged B2 (#8 moved to H1). Prod needs nothing beyond the new image (ROLLOUT 3.3a).
+
+## 2026-11-27: HTTP hardening (lane H1)
+
+**Headers live in Caddy, CSP included.** One place for the whole site, as BACKLOG #7 suggested.
+The cost: the CSP allows the inline theme script in `frontend/index.html` by hash, and Caddy
+deploys separately from the frontend image. `frontend/src/csp.test.ts` (runs in the pipeline's
+`frontend-test`) fails when the hash and the script differ, and whoever edits the script deploys
+Caddy first (list both hashes during the switch if old builds must keep working). Rejected:
+moving the script to a file (a render-blocking request on every load) and setting the CSP in
+nginx (every `location` would have to repeat it; ARCHITECTURE.md "nginx").
+
+**CSP**: `default-src 'self'`; `script-src 'self'` + the hash; `style-src 'unsafe-inline'`
+(Vue/reka-ui/motion style attributes); `img-src 'self' data: https:` (external media covers,
+until C5 decides on #15); `font-src 'self' data:`; `object-src 'none'`; `base-uri`,
+`form-action 'self'`; `frame-ancestors 'none'`. The build has no `eval`/`new Function`.
+Lanes adding an external fetch, iframe, worker or inline script must extend it, and check the
+console on a local prod copy (ARCHITECTURE.md "Caddy").
+
+**`Referrer-Policy: same-origin`**: keeps C6's `/setup/<token>` URL (and every other path) from
+reaching other sites, and costs nothing, since the SPA and API share one origin. `no-referrer`
+would also work: tested in Chromium, it changes `Origin` to `null` only on native form POSTs,
+not on `fetch`/XHR, and every form in the app uses `@submit.prevent` + axios. A native form POST
+under `no-referrer` would get 403 from the CORS middleware, so check that before tightening it.
+
+**Body limits** (`backend/cmd/server/hardening.go`, kept out of the request middleware B2
+rewrites): one global middleware, first in the chain, with a 1 MiB default and per-route
+overrides keyed by `METHOD /gin/path` (`TestBodyLimitRoutesExist` catches a renamed route).
+Only the Renpho import gets more: 5 MiB, and at most `weight.MaxImportRows` = 10,000 days after
+same-day rows collapse (that's what the transaction writes; a tab-separated export of 10,000
+rows is under 2 MB as JSON). Caddy's `request_body max_size 6MB` is the outer guard. A route that needs
+a larger body adds a `bodyLimits` entry and, above 6 MB, raises Caddy's limit too.
+
+**`Cache-Control: no-store` on every backend response**, set by the same middleware (in the
+backend rather than Caddy so dev and e2e behave like prod). Nothing in the API wants caching.
+
+**CORS**: no default origin list. With `CORS_ORIGINS` unset the middleware still runs but allows
+no origin, so same-origin requests pass and any other `Origin` (including `null`) gets 403. That
+keeps cross-site POSTs off the `/auth` routes, which AuthMiddleware's Sec-Fetch-Site check
+doesn't cover. Production still requires `CORS_ORIGINS` (`APP_ORIGIN`); `dev/env.sh` and e2e
+set their own.
+
+## 2026-11-27: Audit writes on failed requests (owner, for C6)
+
+Since B2, everything a request writes is rolled back when the response is 4xx/5xx. An audit row
+written on a rejected request ("setup link expired", "reset refused", "disabled user tried to sign
+in") would vanish with it, which is exactly the event worth keeping. So `auth_events` (C6) are
+written outside the request transaction: on the pool (as `/auth/login` and `/auth/register`
+already run, via `OutsideRequestTx`) or in their own short transaction, never through
+`database.From(ctx)` on a path that can fail. C6 adds a test that a rejected attempt still leaves
+its event.
+

@@ -27,8 +27,8 @@ Nothing Critical was found. Prod today has one account, so most multi-user findi
 | 4 | Medium | IPv6 address rotation defeats per-IP limits and can fill the limiter (global lockout) | C6 |
 | 5 | Medium | TMDB API key can leak to users in lookup error messages | C5 |
 | 6 | Medium | Raw internal errors (SQL, constraint names) returned to clients at ~160 sites | C1–C5, B3 (lint) |
-| 7 | Medium | No security headers (CSP, frame-ancestors, nosniff, Referrer-Policy); API has none at all | new (H1 headers) |
-| 8 | Medium | No request body size limit outside `/auth` (imports, JSON) | B2 or new (H1) |
+| 7 | Medium | No security headers (CSP, frame-ancestors, nosniff, Referrer-Policy); API has none at all | H1: **done** (Caddy; deploys at D1, ROLLOUT 3.5) |
+| 8 | Medium | No request body size limit outside `/auth` (imports, JSON) | H1: **done** (1 MiB default, 5 MiB + 10k rows on import; Caddy 6MB) |
 | 9 | Medium | Frontend local storage isn't scoped to the user; logout leaves drafts, timers, last route | C6 (frontend) |
 | 10 | Medium | Tokens without `exp` never expire; 1-year session lifetime | B1: **done** (exp/iat/alg enforced; 365-day lifetime accepted by owner) |
 | 11 | Low | JWT signature compared with `!=` (not constant-time) | B1: **done** |
@@ -37,8 +37,8 @@ Nothing Critical was found. Prod today has one account, so most multi-user findi
 | 14 | Low | Usernames are case-sensitive unique (`Jack` vs `jack`); no password policy; `max=72` counts runes, bcrypt limit is bytes | C6 |
 | 15 | Low | Shared-catalog cover URLs are arbitrary image URLs shown to every user (tracking pixel) | C5 |
 | 16 | Low | `TRUSTED_PROXIES` depends on an unpinned Docker gateway IP; drift merges all clients into one IP | A2: deferred to D1 (needs a network recreate on the VPS) |
-| 17 | Low | API responses carry no `Cache-Control`; personal data may sit in browser/bfcache on shared devices | new (H1) |
-| 18 | Low | Default CORS list (used when `CORS_ORIGINS` is unset) hard-codes home LAN IPs | new (H1) |
+| 17 | Low | API responses carry no `Cache-Control`; personal data may sit in browser/bfcache on shared devices | H1: **done** |
+| 18 | Low | Default CORS list (used when `CORS_ORIGINS` is unset) hard-codes home LAN IPs | H1: **done** |
 | 19 | Low | Request logs include full query strings; login logs record attempted usernames | C6 |
 | 20 | Low | No Go vulnerability scan in CI | B3 |
 | 21 | Info | Dev stack: backend listens on 0.0.0.0, `/benchmark` unauthenticated, dev/dev login on LAN | none |
@@ -88,6 +88,11 @@ Nothing Critical was found. Prod today has one account, so most multi-user findi
   existence check by user, including `Unscoped()` ones. Add a two-user test: Alice and Bob both
   start a workout on the same date.
 - **Lane**: C2 (diet), C3 (workout); B3 should provide a `LockKey(ctx, ...)` helper.
+- **Since B2**: locks taken in a request are held until the response is sent (the request
+  transaction), not just for the insert. With the date-only key, Alice's and Bob's first gym
+  load of the same day would wait for each other's whole request. Still only the first load of
+  a day; the per-user key removes it. The diet locks key on `client_id` (random per request), so
+  users never share one.
 
 ### 3. Medium: login lockout of a known username (exploitable now)
 
@@ -172,6 +177,10 @@ Nothing Critical was found. Prod today has one account, so most multi-user findi
   local prod copy first.
 - **Lane**: new (H1 "HTTP hardening": headers, body limits, cache headers; small, can run any
   time; must land before C6's setup page ships).
+- **Done (H1)**: `deploy/Caddyfile` sets CSP (inline theme script by hash,
+  `frontend/src/csp.test.ts` keeps them in sync), `X-Frame-Options`, nosniff, `Referrer-Policy:
+  same-origin`, `Permissions-Policy`, `-Server`. Checked on a local prod copy: no CSP violations on any page.
+  Reaches prod via the Caddy j-cicd project at D1, after the app (ROLLOUT 3.5).
 
 ### 8. Medium: no request body size limit outside `/auth`
 
@@ -186,6 +195,9 @@ Nothing Critical was found. Prod today has one account, so most multi-user findi
   on the import route (e.g. 5 MiB, plus a cap on row count), and `request_body { max_size … }`
   under `handle_path /api/*` in Caddy as the outer guard.
 - **Lane**: new (H1), or B2 since it adds request middleware anyway.
+- **Done (H1)**: `cmd/server/hardening.go`: 1 MiB default, per-route `bodyLimits` (5 MiB weight
+  import), 413 on `Content-Length`; 10,000 days per import (`weight.MaxImportRows`); Caddy
+  `request_body max_size 6MB` on `/api`.
 
 ### 9. Medium: frontend storage isn't per-user
 
@@ -306,6 +318,8 @@ Nothing Critical was found. Prod today has one account, so most multi-user findi
 - **Fix**: `Cache-Control: no-store` (or `private, no-cache`) on every `/api` response, in the
   backend or in Caddy's `/api` handler.
 - **Lane**: new (H1).
+- **Done (H1)**: `Cache-Control: no-store` on every backend response, set in
+  `cmd/server/hardening.go`.
 
 ### 18. Low: default CORS origins include home LAN IPs
 
@@ -317,6 +331,8 @@ Nothing Critical was found. Prod today has one account, so most multi-user findi
   is unused in dev too.
 - **Fix**: default to no extra origins (same-origin only) and drop `ExposeHeaders`.
 - **Lane**: new (H1).
+- **Done (H1)**: no default list; with `CORS_ORIGINS` unset only same-origin requests pass (other
+  origins get 403). `ExposeHeaders` removed.
 
 ### 19. Low: logs carry search terms and attempted usernames
 

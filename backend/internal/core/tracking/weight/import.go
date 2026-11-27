@@ -55,6 +55,12 @@ func isBlank(s string) bool {
 	return s == "" || s == "--"
 }
 
+// MaxImportRows caps the days in one import (BACKLOG #8), so one request can't hold a
+// transaction open for an unbounded number of upserts: about 27 years of history. Rows on the
+// same day collapse first, so frequent weigh-ins don't count against it; the route's body limit
+// (cmd/server bodyLimits) bounds the raw rows.
+const MaxImportRows = 10000
+
 // ParseRenphoCSV parses a Renpho CSV export (comma or tab separated, as copied to
 // the clipboard). Rows sharing a date collapse to the latest measurement.
 func ParseRenphoCSV(text string) ([]BodyWeightLog, error) {
@@ -147,6 +153,9 @@ func ParseRenphoCSV(text string) ([]BodyWeightLog, error) {
 	}
 	if len(order) == 0 {
 		return nil, errors.New("no data rows found")
+	}
+	if len(order) > MaxImportRows {
+		return nil, fmt.Errorf("too many days (%d); import at most %d at a time", len(order), MaxImportRows)
 	}
 	out := make([]BodyWeightLog, 0, len(order))
 	for _, k := range order {

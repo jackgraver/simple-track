@@ -47,19 +47,10 @@ VPS wiring (one-time setup):
   `files: [{name: Caddyfile, path: /opt/simple-track/Caddyfile, mode: "0644"}]`,
   `systemd: {unit: caddy.service}` and a `check` that curls the site.
 
-Current config:
-
-```caddy
-st.jackgraver.ca {
-	encode zstd gzip
-	handle_path /api/* {
-		reverse_proxy 127.0.0.1:8080
-	}
-	handle {
-		reverse_proxy 127.0.0.1:3000
-	}
-}
-```
+Config: `deploy/Caddyfile` (not copied here, so it can't drift). In outline: `encode zstd gzip`,
+a site-wide `header` block, `handle_path /api/*` with a `request_body` limit -> backend, and
+`handle` -> frontend. Until the multi-user project's D1 deploy, production still runs the
+pre-H1 file (no `header` or `request_body`).
 
 - **TLS:** automatic certificates for `st.jackgraver.ca`. The backend relies on HTTPS
   (`AUTH_COOKIE_SECURE=true`, and production CORS origins must be HTTPS).
@@ -70,6 +61,21 @@ st.jackgraver.ca {
   The Vite dev proxy does the same rewrite, so dev and prod behave alike.
 - **`/version.json`** goes to nginx and is served unauthenticated; j-cicd's post-deploy check reads it.
 - No CDN sits in front of Caddy.
+- **Security headers** (whole site, set only here; nginx adds just HSTS and cache headers):
+  - `Content-Security-Policy`: scripts and everything else from `'self'` only. The one inline
+    script in `frontend/index.html` (theme before first paint) is allowed by its `sha256` hash, so
+    editing it means updating the hash in the Caddyfile and deploying Caddy first;
+    `frontend/src/csp.test.ts` fails when they differ. `style-src 'unsafe-inline'` because Vue,
+    reka-ui and motion set style attributes. `img-src https:` for media cover images,
+    `data:` for Vite-inlined fonts. `frame-ancestors 'none'`.
+  - `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Permissions-Policy` denying
+    camera, microphone, geolocation, payment and USB, and `-Server` (no version banner).
+  - `Referrer-Policy: same-origin`: no referrer to other sites (so C6's `/setup/<token>` URL
+    can't leak), the full one within the site. If this is ever tightened to `no-referrer`, note
+    that browsers then send `Origin: null` on native form POSTs (not on `fetch`/XHR), which the
+    backend's CORS middleware rejects with 403. The SPA submits every form through axios today.
+- **Request body limit:** `request_body max_size 6MB` on `/api` is the outer guard. The backend
+  enforces the real per-route limits (below) and Caddy's must stay at or above the largest.
 
 ### Client IPs and `TRUSTED_PROXIES`
 
@@ -121,6 +127,14 @@ container is replaced).
   On SIGTERM it stops accepting connections, lets in-flight requests finish for up to 25 s,
   then closes the DB pool. `stop_grace_period: 30s` on the backend service gives it that time
   (Docker's default is 10 s).
+- **Hardening middleware** (`cmd/server/hardening.go`, first in the chain): every response gets
+  `Cache-Control: no-store`; request bodies are capped at 1 MiB, with larger limits per route
+  in `bodyLimits` (5 MiB for the Renpho weight import, which also caps rows). Over the limit:
+  413 when `Content-Length` says so, otherwise the read fails and binding returns 400.
+- **CORS** (`corsMiddleware`, same file) allows only the origins in `CORS_ORIGINS` (required in
+  production: `APP_ORIGIN`). There's no default: unset means same-origin only, and requests with
+  any other `Origin` get 403. The SPA always calls the API on its own origin (Caddy in prod, the
+  Vite proxy in dev and for `dev phone`).
 - **Connection pool** (`internal/database/pool.go`): max 20 open, 10 idle, 30 min lifetime,
   5 min idle time. Override with `DB_MAX_OPEN_CONNS`, `DB_MAX_IDLE_CONNS`,
   `DB_CONN_MAX_LIFETIME`, `DB_CONN_MAX_IDLE_TIME`.
