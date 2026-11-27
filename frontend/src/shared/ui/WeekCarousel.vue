@@ -45,14 +45,17 @@ const step = () => (trackEl()?.offsetWidth ?? 0) + GAP_PX;
 // spring back to 0. Works the same after an arrow, a swipe, or a tap mid-slide.
 const x = useMotionValue(0);
 let settle: ReturnType<typeof animate> | null = null;
-const slideTo0 = () => {
+// The finger's speed at release (px/s), carried into the spring so a flick keeps its momentum.
+let releaseVelocity = 0;
+const slideTo0 = (velocity = 0) => {
     settle?.stop();
-    settle = animate(x, 0, carouselSpring());
+    settle = animate(x, 0, carouselSpring(velocity));
 };
 watch(weekKey, (next, prev) => {
     if (!next || !prev || next === prev) return;
     x.jump(x.get() + (next > prev ? 1 : -1) * step());
-    slideTo0();
+    slideTo0(releaseVelocity);
+    releaseVelocity = 0;
 });
 
 // The outline follows the selected tile's layout box (offsets ignore transforms, so it targets
@@ -90,19 +93,22 @@ let dragged = false;
 const onDragStart = () => {
     settle?.stop();
     dragged = true;
+    stopMirror?.();
     stopMirror = x.on("change", (v) => outlineShift.set(v));
 };
 const onDragEnd = (_e: PointerEvent, info: PanInfo) => {
     setTimeout(() => (dragged = false));
     stopMirror?.();
-    animate(outlineShift, 0, carouselSpring());
+    stopMirror = null;
+    animate(outlineShift, 0, carouselSpring(info.velocity.x));
     const far = Math.abs(info.offset.x) > step() * carousel.swipeDistance;
     const fast = Math.abs(info.velocity.x) > carousel.swipeVelocity;
     const dir = info.offset.x < 0 ? "next" : "prev";
     if (!(far || fast) || !(dir === "next" ? props.nextDays : props.prevDays)?.length) {
-        slideTo0();
+        slideTo0(info.velocity.x);
         return;
     }
+    releaseVelocity = info.velocity.x;
     const from = weekKey.value;
     if (dir === "next") emit("next");
     else emit("prev");

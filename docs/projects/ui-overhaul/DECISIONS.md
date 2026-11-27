@@ -198,7 +198,7 @@ Worked out with the owner. Per exercise (Edit dialog toggle, `exercises.unilater
 
 ## 2026-11-26: Gym home: week strip is the only day picker, and it slides
 - `/gym` drops the global date bar (`meta.dated`) and the desktop "Gym" title bar; the week strip is the day picker, 40px (`lg:mt-10`) from the top on desktop. Gym sub-pages that read a day (weight, steps, cardio, mobility) set `dated: true` themselves.
-- Week arrows land on Sunday of the new week (today when it's the current week). The weeks slide as one continuous row (`duration-350`, picked by the owner from 250-800 with a debug picker), and one selected-day outline outside the sliding weeks glides to the new column over the same 350ms.
+- Week arrows land on Sunday of the new week (today when it's the current week). The weeks slide as one continuous row (a 0.35s spring, picked by the owner from 250-800ms with a debug picker), and one selected-day outline outside the sliding weeks glides to the new column over the same spring.
 - The Today card trails the strip: it keeps the shown day until the picked day has loaded (`ensureQueryData`), so it never empties mid-switch (that flashed and shifted the page).
 
 ## 2026-11-26: motion-v for gesture and layout motion; WeekCarousel primitive

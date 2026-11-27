@@ -34,7 +34,7 @@ export const reduceMotion = (): boolean => reducedQuery?.matches ?? false;
 const spring = (duration: number, bounce: number, velocity = 0): Transition =>
     reduceMotion() ? { duration: 0 } : { type: "spring", visualDuration: duration, bounce, velocity };
 
-export const carouselSpring = (): Transition => spring(carousel.duration, carousel.bounce);
+export const carouselSpring = (velocity = 0): Transition => spring(carousel.duration, carousel.bounce, velocity);
 
 /** Mobile nav drawer: the slide in/out (carrying a release's velocity, px/s), and when a released
  * swipe opens it: a fling faster than `flingVelocity` px/s goes its way, otherwise it opens if more
