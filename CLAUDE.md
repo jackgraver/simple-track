@@ -39,6 +39,7 @@ Never run bare `./bin/dev` (it opens an interactive TUI). Use the background com
 ./bin/dev logs backend 50  # recent logs (backend, frontend, postgres, pgweb, devuser)
 ./bin/dev api /auth/me     # curl the backend as the dev user (extra args go to curl)
 ./bin/dev stop             # stop when done, if you started it
+./bin/dev phone            # serve this checkout to the phone at a fixed LAN URL (see below)
 ```
 
 - The backend (air) and frontend (vite) hot-reload, so there's no need to restart after edits.
@@ -49,6 +50,13 @@ Never run bare `./bin/dev` (it opens an interactive TUI). Use the background com
 - **e2e:** `./bin/dev e2e` (args go to `playwright test`, e.g. `--grep @smoke` or `tests/gym`). It is
   self-contained (own Postgres container, DBs and backends), so it doesn't need `dev start`. How to
   run, write and debug specs: `e2e/README.md`.
+- **Phone (home LAN):** when asked to make a checkout phone accessible / show it on the phone, run
+  `./bin/dev phone` from that checkout and give the user the `phone` URL it prints. It starts the
+  stack if needed and points a shared proxy at it: `http://<host>.local:2999` (`DEV_PHONE_PORT`)
+  is always the same origin, so one home-screen PWA serves whichever checkout ran it last (the
+  `x-dev-slot` response header says which). `dev phone status` shows the current target. The
+  proxy is shared by every checkout, so only run `dev phone off` when the user asks. All slots share
+  one dev `JWT_SECRET` (in the dev state dir), so the login survives switching.
 - `dev api` uses the `DEV_AUTH_TOKEN` cookie bypass from `backend/.env` (`ALLOW_BYPASS` is
   forced on by `dev/env.sh`; the backend rejects both in production).
 - A fresh worktree starts with an empty DB: the one-shot `migrate` service applies every

@@ -8,7 +8,7 @@
 # by the same path; entries for deleted worktrees are pruned automatically.
 
 DEV_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-DEV_STATE="${XDG_STATE_HOME:-$HOME/.local/state}/simple-track-dev"
+export DEV_STATE="${XDG_STATE_HOME:-$HOME/.local/state}/simple-track-dev"
 mkdir -p "$DEV_STATE" "${XDG_CONFIG_HOME:-$HOME/.config}/process-compose"  # latter silences a process-compose debug warning
 
 _dev_slot() {
@@ -51,6 +51,8 @@ export DEV_PGWEB_PORT=$((8081 + _off))
 export DEV_PG_PORT=$((5432 + _off))
 export DEV_FRONTEND_URL="http://localhost:$DEV_FRONTEND_PORT"
 export DEV_BACKEND_URL="http://127.0.0.1:$DEV_BACKEND_PORT"
+# Shared by every slot: `dev phone` serves whichever checkout last ran it on this fixed port.
+export DEV_PHONE_PORT="${DEV_PHONE_PORT:-2999}"
 
 # Separate docker compose project => separate postgres container + volume.
 if [[ "$DEV_SLOT" == 0 ]]; then
@@ -70,15 +72,23 @@ export LISTEN_ADDR="0.0.0.0:$DEV_BACKEND_PORT"
 export DATABASE_URL="postgresql://postgres:postgres@localhost:$DEV_PG_PORT/simpletracker_dev?sslmode=disable"
 # Also allow this machine's LAN addresses (phone testing via http://<lan-ip>:<port>).
 # Override with DEV_LAN_HOST="ip1 ip2" (space separated); default is every private IPv4.
-CORS_ORIGINS="http://localhost:$DEV_FRONTEND_PORT,http://127.0.0.1:$DEV_FRONTEND_PORT"
+# The phone proxy's origins (http://<host>.local:$DEV_PHONE_PORT and the LAN IPs) are allowed too.
+CORS_ORIGINS="http://localhost:$DEV_FRONTEND_PORT,http://127.0.0.1:$DEV_FRONTEND_PORT,http://$(hostname).local:$DEV_PHONE_PORT"
 for _ip in ${DEV_LAN_HOST:-$(hostname -I 2>/dev/null)}; do
   case "$_ip" in
-    10.*|192.168.*|172.1[6-9].*|172.2?.*|172.3[01].*) CORS_ORIGINS="$CORS_ORIGINS,http://$_ip:$DEV_FRONTEND_PORT" ;;
+    10.*|192.168.*|172.1[6-9].*|172.2?.*|172.3[01].*)
+      CORS_ORIGINS="$CORS_ORIGINS,http://$_ip:$DEV_FRONTEND_PORT,http://$_ip:$DEV_PHONE_PORT" ;;
   esac
 done
 unset _ip
 export CORS_ORIGINS
 export ALLOW_BYPASS=true
+# One JWT secret for every slot, so a login survives `dev phone` switching checkouts behind the
+# same origin (each backend/.env has its own random one, which this overrides).
+_jwt="$DEV_STATE/jwt-secret"
+[[ -s "$_jwt" ]] || (umask 077 && openssl rand -hex 32 > "$_jwt")
+export JWT_SECRET="$(cat "$_jwt")"
+unset _jwt
 export DEV_AUTH_USER=dev
 
 # Frontend: vite proxies /api to this slot's backend.

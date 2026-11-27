@@ -1,0 +1,71 @@
+#!/usr/bin/env bash
+#MISE description="Serve this checkout to a phone on the home LAN at a fixed URL (phone [on|off|status])"
+# One fixed origin (http://<host>.local:$DEV_PHONE_PORT) for every checkout, so a single
+# home-screen PWA works no matter which worktree is being tested. `dev phone` starts this
+# checkout's stack if needed and points the shared proxy (dev/phone-proxy.mjs) at it.
+set -euo pipefail
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+: "${DEV_STATE:?run via ./bin/dev phone}"
+target_file="$DEV_STATE/phone-target"
+pid_file="$DEV_STATE/phone-proxy.pid"
+log_file="$DEV_STATE/phone-proxy.log"
+
+proxy_pid() {
+  local pid
+  pid="$(cat "$pid_file" 2>/dev/null)" || return 1
+  [[ -n "$pid" ]] && kill -0 "$pid" 2>/dev/null && grep -q phone-proxy "/proc/$pid/cmdline" 2>/dev/null && echo "$pid"
+}
+
+urls() {
+  echo "phone     http://$(hostname).local:$DEV_PHONE_PORT   (install the PWA from this one)"
+  # The LAN address is the one on the default route (hostname -I also lists docker bridges).
+  local ip
+  for ip in ${DEV_LAN_HOST:-$(ip -4 route get 1.1.1.1 2>/dev/null | sed -n 's/.* src \([0-9.]*\).*/\1/p')}; do
+    echo "          http://$ip:$DEV_PHONE_PORT   (fallback if .local doesn't resolve)"
+  done
+}
+
+show_target() {
+  if [[ -f "$target_file" ]]; then
+    read -r slot port path < "$target_file"
+    echo "serving   slot $slot ($path), frontend :$port"
+  else
+    echo "serving   nothing selected"
+  fi
+}
+
+case "${1:-on}" in
+  on)
+    "$ROOT/bin/dev" start >/dev/null
+    prev=""
+    [[ -f "$target_file" ]] && read -r prev _ _ < "$target_file"
+    echo "$DEV_SLOT $DEV_FRONTEND_PORT $ROOT" > "$target_file.tmp" && mv "$target_file.tmp" "$target_file"
+    if ! proxy_pid >/dev/null; then
+      # setsid: outlive this shell. DEV_PHONE_* reach the proxy through the environment.
+      DEV_PHONE_TARGET_FILE="$target_file" setsid node "$ROOT/dev/phone-proxy.mjs" >> "$log_file" 2>&1 < /dev/null &
+      echo $! > "$pid_file"
+      for _ in $(seq 1 25); do
+        curl -s -o /dev/null "http://127.0.0.1:$DEV_PHONE_PORT/" && break
+        sleep 0.2
+      done
+      proxy_pid >/dev/null || { echo "dev phone: proxy failed to start; see $log_file" >&2; tail -5 "$log_file" >&2; exit 1; }
+    fi
+    [[ -n "$prev" && "$prev" != "$DEV_SLOT" ]] && echo "switched  slot $prev -> $DEV_SLOT"
+    show_target
+    urls
+    echo "login     dev / dev"
+    ;;
+  off)
+    if pid="$(proxy_pid)"; then kill "$pid"; echo "dev phone: proxy stopped"; else echo "dev phone: proxy not running"; fi
+    rm -f "$pid_file" "$target_file"
+    ;;
+  status)
+    if pid="$(proxy_pid)"; then echo "proxy     running (pid $pid)"; else echo "proxy     not running"; fi
+    show_target
+    urls
+    ;;
+  *)
+    echo "usage: dev phone [on|off|status]" >&2
+    exit 1
+    ;;
+esac
