@@ -98,7 +98,7 @@ Depends on: none. Frontend only.
 
 ### S3 Lookup errors (`mu/s3-lookup-errors`)
 Depends on: B2. Files: `media/lookup/`, `respondLookupError`.
-- [ ] #5 Fixed client messages from media lookups, no upstream body echo, API key redacted in logs.
+- [x] #5 Fixed client messages from media lookups, no upstream body echo, API key redacted in logs.
 
 ### S4 Dependency audit (`mu/s4-dep-audit`)
 Depends on: none.
