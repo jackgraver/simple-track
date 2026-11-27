@@ -352,3 +352,12 @@ gets one explicit, greppable way to say so:
 - C6 builds it (first user) with tests: runs after commit, after rollback and after a panic;
   sees the identity; failure doesn't change the response; a rejected setup attempt still leaves
   its `auth_events` row.
+
+## 2026-11-27: S lanes (owner)
+
+Small BACKLOG fixes that sit outside B2's and H1's files run as **S lanes** (TASKS "S lanes"):
+one Sonnet subagent per lane, each in its own worktree from `origin/proj/multi-user`. An Opus
+session reviews each diff as a security reviewer, fixes it up on the same branch, runs
+`dev test` / `dev check`, ticks BACKLOG and TASKS, and squash-merges the PR into
+`proj/multi-user` once checks pass, one at a time. The owner doesn't review these PRs
+individually. C5 and C6 skip BACKLOG entries an S lane has ticked.

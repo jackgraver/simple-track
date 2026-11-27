@@ -79,6 +79,32 @@ Touches Caddy: read `docs/ARCHITECTURE.md` and `j-cicd guide` first.
 - Done when: a test covers body limits and `Cache-Control`; the CSP produces no console
   violations on any page.
 
+## S lanes: quick security fixes (parallel, any time after B2)
+
+Small BACKLOG fixes outside B2's and H1's files. A Sonnet subagent does each lane in its own
+worktree; an Opus session reviews, fixes up and squash-merges the PR into `proj/multi-user`
+(DECISIONS "S lanes"). C5 and C6 skip BACKLOG entries an S lane has ticked.
+
+### S1 Login protection (`mu/s1-login-protection`)
+Depends on: none. Files: `auth/controller/login_protection.go` + tests, minimal `auth_route.go`.
+- [ ] #3 Strict counter per (ip, username); looser username-wide counter with growing delay, no hard block.
+- [ ] #4 IPv6 clients keyed by /64; evict oldest entries instead of rejecting every login when full.
+- [ ] #19 (login part) Don't log attempted usernames that don't exist.
+
+### S2 Frontend storage per user (`mu/s2-frontend-storage`)
+Depends on: none. Frontend only.
+- [ ] #9 Persisted keys namespaced by user ID; `clearUserStorage()` on logout and on the
+      session-expired/401 path, also clearing the `st_last_route` cookie.
+
+### S3 Lookup errors (`mu/s3-lookup-errors`)
+Depends on: B2. Files: `media/lookup/`, `respondLookupError`.
+- [ ] #5 Fixed client messages from media lookups, no upstream body echo, API key redacted in logs.
+
+### S4 Dependency audit (`mu/s4-dep-audit`)
+Depends on: none.
+- [ ] #20 (manual run) `govulncheck` in `backend/`, `npm audit --omit=dev` in `frontend/` and
+      `e2e/`; bump only what's affected; results recorded under #20. The pipeline step stays with B3.
+
 ## Phase B: foundation (sequential, one agent at a time)
 
 ### B1 User identity on the request
@@ -165,7 +191,7 @@ Depends on: B3
 Depends on: B3
 - [ ] Split media_items into a shared catalog and per-user `user_media` (status, rating, notes, dates).
 - [ ] Frontend follows the API change.
-- [ ] BACKLOG #5 (TMDB key in error messages), #6, #15 (catalog cover URLs).
+- [ ] BACKLOG #5 (TMDB key in error messages), #6, #15 (catalog cover URLs). Skip #5 if S3 ticked it.
 
 ### C6 Accounts and setup links
 Depends on: B1, B2, H1 (all merged). Runs alongside B3 and the S lanes.
