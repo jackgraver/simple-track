@@ -54,7 +54,8 @@ function isAuthCredentialRequest(url: string): boolean {
     return (
         url.includes("/auth/me") ||
         url.includes("/auth/login") ||
-        url.includes("/auth/register")
+        url.includes("/auth/register") ||
+        url.includes("/auth/setup")
     );
 }
 

@@ -1,6 +1,6 @@
 import { createRouter, createWebHistory, START_LOCATION } from "vue-router";
 import type { RouteRecordRaw } from "vue-router";
-import { authStatus } from "~/composables/auth/session";
+import { authStatus, isAdmin } from "~/composables/auth/session";
 import { resolveAuthSession } from "~/composables/auth/useAuth";
 import { isExpiredLoggingResume, loadLastRoute, saveLastRoute } from "~/utils/lastRoute";
 import { dietQueries } from "~/api/diet/queries";
@@ -22,6 +22,10 @@ declare module "vue-router" {
         focus?: boolean;
         /** Route name of this page's parent. Header Back goes there instead of through history. */
         backTo?: string;
+        /** Reachable signed out (the setup link page). */
+        public?: boolean;
+        /** Admin only; others are sent home (the API refuses them anyway). */
+        admin?: boolean;
         /** Multi-column workspace: wider desktop content column (`spacing-content-wide`). */
         wide?: boolean;
         /**
@@ -241,6 +245,25 @@ const routes: RouteRecordRaw[] = [
         meta: { focus: true },
     },
     {
+        // One-time link to set or reset a password. Public; the token stays out of saved routes.
+        path: "/setup/:token",
+        name: "setup",
+        component: () => import("~/pages/setup/index.vue"),
+        meta: { focus: true, public: true },
+    },
+    {
+        path: "/settings/account",
+        name: "settings-account",
+        component: () => import("~/pages/settings/account/index.vue"),
+        meta: { breadcrumb: "Account" },
+    },
+    {
+        path: "/settings/users",
+        name: "settings-users",
+        component: () => import("~/pages/settings/users/index.vue"),
+        meta: { breadcrumb: "Users", admin: true },
+    },
+    {
         path: "/settings/profile",
         name: "settings-profile",
         component: () => import("~/pages/settings/profile/index.vue"),
@@ -264,7 +287,7 @@ function resolveSavedRoute(): string | null {
     const entry = loadLastRoute();
     if (!entry) return null;
     const target = router.resolve(entry.path);
-    if (!target.name || target.name === "not-found" || target.name === "signin" || target.name === "launch") {
+    if (!target.name || target.meta.public || target.name === "not-found" || target.name === "signin" || target.name === "launch") {
         return null;
     }
     if (isExpiredLoggingResume(entry)) return router.resolve({ name: "gym" }).fullPath;
@@ -287,6 +310,7 @@ router.beforeEach(async (to, from) => {
         const saved = resolveSavedRoute();
         if (saved && saved !== to.fullPath) return saved;
     }
+    if (to.meta.public) return true;
     if (to.name === "signin") {
         if (authStatus.value === "unknown") await resolveAuthSession();
         if (authStatus.value === "authenticated") {
@@ -298,6 +322,7 @@ router.beforeEach(async (to, from) => {
     if (authStatus.value !== "authenticated") {
         return { name: "signin", query: { redirect: to.fullPath } };
     }
+    if (to.meta.admin && !isAdmin.value) return { name: "gym" };
     // App start: begin the landing page's queries while its component chunk loads (redirects are
     // already applied here, so `/` warms the gym day and `/media` warms nothing day-related).
     if (from === START_LOCATION) prefetchRoute(queryClient, to);
@@ -310,6 +335,6 @@ router.beforeEach(async (to, from) => {
 router.beforeResolve((to, from) => warmNavigation(queryClient, to, from));
 
 router.afterEach((to, _from, failure) => {
-    if (failure || to.name === "signin" || to.name === "not-found" || to.name === "launch") return;
+    if (failure || to.meta.public || to.name === "signin" || to.name === "not-found" || to.name === "launch") return;
     saveLastRoute(to.fullPath);
 });

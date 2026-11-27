@@ -206,7 +206,7 @@ PRs have merged into the base; then rebase. B3 also adds migrations: renumber on
       `database.Always`; admin view. RLS on C6's new tables (policies are C6's call, recorded in DECISIONS).
 - [x] Signed-in users can change their own password (bumps `token_version`, keeps the current session).
 - [x] Setup endpoint: validate token, set password, sign in; login protection applies.
-- [ ] Frontend: admin section in settings (create user, copy link), `/setup/:token` page.
+- [x] Frontend: admin section in settings (create user, copy link), `/setup/:token` page.
       Follow `docs/design/` and the `ui` skill.
 - [ ] BACKLOG #3 (login lockout of a known username), #4 (IPv6 /64 keying, limiter eviction),
       #9 (per-user frontend storage, cleared on logout and 401), #14 (username/password rules),
