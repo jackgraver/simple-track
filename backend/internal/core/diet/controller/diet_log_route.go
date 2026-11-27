@@ -103,7 +103,7 @@ func GetMealPlanDay(c *gin.Context) {
 }
 
 func GetGoalsToday(c *gin.Context) {
-	goals, err := services.GoalsToday()
+	goals, err := services.GoalsToday(c.Request.Context())
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

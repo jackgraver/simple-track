@@ -29,7 +29,7 @@ var requestPaths = []string{"internal/core/", "internal/utils/"}
 
 // Modules still on the package-global conn(); the next PRs of lane B2 convert them and shrink
 // this list to nothing.
-var notYetConverted = []string{"internal/core/diet/", "internal/core/workout/"}
+var notYetConverted = []string{"internal/core/workout/"}
 
 // Allowed exceptions, each with its reason.
 var requestPathAllowed = map[string][]string{

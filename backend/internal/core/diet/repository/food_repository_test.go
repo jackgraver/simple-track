@@ -4,16 +4,19 @@ import (
 	"be-simpletracker/internal/core/diet/models"
 	dietrepo "be-simpletracker/internal/core/diet/repository"
 	"be-simpletracker/internal/core/diet/testutil"
+	"be-simpletracker/internal/database"
+	"context"
 	"testing"
 )
 
 func TestEnrichFoodVariants_nilSafe(t *testing.T) {
-	testutil.SetupTestDB(t)
-	dietrepo.EnrichFoodVariants(nil)
+	ctx := database.WithDB(context.Background(), testutil.SetupTestDB(t))
+	dietrepo.EnrichFoodVariants(ctx, nil)
 }
 
 func TestFoodCreateAndFoodsAll_excludesQuickEntry(t *testing.T) {
 	db := testutil.SetupTestDB(t)
+	ctx := database.WithDB(context.Background(), db)
 	f := testutil.DefaultMacros()
 	f.QuickEntry = false
 	testutil.SeedFood(t, db, "Chicken", f)
@@ -21,7 +24,7 @@ func TestFoodCreateAndFoodsAll_excludesQuickEntry(t *testing.T) {
 	q.QuickEntry = true
 	testutil.SeedFood(t, db, "Quick Snack [ql-1]", q)
 
-	foods, err := dietrepo.FoodsAll(nil)
+	foods, err := dietrepo.FoodsAll(ctx, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -32,6 +35,7 @@ func TestFoodCreateAndFoodsAll_excludesQuickEntry(t *testing.T) {
 
 func TestFoodCreateWithOptionalRelated_linksVariantGroup(t *testing.T) {
 	db := testutil.SetupTestDB(t)
+	ctx := database.WithDB(context.Background(), db)
 	base := testutil.SeedFood(t, db, "Rice White", testutil.DefaultMacros())
 	related := base.ID
 	newFood := &models.Food{
@@ -41,27 +45,27 @@ func TestFoodCreateWithOptionalRelated_linksVariantGroup(t *testing.T) {
 		Calories:      110,
 		Protein:       3,
 	}
-	if err := dietrepo.FoodCreateWithOptionalRelated(newFood, &related); err != nil {
+	if err := dietrepo.FoodCreateWithOptionalRelated(ctx, newFood, &related); err != nil {
 		t.Fatal(err)
 	}
 	if newFood.VariantGroupID == nil {
 		t.Fatal("expected variant group")
 	}
-	dietrepo.EnrichFoodVariants(newFood)
+	dietrepo.EnrichFoodVariants(ctx, newFood)
 	if len(newFood.Variants) != 1 || newFood.Variants[0].ID != base.ID {
 		t.Fatalf("variants %+v", newFood.Variants)
 	}
 }
 
 func TestFoodCreateWithOptionalRelated_noRelated(t *testing.T) {
-	testutil.SetupTestDB(t)
+	ctx := database.WithDB(context.Background(), testutil.SetupTestDB(t))
 	f := &models.Food{
 		Name:          "Oats",
 		ServingType:   "g",
 		ServingAmount: 40,
 		Calories:      150,
 	}
-	if err := dietrepo.FoodCreateWithOptionalRelated(f, nil); err != nil {
+	if err := dietrepo.FoodCreateWithOptionalRelated(ctx, f, nil); err != nil {
 		t.Fatal(err)
 	}
 	if f.ID == 0 {
@@ -71,6 +75,7 @@ func TestFoodCreateWithOptionalRelated_noRelated(t *testing.T) {
 
 func TestFoodsAllWithVariantSiblings_andExclude(t *testing.T) {
 	db := testutil.SetupTestDB(t)
+	ctx := database.WithDB(context.Background(), db)
 	a := testutil.SeedFood(t, db, "Bread A", testutil.DefaultMacros())
 	gid := uint(7)
 	if err := db.Model(&a).Update("variant_group_id", gid).Error; err != nil {
@@ -80,7 +85,7 @@ func TestFoodsAllWithVariantSiblings_andExclude(t *testing.T) {
 	if err := db.Model(&b).Update("variant_group_id", gid).Error; err != nil {
 		t.Fatal(err)
 	}
-	rows, err := dietrepo.FoodsAllWithVariantSiblings([]uint{a.ID})
+	rows, err := dietrepo.FoodsAllWithVariantSiblings(ctx, []uint{a.ID})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -94,6 +99,7 @@ func TestFoodsAllWithVariantSiblings_andExclude(t *testing.T) {
 
 func TestCompositeFoodCreateAndByID(t *testing.T) {
 	db := testutil.SetupTestDB(t)
+	ctx := database.WithDB(context.Background(), db)
 	f := testutil.SeedFood(t, db, "Egg", testutil.DefaultMacros())
 	cf := &models.CompositeFood{
 		Name: "Scramble",
@@ -102,15 +108,15 @@ func TestCompositeFoodCreateAndByID(t *testing.T) {
 			Amount: 2,
 		}},
 	}
-	id, err := dietrepo.CompositeFoodCreate(cf)
+	id, err := dietrepo.CompositeFoodCreate(ctx, cf)
 	if err != nil {
 		t.Fatal(err)
 	}
-	all, err := dietrepo.CompositeFoodsAll()
+	all, err := dietrepo.CompositeFoodsAll(ctx)
 	if err != nil || len(all) != 1 {
 		t.Fatalf("all %+v err %v", all, err)
 	}
-	loaded, err := dietrepo.CompositeFoodByID(id)
+	loaded, err := dietrepo.CompositeFoodByID(ctx, id)
 	if err != nil || loaded.Name != "Scramble" {
 		t.Fatalf("loaded %+v err %v", loaded, err)
 	}
@@ -118,8 +124,9 @@ func TestCompositeFoodCreateAndByID(t *testing.T) {
 
 func TestUpdatePlanMacros(t *testing.T) {
 	db := testutil.SetupTestDB(t)
+	ctx := database.WithDB(context.Background(), db)
 	p := testutil.SeedPlan(t, db, "Cut")
-	updated, err := dietrepo.UpdatePlanMacros(p.ID, 1800, 140, 25, 150, 55)
+	updated, err := dietrepo.UpdatePlanMacros(ctx, p.ID, 1800, 140, 25, 150, 55)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -129,8 +136,8 @@ func TestUpdatePlanMacros(t *testing.T) {
 }
 
 func TestUpdatePlanMacros_notFound(t *testing.T) {
-	testutil.SetupTestDB(t)
-	_, err := dietrepo.UpdatePlanMacros(9999, 1, 1, 1, 1, 1)
+	ctx := database.WithDB(context.Background(), testutil.SetupTestDB(t))
+	_, err := dietrepo.UpdatePlanMacros(ctx, 9999, 1, 1, 1, 1, 1)
 	if err == nil {
 		t.Fatal("expected error")
 	}

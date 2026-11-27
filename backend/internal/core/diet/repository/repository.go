@@ -2,6 +2,7 @@ package dietrepo
 
 import (
 	"be-simpletracker/internal/clock"
+	"be-simpletracker/internal/database"
 	"context"
 	"errors"
 	"fmt"
@@ -15,7 +16,7 @@ import (
 	"gorm.io/gorm/clause"
 )
 
-func EnrichFoodVariants(f *models.Food) {
+func EnrichFoodVariants(ctx context.Context, f *models.Food) {
 	if f == nil {
 		return
 	}
@@ -24,7 +25,7 @@ func EnrichFoodVariants(f *models.Food) {
 		return
 	}
 	var sibs []models.Food
-	if err := conn().Where("variant_group_id = ? AND id != ?", *f.VariantGroupID, f.ID).Order("name ASC").Find(&sibs).Error; err != nil {
+	if err := database.From(ctx).Where("variant_group_id = ? AND id != ?", *f.VariantGroupID, f.ID).Order("name ASC").Find(&sibs).Error; err != nil {
 		return
 	}
 	for i := range sibs {
@@ -33,47 +34,47 @@ func EnrichFoodVariants(f *models.Food) {
 	f.Variants = sibs
 }
 
-func enrichMealFoodVariants(m *models.Meal) {
+func enrichMealFoodVariants(ctx context.Context, m *models.Meal) {
 	if m == nil {
 		return
 	}
 	for i := range m.Items {
 		if m.Items[i].Food.ID != 0 {
-			EnrichFoodVariants(&m.Items[i].Food)
+			EnrichFoodVariants(ctx, &m.Items[i].Food)
 		}
 	}
 }
 
-func enrichSavedMealFoodVariants(sm *models.SavedMeal) {
+func enrichSavedMealFoodVariants(ctx context.Context, sm *models.SavedMeal) {
 	if sm == nil {
 		return
 	}
 	for i := range sm.Items {
 		if sm.Items[i].Food.ID != 0 {
-			EnrichFoodVariants(&sm.Items[i].Food)
+			EnrichFoodVariants(ctx, &sm.Items[i].Food)
 		}
 	}
 }
 
-func enrichDietDayFoodVariants(d *models.DietDay) {
+func enrichDietDayFoodVariants(ctx context.Context, d *models.DietDay) {
 	if d == nil {
 		return
 	}
 	for i := range d.PlannedMeals {
 		if d.PlannedMeals[i].Meal.ID != 0 {
-			enrichMealFoodVariants(&d.PlannedMeals[i].Meal)
+			enrichMealFoodVariants(ctx, &d.PlannedMeals[i].Meal)
 		}
 	}
 	for i := range d.Logs {
 		if d.Logs[i].Meal.ID != 0 {
-			enrichMealFoodVariants(&d.Logs[i].Meal)
+			enrichMealFoodVariants(ctx, &d.Logs[i].Meal)
 		}
 	}
 }
 
-func FoodsAll(excludeIDs []uint) ([]models.Food, error) {
+func FoodsAll(ctx context.Context, excludeIDs []uint) ([]models.Food, error) {
 	var foods []models.Food
-	query := conn().Model(&models.Food{}).Where("quick_entry = ? OR quick_entry IS NULL", false).Order("name ASC")
+	query := database.From(ctx).Model(&models.Food{}).Where("quick_entry = ? OR quick_entry IS NULL", false).Order("name ASC")
 	if len(excludeIDs) > 0 {
 		query = query.Where("id NOT IN ?", excludeIDs)
 	}
@@ -83,8 +84,8 @@ func FoodsAll(excludeIDs []uint) ([]models.Food, error) {
 	return foods, nil
 }
 
-func FoodCreate(food *models.Food) error {
-	return conn().Create(food).Error
+func FoodCreate(ctx context.Context, food *models.Food) error {
+	return database.From(ctx).Create(food).Error
 }
 
 // FoodCreateWithOptionalRelated inserts a food and, if set, links it to a related food's variant group.
@@ -92,8 +93,8 @@ func FoodCreate(food *models.Food) error {
 // (unique index idx_foods_name, which also covers soft-deleted foods).
 var ErrFoodNameTaken = errors.New("a food with this name already exists")
 
-func FoodCreateWithOptionalRelated(food *models.Food, relatedFoodID *uint) error {
-	return conn().Transaction(func(tx *gorm.DB) error {
+func FoodCreateWithOptionalRelated(ctx context.Context, food *models.Food, relatedFoodID *uint) error {
+	return database.From(ctx).Transaction(func(tx *gorm.DB) error {
 		food.ID = 0
 		if err := tx.Create(food).Error; err != nil {
 			if isUniqueConstraintError(err) {
@@ -139,9 +140,9 @@ func linkNewFoodToRelatedInTx(tx *gorm.DB, food *models.Food, relatedFoodID uint
 	return nil
 }
 
-func foodsByVariantGroup() (map[uint][]models.Food, error) {
+func foodsByVariantGroup(ctx context.Context) (map[uint][]models.Food, error) {
 	var list []models.Food
-	if err := conn().Model(&models.Food{}).Where("variant_group_id IS NOT NULL").Order("name ASC").Find(&list).Error; err != nil {
+	if err := database.From(ctx).Model(&models.Food{}).Where("variant_group_id IS NOT NULL").Order("name ASC").Find(&list).Error; err != nil {
 		return nil, err
 	}
 	m := make(map[uint][]models.Food)
@@ -156,12 +157,12 @@ func foodsByVariantGroup() (map[uint][]models.Food, error) {
 }
 
 // FoodsAllWithVariantSiblings returns all foods (with excludes) and attaches sibling rows per variant group.
-func FoodsAllWithVariantSiblings(excludeIDs []uint) ([]models.FoodWithVariants, error) {
-	foods, err := FoodsAll(excludeIDs)
+func FoodsAllWithVariantSiblings(ctx context.Context, excludeIDs []uint) ([]models.FoodWithVariants, error) {
+	foods, err := FoodsAll(ctx, excludeIDs)
 	if err != nil {
 		return nil, err
 	}
-	byGroup, err := foodsByVariantGroup()
+	byGroup, err := foodsByVariantGroup(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -183,9 +184,9 @@ func FoodsAllWithVariantSiblings(excludeIDs []uint) ([]models.FoodWithVariants, 
 	return out, nil
 }
 
-func CompositeFoodsAll() ([]models.CompositeFood, error) {
+func CompositeFoodsAll(ctx context.Context) ([]models.CompositeFood, error) {
 	var list []models.CompositeFood
-	if err := conn().Preload("Items.Food").Order("name ASC").Find(&list).Error; err != nil {
+	if err := database.From(ctx).Preload("Items.Food").Order("name ASC").Find(&list).Error; err != nil {
 		return nil, err
 	}
 	for i := range list {
@@ -196,20 +197,20 @@ func CompositeFoodsAll() ([]models.CompositeFood, error) {
 	return list, nil
 }
 
-func CompositeFoodCreate(cf *models.CompositeFood) (uint, error) {
+func CompositeFoodCreate(ctx context.Context, cf *models.CompositeFood) (uint, error) {
 	cf.ID = 0
 	for i := range cf.Items {
 		cf.Items[i].ID = 0
 	}
-	if err := conn().Create(cf).Error; err != nil {
+	if err := database.From(ctx).Create(cf).Error; err != nil {
 		return 0, err
 	}
 	return cf.ID, nil
 }
 
-func MealsAll(excludeIDs []uint) ([]models.Meal, error) {
+func MealsAll(ctx context.Context, excludeIDs []uint) ([]models.Meal, error) {
 	var meals []models.Meal
-	query := conn().Model(&models.Meal{}).Order("name ASC")
+	query := database.From(ctx).Model(&models.Meal{}).Order("name ASC")
 	if len(excludeIDs) > 0 {
 		query = query.Where("id NOT IN ?", excludeIDs)
 	}
@@ -219,9 +220,9 @@ func MealsAll(excludeIDs []uint) ([]models.Meal, error) {
 	return meals, nil
 }
 
-func SavedMealsAll(excludeIDs []uint) ([]models.SavedMeal, error) {
+func SavedMealsAll(ctx context.Context, excludeIDs []uint) ([]models.SavedMeal, error) {
 	var meals []models.SavedMeal
-	query := conn().Model(&models.SavedMeal{}).Order("name ASC")
+	query := database.From(ctx).Model(&models.SavedMeal{}).Order("name ASC")
 	if len(excludeIDs) > 0 {
 		query = query.Where("id NOT IN ?", excludeIDs)
 	}
@@ -230,54 +231,54 @@ func SavedMealsAll(excludeIDs []uint) ([]models.SavedMeal, error) {
 	}
 	for i := range meals {
 		if meals[i].Items != nil {
-			enrichSavedMealFoodVariants(&meals[i])
+			enrichSavedMealFoodVariants(ctx, &meals[i])
 		}
 	}
 	return meals, nil
 }
 
-func SavedMealCreate(sm *models.SavedMeal) (uint, error) {
+func SavedMealCreate(ctx context.Context, sm *models.SavedMeal) (uint, error) {
 	for i := range sm.Items {
 		sm.Items[i].ID = 0
 	}
-	if err := conn().Create(sm).Error; err != nil {
+	if err := database.From(ctx).Create(sm).Error; err != nil {
 		return 0, err
 	}
 	return sm.ID, nil
 }
 
-func SavedMealByID(id uint) (*models.SavedMeal, error) {
+func SavedMealByID(ctx context.Context, id uint) (*models.SavedMeal, error) {
 	var sm models.SavedMeal
-	if err := conn().Preload("Items.Food").First(&sm, id).Error; err != nil {
+	if err := database.From(ctx).Preload("Items.Food").First(&sm, id).Error; err != nil {
 		return nil, err
 	}
-	enrichSavedMealFoodVariants(&sm)
+	enrichSavedMealFoodVariants(ctx, &sm)
 	return &sm, nil
 }
 
-func SavedMealDelete(id uint) error {
+func SavedMealDelete(ctx context.Context, id uint) error {
 	var sm models.SavedMeal
-	if err := conn().First(&sm, id).Error; err != nil {
+	if err := database.From(ctx).First(&sm, id).Error; err != nil {
 		return err
 	}
-	return conn().Delete(&sm).Error
+	return database.From(ctx).Delete(&sm).Error
 }
 
-func CountUnloggedPlannedBySavedMealID(savedMealID uint) (int64, error) {
+func CountUnloggedPlannedBySavedMealID(ctx context.Context, savedMealID uint) (int64, error) {
 	var count int64
-	err := conn().Model(&models.PlannedMeal{}).
+	err := database.From(ctx).Model(&models.PlannedMeal{}).
 		Where("saved_meal_id = ? AND logged = ?", savedMealID, false).
 		Count(&count).Error
 	return count, err
 }
 
-func DeleteUnloggedPlannedBySavedMealID(savedMealID uint) error {
-	return conn().Where("saved_meal_id = ? AND logged = ?", savedMealID, false).Delete(&models.PlannedMeal{}).Error
+func DeleteUnloggedPlannedBySavedMealID(ctx context.Context, savedMealID uint) error {
+	return database.From(ctx).Where("saved_meal_id = ? AND logged = ?", savedMealID, false).Delete(&models.PlannedMeal{}).Error
 }
 
 // SavedMealReplace updates the template name and replaces all items in one transaction.
-func SavedMealReplace(id uint, incoming *models.SavedMeal) error {
-	return conn().Transaction(func(tx *gorm.DB) error {
+func SavedMealReplace(ctx context.Context, id uint, incoming *models.SavedMeal) error {
+	return database.From(ctx).Transaction(func(tx *gorm.DB) error {
 		var existing models.SavedMeal
 		if err := tx.First(&existing, id).Error; err != nil {
 			return err
@@ -300,30 +301,30 @@ func SavedMealReplace(id uint, incoming *models.SavedMeal) error {
 	})
 }
 
-func PlannedMealCreate(pm *models.PlannedMeal) error {
+func PlannedMealCreate(ctx context.Context, pm *models.PlannedMeal) error {
 	pm.ID = 0
-	return conn().Create(pm).Error
+	return database.From(ctx).Create(pm).Error
 }
 
-func PlannedMealDelete(plannedMealID uint, dayID uint) error {
+func PlannedMealDelete(ctx context.Context, plannedMealID uint, dayID uint) error {
 	var pm models.PlannedMeal
-	if err := conn().Where("id = ? AND day_id = ?", plannedMealID, dayID).First(&pm).Error; err != nil {
+	if err := database.From(ctx).Where("id = ? AND day_id = ?", plannedMealID, dayID).First(&pm).Error; err != nil {
 		return err
 	}
-	return conn().Delete(&pm).Error
+	return database.From(ctx).Delete(&pm).Error
 }
 
-func NextPlannedMealDisplayOrder(dayID uint) (int, error) {
+func NextPlannedMealDisplayOrder(ctx context.Context, dayID uint) (int, error) {
 	var next int
-	err := conn().Model(&models.PlannedMeal{}).
+	err := database.From(ctx).Model(&models.PlannedMeal{}).
 		Where("day_id = ? AND logged = ?", dayID, false).
 		Select("COALESCE(MAX(display_order), -1) + 1").
 		Scan(&next).Error
 	return next, err
 }
 
-func PlannedMealReorder(dayID uint, orderedIDs []uint) error {
-	return conn().Transaction(func(tx *gorm.DB) error {
+func PlannedMealReorder(ctx context.Context, dayID uint, orderedIDs []uint) error {
+	return database.From(ctx).Transaction(func(tx *gorm.DB) error {
 		var count int64
 		if err := tx.Model(&models.PlannedMeal{}).
 			Where("day_id = ? AND logged = ?", dayID, false).
@@ -361,20 +362,20 @@ func PlannedMealReorder(dayID uint, orderedIDs []uint) error {
 	})
 }
 
-func MealByID(id uint) (*models.Meal, error) {
+func MealByID(ctx context.Context, id uint) (*models.Meal, error) {
 	var meal models.Meal
-	if err := conn().Preload("Items.Food").First(&meal, id).Error; err != nil {
+	if err := database.From(ctx).Preload("Items.Food").First(&meal, id).Error; err != nil {
 		return nil, err
 	}
-	enrichMealFoodVariants(&meal)
+	enrichMealFoodVariants(ctx, &meal)
 	return &meal, nil
 }
 
-func MealCreate(meal *models.Meal) (uint, error) {
+func MealCreate(ctx context.Context, meal *models.Meal) (uint, error) {
 	for i := range meal.Items {
 		meal.Items[i].ID = 0
 	}
-	if err := conn().Create(meal).Error; err != nil {
+	if err := database.From(ctx).Create(meal).Error; err != nil {
 		return 0, err
 	}
 	return meal.ID, nil
@@ -426,10 +427,10 @@ func planForDate(db *gorm.DB, t time.Time) (models.Plan, error) {
 }
 
 // findOrCreateDietDayForCalendarDate returns a day row for the wall-clock calendar day of t (location from t).
-func findOrCreateDietDayForCalendarDate(t time.Time) (models.DietDay, error) {
+func findOrCreateDietDayForCalendarDate(ctx context.Context, t time.Time) (models.DietDay, error) {
 	start, end := calendarDayRange(t)
 	var day models.DietDay
-	err := conn().Where("date >= ? AND date < ?", start, end).First(&day).Error
+	err := database.From(ctx).Where("date >= ? AND date < ?", start, end).First(&day).Error
 	if err == nil {
 		return day, nil
 	}
@@ -437,7 +438,7 @@ func findOrCreateDietDayForCalendarDate(t time.Time) (models.DietDay, error) {
 		return models.DietDay{}, err
 	}
 
-	plan, err := planForDate(conn(), t)
+	plan, err := planForDate(database.From(ctx), t)
 	if err != nil {
 		return models.DietDay{}, err
 	}
@@ -448,9 +449,9 @@ func findOrCreateDietDayForCalendarDate(t time.Time) (models.DietDay, error) {
 		Date:   atMidnight,
 		PlanID: plan.ID,
 	}
-	if err := conn().Create(&day).Error; err != nil {
+	if err := database.CreateInSavepoint(database.From(ctx), &day); err != nil {
 		if isUniqueConstraintError(err) {
-			if err := conn().Where("date >= ? AND date < ?", start, end).First(&day).Error; err != nil {
+			if err := database.From(ctx).Where("date >= ? AND date < ?", start, end).First(&day).Error; err != nil {
 				return models.DietDay{}, err
 			}
 			return day, nil
@@ -470,9 +471,9 @@ func isUniqueConstraintError(err error) bool {
 		strings.Contains(s, "unique constraint failed")
 }
 
-func loadDietDayWithPreloads(id uint) (models.DietDay, error) {
+func loadDietDayWithPreloads(ctx context.Context, id uint) (models.DietDay, error) {
 	var day models.DietDay
-	if err := conn().
+	if err := database.From(ctx).
 		Preload("PlannedMeals", func(db *gorm.DB) *gorm.DB {
 			return db.Where("logged = ?", false).Order("display_order ASC, id ASC")
 		}).
@@ -482,22 +483,22 @@ func loadDietDayWithPreloads(id uint) (models.DietDay, error) {
 		First(&day, id).Error; err != nil {
 		return models.DietDay{}, err
 	}
-	enrichDietDayFoodVariants(&day)
+	enrichDietDayFoodVariants(ctx, &day)
 	return day, nil
 }
 
-func DayMealPlanToday(offset int) (models.DietDay, error) {
-	d, err := findOrCreateDietDayForCalendarDate(clock.ZerodTime(offset))
+func DayMealPlanToday(ctx context.Context, offset int) (models.DietDay, error) {
+	d, err := findOrCreateDietDayForCalendarDate(ctx, clock.ZerodTime(offset))
 	if err != nil {
 		return models.DietDay{}, err
 	}
-	return loadDietDayWithPreloads(d.ID)
+	return loadDietDayWithPreloads(ctx, d.ID)
 }
 
 // CountUnloggedPlannedMealsPerCalendarDay returns YYYY-MM-DD (loc) → count for that calendar day.
-func CountUnloggedPlannedMealsPerCalendarDay(start, end time.Time) (map[string]int, error) {
+func CountUnloggedPlannedMealsPerCalendarDay(ctx context.Context, start, end time.Time) (map[string]int, error) {
 	out := make(map[string]int)
-	rows, err := conn().Model(&models.PlannedMeal{}).
+	rows, err := database.From(ctx).Model(&models.PlannedMeal{}).
 		Joins("JOIN days ON days.id = planned_meals.day_id").
 		Where("planned_meals.logged = ?", false).
 		Where("days.date >= ? AND days.date <= ?", start, end).
@@ -521,8 +522,8 @@ func CountUnloggedPlannedMealsPerCalendarDay(start, end time.Time) (map[string]i
 	return out, rows.Err()
 }
 
-func DayByID(id int) (*models.DietDay, error) {
-	day, err := loadDietDayWithPreloads(uint(id))
+func DayByID(ctx context.Context, id int) (*models.DietDay, error) {
+	day, err := loadDietDayWithPreloads(ctx, uint(id))
 	if err != nil {
 		return nil, err
 	}
@@ -536,7 +537,7 @@ func preloadDietDay(db *gorm.DB) *gorm.DB {
 
 func DaysByDateRange(ctx context.Context, start, end time.Time) ([]models.DietDay, error) {
 	var days []models.DietDay
-	err := conn().WithContext(ctx).Scopes(preloadDietDay).
+	err := database.From(ctx).WithContext(ctx).Scopes(preloadDietDay).
 		Where("date >= ? AND date <= ?", start, end).
 		Order("date ASC").
 		Find(&days).Error
@@ -545,7 +546,7 @@ func DaysByDateRange(ctx context.Context, start, end time.Time) ([]models.DietDa
 
 func DayByIDGeneric(ctx context.Context, id uint) (models.DietDay, error) {
 	var day models.DietDay
-	err := conn().WithContext(ctx).Scopes(preloadDietDay).First(&day, id).Error
+	err := database.From(ctx).WithContext(ctx).Scopes(preloadDietDay).First(&day, id).Error
 	return day, err
 }
 
@@ -558,9 +559,9 @@ type MealDayTotals struct {
 	Fat      float32
 }
 
-func CalculateTotals(dayID uint) MealDayTotals {
+func CalculateTotals(ctx context.Context, dayID uint) MealDayTotals {
 	var totals MealDayTotals
-	conn().Raw(`
+	database.From(ctx).Raw(`
         SELECT
             SUM(f.calories * mi.amount) AS calories,
             SUM(f.protein  * mi.amount) AS protein,
@@ -577,41 +578,41 @@ func CalculateTotals(dayID uint) MealDayTotals {
 	return totals
 }
 
-func AllMealDays() ([]models.DietDay, error) {
+func AllMealDays(ctx context.Context) ([]models.DietDay, error) {
 	var days []models.DietDay
-	if err := conn().Find(&days).Error; err != nil {
+	if err := database.From(ctx).Find(&days).Error; err != nil {
 		return nil, err
 	}
 	return days, nil
 }
 
-func GoalsToday() (*models.Plan, error) {
-	todayDay, err := findOrCreateDietDayForCalendarDate(clock.ZerodTime(0))
+func GoalsToday(ctx context.Context) (*models.Plan, error) {
+	todayDay, err := findOrCreateDietDayForCalendarDate(ctx, clock.ZerodTime(0))
 	if err != nil {
 		return nil, err
 	}
 	var plan models.Plan
-	if err := conn().First(&plan, todayDay.PlanID).Error; err != nil {
+	if err := database.From(ctx).First(&plan, todayDay.PlanID).Error; err != nil {
 		return nil, err
 	}
 	return &plan, nil
 }
 
-func FindDayByDate(date time.Time) (*models.DietDay, error) {
-	day, err := findOrCreateDietDayForCalendarDate(date)
+func FindDayByDate(ctx context.Context, date time.Time) (*models.DietDay, error) {
+	day, err := findOrCreateDietDayForCalendarDate(ctx, date)
 	if err != nil {
 		return nil, err
 	}
 	return &day, nil
 }
 
-func CreateDayMeal(dayMeal *models.DayLog) error {
-	return conn().Create(dayMeal).Error
+func CreateDayMeal(ctx context.Context, dayMeal *models.DayLog) error {
+	return database.From(ctx).Create(dayMeal).Error
 }
 
-func DayLogExists(dayID uint, mealID uint) (bool, error) {
+func DayLogExists(ctx context.Context, dayID uint, mealID uint) (bool, error) {
 	var count int64
-	err := conn().Model(&models.DayLog{}).
+	err := database.From(ctx).Model(&models.DayLog{}).
 		Where("day_id = ? AND meal_id = ?", dayID, mealID).
 		Count(&count).Error
 	if err != nil {
@@ -620,13 +621,13 @@ func DayLogExists(dayID uint, mealID uint) (bool, error) {
 	return count > 0, nil
 }
 
-func SetPlannedMealLogged(dayID uint, mealID uint) error {
+func SetPlannedMealLogged(ctx context.Context, dayID uint, mealID uint) error {
 	var pm models.PlannedMeal
-	if err := conn().Where("day_id = ? AND meal_id = ?", dayID, mealID).First(&pm).Error; err != nil {
+	if err := database.From(ctx).Where("day_id = ? AND meal_id = ?", dayID, mealID).First(&pm).Error; err != nil {
 		return err
 	}
 	pm.Logged = true
-	return conn().Save(&pm).Error
+	return database.From(ctx).Save(&pm).Error
 }
 
 // DeleteLoggedMeal removes a logged meal from a day. It is idempotent: a log that is already
@@ -634,15 +635,15 @@ func SetPlannedMealLogged(dayID uint, mealID uint) error {
 //
 // It does not reset planned_meals.logged: whether an unlogged planned meal returns to
 // "planned" is an open owner question (optimistic-ui README, Q1).
-func DeleteLoggedMeal(dayID uint, mealID uint) error {
-	return conn().Where("day_id = ? AND meal_id = ?", dayID, mealID).Delete(&models.DayLog{}).Error
+func DeleteLoggedMeal(ctx context.Context, dayID uint, mealID uint) error {
+	return database.From(ctx).Where("day_id = ? AND meal_id = ?", dayID, mealID).Delete(&models.DayLog{}).Error
 }
 
 // LogPlannedMeal marks the day's planned meal as logged and ensures exactly one day log exists
 // for it. Repeating the call is a no-op. Returns gorm.ErrRecordNotFound when the day has no such
 // planned meal.
-func LogPlannedMeal(dayID uint, mealID uint) error {
-	return conn().Transaction(func(tx *gorm.DB) error {
+func LogPlannedMeal(ctx context.Context, dayID uint, mealID uint) error {
+	return database.From(ctx).Transaction(func(tx *gorm.DB) error {
 		// FOR UPDATE serializes concurrent calls for the same planned meal even when it is
 		// already logged=true (after an unlog, which keeps the flag), so the day_log count below
 		// sees the other call's insert instead of both inserting and one hitting
@@ -669,22 +670,22 @@ func LogPlannedMeal(dayID uint, mealID uint) error {
 	})
 }
 
-func UpdateDayLogMeal(dayID uint, oldMealID uint, newMealID uint) error {
+func UpdateDayLogMeal(ctx context.Context, dayID uint, oldMealID uint, newMealID uint) error {
 	var log models.DayLog
-	if err := conn().Where("day_id = ? AND meal_id = ?", dayID, oldMealID).First(&log).Error; err != nil {
+	if err := database.From(ctx).Where("day_id = ? AND meal_id = ?", dayID, oldMealID).First(&log).Error; err != nil {
 		return err
 	}
 	log.MealID = newMealID
-	return conn().Save(&log).Error
+	return database.From(ctx).Save(&log).Error
 }
 
 func PlansGetAll(ctx context.Context, params utils.QueryParams) (*utils.ListResult[models.Plan], error) {
-	return utils.List[models.Plan](conn().WithContext(ctx), params, "id", true)
+	return utils.List[models.Plan](database.From(ctx).WithContext(ctx), params, "id", true)
 }
 
-func CompositeFoodByID(id uint) (*models.CompositeFood, error) {
+func CompositeFoodByID(ctx context.Context, id uint) (*models.CompositeFood, error) {
 	var cf models.CompositeFood
-	if err := conn().Preload("Items.Food").First(&cf, id).Error; err != nil {
+	if err := database.From(ctx).Preload("Items.Food").First(&cf, id).Error; err != nil {
 		return nil, err
 	}
 	for i := range cf.Items {
@@ -693,11 +694,11 @@ func CompositeFoodByID(id uint) (*models.CompositeFood, error) {
 	return &cf, nil
 }
 
-func UpdatePlanMacros(id uint, calories, protein, fiber, carbs, fat float32) (*models.Plan, error) {
+func UpdatePlanMacros(ctx context.Context, id uint, calories, protein, fiber, carbs, fat float32) (*models.Plan, error) {
 	effectiveStart, _ := calendarDayRange(clock.ZerodTime(0))
 	var plan models.Plan
 
-	if err := conn().Transaction(func(tx *gorm.DB) error {
+	if err := database.From(ctx).Transaction(func(tx *gorm.DB) error {
 		var basePlan models.Plan
 		if err := tx.First(&basePlan, id).Error; err != nil {
 			return err
@@ -725,8 +726,8 @@ func UpdatePlanMacros(id uint, calories, protein, fiber, carbs, fat float32) (*m
 	return &plan, nil
 }
 
-func DeleteSavedMeal(id uint) error {
-	return conn().Transaction(func(tx *gorm.DB) error {
+func DeleteSavedMeal(ctx context.Context, id uint) error {
+	return database.From(ctx).Transaction(func(tx *gorm.DB) error {
 		if err := tx.Where("saved_meal_id = ? AND logged = ?", id, false).Delete(&models.PlannedMeal{}).Error; err != nil {
 			return err
 		}
@@ -758,8 +759,8 @@ func nilIfEmpty(s string) *string {
 
 // AddPlannedMealFromSavedMeal appends a planned copy of a saved meal. A non-empty clientID makes it
 // idempotent: when a planned meal with that id exists, nothing is created.
-func AddPlannedMealFromSavedMeal(offset int, savedMealID uint, meal *models.Meal, clientID string) error {
-	return conn().Transaction(func(tx *gorm.DB) error {
+func AddPlannedMealFromSavedMeal(ctx context.Context, offset int, savedMealID uint, meal *models.Meal, clientID string) error {
+	return database.From(ctx).Transaction(func(tx *gorm.DB) error {
 		day, err := findOrCreateDietDayForCalendarDateInTx(tx, clock.ZerodTime(offset))
 		if err != nil {
 			return err
@@ -824,7 +825,7 @@ func findOrCreateDietDayForCalendarDateInTx(tx *gorm.DB, t time.Time) (models.Di
 		Date:   atMidnight,
 		PlanID: plan.ID,
 	}
-	if err := tx.Create(&day).Error; err != nil {
+	if err := database.CreateInSavepoint(tx, &day); err != nil {
 		if isUniqueConstraintError(err) {
 			if err := tx.Where("date >= ? AND date < ?", start, end).First(&day).Error; err != nil {
 				return models.DietDay{}, err
@@ -850,8 +851,8 @@ type QuickLogParams struct {
 	ClientID string
 }
 
-func QuickLogMeal(params QuickLogParams) (dayID uint, err error) {
-	err = conn().Transaction(func(tx *gorm.DB) error {
+func QuickLogMeal(ctx context.Context, params QuickLogParams) (dayID uint, err error) {
+	err = database.From(ctx).Transaction(func(tx *gorm.DB) error {
 		day, derr := findOrCreateDietDayForCalendarDateInTx(tx, clock.ZerodTime(params.Offset))
 		if derr != nil {
 			return derr
@@ -919,8 +920,8 @@ func QuickLogMeal(params QuickLogParams) (dayID uint, err error) {
 	return dayID, err
 }
 
-func EditLoggedMeal(dayID uint, oldMealID uint, meal *models.Meal) error {
-	return conn().Transaction(func(tx *gorm.DB) error {
+func EditLoggedMeal(ctx context.Context, dayID uint, oldMealID uint, meal *models.Meal) error {
+	return database.From(ctx).Transaction(func(tx *gorm.DB) error {
 		meal.ID = 0
 		for i := range meal.Items {
 			meal.Items[i].ID = 0
@@ -941,9 +942,9 @@ func EditLoggedMeal(dayID uint, oldMealID uint, meal *models.Meal) error {
 // each target day, after whatever that day already has. Each copy gets its own Meal row, so editing
 // or logging one day never touches another. Targets equal to the source are skipped. Returns how many
 // meals the source day had.
-func CopyPlannedMeals(fromOffset int, toOffsets []int) (int, error) {
+func CopyPlannedMeals(ctx context.Context, fromOffset int, toOffsets []int) (int, error) {
 	var n int
-	err := conn().Transaction(func(tx *gorm.DB) error {
+	err := database.From(ctx).Transaction(func(tx *gorm.DB) error {
 		src, err := findOrCreateDietDayForCalendarDateInTx(tx, clock.ZerodTime(fromOffset))
 		if err != nil {
 			return err
