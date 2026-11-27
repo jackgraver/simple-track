@@ -98,7 +98,7 @@ repos:      database.From(ctx).Where(...)...        // never the global
   Those endpoints fetch first, then write.
 - Nested `db.Transaction(...)` inside a request becomes a savepoint; existing code keeps working.
 
-The exact shape is lane B2's call; record it in `DECISIONS.md`.
+The final shape is in `DECISIONS.md` ("B2 per-request database handle").
 
 ### Ownership
 
@@ -224,5 +224,12 @@ a nullable `group_id` on tables that should be shareable, and the rule becomes
 - **The app role has `statement_timeout = 15s` and `idle_in_transaction_session_timeout = 30s`**
   (A2). B2's per-request transaction must not stay open across slow work (external lookups,
   e2e holds): after 30 s idle in a transaction Postgres kills the session.
+- **One failed statement aborts the request's transaction** (B2). On Postgres, every query after
+  a failed one fails too. Code that recovers from a SQL error must run the failing statement in
+  a savepoint (`database.CreateInSavepoint`, or its own `db.Transaction`). SQLite module tests and
+  e2e fault injection don't show this; Postgres tests do.
+- **Locks live until the request ends** (B2). A repository's `Transaction` inside a request is a
+  savepoint, so its row and advisory locks are released at the request's commit, not when the
+  block returns.
 - **`dev test` points `TEST_DATABASE_URL` at the owner** (`DATABASE_OWNER_URL`), since the app role
   can't create databases.

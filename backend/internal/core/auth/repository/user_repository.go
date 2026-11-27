@@ -1,14 +1,17 @@
 package authrepo
 
 import (
+	"context"
+
 	"be-simpletracker/internal/core/auth/models"
+	"be-simpletracker/internal/database"
 
 	"gorm.io/gorm"
 )
 
-func FindUserByUsername(username string) (models.User, error) {
+func FindUserByUsername(ctx context.Context, username string) (models.User, error) {
 	var user models.User
-	if err := conn().Where("username = ?", username).First(&user).Error; err != nil {
+	if err := database.From(ctx).Where("username = ?", username).First(&user).Error; err != nil {
 		return models.User{}, err
 	}
 	return user, nil
@@ -16,28 +19,28 @@ func FindUserByUsername(username string) (models.User, error) {
 
 // FindUserByID returns a live (not soft-deleted) user. Disabled users are returned; callers
 // decide what disabled means for them.
-func FindUserByID(id uint) (models.User, error) {
+func FindUserByID(ctx context.Context, id uint) (models.User, error) {
 	var user models.User
-	if err := conn().First(&user, id).Error; err != nil {
+	if err := database.From(ctx).First(&user, id).Error; err != nil {
 		return models.User{}, err
 	}
 	return user, nil
 }
 
-func CreateUser(user *models.User) error {
+func CreateUser(ctx context.Context, user *models.User) error {
 	if user.TokenVersion == 0 {
 		user.TokenVersion = models.InitialTokenVersion
 	}
-	return conn().Create(user).Error
+	return database.From(ctx).Create(user).Error
 }
 
-func UpdateUserBirthYear(id uint, birthYear *int) (models.User, error) {
-	result := conn().Model(&models.User{}).Where("id = ?", id).Update("birth_year", birthYear)
+func UpdateUserBirthYear(ctx context.Context, id uint, birthYear *int) (models.User, error) {
+	result := database.From(ctx).Model(&models.User{}).Where("id = ?", id).Update("birth_year", birthYear)
 	if result.Error != nil {
 		return models.User{}, result.Error
 	}
 	if result.RowsAffected == 0 {
 		return models.User{}, gorm.ErrRecordNotFound
 	}
-	return FindUserByID(id)
+	return FindUserByID(ctx, id)
 }

@@ -82,6 +82,9 @@ func main() {
 
 	// Test-only /__e2e endpoints; a no-op unless built with -tags e2e (e2e/README.md).
 	e2e.Install(router, db)
+	// After e2e.Install (its holds must not sit in an open transaction), before every route that
+	// reaches the database (docs/multi-user/DECISIONS.md, "B2").
+	router.Use(database.Middleware(db))
 	CreateFeatures(db, router)
 	// Last, after the schema check: see healthHandler.
 	router.GET("/health", healthHandler(db))
@@ -136,20 +139,20 @@ func checkSchema(db *gorm.DB) error {
 }
 
 func CreateFeatures(db *gorm.DB, router *gin.Engine) {
-	auth.RegisterRoutes(router)
+	auth.RegisterRoutes(router, db)
 
-	authMW := auth.AuthMiddleware()
+	authMW := auth.AuthMiddleware(db)
 
 	diet.RegisterRoutes(router, authMW)
 
 	workout.RegisterRoutes(router, authMW)
 
-	trackingHandler := tracking.NewHandler(db)
+	trackingHandler := tracking.NewHandler()
 	trackingHandler.RegisterRoutes(router, authMW)
 
-	moneyHandler := money.NewHandler(db)
+	moneyHandler := money.NewHandler()
 	moneyHandler.RegisterRoutes(router, authMW)
 
-	mediaHandler := media.NewHandler(db)
+	mediaHandler := media.NewHandler()
 	mediaHandler.RegisterRoutes(router, authMW)
 }

@@ -18,7 +18,10 @@ import (
 
 const testDevAuthToken = "dev-bypass-token-for-tests-only"
 
-// setupUsers gives the test its own SQLite users table as the global DB.
+// usersDB is the database AuthMiddleware looks users up in: the last setupUsers table.
+var usersDB *gorm.DB
+
+// setupUsers gives the test its own SQLite users table.
 func setupUsers(t *testing.T) *gorm.DB {
 	t.Helper()
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
@@ -28,8 +31,8 @@ func setupUsers(t *testing.T) *gorm.DB {
 	if err := db.AutoMigrate(&models.User{}); err != nil {
 		t.Fatal(err)
 	}
-	database.SetDB(db)
-	t.Cleanup(func() { database.SetDB(nil) })
+	usersDB = db
+	t.Cleanup(func() { usersDB = nil })
 	return db
 }
 
@@ -64,7 +67,8 @@ func serve(t *testing.T, cookie string) (int, meBody) {
 	t.Helper()
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
-	r.GET("/x", AuthMiddleware(), func(c *gin.Context) {
+	r.Use(database.Middleware(usersDB))
+	r.GET("/x", AuthMiddleware(usersDB), func(c *gin.Context) {
 		u := MustUser(c.Request.Context())
 		c.JSON(http.StatusOK, gin.H{"id": u.ID, "username": u.Username, "admin": u.IsAdmin, "gin_user": c.GetString("username")})
 	})
@@ -133,7 +137,8 @@ func TestAuthMiddleware_authorizationBearerIgnored_withoutCookie(t *testing.T) {
 	tok := tokenFor(t, createUser(t, db, "zeus", false))
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
-	r.GET("/", AuthMiddleware(), func(c *gin.Context) {})
+	r.Use(database.Middleware(usersDB))
+	r.GET("/", AuthMiddleware(usersDB), func(c *gin.Context) {})
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	req.Header.Set("Authorization", "Bearer "+tok)
 	rec := httptest.NewRecorder()
@@ -350,7 +355,8 @@ func TestAuthMiddleware_crossSiteWritesRefused(t *testing.T) {
 	tok := tokenFor(t, createUser(t, db, "wanda", false))
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
-	r.Any("/x", AuthMiddleware(), func(c *gin.Context) { c.Status(http.StatusNoContent) })
+	r.Use(database.Middleware(usersDB))
+	r.Any("/x", AuthMiddleware(usersDB), func(c *gin.Context) { c.Status(http.StatusNoContent) })
 	cases := []struct {
 		method, site string
 		want         int

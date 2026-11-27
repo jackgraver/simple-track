@@ -6,9 +6,10 @@ import (
 	"be-simpletracker/internal/env"
 
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
-func RegisterRoutes(router *gin.Engine) {
+func RegisterRoutes(router *gin.Engine, db *gorm.DB) {
 	group := router.Group("/")
 	registerEnabled := !env.IsProduction() && env.StringOr("REGISTER_ENABLED", "false") == "true"
 	service := services.NewAuthService(GenerateToken)
@@ -33,10 +34,10 @@ func RegisterRoutes(router *gin.Engine) {
 		auth.POST("/logout", func(c *gin.Context) {
 			controller.Logout(c, cookie)
 		})
-		auth.GET("/me", AuthMiddleware(), func(c *gin.Context) {
+		auth.GET("/me", AuthMiddleware(db), func(c *gin.Context) {
 			controller.GetCurrentUser(c, service, MustUser(c).ID)
 		})
-		auth.PATCH("/me", AuthMiddleware(), func(c *gin.Context) {
+		auth.PATCH("/me", AuthMiddleware(db), func(c *gin.Context) {
 			controller.UpdateCurrentUser(c, service, MustUser(c).ID)
 		})
 	}

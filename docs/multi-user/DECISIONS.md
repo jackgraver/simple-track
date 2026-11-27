@@ -199,3 +199,84 @@ manual compose-file copy and rollbacks. It changes every deploy, so it's left to
 Follow-ups (owner, 2026-11-27): the owner-DSN gap and `deploy.compose_file` are j-cicd/deploy
 config work after D1, tracked as BACKLOG #23 and #24. BACKLOG #16 (pin the network subnet) is
 deferred to D1, since it needs a network recreate on the VPS.
+
+## 2026-11-27: B2 per-request database handle (agent, lane B2)
+
+Lands as three stacked PRs: the handle, middleware, auth, tracking, money and media; then diet;
+then workout plus removing the global connection. Until the last one merges, diet and workout
+still query the global pool outside the request transaction.
+
+**API** (`internal/database/request.go`, `middleware.go`):
+- `database.Middleware(pool)` gives every request a lazy transaction. `cmd/server` installs it
+  after `e2e.Install` (so an e2e hold never waits inside an open transaction) and before every
+  feature route.
+- `database.From(ctx) *gorm.DB` is the only way request code reaches the database. The first
+  call begins the transaction (`BeginTx` with the request context, so a client that goes away
+  rolls it back) and sets `app.user_id` / `app.is_admin` with `set_config(..., true)`
+  (transaction-local, so nothing leaks to the next user of the pooled connection). Each call
+  returns a fresh session on that transaction. It accepts a `*gin.Context` too, and **panics**
+  when the context has no handle (a route outside the middleware, or a test without `WithDB`).
+- `database.SetIdentity(ctx, database.Identity{UserID, IsAdmin})`: AuthMiddleware calls it after
+  resolving the user (applied at begin, or immediately if the transaction is already open).
+  `internal/database` still doesn't import `internal/core/auth`.
+- `database.WithDB(ctx, db)`: `From` returns `db` itself, no transaction, no identity. For tools,
+  tests and the session lookup below; the guard test forbids it elsewhere in request code.
+- `database.WithTx(ctx, pool) (ctx, *Request)` with `Commit` / `Rollback` / `Begun`, for code that
+  needs a request-shaped transaction outside gin (the Postgres concurrency tests use it).
+- `database.CreateInSavepoint(db, value)`, see "failed statements" below.
+- `GetDB` / `SetDB`, the global connection and every package's `conn()` are gone.
+
+**When the transaction ends.** Just before the first byte of the response is written: status
+< 400 commits, 4xx/5xx rolls back. A handler that writes nothing ends it when it returns, and a
+panic rolls it back. Committing before the response means a failed commit becomes a 500
+(`{"error":"Could not save changes"}`) instead of a success the client (and optimistic UI) would
+trust. A `From` call after the response gets `ErrRequestDone`; nothing does that today.
+**Behaviour change:** a request that answers 4xx/5xx no longer leaves the writes it made before
+failing (e.g. `POST /diet/meals/meal/new` creating the meal, then failing to log it). Every
+response the client sees as an error now means "nothing changed".
+
+**Session lookup stays outside the transaction.** `auth.AuthMiddleware(pool)` (and
+`auth.RegisterRoutes(router, pool)`) look the user up on the pool through `WithDB`, then call
+`SetIdentity`. B1 left moving it in open; kept out so the transaction stays lazy: a route that
+never queries (media lookups, `/auth/logout`) holds no connection. Cost: a DB-touching request
+checks out a connection twice, one after the other (never two at once). `users` has no RLS.
+Login/register run under the middleware without an identity.
+
+**External lookups.** The media lookup routes never call `From`, so no connection or transaction
+is held while TMDB/OpenLibrary/AniList/iTunes answer (`media/controller/media_route_test.go`
+checks the pool has nothing in use during the upstream call). The food lookup isn't on this
+branch (`feat/food-api`); when it lands, fetch before the handler's first `From`. If an endpoint
+ever needs the database both before and after an external call, add an explicit
+"commit and start a new transaction" helper rather than holding the transaction across it (the
+app role's `idle_in_transaction_session_timeout` is 30 s).
+
+**Nested transactions are savepoints.** Existing `From(ctx).Transaction(...)` blocks keep
+working; their rollback undoes only their own work. Locks they take (row locks,
+`pg_advisory_xact_lock`) are now held **until the request ends**, not until the block returns.
+Still correct; the Postgres concurrency tests (diet replays, workout sets/days) now run each call
+in its own request transaction (`inRequest` helpers) to prove it. C2/C3 keep that in mind when
+re-keying the advisory locks.
+
+**Failed statements abort the Postgres transaction.** Anything after a failed SQL statement in
+the same transaction fails with "current transaction is aborted". Code that recovers from a
+statement error (insert, unique violation, read the winner's row) must run the statement in a
+savepoint: `database.CreateInSavepoint(db, &row)` or its own `db.Transaction(...)`. Converted:
+diet day find-or-create (both copies), grocery `CreateItem`, water `CreateWaterLog`. Errors
+injected by the e2e fault hooks never reach Postgres, so e2e can't catch this; review for it.
+
+**Conventions for later lanes:**
+- Services and repositories take `ctx context.Context` first and call `database.From(ctx)` (once
+  at the top as `db := database.From(ctx)`, or per query). Helpers that run inside a
+  `Transaction` callback keep taking `tx *gorm.DB`. Handlers pass `c.Request.Context()`.
+- Handlers and route registration hold no `*gorm.DB` (`tracking.NewHandler()`,
+  `money.NewHandler()`, `media.NewHandler()`, `RegisterXRoutes(group)`).
+- Module tests on SQLite: `ctx := database.WithDB(context.Background(), db)`; route tests add
+  `r.Use(database.Middleware(db))`.
+- `internal/database/guard_test.go` fails on `GetDB`/`SetDB`/`conn()`, a `*gorm.DB` struct field,
+  opening a pool, or `WithDB` in `internal/core` / `internal/utils` (testutil excluded; the one
+  allowed `WithDB` is the session lookup).
+- Every DB-touching request holds one pooled connection from its first query to its response.
+  The pool's 20 (A2) is still ample.
+
+Not done here: money's birth-year lookup still goes by the `username` gin key (C4). No BACKLOG
+entry was tagged B2 (#8 moved to H1). Prod needs nothing beyond the new image (ROLLOUT 3.3a).

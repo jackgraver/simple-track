@@ -13,7 +13,7 @@ func TestRegisterRouteIsNeverEnabledInProduction(t *testing.T) {
 	t.Setenv("REGISTER_ENABLED", "true")
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
-	RegisterRoutes(router)
+	RegisterRoutes(router, nil)
 	recorder := httptest.NewRecorder()
 	router.ServeHTTP(recorder, httptest.NewRequest(http.MethodPost, "/auth/register", nil))
 	if recorder.Code != http.StatusNotFound {

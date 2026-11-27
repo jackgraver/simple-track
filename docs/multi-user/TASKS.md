@@ -94,14 +94,14 @@ Depends on: none (can start alongside A)
 
 ### B2 Per-request DB handle
 Depends on: A1, A2, B1
-- [ ] `database.WithTx` / `database.From(ctx)`: lazy per-request transaction with
+- [x] `database.WithTx` / `database.From(ctx)`: lazy per-request transaction with
       `set_config('app.user_id', ..)` and `app.is_admin`; commit/rollback/panic handling.
 - [ ] Thread `ctx` through every service and repo function; replace every `conn()` /
       `GetDB()` in request paths. Mechanical, no behaviour change. The handle carries the
       request context, so a disconnected or timed-out request cancels its query (today only the
       workout repos pass a context; diet, money, tracking and media queries can't be cancelled).
-- [ ] External lookups (media, food) don't run inside the request transaction.
-- [ ] Record the final shape in DECISIONS.
+- [x] External lookups (media, food) don't run inside the request transaction.
+- [x] Record the final shape in DECISIONS.
 - Done when: no request-path code calls `GetDB()`/`conn()` (add a test or lint that greps for it);
   full test suite and e2e pass.
 

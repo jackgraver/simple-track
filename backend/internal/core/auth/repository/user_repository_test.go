@@ -1,6 +1,7 @@
 package authrepo
 
 import (
+	"context"
 	"testing"
 
 	"be-simpletracker/internal/core/auth/models"
@@ -18,16 +19,13 @@ func TestUserRepositoryFindsUserByUsername(t *testing.T) {
 	if err := db.AutoMigrate(&models.User{}); err != nil {
 		t.Fatal(err)
 	}
-	database.SetDB(db)
-	t.Cleanup(func() {
-		database.SetDB(nil)
-	})
+	ctx := database.WithDB(context.Background(), db)
 
 	expected := models.User{Username: "wanda", Password: "hash"}
-	if err := CreateUser(&expected); err != nil {
+	if err := CreateUser(ctx, &expected); err != nil {
 		t.Fatal(err)
 	}
-	actual, err := FindUserByUsername("wanda")
+	actual, err := FindUserByUsername(ctx, "wanda")
 	if err != nil {
 		t.Fatal(err)
 	}

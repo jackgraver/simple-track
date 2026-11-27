@@ -2,6 +2,7 @@ package services
 
 import (
 	"be-simpletracker/internal/clock"
+	"context"
 	"errors"
 	"fmt"
 
@@ -56,8 +57,8 @@ func NewAuthService(generateToken TokenGenerator) *AuthService {
 	return &AuthService{generateToken: generateToken}
 }
 
-func (s *AuthService) Register(input RegisterInput) (AuthResult, error) {
-	_, err := authrepo.FindUserByUsername(input.Username)
+func (s *AuthService) Register(ctx context.Context, input RegisterInput) (AuthResult, error) {
+	_, err := authrepo.FindUserByUsername(ctx, input.Username)
 	if err == nil {
 		return AuthResult{}, ErrUsernameExists
 	}
@@ -75,7 +76,7 @@ func (s *AuthService) Register(input RegisterInput) (AuthResult, error) {
 		Password: string(hashedPassword),
 		Email:    input.Email,
 	}
-	if err := authrepo.CreateUser(&user); err != nil {
+	if err := authrepo.CreateUser(ctx, &user); err != nil {
 		return AuthResult{}, fmt.Errorf("%w: %v", ErrUserCreation, err)
 	}
 
@@ -88,8 +89,8 @@ func (s *AuthService) Register(input RegisterInput) (AuthResult, error) {
 	return AuthResult{Token: token, User: user}, nil
 }
 
-func (s *AuthService) Login(input LoginInput) (AuthResult, error) {
-	user, err := authrepo.FindUserByUsername(input.Username)
+func (s *AuthService) Login(ctx context.Context, input LoginInput) (AuthResult, error) {
+	user, err := authrepo.FindUserByUsername(ctx, input.Username)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			_ = bcrypt.CompareHashAndPassword(dummyPasswordHash, []byte(input.Password))
@@ -114,8 +115,8 @@ func (s *AuthService) Login(input LoginInput) (AuthResult, error) {
 	return AuthResult{Token: token, User: user}, nil
 }
 
-func (s *AuthService) CurrentUser(userID uint) (models.User, error) {
-	user, err := authrepo.FindUserByID(userID)
+func (s *AuthService) CurrentUser(ctx context.Context, userID uint) (models.User, error) {
+	user, err := authrepo.FindUserByID(ctx, userID)
 	if err != nil {
 		return models.User{}, err
 	}
@@ -123,12 +124,12 @@ func (s *AuthService) CurrentUser(userID uint) (models.User, error) {
 	return user, nil
 }
 
-func (s *AuthService) UpdateBirthYear(userID uint, birthYear int) (models.User, error) {
+func (s *AuthService) UpdateBirthYear(ctx context.Context, userID uint, birthYear int) (models.User, error) {
 	currentYear := clock.Now().Year()
 	if birthYear < 1900 || birthYear > currentYear {
 		return models.User{}, ErrInvalidBirthYear
 	}
-	user, err := authrepo.UpdateUserBirthYear(userID, &birthYear)
+	user, err := authrepo.UpdateUserBirthYear(ctx, userID, &birthYear)
 	if err != nil {
 		return models.User{}, err
 	}

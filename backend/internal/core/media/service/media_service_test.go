@@ -1,6 +1,8 @@
 package service
 
 import (
+	"be-simpletracker/internal/database"
+	"context"
 	"encoding/json"
 	"errors"
 	"testing"
@@ -37,7 +39,7 @@ var now = time.Date(2026, time.November, 15, 14, 30, 0, 0, time.Local)
 
 func TestCreateDefaultsToPlannedAndRequiresTypeAndTitle(t *testing.T) {
 	db := setupTestDB(t)
-	item, err := CreateMedia(db, decode(t, `{"type":"movie","title":"  Heat  ","release_year":1995}`), now)
+	item, err := CreateMedia(database.WithDB(context.Background(), db), decode(t, `{"type":"movie","title":"  Heat  ","release_year":1995}`), now)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -45,7 +47,7 @@ func TestCreateDefaultsToPlannedAndRequiresTypeAndTitle(t *testing.T) {
 		t.Fatalf("unexpected item: %+v", item)
 	}
 	for _, raw := range []string{`{"title":"x"}`, `{"type":"movie"}`, `{"type":"vhs","title":"x"}`, `{"type":"movie","title":"   "}`} {
-		if _, err := CreateMedia(db, decode(t, raw), now); !errors.Is(err, ErrInvalid) {
+		if _, err := CreateMedia(database.WithDB(context.Background(), db), decode(t, raw), now); !errors.Is(err, ErrInvalid) {
 			t.Errorf("%s: expected ErrInvalid, got %v", raw, err)
 		}
 	}
@@ -57,7 +59,7 @@ func TestRatingValidation(t *testing.T) {
 		`0.5`: true, `3`: true, `4.5`: true, `5`: true,
 		`0`: false, `5.5`: false, `3.3`: false, `-1`: false,
 	} {
-		_, err := CreateMedia(db, decode(t, `{"type":"book","title":"x","rating":`+raw+`}`), now)
+		_, err := CreateMedia(database.WithDB(context.Background(), db), decode(t, `{"type":"book","title":"x","rating":`+raw+`}`), now)
 		if ok && err != nil {
 			t.Errorf("rating %s: unexpected error %v", raw, err)
 		}
@@ -69,25 +71,25 @@ func TestRatingValidation(t *testing.T) {
 
 func TestPatchOmittedVsNull(t *testing.T) {
 	db := setupTestDB(t)
-	item, err := CreateMedia(db, decode(t, `{"type":"movie","title":"Heat","rating":4.5,"cover_url":"http://x/y.jpg"}`), now)
+	item, err := CreateMedia(database.WithDB(context.Background(), db), decode(t, `{"type":"movie","title":"Heat","rating":4.5,"cover_url":"http://x/y.jpg"}`), now)
 	if err != nil {
 		t.Fatal(err)
 	}
-	item, err = UpdateMedia(db, item.ID, decode(t, `{"review":"great"}`), now)
+	item, err = UpdateMedia(database.WithDB(context.Background(), db), item.ID, decode(t, `{"review":"great"}`), now)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if item.Rating == nil || *item.Rating != 4.5 || item.CoverURL == "" || item.Review != "great" {
 		t.Fatalf("omitted fields should be untouched: %+v", item)
 	}
-	item, err = UpdateMedia(db, item.ID, decode(t, `{"rating":null,"cover_url":null}`), now)
+	item, err = UpdateMedia(database.WithDB(context.Background(), db), item.ID, decode(t, `{"rating":null,"cover_url":null}`), now)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if item.Rating != nil || item.CoverURL != "" {
 		t.Fatalf("null should clear fields: %+v", item)
 	}
-	if _, err := UpdateMedia(db, item.ID, decode(t, `{"title":null}`), now); !errors.Is(err, ErrInvalid) {
+	if _, err := UpdateMedia(database.WithDB(context.Background(), db), item.ID, decode(t, `{"title":null}`), now); !errors.Is(err, ErrInvalid) {
 		t.Fatalf("expected ErrInvalid for null title, got %v", err)
 	}
 }
@@ -95,18 +97,18 @@ func TestPatchOmittedVsNull(t *testing.T) {
 func TestStatusTransitionsFillDates(t *testing.T) {
 	db := setupTestDB(t)
 	today := time.Date(2026, time.November, 15, 0, 0, 0, 0, time.Local)
-	item, err := CreateMedia(db, decode(t, `{"type":"book","title":"Dune","length":600}`), now)
+	item, err := CreateMedia(database.WithDB(context.Background(), db), decode(t, `{"type":"book","title":"Dune","length":600}`), now)
 	if err != nil {
 		t.Fatal(err)
 	}
-	item, err = UpdateMedia(db, item.ID, decode(t, `{"status":"in_progress"}`), now)
+	item, err = UpdateMedia(database.WithDB(context.Background(), db), item.ID, decode(t, `{"status":"in_progress"}`), now)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if item.StartedAt == nil || !item.StartedAt.Equal(today) {
 		t.Fatalf("expected started_at today, got %v", item.StartedAt)
 	}
-	item, err = UpdateMedia(db, item.ID, decode(t, `{"status":"completed"}`), now)
+	item, err = UpdateMedia(database.WithDB(context.Background(), db), item.ID, decode(t, `{"status":"completed"}`), now)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -115,7 +117,7 @@ func TestStatusTransitionsFillDates(t *testing.T) {
 	}
 
 	// Explicit dates win over defaults.
-	other, err := CreateMedia(db, decode(t, `{"type":"movie","title":"Alien","status":"completed","finished_at":"2020-05-01"}`), now)
+	other, err := CreateMedia(database.WithDB(context.Background(), db), decode(t, `{"type":"movie","title":"Alien","status":"completed","finished_at":"2020-05-01"}`), now)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -123,10 +125,10 @@ func TestStatusTransitionsFillDates(t *testing.T) {
 		t.Fatalf("explicit finished_at overwritten: %v", other.FinishedAt)
 	}
 
-	if _, err := UpdateMedia(db, other.ID, decode(t, `{"started_at":"2021-01-01"}`), now); !errors.Is(err, ErrInvalid) {
+	if _, err := UpdateMedia(database.WithDB(context.Background(), db), other.ID, decode(t, `{"started_at":"2021-01-01"}`), now); !errors.Is(err, ErrInvalid) {
 		t.Fatalf("expected finished-before-started error, got %v", err)
 	}
-	if _, err := UpdateMedia(db, other.ID, decode(t, `{"started_at":"01/02/2020"}`), now); !errors.Is(err, ErrInvalid) {
+	if _, err := UpdateMedia(database.WithDB(context.Background(), db), other.ID, decode(t, `{"started_at":"01/02/2020"}`), now); !errors.Is(err, ErrInvalid) {
 		t.Fatalf("expected bad date error, got %v", err)
 	}
 }
@@ -139,7 +141,7 @@ func TestListFiltersAndSorts(t *testing.T) {
 		`{"type":"book","title":"Dune","creator":"Frank Herbert"}`,
 		`{"type":"tv","title":"The Wire","status":"in_progress"}`,
 	} {
-		if _, err := CreateMedia(db, decode(t, raw), now); err != nil {
+		if _, err := CreateMedia(database.WithDB(context.Background(), db), decode(t, raw), now); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -162,7 +164,7 @@ func TestListFiltersAndSorts(t *testing.T) {
 		{"title sort", ListFilter{Sort: "title"}, []string{"Alien", "Dune", "Heat", "The Wire"}},
 	}
 	for _, tc := range cases {
-		items, err := ListMedia(db, tc.filter)
+		items, err := ListMedia(database.WithDB(context.Background(), db), tc.filter)
 		if err != nil {
 			t.Fatalf("%s: %v", tc.name, err)
 		}
@@ -176,11 +178,11 @@ func TestListFiltersAndSorts(t *testing.T) {
 			}
 		}
 	}
-	if _, err := ListMedia(db, ListFilter{Sort: "bogus"}); !errors.Is(err, ErrInvalid) {
+	if _, err := ListMedia(database.WithDB(context.Background(), db), ListFilter{Sort: "bogus"}); !errors.Is(err, ErrInvalid) {
 		t.Fatalf("expected ErrInvalid for bad sort, got %v", err)
 	}
 
-	stats, err := GetMediaStats(db, now)
+	stats, err := GetMediaStats(database.WithDB(context.Background(), db), now)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -194,7 +196,7 @@ func TestListFiltersAndSorts(t *testing.T) {
 
 func TestDeleteMissing(t *testing.T) {
 	db := setupTestDB(t)
-	if err := DeleteMedia(db, 99); !errors.Is(err, gorm.ErrRecordNotFound) {
+	if err := DeleteMedia(database.WithDB(context.Background(), db), 99); !errors.Is(err, gorm.ErrRecordNotFound) {
 		t.Fatalf("expected not found, got %v", err)
 	}
 }

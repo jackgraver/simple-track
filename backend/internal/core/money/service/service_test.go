@@ -1,6 +1,8 @@
 package service
 
 import (
+	"be-simpletracker/internal/database"
+	"context"
 	"errors"
 	"testing"
 	"time"
@@ -35,7 +37,7 @@ func day(year int, month time.Month, d int) time.Time {
 
 func mustAccount(t *testing.T, db *gorm.DB, input AccountInput, balance *float64, date time.Time) *models.Account {
 	t.Helper()
-	account, err := CreateAccount(db, input, balance, date)
+	account, err := CreateAccount(database.WithDB(context.Background(), db), input, balance, date)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -45,7 +47,7 @@ func mustAccount(t *testing.T, db *gorm.DB, input AccountInput, balance *float64
 func TestTFSAPresetSharesRoomAcrossAccounts(t *testing.T) {
 	db := setupTestDB(t)
 	birthYear := 2004 // eligible from 2022
-	tfsa, err := CreateContributionTypeFromPreset(db, PresetInput{Key: "tfsa"})
+	tfsa, err := CreateContributionTypeFromPreset(database.WithDB(context.Background(), db), PresetInput{Key: "tfsa"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -62,12 +64,12 @@ func TestTFSAPresetSharesRoomAcrossAccounts(t *testing.T) {
 		{second.ID, models.TransactionDeposit, 2_000, day(2025, time.June, 1)},
 		{first.ID, models.TransactionWithdrawal, 3_000, day(2025, time.July, 1)},
 	} {
-		if _, err := CreateTransaction(db, tx.account, TransactionInput{Kind: tx.kind, Amount: tx.amount, Date: tx.date}); err != nil {
+		if _, err := CreateTransaction(database.WithDB(context.Background(), db), tx.account, TransactionInput{Kind: tx.kind, Amount: tx.amount, Date: tx.date}); err != nil {
 			t.Fatal(err)
 		}
 	}
 
-	summary, err := GetContributionType(db, tfsa.ID, &birthYear, day(2026, time.November, 15))
+	summary, err := GetContributionType(database.WithDB(context.Background(), db), tfsa.ID, &birthYear, day(2026, time.November, 15))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -87,10 +89,10 @@ func TestTFSAPresetSharesRoomAcrossAccounts(t *testing.T) {
 	}
 
 	// Deleting an account removes its contributions from the room.
-	if err := DeleteAccount(db, second.ID); err != nil {
+	if err := DeleteAccount(database.WithDB(context.Background(), db), second.ID); err != nil {
 		t.Fatal(err)
 	}
-	summary, err = GetContributionType(db, tfsa.ID, &birthYear, day(2026, time.November, 15))
+	summary, err = GetContributionType(database.WithDB(context.Background(), db), tfsa.ID, &birthYear, day(2026, time.November, 15))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -102,10 +104,10 @@ func TestTFSAPresetSharesRoomAcrossAccounts(t *testing.T) {
 func TestRoomIssueWhenNotConfigured(t *testing.T) {
 	db := setupTestDB(t)
 	age := 18
-	if _, err := CreateContributionType(db, ContributionTypeInput{Name: "Custom", EligibilityAge: &age}); err != nil {
+	if _, err := CreateContributionType(database.WithDB(context.Background(), db), ContributionTypeInput{Name: "Custom", EligibilityAge: &age}); err != nil {
 		t.Fatal(err)
 	}
-	types, err := ListContributionTypes(db, nil, time.Now())
+	types, err := ListContributionTypes(database.WithDB(context.Background(), db), nil, time.Now())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -116,60 +118,60 @@ func TestRoomIssueWhenNotConfigured(t *testing.T) {
 
 func TestContributionTypeValidation(t *testing.T) {
 	db := setupTestDB(t)
-	if _, err := CreateContributionTypeFromPreset(db, PresetInput{Key: "tfsa"}); err != nil {
+	if _, err := CreateContributionTypeFromPreset(database.WithDB(context.Background(), db), PresetInput{Key: "tfsa"}); err != nil {
 		t.Fatal(err)
 	}
 	var validation ValidationError
-	if _, err := CreateContributionType(db, ContributionTypeInput{Name: "tfsa"}); !errors.As(err, &validation) {
+	if _, err := CreateContributionType(database.WithDB(context.Background(), db), ContributionTypeInput{Name: "tfsa"}); !errors.As(err, &validation) {
 		t.Fatalf("expected duplicate name to be rejected, got %v", err)
 	}
 	year := 2025
-	if _, err := CreateContributionType(db, ContributionTypeInput{Name: "X", OpeningRoomYear: &year}); !errors.As(err, &validation) {
+	if _, err := CreateContributionType(database.WithDB(context.Background(), db), ContributionTypeInput{Name: "X", OpeningRoomYear: &year}); !errors.As(err, &validation) {
 		t.Fatalf("expected opening year without amount to be rejected, got %v", err)
 	}
-	if _, err := CreateContributionTypeFromPreset(db, PresetInput{Key: "nope"}); !errors.As(err, &validation) {
+	if _, err := CreateContributionTypeFromPreset(database.WithDB(context.Background(), db), PresetInput{Key: "nope"}); !errors.As(err, &validation) {
 		t.Fatalf("expected unknown preset to be rejected, got %v", err)
 	}
 }
 
 func TestContributionTypeInUseCannotBeDeleted(t *testing.T) {
 	db := setupTestDB(t)
-	rrsp, err := CreateContributionTypeFromPreset(db, PresetInput{Key: "rrsp"})
+	rrsp, err := CreateContributionTypeFromPreset(database.WithDB(context.Background(), db), PresetInput{Key: "rrsp"})
 	if err != nil {
 		t.Fatal(err)
 	}
 	account := mustAccount(t, db, AccountInput{Name: "RRSP", Kind: models.AccountKindInvestment, ContributionTypeID: &rrsp.ID}, nil, time.Now())
-	if err := DeleteContributionType(db, rrsp.ID); err == nil {
+	if err := DeleteContributionType(database.WithDB(context.Background(), db), rrsp.ID); err == nil {
 		t.Fatal("expected delete to fail while assigned")
 	}
-	if _, err := UpdateAccount(db, account.ID, AccountInput{Name: "RRSP", Kind: models.AccountKindInvestment}); err != nil {
+	if _, err := UpdateAccount(database.WithDB(context.Background(), db), account.ID, AccountInput{Name: "RRSP", Kind: models.AccountKindInvestment}); err != nil {
 		t.Fatal(err)
 	}
-	if err := DeleteContributionType(db, rrsp.ID); err != nil {
+	if err := DeleteContributionType(database.WithDB(context.Background(), db), rrsp.ID); err != nil {
 		t.Fatal(err)
 	}
 	// Name is free again after a delete.
-	if _, err := CreateContributionTypeFromPreset(db, PresetInput{Key: "rrsp"}); err != nil {
+	if _, err := CreateContributionTypeFromPreset(database.WithDB(context.Background(), db), PresetInput{Key: "rrsp"}); err != nil {
 		t.Fatal(err)
 	}
 }
 
 func TestLimitUpsertAndDelete(t *testing.T) {
 	db := setupTestDB(t)
-	fhsa, err := CreateContributionTypeFromPreset(db, PresetInput{Key: "fhsa", StartYear: intPtr(2025)})
+	fhsa, err := CreateContributionTypeFromPreset(database.WithDB(context.Background(), db), PresetInput{Key: "fhsa", StartYear: intPtr(2025)})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := UpsertContributionLimit(db, fhsa.ID, 2023, 9_000); err != nil {
+	if _, err := UpsertContributionLimit(database.WithDB(context.Background(), db), fhsa.ID, 2023, 9_000); err != nil {
 		t.Fatal(err)
 	}
-	if err := DeleteContributionLimit(db, fhsa.ID, 2023); err != nil {
+	if err := DeleteContributionLimit(database.WithDB(context.Background(), db), fhsa.ID, 2023); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := UpsertContributionLimit(db, fhsa.ID, 2023, 8_000); err != nil {
+	if _, err := UpsertContributionLimit(database.WithDB(context.Background(), db), fhsa.ID, 2023, 8_000); err != nil {
 		t.Fatal(err)
 	}
-	summary, err := GetContributionType(db, fhsa.ID, nil, day(2026, time.January, 1))
+	summary, err := GetContributionType(database.WithDB(context.Background(), db), fhsa.ID, nil, day(2026, time.January, 1))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -182,25 +184,25 @@ func TestAccountBalancesAndSummary(t *testing.T) {
 	db := setupTestDB(t)
 	opening := 1_000.0
 	account := mustAccount(t, db, AccountInput{Name: "Brokerage", Kind: models.AccountKindInvestment}, &opening, day(2026, time.January, 1))
-	if err := SetBalance(db, account.ID, day(2026, time.March, 1), 1_500); err != nil {
+	if err := SetBalance(database.WithDB(context.Background(), db), account.ID, day(2026, time.March, 1), 1_500); err != nil {
 		t.Fatal(err)
 	}
 	// Same day replaces the snapshot.
-	if err := SetBalance(db, account.ID, day(2026, time.March, 1), 1_600); err != nil {
+	if err := SetBalance(database.WithDB(context.Background(), db), account.ID, day(2026, time.March, 1), 1_600); err != nil {
 		t.Fatal(err)
 	}
 	// Back-dated snapshot does not become the current balance.
-	if err := SetBalance(db, account.ID, day(2025, time.December, 1), 900); err != nil {
+	if err := SetBalance(database.WithDB(context.Background(), db), account.ID, day(2025, time.December, 1), 900); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := CreateTransaction(db, account.ID, TransactionInput{Amount: 500, Date: day(2026, time.February, 1)}); err != nil {
+	if _, err := CreateTransaction(database.WithDB(context.Background(), db), account.ID, TransactionInput{Amount: 500, Date: day(2026, time.February, 1)}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := CreateTransaction(db, account.ID, TransactionInput{Kind: models.TransactionWithdrawal, Amount: 100, Date: day(2026, time.February, 2)}); err != nil {
+	if _, err := CreateTransaction(database.WithDB(context.Background(), db), account.ID, TransactionInput{Kind: models.TransactionWithdrawal, Amount: 100, Date: day(2026, time.February, 2)}); err != nil {
 		t.Fatal(err)
 	}
 
-	summary, err := GetAccount(db, account.ID)
+	summary, err := GetAccount(database.WithDB(context.Background(), db), account.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -211,14 +213,14 @@ func TestAccountBalancesAndSummary(t *testing.T) {
 		t.Fatalf("summary = %+v, want net 400, gain 1200, 2 transactions", summary)
 	}
 
-	balances, err := ListBalances(db, account.ID)
+	balances, err := ListBalances(database.WithDB(context.Background(), db), account.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(balances) != 3 {
 		t.Fatalf("balances = %d, want 3", len(balances))
 	}
-	if err := DeleteBalance(db, account.ID, balances[0].ID); err != nil {
+	if err := DeleteBalance(database.WithDB(context.Background(), db), account.ID, balances[0].ID); err != nil {
 		t.Fatal(err)
 	}
 	var cached models.Account
@@ -231,25 +233,25 @@ func TestAccountBalancesAndSummary(t *testing.T) {
 func TestAccountValidation(t *testing.T) {
 	db := setupTestDB(t)
 	var validation ValidationError
-	if _, err := CreateAccount(db, AccountInput{Name: "", Kind: models.AccountKindChequing}, nil, time.Now()); !errors.As(err, &validation) {
+	if _, err := CreateAccount(database.WithDB(context.Background(), db), AccountInput{Name: "", Kind: models.AccountKindChequing}, nil, time.Now()); !errors.As(err, &validation) {
 		t.Fatalf("expected empty name to be rejected, got %v", err)
 	}
-	if _, err := CreateAccount(db, AccountInput{Name: "X", Kind: "boat"}, nil, time.Now()); !errors.As(err, &validation) {
+	if _, err := CreateAccount(database.WithDB(context.Background(), db), AccountInput{Name: "X", Kind: "boat"}, nil, time.Now()); !errors.As(err, &validation) {
 		t.Fatalf("expected unknown kind to be rejected, got %v", err)
 	}
 	missing := uint(999)
-	if _, err := CreateAccount(db, AccountInput{Name: "X", Kind: models.AccountKindInvestment, ContributionTypeID: &missing}, nil, time.Now()); !errors.As(err, &validation) {
+	if _, err := CreateAccount(database.WithDB(context.Background(), db), AccountInput{Name: "X", Kind: models.AccountKindInvestment, ContributionTypeID: &missing}, nil, time.Now()); !errors.As(err, &validation) {
 		t.Fatalf("expected missing contribution type to be rejected, got %v", err)
 	}
-	tfsa, _ := CreateContributionTypeFromPreset(db, PresetInput{Key: "tfsa"})
-	if _, err := CreateAccount(db, AccountInput{Name: "Card", Kind: models.AccountKindCreditCard, ContributionTypeID: &tfsa.ID}, nil, time.Now()); !errors.As(err, &validation) {
+	tfsa, _ := CreateContributionTypeFromPreset(database.WithDB(context.Background(), db), PresetInput{Key: "tfsa"})
+	if _, err := CreateAccount(database.WithDB(context.Background(), db), AccountInput{Name: "Card", Kind: models.AccountKindCreditCard, ContributionTypeID: &tfsa.ID}, nil, time.Now()); !errors.As(err, &validation) {
 		t.Fatalf("expected liability with contribution type to be rejected, got %v", err)
 	}
 	account := mustAccount(t, db, AccountInput{Name: "Chequing", Kind: models.AccountKindChequing}, nil, time.Now())
-	if _, err := CreateTransaction(db, account.ID, TransactionInput{Amount: 0, Date: time.Now()}); !errors.As(err, &validation) {
+	if _, err := CreateTransaction(database.WithDB(context.Background(), db), account.ID, TransactionInput{Amount: 0, Date: time.Now()}); !errors.As(err, &validation) {
 		t.Fatalf("expected zero amount to be rejected, got %v", err)
 	}
-	if _, err := CreateTransaction(db, account.ID, TransactionInput{Kind: "refund", Amount: 5, Date: time.Now()}); !errors.As(err, &validation) {
+	if _, err := CreateTransaction(database.WithDB(context.Background(), db), account.ID, TransactionInput{Kind: "refund", Amount: 5, Date: time.Now()}); !errors.As(err, &validation) {
 		t.Fatalf("expected unknown transaction kind to be rejected, got %v", err)
 	}
 }
@@ -260,17 +262,17 @@ func TestArchiveHidesAccountAndNetWorthHistory(t *testing.T) {
 	cardBalance := 500.0
 	chequing := mustAccount(t, db, AccountInput{Name: "Chequing", Kind: models.AccountKindChequing}, &chequingBalance, day(2026, time.January, 1))
 	card := mustAccount(t, db, AccountInput{Name: "Visa", Kind: models.AccountKindCreditCard}, &cardBalance, day(2026, time.January, 1))
-	if err := SetBalances(db, day(2026, time.February, 1), []BalanceEntry{
+	if err := SetBalances(database.WithDB(context.Background(), db), day(2026, time.February, 1), []BalanceEntry{
 		{AccountID: chequing.ID, Balance: 2_500},
 		{AccountID: card.ID, Balance: 300},
 	}); err != nil {
 		t.Fatal(err)
 	}
-	if err := SetBalances(db, day(2026, time.March, 1), []BalanceEntry{{AccountID: 999, Balance: 1}}); err == nil {
+	if err := SetBalances(database.WithDB(context.Background(), db), day(2026, time.March, 1), []BalanceEntry{{AccountID: 999, Balance: 1}}); err == nil {
 		t.Fatal("expected unknown account in bulk update to fail")
 	}
 
-	history, err := NetWorthHistory(db)
+	history, err := NetWorthHistory(database.WithDB(context.Background(), db))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -281,17 +283,17 @@ func TestArchiveHidesAccountAndNetWorthHistory(t *testing.T) {
 		t.Fatalf("history = %+v, want 1500 then 2200 with 300 liabilities", history)
 	}
 
-	if _, err := UpdateAccount(db, card.ID, AccountInput{Name: "Visa", Kind: models.AccountKindCreditCard, Archived: true}); err != nil {
+	if _, err := UpdateAccount(database.WithDB(context.Background(), db), card.ID, AccountInput{Name: "Visa", Kind: models.AccountKindCreditCard, Archived: true}); err != nil {
 		t.Fatal(err)
 	}
-	active, err := ListAccounts(db, false)
+	active, err := ListAccounts(database.WithDB(context.Background(), db), false)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(active) != 1 || active[0].ID != chequing.ID {
 		t.Fatalf("active accounts = %+v, want only chequing", active)
 	}
-	all, err := ListAccounts(db, true)
+	all, err := ListAccounts(database.WithDB(context.Background(), db), true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -303,10 +305,10 @@ func TestArchiveHidesAccountAndNetWorthHistory(t *testing.T) {
 	}
 
 	// Past points still count the card; a later point after archiving does not.
-	if err := SetBalance(db, chequing.ID, time.Now().AddDate(0, 0, 1), 3_000); err != nil {
+	if err := SetBalance(database.WithDB(context.Background(), db), chequing.ID, time.Now().AddDate(0, 0, 1), 3_000); err != nil {
 		t.Fatal(err)
 	}
-	history, err = NetWorthHistory(db)
+	history, err = NetWorthHistory(database.WithDB(context.Background(), db))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -324,10 +326,10 @@ func TestTransactionUpdatesBalanceAtomically(t *testing.T) {
 	opening := 1_000.0
 	account := mustAccount(t, db, AccountInput{Name: "Savings", Kind: models.AccountKindCash}, &opening, day(2026, time.March, 1))
 
-	if _, err := CreateTransaction(db, account.ID, TransactionInput{Amount: 250.5, Date: day(2026, time.March, 5), UpdateBalance: true}); err != nil {
+	if _, err := CreateTransaction(database.WithDB(context.Background(), db), account.ID, TransactionInput{Amount: 250.5, Date: day(2026, time.March, 5), UpdateBalance: true}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := CreateTransaction(db, account.ID, TransactionInput{Kind: models.TransactionWithdrawal, Amount: 50.5, Date: day(2026, time.March, 5), UpdateBalance: true}); err != nil {
+	if _, err := CreateTransaction(database.WithDB(context.Background(), db), account.ID, TransactionInput{Kind: models.TransactionWithdrawal, Amount: 50.5, Date: day(2026, time.March, 5), UpdateBalance: true}); err != nil {
 		t.Fatal(err)
 	}
 	var cached models.Account
@@ -338,7 +340,7 @@ func TestTransactionUpdatesBalanceAtomically(t *testing.T) {
 
 	// Before the latest snapshot: rejected, and the transaction is not saved either.
 	var validation ValidationError
-	if _, err := CreateTransaction(db, account.ID, TransactionInput{Amount: 10, Date: day(2026, time.March, 2), UpdateBalance: true}); !errors.As(err, &validation) {
+	if _, err := CreateTransaction(database.WithDB(context.Background(), db), account.ID, TransactionInput{Amount: 10, Date: day(2026, time.March, 2), UpdateBalance: true}); !errors.As(err, &validation) {
 		t.Fatalf("back-dated update err = %v, want validation error", err)
 	}
 	var count int64
@@ -348,7 +350,7 @@ func TestTransactionUpdatesBalanceAtomically(t *testing.T) {
 	}
 
 	// Without UpdateBalance the balance is untouched.
-	if _, err := CreateTransaction(db, account.ID, TransactionInput{Amount: 10, Date: day(2026, time.March, 2)}); err != nil {
+	if _, err := CreateTransaction(database.WithDB(context.Background(), db), account.ID, TransactionInput{Amount: 10, Date: day(2026, time.March, 2)}); err != nil {
 		t.Fatal(err)
 	}
 	db.First(&cached, account.ID)

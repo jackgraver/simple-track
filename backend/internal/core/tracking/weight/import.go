@@ -1,6 +1,8 @@
 package weight
 
 import (
+	"be-simpletracker/internal/database"
+	"context"
 	"encoding/csv"
 	"errors"
 	"fmt"
@@ -155,7 +157,8 @@ func ParseRenphoCSV(text string) ([]BodyWeightLog, error) {
 
 // ImportBodyWeights upserts every log by date in one transaction, replacing all
 // metric columns for matching days. It returns how many rows were created/updated.
-func ImportBodyWeights(db *gorm.DB, logs []BodyWeightLog) (created, updated int, err error) {
+func ImportBodyWeights(ctx context.Context, logs []BodyWeightLog) (created, updated int, err error) {
+	db := database.From(ctx)
 	err = db.Transaction(func(tx *gorm.DB) error {
 		for i := range logs {
 			l := logs[i]

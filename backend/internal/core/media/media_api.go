@@ -6,21 +6,18 @@ import (
 	"be-simpletracker/internal/env"
 
 	"github.com/gin-gonic/gin"
-	"gorm.io/gorm"
 )
 
-type Handler struct {
-	db *gorm.DB
-}
+type Handler struct{}
 
-func NewHandler(db *gorm.DB) *Handler {
-	return &Handler{db: db}
+func NewHandler() *Handler {
+	return &Handler{}
 }
 
 func (h *Handler) RegisterRoutes(router *gin.Engine, authMiddleware gin.HandlerFunc) {
 	lookupService := lookup.NewService(env.OptionalString("TMDB_API_KEY"))
 	applyLookupURLOverrides(lookupService)
-	controller.RegisterMediaRoutes(router.Group("/media", authMiddleware), h.db, lookupService)
+	controller.RegisterMediaRoutes(router.Group("/media", authMiddleware), lookupService)
 }
 
 // applyLookupURLOverrides points the lookup sources at other servers (the e2e suite's fake

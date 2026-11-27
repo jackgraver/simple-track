@@ -1,6 +1,8 @@
 package service
 
 import (
+	"be-simpletracker/internal/database"
+	"context"
 	"errors"
 	"strings"
 	"time"
@@ -36,7 +38,8 @@ type ContributionTypeSummary struct {
 	RoomIssue string `json:"room_issue,omitempty"`
 }
 
-func ListContributionTypes(db *gorm.DB, birthYear *int, now time.Time) ([]ContributionTypeSummary, error) {
+func ListContributionTypes(ctx context.Context, birthYear *int, now time.Time) ([]ContributionTypeSummary, error) {
+	db := database.From(ctx)
 	var types []models.ContributionType
 	if err := db.Preload("Limits", func(tx *gorm.DB) *gorm.DB {
 		return tx.Order("year DESC")
@@ -65,8 +68,8 @@ func ListContributionTypes(db *gorm.DB, birthYear *int, now time.Time) ([]Contri
 	return summaries, nil
 }
 
-func GetContributionType(db *gorm.DB, id uint, birthYear *int, now time.Time) (*ContributionTypeSummary, error) {
-	summaries, err := ListContributionTypes(db, birthYear, now)
+func GetContributionType(ctx context.Context, id uint, birthYear *int, now time.Time) (*ContributionTypeSummary, error) {
+	summaries, err := ListContributionTypes(ctx, birthYear, now)
 	if err != nil {
 		return nil, err
 	}
@@ -137,7 +140,8 @@ func contributionFlows(db *gorm.DB) (map[uint]map[int]YearFlow, error) {
 	return flows, nil
 }
 
-func CreateContributionType(db *gorm.DB, input ContributionTypeInput) (*models.ContributionType, error) {
+func CreateContributionType(ctx context.Context, input ContributionTypeInput) (*models.ContributionType, error) {
+	db := database.From(ctx)
 	contributionType := models.ContributionType{}
 	applyContributionTypeInput(&contributionType, input)
 	if err := validateContributionType(db, contributionType); err != nil {
@@ -149,7 +153,8 @@ func CreateContributionType(db *gorm.DB, input ContributionTypeInput) (*models.C
 	return &contributionType, nil
 }
 
-func UpdateContributionType(db *gorm.DB, id uint, input ContributionTypeInput) (*models.ContributionType, error) {
+func UpdateContributionType(ctx context.Context, id uint, input ContributionTypeInput) (*models.ContributionType, error) {
+	db := database.From(ctx)
 	var contributionType models.ContributionType
 	if err := db.First(&contributionType, id).Error; err != nil {
 		return nil, err
@@ -174,7 +179,8 @@ type PresetInput struct {
 
 // CreateContributionTypeFromPreset creates a contribution type with the
 // preset's rules and limit schedule in one go.
-func CreateContributionTypeFromPreset(db *gorm.DB, input PresetInput) (*models.ContributionType, error) {
+func CreateContributionTypeFromPreset(ctx context.Context, input PresetInput) (*models.ContributionType, error) {
+	db := database.From(ctx)
 	preset, ok := findContributionPreset(input.Key)
 	if !ok {
 		return nil, invalid("unknown preset %q", input.Key)
@@ -215,7 +221,8 @@ func CreateContributionTypeFromPreset(db *gorm.DB, input PresetInput) (*models.C
 	return &contributionType, nil
 }
 
-func DeleteContributionType(db *gorm.DB, id uint) error {
+func DeleteContributionType(ctx context.Context, id uint) error {
+	db := database.From(ctx)
 	var count int64
 	if err := db.Model(&models.Account{}).Where("investment_account_type_id = ?", id).Count(&count).Error; err != nil {
 		return err
@@ -238,7 +245,8 @@ func DeleteContributionType(db *gorm.DB, id uint) error {
 	})
 }
 
-func UpsertContributionLimit(db *gorm.DB, contributionTypeID uint, year int, annualLimit float64) (*models.ContributionLimit, error) {
+func UpsertContributionLimit(ctx context.Context, contributionTypeID uint, year int, annualLimit float64) (*models.ContributionLimit, error) {
+	db := database.From(ctx)
 	if !validYear(year) {
 		return nil, invalid("year must be between 1900 and 9999")
 	}
@@ -270,7 +278,8 @@ func UpsertContributionLimit(db *gorm.DB, contributionTypeID uint, year int, ann
 	return &limit, nil
 }
 
-func DeleteContributionLimit(db *gorm.DB, contributionTypeID uint, year int) error {
+func DeleteContributionLimit(ctx context.Context, contributionTypeID uint, year int) error {
+	db := database.From(ctx)
 	result := db.Unscoped().Where("investment_account_type_id = ? AND year = ?", contributionTypeID, year).Delete(&models.ContributionLimit{})
 	if result.Error != nil {
 		return result.Error

@@ -133,6 +133,9 @@ Each lane adds what its changes need here (README: "Prod changes go in ROLLOUT.m
 - **H1 (HTTP hardening)**: Caddy changes deploy through the separate Caddy j-cicd project
   (`deploy/Caddyfile`, see ARCHITECTURE.md). H1 writes the exact order relative to 3.3 here.
 
+- **B2 (per-request DB handle)**: nothing to do. In 3.4, also check the backend log has no
+  `database: commit` or `database: rollback` errors (a failed commit answers 500).
+
 <!-- Later lanes: add anything else that must happen in this deploy here. -->
 
 ### 3.4 Verify

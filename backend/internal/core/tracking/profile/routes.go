@@ -4,21 +4,18 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"gorm.io/gorm"
 )
 
-type handler struct {
-	db *gorm.DB
-}
+type handler struct{}
 
-func RegisterProfileRoutes(group *gin.RouterGroup, db *gorm.DB) {
-	h := handler{db: db}
+func RegisterProfileRoutes(group *gin.RouterGroup) {
+	h := handler{}
 	group.GET("", h.getProfile)
 	group.PUT("", h.putProfile)
 }
 
 func (h *handler) getProfile(c *gin.Context) {
-	row, err := GetProfile(h.db)
+	row, err := GetProfile(c.Request.Context())
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -43,7 +40,7 @@ func (h *handler) putProfile(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	row, err := UpsertProfile(h.db, body.HeightIn, body.Age, body.Sex, body.ActivityLevel)
+	row, err := UpsertProfile(c.Request.Context(), body.HeightIn, body.Age, body.Sex, body.ActivityLevel)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return

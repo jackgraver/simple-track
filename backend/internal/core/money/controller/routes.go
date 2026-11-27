@@ -2,6 +2,7 @@ package controller
 
 import (
 	"be-simpletracker/internal/clock"
+	"be-simpletracker/internal/database"
 	"errors"
 	"net/http"
 	"strconv"
@@ -16,12 +17,10 @@ import (
 	"gorm.io/gorm"
 )
 
-type Handler struct {
-	db *gorm.DB
-}
+type Handler struct{}
 
-func RegisterRoutes(group *gin.RouterGroup, db *gorm.DB) {
-	h := Handler{db: db}
+func RegisterRoutes(group *gin.RouterGroup) {
+	h := Handler{}
 
 	accounts := group.Group("/accounts")
 	accounts.GET("", h.listAccounts)
@@ -54,7 +53,7 @@ func RegisterRoutes(group *gin.RouterGroup, db *gorm.DB) {
 // ---- Accounts ----
 
 func (h *Handler) listAccounts(c *gin.Context) {
-	accounts, err := service.ListAccounts(h.db, c.Query("archived") == "true")
+	accounts, err := service.ListAccounts(c.Request.Context(), c.Query("archived") == "true")
 	if err != nil {
 		respondError(c, err)
 		return
@@ -67,7 +66,7 @@ func (h *Handler) getAccount(c *gin.Context) {
 	if !ok {
 		return
 	}
-	account, err := service.GetAccount(h.db, id)
+	account, err := service.GetAccount(c.Request.Context(), id)
 	if err != nil {
 		respondError(c, err)
 		return
@@ -91,7 +90,7 @@ func (h *Handler) createAccount(c *gin.Context) {
 	if !ok {
 		return
 	}
-	account, err := service.CreateAccount(h.db, body.AccountInput, body.OpeningBalance, date)
+	account, err := service.CreateAccount(c.Request.Context(), body.AccountInput, body.OpeningBalance, date)
 	if err != nil {
 		respondError(c, err)
 		return
@@ -109,7 +108,7 @@ func (h *Handler) updateAccount(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	account, err := service.UpdateAccount(h.db, id, body)
+	account, err := service.UpdateAccount(c.Request.Context(), id, body)
 	if err != nil {
 		respondError(c, err)
 		return
@@ -122,7 +121,7 @@ func (h *Handler) deleteAccount(c *gin.Context) {
 	if !ok {
 		return
 	}
-	if err := service.DeleteAccount(h.db, id); err != nil {
+	if err := service.DeleteAccount(c.Request.Context(), id); err != nil {
 		respondError(c, err)
 		return
 	}
@@ -136,7 +135,7 @@ func (h *Handler) listBalances(c *gin.Context) {
 	if !ok {
 		return
 	}
-	balances, err := service.ListBalances(h.db, id)
+	balances, err := service.ListBalances(c.Request.Context(), id)
 	if err != nil {
 		respondError(c, err)
 		return
@@ -167,7 +166,7 @@ func (h *Handler) setBalance(c *gin.Context) {
 	if !ok {
 		return
 	}
-	if err := service.SetBalance(h.db, id, date, *body.Balance); err != nil {
+	if err := service.SetBalance(c.Request.Context(), id, date, *body.Balance); err != nil {
 		respondError(c, err)
 		return
 	}
@@ -189,7 +188,7 @@ func (h *Handler) setBalances(c *gin.Context) {
 	if !ok {
 		return
 	}
-	if err := service.SetBalances(h.db, date, body.Balances); err != nil {
+	if err := service.SetBalances(c.Request.Context(), date, body.Balances); err != nil {
 		respondError(c, err)
 		return
 	}
@@ -205,7 +204,7 @@ func (h *Handler) deleteBalance(c *gin.Context) {
 	if !ok {
 		return
 	}
-	if err := service.DeleteBalance(h.db, id, balanceID); err != nil {
+	if err := service.DeleteBalance(c.Request.Context(), id, balanceID); err != nil {
 		respondError(c, err)
 		return
 	}
@@ -213,7 +212,7 @@ func (h *Handler) deleteBalance(c *gin.Context) {
 }
 
 func (h *Handler) netWorthHistory(c *gin.Context) {
-	points, err := service.NetWorthHistory(h.db)
+	points, err := service.NetWorthHistory(c.Request.Context())
 	if err != nil {
 		respondError(c, err)
 		return
@@ -228,7 +227,7 @@ func (h *Handler) listTransactions(c *gin.Context) {
 	if !ok {
 		return
 	}
-	transactions, err := service.ListTransactions(h.db, id)
+	transactions, err := service.ListTransactions(c.Request.Context(), id)
 	if err != nil {
 		respondError(c, err)
 		return
@@ -257,7 +256,7 @@ func (h *Handler) createTransaction(c *gin.Context) {
 	}
 	input := body.TransactionInput
 	input.Date = date
-	transaction, err := service.CreateTransaction(h.db, id, input)
+	transaction, err := service.CreateTransaction(c.Request.Context(), id, input)
 	if err != nil {
 		respondError(c, err)
 		return
@@ -274,7 +273,7 @@ func (h *Handler) deleteTransaction(c *gin.Context) {
 	if !ok {
 		return
 	}
-	if err := service.DeleteTransaction(h.db, id, transactionID); err != nil {
+	if err := service.DeleteTransaction(c.Request.Context(), id, transactionID); err != nil {
 		respondError(c, err)
 		return
 	}
@@ -288,7 +287,7 @@ func (h *Handler) listContributionTypes(c *gin.Context) {
 	if !ok {
 		return
 	}
-	types, err := service.ListContributionTypes(h.db, birthYear, clock.Now())
+	types, err := service.ListContributionTypes(c.Request.Context(), birthYear, clock.Now())
 	if err != nil {
 		respondError(c, err)
 		return
@@ -305,7 +304,7 @@ func (h *Handler) getContributionType(c *gin.Context) {
 	if !ok {
 		return
 	}
-	contributionType, err := service.GetContributionType(h.db, id, birthYear, clock.Now())
+	contributionType, err := service.GetContributionType(c.Request.Context(), id, birthYear, clock.Now())
 	if err != nil {
 		respondError(c, err)
 		return
@@ -323,7 +322,7 @@ func (h *Handler) createFromPreset(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	contributionType, err := service.CreateContributionTypeFromPreset(h.db, body)
+	contributionType, err := service.CreateContributionTypeFromPreset(c.Request.Context(), body)
 	if err != nil {
 		respondError(c, err)
 		return
@@ -337,7 +336,7 @@ func (h *Handler) createContributionType(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	contributionType, err := service.CreateContributionType(h.db, body)
+	contributionType, err := service.CreateContributionType(c.Request.Context(), body)
 	if err != nil {
 		respondError(c, err)
 		return
@@ -355,7 +354,7 @@ func (h *Handler) updateContributionType(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	contributionType, err := service.UpdateContributionType(h.db, id, body)
+	contributionType, err := service.UpdateContributionType(c.Request.Context(), id, body)
 	if err != nil {
 		respondError(c, err)
 		return
@@ -368,7 +367,7 @@ func (h *Handler) deleteContributionType(c *gin.Context) {
 	if !ok {
 		return
 	}
-	if err := service.DeleteContributionType(h.db, id); err != nil {
+	if err := service.DeleteContributionType(c.Request.Context(), id); err != nil {
 		respondError(c, err)
 		return
 	}
@@ -397,7 +396,7 @@ func (h *Handler) upsertLimit(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "annual_limit is required"})
 		return
 	}
-	limit, err := service.UpsertContributionLimit(h.db, id, year, *body.AnnualLimit)
+	limit, err := service.UpsertContributionLimit(c.Request.Context(), id, year, *body.AnnualLimit)
 	if err != nil {
 		respondError(c, err)
 		return
@@ -414,7 +413,7 @@ func (h *Handler) deleteLimit(c *gin.Context) {
 	if !ok {
 		return
 	}
-	if err := service.DeleteContributionLimit(h.db, id, year); err != nil {
+	if err := service.DeleteContributionLimit(c.Request.Context(), id, year); err != nil {
 		respondError(c, err)
 		return
 	}
@@ -470,7 +469,7 @@ func (h *Handler) currentUserBirthYear(c *gin.Context) (*int, bool) {
 		return nil, false
 	}
 	var user authmodels.User
-	if err := h.db.Select("birth_year").Where("username = ?", username).First(&user).Error; err != nil {
+	if err := database.From(c.Request.Context()).Select("birth_year").Where("username = ?", username).First(&user).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, true
 		}

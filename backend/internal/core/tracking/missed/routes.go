@@ -4,12 +4,11 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"gorm.io/gorm"
 )
 
-func RegisterMissedRoutes(group *gin.RouterGroup, db *gorm.DB) {
+func RegisterMissedRoutes(group *gin.RouterGroup) {
 	group.GET("/missed", func(c *gin.Context) {
-		date, missingWeight, missingSteps, err := GetMissedYesterday(db)
+		date, missingWeight, missingSteps, err := GetMissedYesterday(c.Request.Context())
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
