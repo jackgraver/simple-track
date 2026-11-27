@@ -30,7 +30,8 @@ func GetDB() *gorm.DB { return db_conn }
 //     connects as: DML only, no ownership, so row-level security applies to it.
 //   - the owner role (DATABASE_OWNER_URL) owns the schema. cmd/migrate, devseed, e2eseed and
 //     devuser use it. Without DATABASE_OWNER_URL they fall back to the app DSN (a single-role
-//     setup), and migrations then fail on the first DDL rather than doing anything surprising.
+//     setup) with a warning: migrations then fail at their first DDL, while DML-only tools
+//     (seeds, devuser) still work.
 
 // ConnectApp opens the server's pool on the app DSN and makes it the global connection.
 func ConnectApp() (*gorm.DB, error) {
@@ -122,6 +123,7 @@ func AppDSN() (string, error) {
 func OwnerDSN() (string, error) {
 	d := env.OptionalString("DATABASE_OWNER_URL")
 	if d == "" {
+		log.Printf("database: DATABASE_OWNER_URL not set; using the app DSN as the owner")
 		return AppDSN()
 	}
 	if env.IsProduction() {

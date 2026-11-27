@@ -22,18 +22,22 @@ import (
 const AppRole = "simpletrack_app"
 
 // CheckAppRole reports why the connection's current role must not run the server: superuser,
-// BYPASSRLS, or owner of a table in the public schema. Any of these silently switches off
-// row-level security. Nil means the role is fine.
+// BYPASSRLS, owner of a table in the public schema (directly or by inheriting the owner's
+// role: RLS treats both as the owner), or a member of a superuser/BYPASSRLS role (one SET ROLE
+// away). Any of these switches off row-level security. Nil means the role is fine.
 func CheckAppRole(ctx context.Context, db rowQuerier) error {
 	var (
-		user          string
-		super, bypass bool
-		owned         int
+		user            string
+		super, bypass   bool
+		owned, powerful int
 	)
 	err := db.QueryRowContext(ctx, `
 		SELECT current_user, r.rolsuper, r.rolbypassrls,
-		       (SELECT count(*) FROM pg_tables WHERE schemaname = 'public' AND tableowner = current_user)
-		FROM pg_roles r WHERE r.rolname = current_user`).Scan(&user, &super, &bypass, &owned)
+		       (SELECT count(*) FROM pg_tables WHERE schemaname = 'public'
+		          AND pg_has_role(current_user, tableowner, 'USAGE')),
+		       (SELECT count(*) FROM pg_roles p WHERE p.rolname <> current_user
+		          AND (p.rolsuper OR p.rolbypassrls) AND pg_has_role(current_user, p.oid, 'MEMBER'))
+		FROM pg_roles r WHERE r.rolname = current_user`).Scan(&user, &super, &bypass, &owned, &powerful)
 	if err != nil {
 		return fmt.Errorf("read current role: %w", err)
 	}
@@ -45,7 +49,10 @@ func CheckAppRole(ctx context.Context, db rowQuerier) error {
 		why = append(why, "has BYPASSRLS")
 	}
 	if owned > 0 {
-		why = append(why, fmt.Sprintf("owns %d table(s)", owned))
+		why = append(why, fmt.Sprintf("owns (or inherits the owner of) %d table(s)", owned))
+	}
+	if powerful > 0 {
+		why = append(why, fmt.Sprintf("is a member of %d superuser/BYPASSRLS role(s)", powerful))
 	}
 	if len(why) == 0 {
 		return nil
@@ -83,10 +90,12 @@ func ensureLogin(ctx context.Context, owner *sql.DB, dsn, role string) (bool, er
 	if cfg.Password == "" {
 		return false, fmt.Errorf("the app DSN for %s has no password", role)
 	}
-	if err := tryConnect(ctx, cfg); err == nil {
+	connErr := tryConnect(ctx, cfg)
+	if connErr == nil {
 		return false, nil
-	} else if !isAuthError(err) {
-		return false, fmt.Errorf("connect as %s: %w", role, err)
+	}
+	if err := needsBootstrap(ctx, owner, role, connErr); err != nil {
+		return false, err
 	}
 	verifier, err := scramVerifier(cfg.Password)
 	if err != nil {
@@ -99,6 +108,12 @@ func ensureLogin(ctx context.Context, owner *sql.DB, dsn, role string) (bool, er
 		return false, err
 	}
 	if _, err := owner.ExecContext(ctx, stmt); err != nil {
+		// Another `migrate up` against the same cluster (e2e templates built in parallel) may have
+		// updated the role at the same moment ("tuple concurrently updated"). If the DSN works
+		// now, that run did our job.
+		if tryConnect(ctx, cfg) == nil {
+			return false, nil
+		}
 		return false, fmt.Errorf("set %s login: %w", role, err)
 	}
 	if err := tryConnect(ctx, cfg); err != nil {
@@ -107,18 +122,43 @@ func ensureLogin(ctx context.Context, owner *sql.DB, dsn, role string) (bool, er
 	return true, nil
 }
 
+// needsBootstrap decides whether a failed login is ours to fix. Wrong password (28P01): yes, the
+// DSN's password is the source of truth (rotation). Can't log in (28000): only while the role is
+// still as migration 0010 left it, NOLOGIN with no password. A role with a password that is
+// NOLOGIN was switched off by someone on purpose, and a 28000 for a LOGIN role is pg_hba or
+// similar; neither is fixed by resetting the password.
+func needsBootstrap(ctx context.Context, owner *sql.DB, role string, connErr error) error {
+	var pgErr *pgconn.PgError
+	if !errors.As(connErr, &pgErr) || (pgErr.Code != "28P01" && pgErr.Code != "28000") {
+		return fmt.Errorf("connect as %s: %w", role, connErr)
+	}
+	if pgErr.Code == "28P01" {
+		return nil
+	}
+	var canLogin bool
+	if err := owner.QueryRowContext(ctx, `SELECT rolcanlogin FROM pg_roles WHERE rolname = $1`, role).Scan(&canLogin); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return fmt.Errorf("role %s doesn't exist: run every migration first (0010 creates it)", role)
+		}
+		return err
+	}
+	if canLogin {
+		return fmt.Errorf("connect as %s (it can log in, so this isn't a missing password; check pg_hba.conf): %w", role, connErr)
+	}
+	// pg_authid is readable by superusers only; without it, assume the 0010 state.
+	var hasPassword bool
+	if err := owner.QueryRowContext(ctx, `SELECT rolpassword IS NOT NULL FROM pg_authid WHERE rolname = $1`, role).Scan(&hasPassword); err == nil && hasPassword {
+		return fmt.Errorf("role %s has a password but NOLOGIN, so it was disabled deliberately; re-enable it by hand (ALTER ROLE %s LOGIN) if that's intended", role, role)
+	}
+	return nil
+}
+
 func tryConnect(ctx context.Context, cfg *pgx.ConnConfig) error {
 	conn, err := pgx.ConnectConfig(ctx, cfg)
 	if err != nil {
 		return err
 	}
 	return conn.Close(ctx)
-}
-
-// isAuthError: wrong password (28P01) or role can't log in / doesn't exist (28000).
-func isAuthError(err error) bool {
-	var pgErr *pgconn.PgError
-	return errors.As(err, &pgErr) && (pgErr.Code == "28P01" || pgErr.Code == "28000")
 }
 
 // scramVerifier builds the SCRAM-SHA-256 secret Postgres stores for a password (RFC 5802 /

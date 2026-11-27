@@ -89,6 +89,8 @@ func main() {
 	addr := env.StringOr("LISTEN_ADDR", "0.0.0.0:8080")
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+	// After the first signal, restore default handling so a second Ctrl-C/SIGTERM kills at once.
+	go func() { <-ctx.Done(); stop() }()
 	if err := serve(ctx, newHTTPServer(addr, router), db); err != nil {
 		log.Fatal(err)
 	}

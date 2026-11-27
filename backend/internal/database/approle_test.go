@@ -208,10 +208,47 @@ func TestEnsureLogin(t *testing.T) {
 		t.Fatalf("rotation: changed=%v err=%v", changed, err)
 	}
 
+	// A role someone switched off (has a password, NOLOGIN) is not silently re-enabled.
+	if _, err := admin.Exec("ALTER ROLE " + role + " NOLOGIN"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := ensureLogin(ctx, admin, dsn.String(), role); err == nil || !strings.Contains(err.Error(), "deliberately") {
+		t.Fatalf("NOLOGIN role with a password: want a refusal, got %v", err)
+	}
+
 	// A DSN for some other role is left alone.
 	other := *u
 	other.User = url.UserPassword("someone_else", "x")
 	if changed, err := ensureLogin(ctx, admin, other.String(), role); err != nil || changed {
 		t.Fatalf("other role: changed=%v err=%v", changed, err)
+	}
+}
+
+// A role that inherits the table owner's role is treated as the owner by RLS, so it's refused.
+func TestCheckAppRoleRejectsOwnerMembership(t *testing.T) {
+	db := migratedDB(t)
+	ctx := context.Background()
+	role := fmt.Sprintf("approle_member_%d", rand.Uint32())
+	var owner string
+	if err := db.QueryRow("SELECT current_user").Scan(&owner); err != nil {
+		t.Fatal(err)
+	}
+	for _, q := range []string{"CREATE ROLE " + role + " NOLOGIN", fmt.Sprintf("GRANT %q TO %s", owner, role)} {
+		if _, err := db.Exec(q); err != nil {
+			t.Fatal(err)
+		}
+	}
+	t.Cleanup(func() { db.Exec("DROP ROLE IF EXISTS " + role) })
+	c, err := db.Conn(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer c.Close()
+	if _, err := c.ExecContext(ctx, "SET ROLE "+role); err != nil {
+		t.Fatal(err)
+	}
+	defer c.ExecContext(ctx, "RESET ROLE")
+	if err := CheckAppRole(ctx, c); err == nil {
+		t.Fatal("CheckAppRole accepted a member of the owner role")
 	}
 }

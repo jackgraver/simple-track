@@ -13,6 +13,8 @@
 
 -- migrate:up
 DO $$
+DECLARE
+  r record;
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'simpletrack_app') THEN
     BEGIN
@@ -27,6 +29,14 @@ BEGIN
              AND (rolsuper OR rolbypassrls OR rolcreatedb OR rolcreaterole OR rolreplication)) THEN
     ALTER ROLE simpletrack_app NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS;
   END IF;
+
+  -- ...and of any role memberships: inheriting the table owner's role would make RLS treat the
+  -- app as the owner. (The server's CheckAppRole refuses that too.)
+  FOR r IN SELECT g.rolname FROM pg_auth_members m
+           JOIN pg_roles g ON g.oid = m.roleid
+           WHERE m.member = 'simpletrack_app'::regrole LOOP
+    EXECUTE format('REVOKE %I FROM simpletrack_app', r.rolname);
+  END LOOP;
 
   -- Timeouts apply to every session the role opens (not to the owner, so migrations are
   -- unaffected). statement_timeout caps a runaway query; idle_in_transaction_session_timeout
@@ -64,6 +74,8 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE O
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT USAGE, SELECT ON SEQUENCES TO simpletrack_app;
 
 -- migrate:down
+-- Leaves REVOKE CREATE ON SCHEMA public FROM PUBLIC in place: it is the Postgres 15+ default
+-- and nothing should depend on PUBLIC creating tables.
 -- Leaves the role itself (and its cluster-wide settings) in place: other databases on the same
 -- server may use it. Drop it by hand once no database grants it anything.
 ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE SELECT, INSERT, UPDATE, DELETE ON TABLES FROM simpletrack_app;

@@ -47,7 +47,9 @@ the compose file and `.env.vps` must be updated before the deploy, not after.
    (the postgres image makes `POSTGRES_USER` a superuser).
 4. No leftover role: `SELECT rolname, rolcanlogin FROM pg_roles WHERE rolname = 'simpletrack_app';`
    should return nothing. If it exists, the migration strips any superuser/BYPASSRLS/CREATEROLE
-   from it and `migrate up` resets its password, so it's safe, but find out where it came from.
+   and role memberships from it, and `migrate up` resets a wrong password, so it's safe, but
+   find out where it came from. One that has a password but is NOLOGIN makes `migrate up` stop
+   (it won't re-enable a role someone disabled): drop it or `ALTER ROLE ... LOGIN` first.
 5. Headroom: `SHOW max_connections;` (default 100). The server uses at most 20
    (`DB_MAX_OPEN_CONNS`), migrate a few, so anything ≥ 40 is fine.
 
@@ -161,6 +163,9 @@ Then sign in on the site and use each module once.
   Open connections survive the change, but new ones fail until the restart, so do both together.
   A normal backend deploy does the same: pre_swap, then recreate.
 - **Tune the pool:** set `DB_MAX_OPEN_CONNS` etc. in `.env.vps` and recreate the backend.
+- **Cut the server off from the DB in an emergency:** `ALTER ROLE simpletrack_app NOLOGIN;` plus
+  `SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE usename = 'simpletrack_app';`.
+  Later deploys' `migrate up` then fail on purpose until you run `ALTER ROLE simpletrack_app LOGIN;`.
 - **Ad-hoc SQL:** `psql_owner` sees everything. Once RLS is on, connecting as `simpletrack_app`
   shows only rows matching `app.user_id`, and none without it.
 - **Possible follow-up:** `deploy.compose_file: docker-compose.vps.yml` in `.cicd.yaml` would ship
