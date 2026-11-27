@@ -17,7 +17,6 @@ import (
 	"log"
 	"os"
 	"os/signal"
-	"strings"
 	"syscall"
 	"time"
 
@@ -46,18 +45,20 @@ func main() {
 		router.Use(utils.BenchmarkMiddleware(router))
 	}
 
-	defaultCORS := "http://localhost:5173,http://localhost:3000,http://192.168.4.78:3000,http://192.168.4.64:3000"
-	corsOrigins := env.StringOr("CORS_ORIGINS", defaultCORS)
-	origins := splitString(corsOrigins, ",")
+	// First, so every response (including CORS preflights and 404s) gets it.
+	router.Use(hardening(defaultBodyLimit, bodyLimits))
 
-	router.Use(cors.New(cors.Config{
-		AllowOrigins:     origins,
-		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE"},
-		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization"},
-		AllowCredentials: true,
-		ExposeHeaders:    []string{"Set-Cookie"},
-		MaxAge:           12 * time.Hour,
-	}))
+	// The SPA and API share one origin (Caddy in prod, the Vite proxy in dev), so CORS is only
+	// for origins listed explicitly. No default list (BACKLOG #18).
+	if origins := env.SliceOr("CORS_ORIGINS", ",", nil); len(origins) > 0 {
+		router.Use(cors.New(cors.Config{
+			AllowOrigins:     origins,
+			AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE"},
+			AllowHeaders:     []string{"Origin", "Content-Type", "Authorization"},
+			AllowCredentials: true,
+			MaxAge:           12 * time.Hour,
+		}))
+	}
 
 	trustedProxies := env.SliceOr("TRUSTED_PROXIES", ",", nil)
 	if err := router.SetTrustedProxies(trustedProxies); err != nil {
@@ -94,17 +95,6 @@ func main() {
 	if err := serve(ctx, newHTTPServer(addr, router), db); err != nil {
 		log.Fatal(err)
 	}
-}
-
-func splitString(s, sep string) []string {
-	var result []string
-	for _, part := range strings.Split(s, sep) {
-		trimmed := strings.TrimSpace(part)
-		if trimmed != "" {
-			result = append(result, trimmed)
-		}
-	}
-	return result
 }
 
 // checkRole: the server must not connect as a role that row-level security doesn't apply to.

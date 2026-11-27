@@ -1,6 +1,26 @@
 st.jackgraver.ca {
 	encode zstd gzip
+
+	# Security headers for every response (docs/ARCHITECTURE.md, "Caddy").
+	# The script-src hash is the inline theme script in frontend/index.html. Changing that script
+	# changes the hash: update it here and deploy Caddy first (frontend/src/csp.test.ts checks
+	# the two match). style-src needs 'unsafe-inline' for Vue/reka-ui/motion style attributes.
+	# img-src allows https: for media covers from external catalogs; data: is Vite-inlined assets.
+	header {
+		Content-Security-Policy "default-src 'self'; script-src 'self' 'sha256-44qDB288fdEkKLtlUj7HtSeCbmOHXAR1iVNTw6jxh/0='; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		# Not no-referrer: that makes browsers send "Origin: null" on same-origin POSTs.
+		Referrer-Policy "same-origin"
+		Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(), usb=()"
+		-Server
+	}
+
 	handle_path /api/* {
+		# Outer guard; the backend enforces per-route limits (1 MiB default, 5 MiB weight import).
+		request_body {
+			max_size 6MB
+		}
 		reverse_proxy 127.0.0.1:8080
 	}
 	handle {

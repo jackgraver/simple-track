@@ -67,14 +67,14 @@ Depends on: none
 ### H1 HTTP hardening
 Depends on: none. Can run alongside B2. Must merge before C6's `/setup/:token` page.
 Touches Caddy: read `docs/ARCHITECTURE.md` and `j-cicd guide` first.
-- [ ] #7 Security headers in `deploy/Caddyfile` for the whole site: CSP (start from the
+- [x] #7 Security headers in `deploy/Caddyfile` for the whole site: CSP (start from the
       BACKLOG suggestion, tighten against the real build output), `frame-ancestors 'none'`,
       `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy`, drop the `Server` banner.
-- [ ] #8 Request body limits: backend middleware with a small default and an explicit larger
+- [x] #8 Request body limits: backend middleware with a small default and an explicit larger
       limit on the weight import route (plus a row cap); `request_body max_size` under `/api` in Caddy.
-- [ ] #17 `Cache-Control: no-store` on every `/api` response.
-- [ ] #18 No default CORS origins (same-origin only); drop `ExposeHeaders: Set-Cookie`.
-- [ ] Verify the headers against a local prod-like stack (images + Caddy) and that the app,
+- [x] #17 `Cache-Control: no-store` on every `/api` response.
+- [x] #18 No default CORS origins (same-origin only); drop `ExposeHeaders: Set-Cookie`.
+- [x] Verify the headers against a local prod-like stack (images + Caddy) and that the app,
       PWA and phone proxy still work. Add the Caddy deploy order to ROLLOUT 3.3a.
 - Done when: a test covers body limits and `Cache-Control`; the CSP produces no console
   violations on any page.

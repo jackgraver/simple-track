@@ -53,6 +53,10 @@ func isBlank(s string) bool {
 	return s == "" || s == "--"
 }
 
+// MaxImportRows caps the data rows in one import (BACKLOG #8), so one request can't hold a
+// transaction open for an unbounded number of upserts. About 27 years of daily weigh-ins.
+const MaxImportRows = 10000
+
 // ParseRenphoCSV parses a Renpho CSV export (comma or tab separated, as copied to
 // the clipboard). Rows sharing a date collapse to the latest measurement.
 func ParseRenphoCSV(text string) ([]BodyWeightLog, error) {
@@ -76,6 +80,9 @@ func ParseRenphoCSV(text string) ([]BodyWeightLog, error) {
 	}
 	if len(records) < 2 {
 		return nil, errors.New("expected a header row and at least one data row")
+	}
+	if len(records)-1 > MaxImportRows {
+		return nil, fmt.Errorf("too many rows (%d); import at most %d at a time", len(records)-1, MaxImportRows)
 	}
 
 	header := map[string]int{}

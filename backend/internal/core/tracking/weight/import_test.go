@@ -84,3 +84,18 @@ func TestImportBodyWeightsUpserts(t *testing.T) {
 		t.Fatalf("unexpected rows: %+v", rows)
 	}
 }
+
+func TestParseRenphoCSVRowCap(t *testing.T) {
+	row := "2026.11.19,164.2\n"
+	if _, err := ParseRenphoCSV("Date,Weight(lb)\n" + strings.Repeat(row, MaxImportRows)); err != nil {
+		t.Fatalf("%d rows: %v", MaxImportRows, err)
+	}
+	_, err := ParseRenphoCSV("Date,Weight(lb)\n" + strings.Repeat(row, MaxImportRows+1))
+	if err == nil || !strings.Contains(err.Error(), "too many rows") {
+		t.Fatalf("%d rows: err = %v, want too many rows", MaxImportRows+1, err)
+	}
+	// A full Renpho export at the cap fits the route's body limit (cmd/server bodyLimits).
+	if n := len(renphoHeader) + MaxImportRows*len(renphoRow)*11/10; n > 5<<20 {
+		t.Fatalf("a %d-row export is ~%d bytes, over the 5 MiB import limit", MaxImportRows, n)
+	}
+}
