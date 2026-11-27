@@ -107,6 +107,11 @@ func Login(c *gin.Context, service *services.AuthService, cookie CookieConfig, p
 	}
 
 	protection.Wait(c.Request.Context(), decision.Delay)
+	if c.Request.Context().Err() != nil {
+		// The client went away during the backoff: don't check the password or log a failure.
+		c.Abort()
+		return
+	}
 	result, err := service.Login(c.Request.Context(), services.LoginInput{
 		Username: req.Username,
 		Password: req.Password,

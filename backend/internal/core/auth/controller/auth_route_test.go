@@ -127,3 +127,30 @@ func TestLoginDoesNotLogUnknownUsernames(t *testing.T) {
 		t.Fatalf("existing username not logged: %s", logs.String())
 	}
 }
+
+func TestLoginStopsWhenClientLeavesDuringBackoff(t *testing.T) {
+	router, logs := setupLoginRouteTest(t, LoginProtectionConfig{
+		Window:         time.Hour,
+		MaxPerIP:       100,
+		MaxPerUsername: 1,
+	})
+	// Two attempts from other sources use up the free username-wide budget (2*MaxPerUsername).
+	for _, ip := range []string{"192.0.2.10", "192.0.2.11"} {
+		req := httptest.NewRequest(http.MethodPost, "/login", strings.NewReader(`{"username":"alice","password":"wrong-password"}`))
+		req.Header.Set("Content-Type", "application/json")
+		req.RemoteAddr = ip + ":1234"
+		router.ServeHTTP(httptest.NewRecorder(), req)
+	}
+	logs.Reset()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	req := httptest.NewRequest(http.MethodPost, "/login", strings.NewReader(`{"username":"alice","password":"wrong-password"}`)).WithContext(ctx)
+	req.Header.Set("Content-Type", "application/json")
+	req.RemoteAddr = "192.0.2.12:1234"
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+	if rec.Body.Len() != 0 || strings.Contains(logs.String(), "server_error") || strings.Contains(logs.String(), "invalid_credentials") {
+		t.Fatalf("cancelled request was processed: body=%q logs=%s", rec.Body.String(), logs.String())
+	}
+}

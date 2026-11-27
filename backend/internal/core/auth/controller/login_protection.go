@@ -11,7 +11,18 @@ import (
 	"time"
 )
 
-const maxLoginRateEntries = 10000
+// maxLoginRateEntries caps the limiter's memory (roughly 150 bytes per entry). When full, the
+// lowest-count, oldest entries go first (makeRoom).
+const maxLoginRateEntries = 100000
+
+// A source (IPv4 address or IPv6 /64) that signed in to a username is trusted for that
+// username for trustedSourceFor: it skips the username-wide backoff queue, so a distributed
+// attack on the username can't keep its owner out from their usual networks. It still has
+// the per-IP and per-(ip, username) limits. At most maxTrustedSources are remembered.
+const (
+	trustedSourceFor  = 30 * 24 * time.Hour
+	maxTrustedSources = 1000
+)
 
 // Username-wide pressure (all sources combined) doesn't hard-block a username for a window.
 // Once a username has seen 2*MaxPerUsername attempts in a window, each further attempt gets a
@@ -81,6 +92,7 @@ type LoginProtection struct {
 	now                 func() time.Time
 	sleep               func(ctx context.Context, d time.Duration)
 	maxEntries          int
+	trusted             map[string]time.Time // pair key -> trusted until
 	lastCleanup         time.Time
 	lastCapacityWarning time.Time
 }
@@ -111,6 +123,7 @@ func NewLoginProtection(config LoginProtectionConfig, logger *slog.Logger) *Logi
 		config:  config,
 		entries: make(map[string]*loginRateWindow),
 		sprays:  make(map[string]*credentialSprayWindow),
+		trusted: make(map[string]time.Time),
 		logger:  logger,
 		now:     time.Now,
 		sleep: func(ctx context.Context, d time.Duration) {
@@ -168,10 +181,12 @@ func (p *LoginProtection) Allow(clientIP, username string) LoginDecision {
 		}
 	}
 
-	// Username-wide backoff: reserve the next slot, or reject if the queue is too long.
+	// Username-wide backoff: reserve the next slot, or reject if the queue is too long. A
+	// trusted source skips the queue (its attempt is still counted).
+	trusted := now.Before(p.trusted[pairKey])
 	attempt := 1
 	start := now
-	if entry, ok := p.entries[usernameKey]; ok && now.Before(entry.ResetAt) {
+	if entry, ok := p.entries[usernameKey]; ok && now.Before(entry.ResetAt) && !trusted {
 		attempt = entry.Count + 1
 		if entry.NextAt.After(start) {
 			start = entry.NextAt
@@ -194,7 +209,7 @@ func (p *LoginProtection) Allow(clientIP, username string) LoginDecision {
 	p.increment(pairKey, now)
 	p.increment(usernameKey, now)
 	step := p.usernameStep(attempt)
-	if step == 0 {
+	if step == 0 || trusted {
 		return LoginDecision{Allowed: true}
 	}
 	entry := p.entries[usernameKey]
@@ -250,20 +265,34 @@ func (p *LoginProtection) makeRoom(now time.Time, keys []string) {
 	type aged struct {
 		key   string
 		at    time.Time
-		keep  bool // blocking/backing off: evicted only after every plain entry
+		count int  // attempts (entries) or distinct usernames (sprays): low counts go first
+		keep  bool // blocking/backing off: evicted only after every other entry
 		spray bool
+	}
+	current := make(map[string]bool, len(keys))
+	for _, k := range keys {
+		current[k] = true // never evict what this request is about to update
 	}
 	all := make([]aged, 0, len(p.entries)+len(p.sprays))
 	for k, e := range p.entries {
+		if current[k] {
+			continue
+		}
 		live := now.Before(e.ResetAt)
-		all = append(all, aged{k, e.ResetAt, live && e.Count >= p.limitFor(k), false})
+		all = append(all, aged{k, e.ResetAt, e.Count, live && e.Count >= p.limitFor(k), false})
 	}
 	for k, sp := range p.sprays {
-		all = append(all, aged{k, sp.ResetAt, now.Before(sp.BlockedUntil), true})
+		if current[k] {
+			continue
+		}
+		all = append(all, aged{k, sp.ResetAt, len(sp.Usernames), now.Before(sp.BlockedUntil), true})
 	}
 	sort.Slice(all, func(i, j int) bool {
 		if all[i].keep != all[j].keep {
 			return !all[i].keep
+		}
+		if all[i].count != all[j].count {
+			return all[i].count < all[j].count
 		}
 		return all[i].at.Before(all[j].at)
 	})
@@ -321,11 +350,24 @@ func (p *LoginProtection) RecordSuccess(clientIP, username string) {
 	defer p.mu.Unlock()
 	usernameKey := normalizeLoginKey(username)
 	ip := loginClientKey(clientIP)
-	delete(p.entries, "username:"+usernameKey)
-	delete(p.entries, "pair:"+ip+"|"+usernameKey)
+	pairKey := "pair:" + ip + "|" + usernameKey
+	// Only this source's state is reset. The username-wide counter runs out with its window,
+	// so one successful login doesn't give a distributed attack a fresh, undelayed budget.
+	delete(p.entries, pairKey)
 	if spray, ok := p.sprays["ip:"+ip]; ok {
 		delete(spray.Usernames, usernameKey)
 	}
+	now := p.now()
+	if _, ok := p.trusted[pairKey]; !ok && len(p.trusted) >= maxTrustedSources {
+		oldestKey, oldest := "", time.Time{}
+		for k, until := range p.trusted {
+			if oldestKey == "" || until.Before(oldest) {
+				oldestKey, oldest = k, until
+			}
+		}
+		delete(p.trusted, oldestKey)
+	}
+	p.trusted[pairKey] = now.Add(trustedSourceFor)
 }
 
 // LogAttempt records a login attempt. knownUser says whether username exists in users; an
@@ -366,6 +408,11 @@ func (p *LoginProtection) cleanupExpired(now time.Time) {
 		blockExpired := spray.BlockedUntil.IsZero() || !now.Before(spray.BlockedUntil)
 		if blockExpired && !now.Before(spray.ResetAt) {
 			delete(p.sprays, key)
+		}
+	}
+	for key, until := range p.trusted {
+		if !now.Before(until) {
+			delete(p.trusted, key)
 		}
 	}
 	p.lastCleanup = now

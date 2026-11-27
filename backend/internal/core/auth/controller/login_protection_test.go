@@ -269,7 +269,7 @@ func TestLoginProtectionLimitsIPAcrossUsernames(t *testing.T) {
 	}
 }
 
-func TestLoginProtectionSuccessResetsUsernameLimit(t *testing.T) {
+func TestLoginProtectionSuccessResetsPairLimit(t *testing.T) {
 	protection := NewLoginProtection(LoginProtectionConfig{
 		Window:         time.Minute,
 		MaxPerIP:       100,
@@ -279,8 +279,88 @@ func TestLoginProtectionSuccessResetsUsernameLimit(t *testing.T) {
 		t.Fatal("first attempt blocked")
 	}
 	protection.RecordSuccess("192.0.2.1", "Alice")
-	if !protection.Allow("192.0.2.2", "alice").Allowed {
-		t.Fatal("successful login did not reset username limit")
+	if !protection.Allow("192.0.2.1", "alice").Allowed {
+		t.Fatal("successful login did not reset the pair limit")
+	}
+}
+
+// A successful login doesn't hand a distributed attack a fresh, undelayed budget, but the
+// source that signed in skips the username-wide queue from then on.
+func TestLoginProtectionTrustedSourceSkipsUsernameQueue(t *testing.T) {
+	protection := NewLoginProtection(LoginProtectionConfig{
+		Window:         time.Hour,
+		MaxPerIP:       100000,
+		MaxPerUsername: 2,
+	}, nil)
+	now := time.Date(2026, 8, 15, 0, 0, 0, 0, time.UTC)
+	protection.now = func() time.Time { return now }
+
+	if !protection.Allow("198.51.100.7", "jack").Allowed {
+		t.Fatal("owner's first login blocked")
+	}
+	protection.RecordSuccess("198.51.100.7", "jack")
+
+	// Distributed attack saturates the username-wide queue.
+	saturated := false
+	for i := 0; i < 200; i++ {
+		if d := protection.Allow(fmt.Sprintf("10.4.%d.%d", i/250, i%250), "jack"); !d.Allowed && d.Reason == "username_backoff" {
+			saturated = true
+		}
+	}
+	if !saturated {
+		t.Fatal("queue never saturated")
+	}
+	// A new attacker source still queues behind it: success did not reset the backoff.
+	if d := protection.Allow("10.5.0.1", "jack"); d.Allowed && d.Delay == 0 {
+		t.Fatalf("success reset the username-wide backoff: %#v", d)
+	}
+	// The owner's usual source goes straight through.
+	if d := protection.Allow("198.51.100.7", "jack"); !d.Allowed || d.Delay != 0 {
+		t.Fatalf("trusted source delayed or blocked: %#v", d)
+	}
+	// Trust is per username: the owner's source gets no pass on another account.
+	protection.Allow("10.6.0.1", "bob")
+	if _, ok := protection.trusted["pair:198.51.100.7|bob"]; ok {
+		t.Fatal("trust leaked to another username")
+	}
+}
+
+// Flooding a full limiter with fresh keys evicts single-use entries first, never the keys the
+// current request updates, so an attacker can't reset its own counters or spray window.
+func TestLoginProtectionFloodDoesNotResetCounters(t *testing.T) {
+	protection := NewLoginProtection(LoginProtectionConfig{
+		Window:               time.Hour,
+		MaxPerIP:             30,
+		MaxPerUsername:       1000,
+		SprayWindow:          time.Hour,
+		MaxDistinctUsernames: 5,
+	}, nil)
+	protection.maxEntries = 200
+	now := time.Date(2026, 8, 15, 0, 0, 0, 0, time.UTC)
+	protection.now = func() time.Time { return now }
+
+	attacker := "2001:db8:1::1"
+	for i := 0; i < 29; i++ {
+		protection.Allow(attacker, fmt.Sprintf("victim%d", i%4))
+	}
+	for i := 0; i < 4; i++ {
+		protection.RecordFailure(attacker, fmt.Sprintf("victim%d", i))
+	}
+	for i := 0; i < 1000; i++ {
+		now = now.Add(time.Millisecond)
+		protection.Allow(fmt.Sprintf("2001:db8:2:%x::1", i), fmt.Sprintf("junk%d", i))
+	}
+	ipKey := "ip:" + loginClientKey(attacker)
+	if e, ok := protection.entries[ipKey]; !ok || e.Count != 29 {
+		t.Fatalf("attacker's IP counter was evicted or reset: %#v", e)
+	}
+	if sp, ok := protection.sprays[ipKey]; !ok || len(sp.Usernames) != 4 {
+		t.Fatalf("attacker's spray window was evicted: %#v", sp)
+	}
+	// The 30th attempt counts on the existing entry rather than a fresh one.
+	protection.Allow(attacker, "victim0")
+	if d := protection.Allow(attacker, "victim1"); d.Allowed {
+		t.Fatal("per-IP limit reset by flooding")
 	}
 }
 
