@@ -11,7 +11,8 @@ import { reactive } from "vue";
 // In a production build `tunable` returns the defaults as a plain object and Tweakpane is never
 // bundled: the branch that loads it is behind `import.meta.env.DEV`, which Vite compiles to false.
 
-export type Knob = { value: number; min: number; max: number; step: number };
+/** `hint` explains what the knob changes; the panel shows it when hovering the row. */
+export type Knob = { value: number; min: number; max: number; step: number; hint: string };
 export type Knobs = Record<string, Knob>;
 export type TuneGroup = { name: string; knobs: Knobs; values: Record<string, number> };
 
