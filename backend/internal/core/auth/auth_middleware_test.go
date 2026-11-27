@@ -343,3 +343,36 @@ func TestAuthMiddleware_devToken_allowBypassFalse_disabled(t *testing.T) {
 	code, body := serve(t, testDevAuthToken)
 	expectRejected(t, code, body)
 }
+
+func TestAuthMiddleware_crossSiteWritesRefused(t *testing.T) {
+	t.Setenv("APP_ENV", "prod")
+	db := setupUsers(t)
+	tok := tokenFor(t, createUser(t, db, "wanda", false))
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	r.Any("/x", AuthMiddleware(), func(c *gin.Context) { c.Status(http.StatusNoContent) })
+	cases := []struct {
+		method, site string
+		want         int
+	}{
+		{http.MethodPost, "same-origin", http.StatusNoContent},
+		{http.MethodPost, "", http.StatusNoContent}, // non-browser client
+		{http.MethodPost, "none", http.StatusNoContent},
+		{http.MethodPost, "same-site", http.StatusForbidden}, // sibling subdomain
+		{http.MethodDelete, "cross-site", http.StatusForbidden},
+		{http.MethodPatch, "cross-site", http.StatusForbidden},
+		{http.MethodGet, "cross-site", http.StatusNoContent}, // reads aren't state-changing
+	}
+	for _, tc := range cases {
+		req := httptest.NewRequest(tc.method, "/x", strings.NewReader("{}"))
+		req.AddCookie(&http.Cookie{Name: AuthTokenCookieName, Value: tok})
+		if tc.site != "" {
+			req.Header.Set("Sec-Fetch-Site", tc.site)
+		}
+		rec := httptest.NewRecorder()
+		r.ServeHTTP(rec, req)
+		if rec.Code != tc.want {
+			t.Fatalf("%s Sec-Fetch-Site=%q: status %d want %d", tc.method, tc.site, rec.Code, tc.want)
+		}
+	}
+}

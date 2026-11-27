@@ -98,3 +98,51 @@ func TestVerifyToken_rejectionsWrapErrInvalidToken(t *testing.T) {
 		}
 	}
 }
+
+func signedWithHeader(tb testing.TB, header map[string]string, claims Claims) string {
+	tb.Helper()
+	hj, _ := json.Marshal(header)
+	cj, _ := json.Marshal(claims)
+	he := base64.RawURLEncoding.EncodeToString(hj)
+	ce := base64.RawURLEncoding.EncodeToString(cj)
+	sig, err := createSignature(he + "." + ce)
+	if err != nil {
+		tb.Fatal(err)
+	}
+	return he + "." + ce + "." + sig
+}
+
+func TestVerifyToken_requiresExpAndIat(t *testing.T) {
+	now := time.Now().Unix()
+	for name, c := range map[string]Claims{
+		"no exp":  {UID: 1, Ver: 1, Iat: now},
+		"no iat":  {UID: 1, Ver: 1, Exp: now + 60},
+		"neither": {UID: 1, Ver: 1},
+	} {
+		if _, err := VerifyToken(mustSignedJWT(t, c)); !errors.Is(err, ErrInvalidToken) {
+			t.Fatalf("%s: got %v, want ErrInvalidToken", name, err)
+		}
+	}
+}
+
+func TestVerifyToken_rejectsLifetimeLongerThanConfigured(t *testing.T) {
+	t.Setenv("AUTH_COOKIE_MAX_AGE_SEC", "3600")
+	now := time.Now().Unix()
+	if _, err := VerifyToken(mustSignedJWT(t, Claims{UID: 1, Ver: 1, Iat: now, Exp: now + 3600})); err != nil {
+		t.Fatalf("lifetime at the limit: %v", err)
+	}
+	if _, err := VerifyToken(mustSignedJWT(t, Claims{UID: 1, Ver: 1, Iat: now, Exp: now + 3601})); !errors.Is(err, ErrInvalidToken) {
+		t.Fatalf("lifetime over the limit: got %v", err)
+	}
+}
+
+func TestVerifyToken_requiresHS256Header(t *testing.T) {
+	now := time.Now().Unix()
+	c := Claims{UID: 1, Ver: 1, Iat: now, Exp: now + 60}
+	for _, alg := range []string{"none", "HS512", ""} {
+		tok := signedWithHeader(t, map[string]string{"alg": alg, "typ": "JWT"}, c)
+		if _, err := VerifyToken(tok); !errors.Is(err, ErrInvalidToken) {
+			t.Fatalf("alg %q: got %v, want ErrInvalidToken", alg, err)
+		}
+	}
+}

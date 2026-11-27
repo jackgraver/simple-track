@@ -92,6 +92,17 @@ func VerifyToken(token string) (*Claims, error) {
 		return nil, invalidToken("signature")
 	}
 
+	headerJSON, err := base64.RawURLEncoding.DecodeString(headerEncoded)
+	if err != nil {
+		return nil, invalidToken("header encoding: " + err.Error())
+	}
+	var header struct {
+		Alg string `json:"alg"`
+	}
+	if err := json.Unmarshal(headerJSON, &header); err != nil || header.Alg != "HS256" {
+		return nil, invalidToken("header: alg must be HS256")
+	}
+
 	claimsJSON, err := base64.RawURLEncoding.DecodeString(claimsEncoded)
 	if err != nil {
 		return nil, invalidToken("encoding: " + err.Error())
@@ -102,7 +113,15 @@ func VerifyToken(token string) (*Claims, error) {
 		return nil, invalidToken("claims: " + err.Error())
 	}
 
-	if claims.Exp > 0 && clock.Now().Unix() > claims.Exp {
+	// exp and iat are required, and the lifetime can't exceed the configured cookie max age
+	// (so lowering AUTH_COOKIE_MAX_AGE_SEC also ends longer-lived tokens already issued).
+	if claims.Exp <= 0 || claims.Iat <= 0 {
+		return nil, invalidToken("missing exp or iat")
+	}
+	if claims.Exp-claims.Iat > int64(CookieMaxAgeSeconds()) {
+		return nil, invalidToken("lifetime longer than AUTH_COOKIE_MAX_AGE_SEC")
+	}
+	if clock.Now().Unix() > claims.Exp {
 		return nil, invalidToken("expired")
 	}
 

@@ -30,6 +30,13 @@ var (
 // invalid tokens always produce 401; there is no default user.
 func AuthMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
+		if crossSiteWrite(c.Request) {
+			log.Printf("[auth] refused %s %s: Sec-Fetch-Site=%q", c.Request.Method, c.Request.URL.Path, c.GetHeader("Sec-Fetch-Site"))
+			c.JSON(http.StatusForbidden, gin.H{"error": "Cross-site request refused"})
+			c.Abort()
+			return
+		}
+
 		token, _ := c.Cookie(AuthTokenCookieName)
 
 		if devTokenMatches(token) {
@@ -64,6 +71,23 @@ func AuthMiddleware() gin.HandlerFunc {
 		setRequestUser(c, user)
 		c.Next()
 	}
+}
+
+// crossSiteWrite reports a state-changing request a browser says came from another origin.
+// The SPA only calls the API same-origin (Caddy and vite proxy /api), so anything else with
+// the cookie attached is CSRF, including from sibling subdomains that SameSite=Lax lets through.
+// Requests without the header (non-browser clients, browsers too old to send it) fall back to
+// SameSite=Lax.
+func crossSiteWrite(r *http.Request) bool {
+	switch r.Method {
+	case http.MethodGet, http.MethodHead, http.MethodOptions:
+		return false
+	}
+	switch r.Header.Get("Sec-Fetch-Site") {
+	case "", "same-origin", "none":
+		return false
+	}
+	return true
 }
 
 // resolveTokenUser checks a signature-verified token against the user's current row.

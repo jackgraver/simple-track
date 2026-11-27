@@ -104,3 +104,14 @@ every other lane, since nothing is reviewed again before the single deploy at D1
   with none (fresh/e2e DBs) nothing happens; with more than one the migration **fails** rather
   than guess who the owner is. D1's rehearsal on a prod backup will surface it if prod ever
   gains a second account before then (README says not to).
+- **A3 backlog items done in B1**: #11 constant-time signature compare, #12 no echoed reasons,
+  #10 partly (tokens must carry `exp` and `iat`, `alg` must be HS256, and `exp - iat` must not
+  exceed `AUTH_COOKIE_MAX_AGE_SEC`, so lowering that setting also ends older long-lived tokens).
+  The default lifetime (365 days) and sliding re-issue are left for the owner to decide.
+- **CSRF (#13)**: AuthMiddleware refuses POST/PUT/PATCH/DELETE with `Sec-Fetch-Site` other
+  than `same-origin` or `none` (403). Chosen over an `Origin` check (would need the public
+  origin behind Caddy) and over forcing `Content-Type: application/json` (would break multipart
+  uploads/imports). The SPA always calls `/api` same-origin (Caddy in prod, vite in dev, the
+  phone proxy). Requests without the header (curl, `dev api`, Playwright's API client, very old
+  browsers) fall back to SameSite=Lax. `/auth/login` and `/auth/logout` aren't behind the
+  middleware and aren't covered.
