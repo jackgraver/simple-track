@@ -137,7 +137,7 @@ func TestPostgres_setsMigrationAndConcurrency(t *testing.T) {
 	if d, err := gdb.DB(); err == nil {
 		d.SetMaxOpenConns(40) // below Postgres' default max_connections (100)
 	}
-	database.SetDB(gdb)
+	ctx = database.WithDB(ctx, gdb)
 	t.Cleanup(func() {
 		if d, err := gdb.DB(); err == nil {
 			d.Close()
@@ -154,7 +154,9 @@ func TestPostgres_setsMigrationAndConcurrency(t *testing.T) {
 			go func(d int) {
 				defer dayWG.Done()
 				<-gate
-				_, err := services.GetOrCreateDay(ctx, clock.ZerodTime(d))
+				_, err := inRequest(gdb, func(ctx context.Context) (models.WorkoutLog, error) {
+					return services.GetOrCreateDay(ctx, clock.ZerodTime(d))
+				})
 				dayErrs <- err
 			}(d)
 		}
@@ -182,8 +184,10 @@ func TestPostgres_setsMigrationAndConcurrency(t *testing.T) {
 		go func(i int) {
 			defer wg.Done()
 			<-start
-			res, err := services.LogSet(ctx, services.LogSetInput{
-				ClientID: clientID(500 + i%8), Day: day, ExerciseID: 2, Reps: 5, Weight: 80,
+			res, err := inRequest(gdb, func(ctx context.Context) (services.LogSetResult, error) {
+				return services.LogSet(ctx, services.LogSetInput{
+					ClientID: clientID(500 + i%8), Day: day, ExerciseID: 2, Reps: 5, Weight: 80,
+				})
 			})
 			errs <- err
 			firsts <- res.FirstSetOfDay
@@ -231,8 +235,20 @@ func TestPostgres_setsMigrationAndConcurrency(t *testing.T) {
 	}
 }
 
-// pgMigratedGorm returns a gorm DB on a fresh, fully migrated database, installed as the
-// package-wide connection.
+// inRequest runs fn the way a request does: in its own lazy request transaction, committed when
+// fn succeeds. Concurrency tests use it so locks are held as long as in production (until the
+// request ends, not until the repository's own transaction, which is a savepoint there).
+func inRequest[T any](db *gorm.DB, fn func(context.Context) (T, error)) (T, error) {
+	ctx, req := database.WithTx(context.Background(), db)
+	v, err := fn(ctx)
+	if err != nil {
+		req.Rollback()
+		return v, err
+	}
+	return v, req.Commit()
+}
+
+// pgMigratedGorm returns a gorm DB on a fresh, fully migrated database.
 func pgMigratedGorm(t *testing.T) (*gorm.DB, *sql.DB) {
 	t.Helper()
 	dsn, sqlDB := pgTestDB(t)
@@ -247,7 +263,6 @@ func pgMigratedGorm(t *testing.T) (*gorm.DB, *sql.DB) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	database.SetDB(gdb)
 	t.Cleanup(func() {
 		if d, err := gdb.DB(); err == nil {
 			d.Close()
@@ -273,8 +288,8 @@ func waitForLockWait(t *testing.T, db *sql.DB) {
 // Review finding 1: deleting an exercise's only set while a new set for the same exercise is
 // being created must not cascade the new (committed) set away.
 func TestPostgres_deleteLastSetDoesNotEatConcurrentCreate(t *testing.T) {
-	_, sqlDB := pgMigratedGorm(t)
-	ctx := context.Background()
+	gdb, sqlDB := pgMigratedGorm(t)
+	ctx := database.WithDB(context.Background(), gdb)
 	mustExec(t, sqlDB, `INSERT INTO exercises (id, name) VALUES (1, 'Squat')`)
 	day := clock.ZerodTime(0)
 
@@ -302,7 +317,9 @@ func TestPostgres_deleteLastSetDoesNotEatConcurrentCreate(t *testing.T) {
 	done := make(chan workoutrepo.DeleteSetResult, 1)
 	errc := make(chan error, 1)
 	go func() {
-		res, err := workoutrepo.DeleteSet(ctx, workoutrepo.SetRef{ClientID: clientID(1)})
+		res, err := inRequest(gdb, func(ctx context.Context) (workoutrepo.DeleteSetResult, error) {
+			return workoutrepo.DeleteSet(ctx, workoutrepo.SetRef{ClientID: clientID(1)})
+		})
 		done <- res
 		errc <- err
 	}()
@@ -337,12 +354,16 @@ func TestPostgres_deleteLastSetDoesNotEatConcurrentCreate(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			<-start
-			_, delErr = workoutrepo.DeleteSet(ctx, workoutrepo.SetRef{ClientID: old})
+			_, delErr = inRequest(gdb, func(ctx context.Context) (workoutrepo.DeleteSetResult, error) {
+				return workoutrepo.DeleteSet(ctx, workoutrepo.SetRef{ClientID: old})
+			})
 		}()
 		go func() {
 			defer wg.Done()
 			<-start
-			_, logErr = services.LogSet(ctx, services.LogSetInput{ClientID: newID, Day: day, ExerciseID: ex, Reps: 2})
+			_, logErr = inRequest(gdb, func(ctx context.Context) (services.LogSetResult, error) {
+				return services.LogSet(ctx, services.LogSetInput{ClientID: newID, Day: day, ExerciseID: ex, Reps: 2})
+			})
 		}()
 		close(start)
 		wg.Wait()

@@ -96,7 +96,7 @@ Depends on: none (can start alongside A)
 Depends on: A1, A2, B1
 - [x] `database.WithTx` / `database.From(ctx)`: lazy per-request transaction with
       `set_config('app.user_id', ..)` and `app.is_admin`; commit/rollback/panic handling.
-- [ ] Thread `ctx` through every service and repo function; replace every `conn()` /
+- [x] Thread `ctx` through every service and repo function; replace every `conn()` /
       `GetDB()` in request paths. Mechanical, no behaviour change. The handle carries the
       request context, so a disconnected or timed-out request cancels its query (today only the
       workout repos pass a context; diet, money, tracking and media queries can't be cancelled).

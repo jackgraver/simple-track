@@ -2,7 +2,6 @@ package testutil
 
 import (
 	"be-simpletracker/internal/core/workout/models"
-	"be-simpletracker/internal/database"
 	"testing"
 
 	"github.com/glebarez/sqlite"
@@ -31,6 +30,5 @@ func SetupTestDB(t *testing.T) *gorm.DB {
 	if err := db.Create(&models.WorkoutProgram{Name: "Test Program", IsActive: true}).Error; err != nil {
 		t.Fatal(err)
 	}
-	database.SetDB(db)
 	return db
 }
