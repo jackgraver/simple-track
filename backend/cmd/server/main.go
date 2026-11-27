@@ -35,7 +35,10 @@ func main() {
 		log.Fatalf("config: %v", err)
 	}
 	gin.SetMode(gin.ReleaseMode)
-	router := gin.Default()
+	router := gin.New()
+	// gin.Default's logger and recovery, but the log names the route, not the raw URL.
+	router.Use(requestLogger()...)
+	router.Use(gin.Recovery())
 	// Contexts derived from a *gin.Context (context.WithTimeout(c, ...)) still reach the
 	// request context, so auth.UserID works on them.
 	router.ContextWithFallback = true

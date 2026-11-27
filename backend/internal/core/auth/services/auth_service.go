@@ -58,7 +58,15 @@ func NewAuthService(generateToken TokenGenerator) *AuthService {
 }
 
 func (s *AuthService) Register(ctx context.Context, input RegisterInput) (AuthResult, error) {
-	_, err := authrepo.FindUserByUsername(ctx, input.Username)
+	username, err := NormalizeUsername(input.Username)
+	if err != nil {
+		return AuthResult{}, err
+	}
+	input.Username = username
+	if err := ValidatePassword(input.Password); err != nil {
+		return AuthResult{}, err
+	}
+	_, err = authrepo.FindUserByUsername(ctx, input.Username)
 	if err == nil {
 		return AuthResult{}, ErrUsernameExists
 	}
@@ -89,21 +97,43 @@ func (s *AuthService) Register(ctx context.Context, input RegisterInput) (AuthRe
 	return AuthResult{Token: token, User: user}, nil
 }
 
+// LoginFailure is an ErrInvalidCredentials with what the audit log needs: the account, when
+// the username exists (0 otherwise; the attempted name is never recorded), and why.
+type LoginFailure struct {
+	UserID uint
+	Reason string // unknown_user, wrong_password, no_password, disabled
+}
+
+func (f *LoginFailure) Error() string { return ErrInvalidCredentials.Error() + " (" + f.Reason + ")" }
+func (f *LoginFailure) Unwrap() error { return ErrInvalidCredentials }
+
 func (s *AuthService) Login(ctx context.Context, input LoginInput) (AuthResult, error) {
 	user, err := authrepo.FindUserByUsername(ctx, input.Username)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			_ = bcrypt.CompareHashAndPassword(dummyPasswordHash, []byte(input.Password))
-			return AuthResult{}, ErrInvalidCredentials
+			return AuthResult{}, &LoginFailure{Reason: "unknown_user"}
 		}
 		return AuthResult{}, err
 	}
+	// An account created by the admin has no password until its setup link is used. Compare
+	// against the dummy hash anyway so it answers in the same time as any other failure.
+	if user.Password == "" {
+		_ = bcrypt.CompareHashAndPassword(dummyPasswordHash, []byte(input.Password))
+		return AuthResult{}, &LoginFailure{UserID: user.ID, Reason: "no_password"}
+	}
+	// bcrypt only reads the first 72 bytes, so a longer input could match on its prefix. No
+	// stored password is longer (they're validated, and bcrypt refuses to hash more).
+	if len(input.Password) > PasswordMaxBytes {
+		_ = bcrypt.CompareHashAndPassword(dummyPasswordHash, []byte(input.Password[:PasswordMaxBytes]))
+		return AuthResult{}, &LoginFailure{UserID: user.ID, Reason: "wrong_password"}
+	}
 	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(input.Password)); err != nil {
-		return AuthResult{}, ErrInvalidCredentials
+		return AuthResult{}, &LoginFailure{UserID: user.ID, Reason: "wrong_password"}
 	}
 	// Checked after the password so a disabled account answers exactly like a wrong password.
 	if user.DisabledAt != nil {
-		return AuthResult{}, ErrInvalidCredentials
+		return AuthResult{}, &LoginFailure{UserID: user.ID, Reason: "disabled"}
 	}
 
 	token, err := s.generateToken(user)
