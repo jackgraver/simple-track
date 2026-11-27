@@ -18,6 +18,7 @@ var (
 	ErrPasswordHash       = errors.New("failed to hash password")
 	ErrUserCreation       = errors.New("failed to create user")
 	ErrTokenGeneration    = errors.New("failed to generate token")
+	ErrInvalidBirthYear   = errors.New("birth_year must be between 1900 and the current year")
 )
 
 var dummyPasswordHash = func() []byte {
@@ -125,7 +126,7 @@ func (s *AuthService) CurrentUser(userID uint) (models.User, error) {
 func (s *AuthService) UpdateBirthYear(userID uint, birthYear int) (models.User, error) {
 	currentYear := clock.Now().Year()
 	if birthYear < 1900 || birthYear > currentYear {
-		return models.User{}, errors.New("birth_year must be between 1900 and the current year")
+		return models.User{}, ErrInvalidBirthYear
 	}
 	user, err := authrepo.UpdateUserBirthYear(userID, &birthYear)
 	if err != nil {

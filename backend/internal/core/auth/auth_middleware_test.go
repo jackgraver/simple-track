@@ -251,6 +251,7 @@ func TestAuthMiddleware_databaseError_isNot401(t *testing.T) {
 }
 
 func TestAuthMiddleware_devTokenDisabledByDefault_evenInDevEnv(t *testing.T) {
+	t.Setenv("APP_ENV", "development")
 	t.Setenv("ALLOW_BYPASS", "")
 	t.Setenv("DEV_AUTH_TOKEN", "")
 	setupUsers(t)
@@ -259,6 +260,7 @@ func TestAuthMiddleware_devTokenDisabledByDefault_evenInDevEnv(t *testing.T) {
 }
 
 func TestAuthMiddleware_devToken_unsetAllowBypass_disabled(t *testing.T) {
+	t.Setenv("APP_ENV", "development")
 	t.Setenv("ALLOW_BYPASS", "")
 	t.Setenv("DEV_AUTH_TOKEN", testDevAuthToken)
 	db := setupUsers(t)
@@ -305,6 +307,7 @@ func TestAuthMiddleware_devTokenNeverAuthorizesInProduction(t *testing.T) {
 }
 
 func TestAuthMiddleware_devToken_overrideUser(t *testing.T) {
+	t.Setenv("APP_ENV", "development")
 	t.Setenv("ALLOW_BYPASS", "true")
 	t.Setenv("DEV_AUTH_TOKEN", testDevAuthToken)
 	t.Setenv("DEV_AUTH_USER", "alice")
@@ -318,6 +321,7 @@ func TestAuthMiddleware_devToken_overrideUser(t *testing.T) {
 }
 
 func TestAuthMiddleware_devToken_disabledDevUser_rejected(t *testing.T) {
+	t.Setenv("APP_ENV", "development")
 	t.Setenv("ALLOW_BYPASS", "true")
 	t.Setenv("DEV_AUTH_TOKEN", testDevAuthToken)
 	t.Setenv("DEV_AUTH_USER", "")
@@ -331,6 +335,7 @@ func TestAuthMiddleware_devToken_disabledDevUser_rejected(t *testing.T) {
 }
 
 func TestAuthMiddleware_devToken_allowBypassFalse_disabled(t *testing.T) {
+	t.Setenv("APP_ENV", "development")
 	t.Setenv("ALLOW_BYPASS", "false")
 	t.Setenv("DEV_AUTH_TOKEN", testDevAuthToken)
 	db := setupUsers(t)

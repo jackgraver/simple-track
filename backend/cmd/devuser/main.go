@@ -49,7 +49,8 @@ func run() error {
 	}
 
 	var user models.User
-	err = db.Where("username = ?", username).First(&user).Error
+	// Unscoped: a soft-deleted dev row is revived rather than colliding with the unique username.
+	err = db.Unscoped().Where("username = ?", username).First(&user).Error
 	switch {
 	case errors.Is(err, gorm.ErrRecordNotFound):
 		user = models.User{
@@ -66,7 +67,8 @@ func run() error {
 	case err != nil:
 		return err
 	default:
-		if err := db.Model(&user).Updates(map[string]any{
+		if err := db.Unscoped().Model(&user).Updates(map[string]any{
+			"deleted_at":  nil,
 			"password":    string(hash),
 			"is_admin":    true,
 			"disabled_at": nil,

@@ -80,7 +80,12 @@ every other lane, since nothing is reviewed again before the single deploy at D1
 - **Rejections**: every invalid/revoked/disabled/unknown-user session is 401
   `{"error":"Invalid or expired session"}`; the reason is logged server-side, never echoed (fixes
   the "Invalid token: " + err echo flagged for A3). Token errors wrap `auth.ErrInvalidToken`;
-  anything else (DB down, missing JWT_SECRET) is **503**, so an outage doesn't sign people out.
+  anything else (DB down, missing JWT_SECRET) is **503**, so the client can tell an outage from
+  a dead session. The frontend doesn't use that yet: `resolveAuthSession` (useAuth.ts) treats
+  any `/auth/me` failure, network errors included, as signed out (pre-existing). Follow-up for
+  C6 (it owns the account UI): keep the session on 5xx/network errors and retry.
+- **Context from gin**: `router.ContextWithFallback = true` in `cmd/server`, so a context
+  derived from a `*gin.Context` still carries the user. Prefer passing `c.Request.Context()`.
 - **Login refuses disabled users** with the same "Invalid username or password" as a wrong
   password (checked after bcrypt, so timing matches). C6 owns the rest of the account flows.
 - **Context API** (`internal/core/auth`): `auth.User{ID, Username, IsAdmin}`, `auth.WithUser`,

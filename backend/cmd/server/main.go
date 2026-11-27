@@ -36,6 +36,9 @@ func main() {
 	}
 	gin.SetMode(gin.ReleaseMode)
 	router := gin.Default()
+	// Contexts derived from a *gin.Context (context.WithTimeout(c, ...)) still reach the
+	// request context, so auth.UserID works on them.
+	router.ContextWithFallback = true
 
 	if !env.IsProduction() {
 		router.Use(utils.BenchmarkMiddleware(router))

@@ -1,6 +1,10 @@
 package authrepo
 
-import "be-simpletracker/internal/core/auth/models"
+import (
+	"be-simpletracker/internal/core/auth/models"
+
+	"gorm.io/gorm"
+)
 
 func FindUserByUsername(username string) (models.User, error) {
 	var user models.User
@@ -28,8 +32,12 @@ func CreateUser(user *models.User) error {
 }
 
 func UpdateUserBirthYear(id uint, birthYear *int) (models.User, error) {
-	if err := conn().Model(&models.User{}).Where("id = ?", id).Update("birth_year", birthYear).Error; err != nil {
-		return models.User{}, err
+	result := conn().Model(&models.User{}).Where("id = ?", id).Update("birth_year", birthYear)
+	if result.Error != nil {
+		return models.User{}, result.Error
+	}
+	if result.RowsAffected == 0 {
+		return models.User{}, gorm.ErrRecordNotFound
 	}
 	return FindUserByID(id)
 }
