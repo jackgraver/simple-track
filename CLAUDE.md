@@ -85,6 +85,9 @@ UI overhaul, optimistic UI and performance work are tracked in `docs/projects/`.
 of them, read `docs/projects/README.md` (session protocol) and that project's README/TASKS. Update
 TASKS/DECISIONS in the same PR as the code.
 
+Multi-user and security hardening: `docs/multi-user/` on the `proj/multi-user` branch (base for
+all its lane PRs). Starter prompt for a lane session: `docs/multi-user/START.md`.
+
 ## UI / design system
 
 Any frontend UI change follows `docs/design/` (start with `docs/design/README.md`; the `ui` skill and
