@@ -38,7 +38,7 @@ func run() error {
 	username := env.StringOr("DEV_AUTH_USER", "dev")
 	password := env.StringOr("DEV_USER_PASSWORD", "dev")
 
-	db, err := database.ConnectToPostgres()
+	db, err := database.ConnectOwner()
 	if err != nil {
 		return err
 	}

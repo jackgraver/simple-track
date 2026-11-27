@@ -69,7 +69,11 @@ export PC_DISABLE_DOTENV=1
 
 # Backend (env vars take precedence over backend/.env).
 export LISTEN_ADDR="0.0.0.0:$DEV_BACKEND_PORT"
-export DATABASE_URL="postgresql://postgres:postgres@localhost:$DEV_PG_PORT/simpletracker_dev?sslmode=disable"
+# Two roles, as in production (docs/ARCHITECTURE.md, "Database roles"): the server connects as
+# simpletrack_app (DML only, so RLS applies); migrate, devseed, devuser, tests and pgweb use the
+# owner. `migrate up` gives simpletrack_app this password. Local-only, like postgres/postgres.
+export DATABASE_URL="postgresql://simpletrack_app:simpletrack_app@localhost:$DEV_PG_PORT/simpletracker_dev?sslmode=disable"
+export DATABASE_OWNER_URL="postgresql://postgres:postgres@localhost:$DEV_PG_PORT/simpletracker_dev?sslmode=disable"
 # Also allow this machine's LAN addresses (phone testing via http://<lan-ip>:<port>).
 # Override with DEV_LAN_HOST="ip1 ip2" (space separated); default is every private IPv4.
 # The phone proxy's origins (http://<host>.local:$DEV_PHONE_PORT and the LAN IPs) are allowed too.

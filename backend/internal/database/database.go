@@ -24,34 +24,69 @@ func SetDB(db *gorm.DB) { db_conn = db }
 // Get the global database connection
 func GetDB() *gorm.DB { return db_conn }
 
-// Connect to postgres
-func ConnectToPostgres() (*gorm.DB, error) {
+// Two database roles (docs/multi-user/DECISIONS.md, "App DB role"):
+//
+//   - the app role (AppRole, DATABASE_URL / DATABASE_URL_PRODUCTION) is what the server
+//     connects as: DML only, no ownership, so row-level security applies to it.
+//   - the owner role (DATABASE_OWNER_URL) owns the schema. cmd/migrate, devseed, e2eseed and
+//     devuser use it. Without DATABASE_OWNER_URL they fall back to the app DSN (a single-role
+//     setup) with a warning: migrations then fail at their first DDL, while DML-only tools
+//     (seeds, devuser) still work.
+
+// ConnectApp opens the server's pool on the app DSN and makes it the global connection.
+func ConnectApp() (*gorm.DB, error) {
+	return connect(AppDSN)
+}
+
+// ConnectOwner opens a pool on the owner DSN and makes it the global connection. For
+// migrations, seeds and the other dev/ops tools, never the server.
+func ConnectOwner() (*gorm.DB, error) {
+	return connect(OwnerDSN)
+}
+
+func connect(dsnFn func() (string, error)) (*gorm.DB, error) {
 	if err := env.Load(); err != nil {
 		return nil, err
 	}
-	// Get prod or dev dsn
-	dsn, err := resolvePostgresDSN()
+	dsn, err := dsnFn()
 	if err != nil {
 		return nil, err
 	}
+	pool, err := PoolFromEnv()
+	if err != nil {
+		return nil, err
+	}
+	db, err := Open(dsn, pool)
+	if err != nil {
+		return nil, err
+	}
+	db_conn = db
+	return db, nil
+}
 
+// Open connects to dsn (retrying briefly while Postgres starts) and applies pool. It does not
+// touch the global connection.
+func Open(dsn string, pool Pool) (*gorm.DB, error) {
 	const maxAttempts = 3
-	const retryDelay = time.Second * 3 // 3s
+	const retryDelay = time.Second * 3
 
-	var db *gorm.DB
-	// Try 3 times
+	var err error
 	for attempt := 1; attempt <= maxAttempts; attempt++ {
+		var db *gorm.DB
 		db, err = gorm.Open(postgres.Open(dsn), &gorm.Config{
 			Logger: logger.Default.LogMode(logger.Silent),
 			// created_at/updated_at follow the server clock (moved only by the e2e suite).
 			NowFunc: func() time.Time { return clock.Now().Local() },
 		})
 		if err == nil {
-			db_conn = db
-			log.Printf("postgres: connected successfully")
+			sqlDB, derr := db.DB()
+			if derr != nil {
+				return nil, derr
+			}
+			pool.apply(sqlDB)
+			log.Printf("postgres: connected (%s)", pool)
 			return db, nil
 		}
-		// sleep to avoid hammering the database between attemps
 		if attempt < maxAttempts {
 			log.Printf("postgres failed connection: %d remaining", maxAttempts-attempt)
 			time.Sleep(retryDelay)
@@ -60,7 +95,9 @@ func ConnectToPostgres() (*gorm.DB, error) {
 	return nil, err
 }
 
-func resolvePostgresDSN() (string, error) {
+// AppDSN is the server's connection string: DATABASE_URL, else DATABASE_URL_PRODUCTION
+// (production) or DATABASE_URL_DEVELOPMENT.
+func AppDSN() (string, error) {
 	if d := env.OptionalString("DATABASE_URL"); d != "" {
 		if env.IsProduction() {
 			if err := validateProductionPostgresDSN(d); err != nil {
@@ -80,6 +117,21 @@ func resolvePostgresDSN() (string, error) {
 		return d, nil
 	}
 	return env.StringOr("DATABASE_URL_DEVELOPMENT", "postgres://postgres:postgres@localhost:5432/simpletracker_dev?sslmode=disable"), nil
+}
+
+// OwnerDSN is the schema owner's connection string: DATABASE_OWNER_URL, else AppDSN.
+func OwnerDSN() (string, error) {
+	d := env.OptionalString("DATABASE_OWNER_URL")
+	if d == "" {
+		log.Printf("database: DATABASE_OWNER_URL not set; using the app DSN as the owner")
+		return AppDSN()
+	}
+	if env.IsProduction() {
+		if err := validateProductionPostgresDSN(d); err != nil {
+			return "", fmt.Errorf("DATABASE_OWNER_URL: %w", err)
+		}
+	}
+	return d, nil
 }
 
 func validateProductionPostgresDSN(dsn string) error {

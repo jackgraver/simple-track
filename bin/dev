@@ -73,7 +73,8 @@ slot      $DEV_SLOT ($COMPOSE_PROJECT_NAME)
 frontend  $DEV_FRONTEND_URL
 backend   $DEV_BACKEND_URL
 pgweb     http://localhost:$DEV_PGWEB_PORT
-postgres  $DATABASE_URL
+postgres  $DATABASE_OWNER_URL
+app role  $DATABASE_URL
 login     dev / dev
 EOF
 }

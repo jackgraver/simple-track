@@ -31,19 +31,20 @@ Depends on: none
 
 ### A2 Connection pool and app DB role
 Depends on: none. Touches compose, j-cicd and prod: read `docs/ARCHITECTURE.md` and `j-cicd guide` first.
-- [ ] Explicit pool settings in `internal/database` (max open/idle, lifetimes), configurable by env.
+- [x] Explicit pool settings in `internal/database` (max open/idle, lifetimes), configurable by env.
       Today: one shared pool on `database/sql` defaults (unlimited open, 2 idle, no lifetime),
       so bursts open new connections and nothing caps them below Postgres' `max_connections`.
-- [ ] Replace `router.Run` with an `http.Server` that has read/write/idle timeouts and graceful
+- [x] Replace `router.Run` with an `http.Server` that has read/write/idle timeouts and graceful
       shutdown (drain in-flight requests on SIGTERM, then close the pool). Today a deploy cuts
       requests off mid-transaction.
-- [ ] `simpletrack_app` login role: DML grants only, no ownership, no `BYPASSRLS`; default
+- [x] `simpletrack_app` login role: DML grants only, no ownership, no `BYPASSRLS`; default
       privileges so future tables are granted automatically. `statement_timeout` and
       `idle_in_transaction_session_timeout` on the role.
-- [ ] Server uses the app role; `migrate`, devseed, e2eseed, devuser keep the owner role. Wire
+- [x] Server uses the app role; `migrate`, devseed, e2eseed, devuser keep the owner role. Wire
       both DSNs through `dev/env.sh`, e2e setup and `docker-compose.vps.yml` / `.cicd.yaml`.
       Role password is a secret, never in a migration.
-- [ ] Update `docs/ARCHITECTURE.md`.
+- [x] Update `docs/ARCHITECTURE.md`.
+- [x] Prod rollout plan: [ROLLOUT.md](ROLLOUT.md).
 - Done when: dev stack and `./bin/dev e2e` run with the server on the app role; a prod rollout
   plan is written to `docs/multi-user/ROLLOUT.md` (used at D1; nothing deploys before then).
 

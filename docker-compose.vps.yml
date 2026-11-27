@@ -27,8 +27,17 @@ services:
             LISTEN_ADDR: 0.0.0.0:8080
             APP_ENV: production
             TZ: ${TZ:-America/Edmonton}
-            DATABASE_URL_PRODUCTION: postgresql://${POSTGRES_USER:-simpletracker}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/${POSTGRES_DB:-simpletracker}?sslmode=disable
+            # The server connects as simpletrack_app (DML only; RLS applies). `/app/migrate up`
+            # (j-cicd pre_swap, run in this service) connects as the owner and sets
+            # simpletrack_app's password from DATABASE_URL_PRODUCTION. docs/ARCHITECTURE.md.
+            DATABASE_URL_PRODUCTION: postgresql://simpletrack_app:${APP_DB_PASSWORD:?APP_DB_PASSWORD is required}@postgres:5432/${POSTGRES_DB:-simpletracker}?sslmode=disable
+            DATABASE_OWNER_URL: postgresql://${POSTGRES_USER:-simpletracker}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/${POSTGRES_DB:-simpletracker}?sslmode=disable
             DATABASE_ALLOW_INSECURE: "true"
+            # Pool overrides (defaults in backend/internal/database/pool.go); empty = default.
+            DB_MAX_OPEN_CONNS: ${DB_MAX_OPEN_CONNS:-}
+            DB_MAX_IDLE_CONNS: ${DB_MAX_IDLE_CONNS:-}
+            DB_CONN_MAX_LIFETIME: ${DB_CONN_MAX_LIFETIME:-}
+            DB_CONN_MAX_IDLE_TIME: ${DB_CONN_MAX_IDLE_TIME:-}
             JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
             CORS_ORIGINS: ${APP_ORIGIN:?APP_ORIGIN is required}
             AUTH_COOKIE_SAMESITE: lax
@@ -52,6 +61,9 @@ services:
         networks:
             - app-network
         restart: unless-stopped
+        # SIGTERM starts a graceful shutdown that drains requests for up to 25 s
+        # (cmd/server/serve.go); Docker's default 10 s would SIGKILL it first.
+        stop_grace_period: 30s
         healthcheck:
             test:
                 - CMD-SHELL

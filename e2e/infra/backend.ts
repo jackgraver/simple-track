@@ -25,14 +25,19 @@ export function freePort(): Promise<number> {
   });
 }
 
-/** Env shared by every e2e backend process. Secrets come from global setup (one per run). */
-export function backendEnv(databaseUrl: string, listen: string): NodeJS.ProcessEnv {
+/**
+ * Env shared by every e2e backend process. Secrets come from global setup (one per run).
+ * `databaseUrl` is the app role (what the server queries as); `ownerUrl` the schema owner, used
+ * only by the /__e2e reset and seed endpoints.
+ */
+export function backendEnv(databaseUrl: string, ownerUrl: string, listen: string): NodeJS.ProcessEnv {
   return {
     PATH: process.env.PATH,
     HOME: process.env.HOME,
     TZ,
     APP_ENV: 'development',
     DATABASE_URL: databaseUrl,
+    DATABASE_OWNER_URL: ownerUrl,
     LISTEN_ADDR: listen,
     JWT_SECRET: process.env.E2E_JWT_SECRET,
     DEV_AUTH_TOKEN: process.env.E2E_AUTH_TOKEN,
@@ -50,6 +55,7 @@ export function backendEnv(databaseUrl: string, listen: string): NodeJS.ProcessE
 export async function startBackend(
   name: string,
   databaseUrl: string,
+  ownerUrl: string,
   extraEnv: NodeJS.ProcessEnv = {},
 ): Promise<Backend> {
   fs.mkdirSync(LOG_DIR, { recursive: true });
@@ -59,7 +65,7 @@ export async function startBackend(
     const out = fs.openSync(logFile, 'w');
     const child = spawn(path.join(BIN_DIR, 'server'), [], {
       cwd: CACHE_DIR, // no .env here: everything comes from the env below
-      env: { ...backendEnv(databaseUrl, `127.0.0.1:${port}`), ...extraEnv },
+      env: { ...backendEnv(databaseUrl, ownerUrl, `127.0.0.1:${port}`), ...extraEnv },
       stdio: ['ignore', out, out],
     });
     fs.closeSync(out);

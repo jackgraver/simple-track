@@ -113,17 +113,64 @@ Go (gin + gorm) in `backend/`, image `ghcr.io/jackgraver/st-backend`. Listens on
 (`/health` for health checks). Config comes from env vars (see `docker-compose.vps.yml`);
 production refuses insecure settings (non-HTTPS CORS origins, dev auth bypass).
 The schema lives in `backend/migrations/` and the server refuses to start while any are pending.
-The image also ships `/app/migrate`.
+The image also ships `/app/migrate`, which j-cicd's VPS agent runs as the `pre_swap` step
+(`docker compose run --rm --no-deps backend /app/migrate up`, in the new image, before the
+container is replaced).
+
+- **HTTP server** (`cmd/server/serve.go`): read-header 5 s, read 30 s, write 45 s, idle 120 s.
+  On SIGTERM it stops accepting connections, lets in-flight requests finish for up to 25 s,
+  then closes the DB pool. `stop_grace_period: 30s` on the backend service gives it that time
+  (Docker's default is 10 s).
+- **Connection pool** (`internal/database/pool.go`): max 20 open, 10 idle, 30 min lifetime,
+  5 min idle time. Override with `DB_MAX_OPEN_CONNS`, `DB_MAX_IDLE_CONNS`,
+  `DB_CONN_MAX_LIFETIME`, `DB_CONN_MAX_IDLE_TIME`.
 
 ## Postgres
 
 `postgres:16-alpine` with the `postgres_data` volume. Pre-deploy backups are in `~/backups` on the
 VPS; rollbacks never revert the database.
 
+### Database roles
+
+Two roles, each with its own connection string in the backend container's environment:
+
+| Role | Env var | Used by | Can |
+|---|---|---|---|
+| owner (`POSTGRES_USER`, `simpletracker`; a superuser in the postgres image) | `DATABASE_OWNER_URL` | `/app/migrate` (pre_swap); in dev also devseed, devuser, e2eseed, pgweb, `dev test` | everything; owns every table |
+| `simpletrack_app` | `DATABASE_URL_PRODUCTION` (`DATABASE_URL` in dev/e2e) | the server | `SELECT/INSERT/UPDATE/DELETE` on tables, `USAGE/SELECT` on sequences, read-only `schema_migrations`; no DDL, no `TRUNCATE`, no ownership, no `BYPASSRLS` |
+
+- The app role exists so row-level security (multi-user project) applies to the server: RLS
+  doesn't apply to table owners or superusers. In production the server **refuses to start**
+  if its role is a superuser, has `BYPASSRLS` or owns a table (`database.CheckAppRole`); in
+  development it logs a warning.
+- Migration `0010_app_role.sql` creates the role `NOLOGIN` with no password, grants, and
+  `ALTER DEFAULT PRIVILEGES` so tables later migrations create are granted automatically. It also
+  sets `statement_timeout = 15s` and `idle_in_transaction_session_timeout = 30s` on the role
+  (cluster-wide; the owner has neither, so migrations aren't limited).
+- **Password:** `APP_DB_PASSWORD` in `~/simple-track/.env.vps`, interpolated into
+  `DATABASE_URL_PRODUCTION`. `migrate up` checks whether that DSN can log in and, if not, sets
+  `LOGIN` and the password on the role (sent as a SCRAM verifier, never in a migration). So
+  rotating it is: change `APP_DB_PASSWORD`, run a backend deploy (or `migrate up` by hand), and
+  restart the backend. Use hex (`openssl rand -hex 24`): it goes into a URL unescaped.
+- The owner's credentials are still in the backend container's environment, because the
+  agent's `pre_swap` runs in the backend service. Code running in the server could read them;
+  the split protects against query bugs, not a compromised server process. See
+  `docs/multi-user/DECISIONS.md`.
+- Dev (`dev/env.sh`) and the e2e suite (`e2e/infra/postgres.ts`) use the same split, with fixed
+  local passwords. The e2e build's `/__e2e/reset` uses its own owner connection, since
+  `TRUNCATE ... RESTART IDENTITY` needs ownership.
+- The root `docker-compose.yml` `backend` service still connects as the `postgres` superuser.
+  It runs with `APP_ENV=development`, so it only gets the warning. A local production-mode copy
+  must use an app-role DSN.
+
+First rollout (multi-user project, lane D1): `docs/multi-user/ROLLOUT.md`.
+
 ## Build and deploy
 
 `j-cicd` (`.cicd.yaml`) builds clean from `main`, runs vet/tests/lint/e2e, pushes both images to
-GHCR, and has the VPS agent pull and restart the compose stack. It then checks
+GHCR, and has the VPS agent pull and restart the compose stack. `.cicd.yaml` sets no
+`deploy.compose_file`, so the agent uses the VPS's own copy of `docker-compose.vps.yml` (the path
+in its config): **changes to that file reach production only when copied there by hand**. It then checks
 `https://st.jackgraver.ca/version.json` for the new commit.
 
 ## Stale artifact

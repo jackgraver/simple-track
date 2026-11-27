@@ -15,6 +15,16 @@ const IMAGE = 'postgres:16-alpine'; // same as docker-compose.yml / prod
 export const pgUrl = (port: number, db: string) =>
   `postgresql://postgres:postgres@127.0.0.1:${port}/${db}?sslmode=disable`;
 
+/**
+ * The server's login role (backend/internal/database AppRole), as in production: DML only, so
+ * row-level security applies to it. `migrate up` (template build) gives it this password. The
+ * role is cluster-wide, so every checkout sharing the container uses the same fixed password.
+ * pgUrl (postgres) stays the owner for migrate, e2eseed, the /__e2e reset and the fixtures.
+ */
+export const APP_ROLE = 'simpletrack_app';
+export const appPgUrl = (port: number, db: string) =>
+  `postgresql://${APP_ROLE}:e2e_app@127.0.0.1:${port}/${db}?sslmode=disable`;
+
 async function containerPort(): Promise<number | undefined> {
   try {
     const out = await run('docker', ['port', CONTAINER, '5432/tcp']);
@@ -105,7 +115,13 @@ export async function ensureTemplate(port: number, backendKey: string): Promise<
     await c.query(`DROP DATABASE IF EXISTS ${TEMPLATE_DB} WITH (FORCE)`);
     await c.query(`CREATE DATABASE ${TEMPLATE_DB}`);
   });
-  const env = { ...process.env, DATABASE_URL: pgUrl(port, TEMPLATE_DB), TZ, APP_ENV: 'development' };
+  const env = {
+    ...process.env,
+    DATABASE_OWNER_URL: pgUrl(port, TEMPLATE_DB),
+    DATABASE_URL: appPgUrl(port, TEMPLATE_DB),
+    TZ,
+    APP_ENV: 'development',
+  };
   await run(path.join(BIN_DIR, 'migrate'), ['up'], { cwd: CACHE_DIR, env });
   await run(path.join(BIN_DIR, 'e2eseed'), [], { cwd: CACHE_DIR, env });
   await withAdmin(port, (c) =>

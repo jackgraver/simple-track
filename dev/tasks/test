@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 #MISE description="Run backend and frontend tests"
 set -euo pipefail
-# Lets the migration integration tests create throwaway databases on the dev
-# Postgres; they're skipped if it isn't running.
-export TEST_DATABASE_URL="${TEST_DATABASE_URL:-$DATABASE_URL}"
+# Lets the Postgres integration tests create throwaway databases (and test roles) on the dev
+# Postgres as its owner; they're skipped if it isn't running.
+export TEST_DATABASE_URL="${TEST_DATABASE_URL:-$DATABASE_OWNER_URL}"
 (cd backend && go test ./... && go test -tags e2e ./internal/e2e/...)
 (cd frontend && npm run test:run)

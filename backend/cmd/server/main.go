@@ -14,9 +14,11 @@ import (
 	"be-simpletracker/internal/utils"
 	"be-simpletracker/migrations"
 	"context"
-	"fmt"
 	"log"
+	"os"
+	"os/signal"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/gin-contrib/cors"
@@ -64,12 +66,18 @@ func main() {
 	if env.IsProduction() && len(trustedProxies) == 0 {
 		log.Printf("config: TRUSTED_PROXIES is empty; login protection will use the direct peer IP")
 	}
-	db, err := database.ConnectToPostgres()
+	db, err := database.ConnectApp()
 	if err != nil {
 		log.Fatalf("database: %v", err)
 	}
 	if err := checkSchema(db); err != nil {
 		log.Fatalf("database schema: %v", err)
+	}
+	if err := checkRole(db); err != nil {
+		if env.IsProduction() {
+			log.Fatalf("database role: %v", err)
+		}
+		log.Printf("database role: warning: %v", err)
 	}
 
 	// Test-only /__e2e endpoints; a no-op unless built with -tags e2e (e2e/README.md).
@@ -79,8 +87,13 @@ func main() {
 	router.GET("/health", healthHandler(db))
 
 	addr := env.StringOr("LISTEN_ADDR", "0.0.0.0:8080")
-	fmt.Println("Server is running on port", addr)
-	router.Run(addr)
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	// After the first signal, restore default handling so a second Ctrl-C/SIGTERM kills at once.
+	go func() { <-ctx.Done(); stop() }()
+	if err := serve(ctx, newHTTPServer(addr, router), db); err != nil {
+		log.Fatal(err)
+	}
 }
 
 func splitString(s, sep string) []string {
@@ -92,6 +105,17 @@ func splitString(s, sep string) []string {
 		}
 	}
 	return result
+}
+
+// checkRole: the server must not connect as a role that row-level security doesn't apply to.
+func checkRole(db *gorm.DB) error {
+	sqlDB, err := db.DB()
+	if err != nil {
+		return err
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	return database.CheckAppRole(ctx, sqlDB)
 }
 
 // checkSchema refuses to start against a database that is missing migrations

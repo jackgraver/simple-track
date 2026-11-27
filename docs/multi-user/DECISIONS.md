@@ -124,3 +124,78 @@ every other lane, since nothing is reviewed again before the single deploy at D1
   `exp - iat` is checked against the current setting), so no stale long sessions survive.
 - **DB outage signing people out is accepted** for now (frontend treats a failed `/auth/me` as
   signed out). Nice-to-have, unscheduled: keep the session and retry on 5xx/network errors.
+## 2026-11-27: App DB role, pool and HTTP server (lane A2)
+
+**Two DSNs.** The server reads the existing `DATABASE_URL` / `DATABASE_URL_PRODUCTION` /
+`DATABASE_URL_DEVELOPMENT`, which now name `simpletrack_app`. A new `DATABASE_OWNER_URL` is the
+schema owner for `cmd/migrate`, devseed, devuser, e2eseed, the e2e build's `/__e2e` reset/seed,
+pgweb and `dev test`. `database.ConnectApp()` / `ConnectOwner()` replace `ConnectToPostgres()` so
+every caller picks one explicitly. Without `DATABASE_OWNER_URL` the tools fall back to the app
+DSN with a logged warning (single-role setups): migrate then fails at its first DDL, DML-only
+tools still work, and the e2e server refuses to start (its reset needs the owner).
+
+**Role bootstrap: migration for structure, `migrate up` for the secret.**
+- `0010_app_role.sql` creates `simpletrack_app` NOLOGIN with no password, strips any
+  superuser/BYPASSRLS/CREATEROLE/CREATEDB/REPLICATION and role memberships from a pre-existing one, sets the role's
+  timeouts, grants DML on all tables and USAGE/SELECT on sequences, revokes writes on
+  `schema_migrations`, and sets `ALTER DEFAULT PRIVILEGES` for the owner so later migrations
+  need no GRANTs. Its down step revokes the grants but keeps the role, since roles are
+  cluster-wide and other databases may use it.
+- `migrate up` (after a full migrate) calls `database.EnsureAppLogin`: if the app DSN names
+  `simpletrack_app` and can't log in because of a wrong password, or because the role is still
+  NOLOGIN with no password (as 0010 leaves it), it runs `ALTER ROLE ... LOGIN PASSWORD` with a
+  client-computed SCRAM-SHA-256 verifier, so the plain password never reaches Postgres or its
+  logs. In prod that happens in j-cicd's `pre_swap` with no extra manual step, and rotating the
+  password is just changing `APP_DB_PASSWORD` and running `migrate up`. Checking first keeps
+  normal deploys no-ops. A concurrent run that changed the role first counts as success. A role
+  with a password that's NOLOGIN was switched off on purpose, so it is refused rather than
+  re-enabled. A LOGIN role that still can't connect (pg_hba) is an error.
+- Rejected: a manual `psql` step in prod (dev and e2e would each need their own bootstrap, and it
+  isn't repeatable); putting the password in a migration (forbidden, and it would be the same
+  everywhere).
+- Roles are cluster-wide but migrations run per database, often in parallel (go test packages, e2e
+  templates). The cluster-wide statements only run when something is missing and tolerate a
+  concurrent creator (`duplicate_object`/`unique_violation`, and "tuple concurrently updated" for
+  role settings). Checked with 3 × 8 concurrent `migrate up` runs on fresh clusters.
+
+**Server guard.** At startup the server checks its own role (`database.CheckAppRole`). Superuser,
+BYPASSRLS, owning a public table or inheriting its owner's role (RLS counts that as the owner),
+or membership in a superuser/BYPASSRLS role is fatal in production and a warning elsewhere. The root
+`docker-compose.yml` backend still uses `postgres` in development mode, and a local
+production-mode copy has to use an app DSN.
+
+**Known gap: the owner DSN is in the backend container's env.** j-cicd's `pre_swap` runs only
+in a tracked service, so migrate has to run in the `backend` service and gets the same
+environment as the server. Code execution inside the server could read the owner password. The
+role split guards against query bugs (missing filters under RLS), not a compromised process.
+Closing the gap needs j-cicd to run pre_swap in a separate compose service. Not worth it now.
+
+**Pool** (`internal/database/pool.go`, env-overridable `DB_MAX_OPEN_CONNS`, `DB_MAX_IDLE_CONNS`,
+`DB_CONN_MAX_LIFETIME`, `DB_CONN_MAX_IDLE_TIME`; invalid values fail startup):
+- max open **20**: one process, a few family users, and Postgres' default `max_connections`
+  of 100 shared with migrate and psql. With B2's per-request transaction, a connection is held
+  for a whole request, so 20 means 20 concurrent DB-touching requests; more queue rather than
+  overload Postgres.
+- max idle **10**: bursts reuse warm connections, while quiet periods hold few.
+- lifetime **30 min**, idle time **5 min**: recycle connections slowly enough to be free, and
+  release server-side memory after a burst.
+- `/__e2e` owner pool: 2 open.
+
+**Role timeouts:** `statement_timeout = 15s` (app queries are small single-user reads/writes; the
+largest is the Renpho CSV import; 15 s catches runaways with a wide margin);
+`idle_in_transaction_session_timeout = 30s` (frees locks held by a request transaction that was
+abandoned). Both on the role, not the owner, so migrations are unaffected. Not added:
+`lock_timeout`, since statement_timeout already bounds lock waits.
+
+**HTTP server** (`cmd/server/serve.go`): read-header 5 s, read 30 s, write 45 s (above the 15 s
+statement timeout plus the media lookups' 10 s client timeout), idle 120 s. SIGTERM/SIGINT:
+stop accepting, drain for up to 25 s, then force-close and close the DB pool.
+`stop_grace_period: 30s` on the prod backend service.
+
+**`.cicd.yaml` unchanged:** it holds no DSNs (the e2e step uses `e2e/infra`, which now wires both).
+`deploy.compose_file` (ship the compose file with each release) would simplify ROLLOUT's
+manual compose-file copy and rollbacks. It changes every deploy, so it's left to the owner.
+
+Follow-ups (owner, 2026-11-27): the owner-DSN gap and `deploy.compose_file` are j-cicd/deploy
+config work after D1, tracked as BACKLOG #23 and #24. BACKLOG #16 (pin the network subnet) is
+deferred to D1, since it needs a network recreate on the VPS.
