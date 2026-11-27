@@ -113,3 +113,17 @@ func TestLoginRateLimitLogsFailureAndReturnsRetryAfter(t *testing.T) {
 		t.Fatalf("password appeared in login audit log: %s", logged)
 	}
 }
+
+func TestLoginDoesNotLogUnknownUsernames(t *testing.T) {
+	router, logs := setupLoginRouteTest(t, LoginProtectionConfig{Window: time.Minute, MaxPerIP: 10, MaxPerUsername: 10})
+	if recorder := performLogin(router, "not-a-user-hunter2", "wrong-password"); recorder.Code != http.StatusUnauthorized {
+		t.Fatalf("status %d", recorder.Code)
+	}
+	if strings.Contains(logs.String(), "hunter2") || !strings.Contains(logs.String(), `"username":"unknown"`) {
+		t.Fatalf("unknown username logged: %s", logs.String())
+	}
+	performLogin(router, "alice", "wrong-password")
+	if !strings.Contains(logs.String(), `"username":"alice"`) {
+		t.Fatalf("existing username not logged: %s", logs.String())
+	}
+}

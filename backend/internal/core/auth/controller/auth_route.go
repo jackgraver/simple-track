@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"be-simpletracker/internal/core/auth/models"
+	authrepo "be-simpletracker/internal/core/auth/repository"
 	"be-simpletracker/internal/core/auth/services"
 	"be-simpletracker/internal/env"
 
@@ -86,6 +87,12 @@ func Login(c *gin.Context, service *services.AuthService, cookie CookieConfig, p
 	}
 
 	clientIP := c.ClientIP()
+	// Whether the username exists is only looked up when something is logged, and only the
+	// existing names are logged verbatim.
+	logAttempt := func(outcome string) {
+		_, err := authrepo.FindUserByUsername(c.Request.Context(), req.Username)
+		protection.LogAttempt(c.Request.Context(), outcome, clientIP, req.Username, err == nil)
+	}
 	decision := protection.Allow(clientIP, req.Username)
 	if !decision.Allowed {
 		if decision.LogRejection {
@@ -93,12 +100,13 @@ func Login(c *gin.Context, service *services.AuthService, cookie CookieConfig, p
 			if decision.Reason == "credential_spray" {
 				outcome = "credential_spray_blocked"
 			}
-			protection.LogAttempt(c.Request.Context(), outcome, clientIP, req.Username)
+			logAttempt(outcome)
 		}
 		respondLoginRateLimited(c, decision.RetryAfter)
 		return
 	}
 
+	protection.Wait(c.Request.Context(), decision.Delay)
 	result, err := service.Login(c.Request.Context(), services.LoginInput{
 		Username: req.Username,
 		Password: req.Password,
@@ -109,18 +117,18 @@ func Login(c *gin.Context, service *services.AuthService, cookie CookieConfig, p
 			sprayDecision := protection.RecordFailure(clientIP, req.Username)
 			if !sprayDecision.Allowed {
 				if sprayDecision.LogRejection {
-					protection.LogAttempt(c.Request.Context(), "credential_spray_blocked", clientIP, req.Username)
+					logAttempt("credential_spray_blocked")
 				}
 				respondLoginRateLimited(c, sprayDecision.RetryAfter)
 				return
 			}
-			protection.LogAttempt(c.Request.Context(), "invalid_credentials", clientIP, req.Username)
+			logAttempt("invalid_credentials")
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid username or password"})
 		case errors.Is(err, services.ErrTokenGeneration):
-			protection.LogAttempt(c.Request.Context(), "server_error", clientIP, req.Username)
+			logAttempt("server_error")
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate token"})
 		default:
-			protection.LogAttempt(c.Request.Context(), "server_error", clientIP, req.Username)
+			logAttempt("server_error")
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Database error"})
 		}
 		return
@@ -128,7 +136,7 @@ func Login(c *gin.Context, service *services.AuthService, cookie CookieConfig, p
 
 	setAuthCookie(c, cookie, result.Token)
 	protection.RecordSuccess(clientIP, result.User.Username)
-	protection.LogAttempt(c.Request.Context(), "success", clientIP, result.User.Username)
+	protection.LogAttempt(c.Request.Context(), "success", clientIP, result.User.Username, true)
 	c.JSON(http.StatusOK, AuthResponse{
 		User:        result.User,
 		Username:    result.User.Username,
