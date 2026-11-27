@@ -50,7 +50,9 @@ main <── proj/multi-user (draft PR, merged last)
 
 ## Merging
 
-The owner reviews and merges lane PRs into `proj/multi-user` unless `DECISIONS.md` says otherwise.
+- **A1 and A3**: the agent merges its own PR into `proj/multi-user` once checks pass
+  (`gh pr merge --squash`).
+- **Every other lane**: the owner reviews and merges. Open the PR and stop.
 
 ## Where things stand (2026-11-27)
 

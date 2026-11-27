@@ -27,3 +27,8 @@ Newest at the bottom. One entry per decision: what, why, and who/when.
 - **Added for a solid foundation**: revocable sessions (`token_version`, `disabled_at`), an
   `auth_events` audit log, Postgres-backed tests running in CI, HTTP server timeouts and graceful
   shutdown, migration rehearsal on a prod backup copy.
+
+## 2026-11-27: Who merges lane PRs (owner)
+
+Agents merge A1 (dead-code cleanup) and A3 (audit doc) themselves. The owner reviews and merges
+every other lane, since nothing is reviewed again before the single deploy at D1.
