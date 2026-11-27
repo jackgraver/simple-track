@@ -329,13 +329,26 @@ keeps cross-site POSTs off the `/auth` routes, which AuthMiddleware's Sec-Fetch-
 doesn't cover. Production still requires `CORS_ORIGINS` (`APP_ORIGIN`); `dev/env.sh` and e2e
 set their own.
 
-## 2026-11-27: Audit writes on failed requests (owner, for C6)
+## 2026-11-27: Writes that survive a rollback: `database.Always` (owner, built in C6)
 
-Since B2, everything a request writes is rolled back when the response is 4xx/5xx. An audit row
-written on a rejected request ("setup link expired", "reset refused", "disabled user tried to sign
-in") would vanish with it, which is exactly the event worth keeping. So `auth_events` (C6) are
-written outside the request transaction: on the pool (as `/auth/login` and `/auth/register`
-already run, via `OutsideRequestTx`) or in their own short transaction, never through
-`database.From(ctx)` on a path that can fail. C6 adds a test that a rejected attempt still leaves
-its event.
+Since B2, everything a request writes is rolled back when the response is 4xx/5xx. Some writes
+must survive that, above all audit rows for rejected attempts ("setup link expired", "disabled
+user tried to sign in"). Rather than going around the request transaction, the database package
+gets one explicit, greppable way to say so:
 
+- `database.Always(ctx, fn func(db *gorm.DB) error)` registers `fn` on the request. The
+  middleware runs it **after** the request transaction has committed or rolled back (and after a
+  panic), in its own short transaction with the same identity (`app.user_id`, `app.is_admin`), so
+  RLS applies as usual. Several calls run in order.
+- After, not alongside: no second connection while the request holds one, and no waiting on
+  locks the request itself holds.
+- Limits: `fn` can't rely on rows the request wrote (they may have been rolled back), gets no
+  result back to the handler, and its failure is logged without changing the response (an
+  audit write must never turn a success into an error).
+- With no request transaction (`OutsideRequestTx`, tools, tests) it runs immediately.
+- Use it only for writes that must outlive the request's outcome (audit/security events). Every
+  use is visible with `grep -rn 'database.Always'`; the B2 guard test keeps forbidding the other
+  ways around the request transaction.
+- C6 builds it (first user) with tests: runs after commit, after rollback and after a panic;
+  sees the identity; failure doesn't change the response; a rejected setup attempt still leaves
+  its `auth_events` row.
