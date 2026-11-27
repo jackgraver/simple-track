@@ -34,10 +34,10 @@ func RegisterRoutes(router *gin.Engine) {
 			controller.Logout(c, cookie)
 		})
 		auth.GET("/me", AuthMiddleware(), func(c *gin.Context) {
-			controller.GetCurrentUser(c, service)
+			controller.GetCurrentUser(c, service, MustUser(c).ID)
 		})
 		auth.PATCH("/me", AuthMiddleware(), func(c *gin.Context) {
-			controller.UpdateCurrentUser(c, service)
+			controller.UpdateCurrentUser(c, service, MustUser(c).ID)
 		})
 	}
 }

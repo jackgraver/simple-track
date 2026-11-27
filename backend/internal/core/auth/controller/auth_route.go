@@ -135,20 +135,10 @@ func Login(c *gin.Context, service *services.AuthService, cookie CookieConfig, p
 	})
 }
 
-func GetCurrentUser(c *gin.Context, service *services.AuthService) {
+// GetCurrentUser answers /auth/me for userID (resolved by AuthMiddleware).
+func GetCurrentUser(c *gin.Context, service *services.AuthService, userID uint) {
 	setAuthResponseHeaders(c)
-	username, exists := c.Get("username")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Not authenticated"})
-		return
-	}
-	usernameStr, ok := username.(string)
-	if !ok {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Not authenticated"})
-		return
-	}
-
-	user, err := service.CurrentUser(usernameStr)
+	user, err := service.CurrentUser(userID)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
 		return
@@ -164,7 +154,7 @@ type updateProfileRequest struct {
 	BirthYear *int `json:"birth_year"`
 }
 
-func UpdateCurrentUser(c *gin.Context, service *services.AuthService) {
+func UpdateCurrentUser(c *gin.Context, service *services.AuthService, userID uint) {
 	var req updateProfileRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -174,7 +164,7 @@ func UpdateCurrentUser(c *gin.Context, service *services.AuthService) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "birth_year is required"})
 		return
 	}
-	user, err := service.UpdateBirthYear(c.GetString("username"), *req.BirthYear)
+	user, err := service.UpdateBirthYear(userID, *req.BirthYear)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return

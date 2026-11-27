@@ -2,27 +2,46 @@ package auth
 
 import (
 	"be-simpletracker/internal/clock"
+	"be-simpletracker/internal/core/auth/models"
 	"be-simpletracker/internal/env"
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 )
 
+// ErrInvalidToken wraps every reason a token is rejected (bad format, signature, expired,
+// revoked...). Errors that don't wrap it are server-side failures (missing secret, DB down).
+var ErrInvalidToken = errors.New("invalid token")
+
+func invalidToken(reason string) error { return fmt.Errorf("%w: %s", ErrInvalidToken, reason) }
+
+// Claims is the JWT payload. UID and Ver identify the session: the middleware rejects a token
+// without a UID (issued before multi-user) and one whose Ver no longer matches the user's
+// token_version (revoked by a password reset or disable).
 type Claims struct {
+	UID       uint   `json:"uid,omitempty"`
+	Ver       int64  `json:"ver,omitempty"`
 	Username  string `json:"username"`
 	Timestamp int64  `json:"timestamp"`
 	Iat       int64  `json:"iat,omitempty"`
 	Exp       int64  `json:"exp,omitempty"`
 }
 
-func GenerateToken(username string) (string, error) {
+// GenerateToken signs a session token for user. The user must be a stored row (non-zero ID).
+func GenerateToken(user models.User) (string, error) {
+	if user.ID == 0 {
+		return "", fmt.Errorf("cannot issue a token for an unsaved user")
+	}
 	now := clock.Now().Unix()
 	ttl := int64(CookieMaxAgeSeconds())
 	claims := Claims{
-		Username:  username,
+		UID:       user.ID,
+		Ver:       user.TokenVersion,
+		Username:  user.Username,
 		Timestamp: now,
 		Iat:       now,
 		Exp:       now + ttl,
@@ -58,7 +77,7 @@ func GenerateToken(username string) (string, error) {
 func VerifyToken(token string) (*Claims, error) {
 	parts := strings.Split(token, ".")
 	if len(parts) != 3 {
-		return nil, fmt.Errorf("invalid token format")
+		return nil, invalidToken("format")
 	}
 
 	headerEncoded := parts[0]
@@ -69,22 +88,22 @@ func VerifyToken(token string) (*Claims, error) {
 	if err != nil {
 		return nil, err
 	}
-	if signature != expectedSignature {
-		return nil, fmt.Errorf("invalid token signature")
+	if !hmac.Equal([]byte(signature), []byte(expectedSignature)) {
+		return nil, invalidToken("signature")
 	}
 
 	claimsJSON, err := base64.RawURLEncoding.DecodeString(claimsEncoded)
 	if err != nil {
-		return nil, fmt.Errorf("invalid token encoding: %v", err)
+		return nil, invalidToken("encoding: " + err.Error())
 	}
 
 	var claims Claims
 	if err := json.Unmarshal(claimsJSON, &claims); err != nil {
-		return nil, fmt.Errorf("invalid token claims: %v", err)
+		return nil, invalidToken("claims: " + err.Error())
 	}
 
 	if claims.Exp > 0 && clock.Now().Unix() > claims.Exp {
-		return nil, fmt.Errorf("token expired")
+		return nil, invalidToken("expired")
 	}
 
 	return &claims, nil

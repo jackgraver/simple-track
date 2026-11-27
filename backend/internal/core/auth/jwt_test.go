@@ -1,15 +1,19 @@
 package auth
 
 import (
+	"be-simpletracker/internal/core/auth/models"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"strings"
 	"testing"
 	"time"
+
+	"gorm.io/gorm"
 )
 
 func TestGenerateToken_verifyToken_roundTrip(t *testing.T) {
-	tok, err := GenerateToken("alice")
+	tok, err := GenerateToken(models.User{Model: gorm.Model{ID: 42}, Username: "alice", TokenVersion: 3})
 	if err != nil {
 		t.Fatalf("GenerateToken: %v", err)
 	}
@@ -17,13 +21,13 @@ func TestGenerateToken_verifyToken_roundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("VerifyToken: %v", err)
 	}
-	if got.Username != "alice" {
-		t.Fatalf("username: got %q want alice", got.Username)
+	if got.Username != "alice" || got.UID != 42 || got.Ver != 3 {
+		t.Fatalf("claims: got %+v want alice uid 42 ver 3", got)
 	}
 }
 
 func TestVerifyToken_badSignature(t *testing.T) {
-	tok, err := GenerateToken("bob")
+	tok, err := GenerateToken(models.User{Model: gorm.Model{ID: 1}, Username: "bob", TokenVersion: 1})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -76,7 +80,21 @@ func mustSignedJWT(tb testing.TB, claims Claims) string {
 
 func TestGenerateToken_missingSecretReturnsError(t *testing.T) {
 	t.Setenv("JWT_SECRET", "")
-	if _, err := GenerateToken("u"); err == nil {
+	if _, err := GenerateToken(models.User{Model: gorm.Model{ID: 1}, Username: "u"}); err == nil {
 		t.Fatal("expected error when JWT_SECRET is empty")
+	}
+}
+
+func TestGenerateToken_unsavedUserRefused(t *testing.T) {
+	if _, err := GenerateToken(models.User{Username: "u"}); err == nil {
+		t.Fatal("expected error for a user with no ID")
+	}
+}
+
+func TestVerifyToken_rejectionsWrapErrInvalidToken(t *testing.T) {
+	for _, tok := range []string{"two.parts", "a.b.c"} {
+		if _, err := VerifyToken(tok); !errors.Is(err, ErrInvalidToken) {
+			t.Fatalf("%q: got %v, want ErrInvalidToken", tok, err)
+		}
 	}
 }
