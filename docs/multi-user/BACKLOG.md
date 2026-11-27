@@ -376,6 +376,29 @@ Nothing Critical was found. Prod today has one account, so most multi-user findi
   pipeline next to `backend-test`. Run it once by hand now.
 - **Lane**: B3 (already editing the CI test step).
 
+**S4 audit result (2026-11-27)**: govulncheck v1.10.0 (DB updated 2026-11-24), go1.27.4 locally,
+node v22.23.5 / npm 10.9.9.
+
+- Before: 8 reachable findings, all from two modules. `golang.org/x/net@v0.55.0`: GO-2026-6617,
+  6612, 6611, 6610, 6603 (HTTP/2, fixed in v0.60.0; reached via `media/lookup` http.Client) and
+  GO-2026-5026 (idna, fixed v0.57.0). `golang.org/x/text@v0.37.0`: GO-2026-6629 (precis, fixed
+  v0.41.0) and GO-2026-5970 (norm, fixed v0.39.0; reached via pgx and gorm). Imported but not
+  called: x/net GO-2026-6866, 6860 (fixed v0.62.0). Required modules only: x/crypto
+  GO-2026-6355, 6354 (ssh, fixed v0.56.0), 6303 (ssh, v0.55.0), x/net GO-2026-5942 (dnsmessage,
+  v0.56.0), x/crypto GO-2026-5932 (openpgp, only fixed in a pseudo-version). The Go stdlib was
+  not flagged.
+- Bumped (backend/go.mod): x/net v0.55.0 to v0.60.0, x/text v0.37.0 to v0.42.0 (v0.60.0
+  requires it), x/crypto v0.52.0 to v0.57.0 and x/sync, x/sys (forced by x/net v0.60.0). x/net
+  v0.60.0 requires Go 1.26, so the `go` directive went 1.25.0 to 1.26.0 and
+  `backend/Dockerfile` went `golang:1.25-alpine` to `golang:1.26-alpine`.
+- After: `govulncheck ./...` reports 0 reachable vulnerabilities.
+- Left: x/net GO-2026-6866 and 6860 (imported, not called; fix v0.62.0 needs x/crypto v0.58.0
+  and x/text v0.43.0), x/crypto GO-2026-5932 (openpgp is unused; no tagged fix). Re-check with
+  the B3 pipeline step.
+- npm: `npm audit --omit=dev` and full `npm audit` both report 0 vulnerabilities in `frontend/`
+  and `e2e/`. Nothing bumped.
+- Pipeline step (govulncheck and npm audit in `.cicd.yaml`) is still open and stays with B3.
+
 ### 21. Info: dev stack exposure
 
 `dev/env.sh:71` binds the backend to `0.0.0.0`, vite runs with `host: true`, the dev account is
