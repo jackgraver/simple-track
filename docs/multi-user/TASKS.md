@@ -102,7 +102,7 @@ Depends on: B2. Files: `media/lookup/`, `respondLookupError`.
 
 ### S4 Dependency audit (`mu/s4-dep-audit`)
 Depends on: none.
-- [ ] #20 (manual run) `govulncheck` in `backend/`, `npm audit --omit=dev` in `frontend/` and
+- [x] #20 (manual run) `govulncheck` in `backend/`, `npm audit --omit=dev` in `frontend/` and
       `e2e/`; bump only what's affected; results recorded under #20. The pipeline step stays with B3.
 
 ## Phase B: foundation (sequential, one agent at a time)
