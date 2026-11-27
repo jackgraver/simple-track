@@ -16,12 +16,7 @@ type DietDay struct {
 	Logs         []DayLog      `gorm:"foreignKey:DayID" json:"loggedMeals"`
 }
 
-func (d DietDay) GetID() uint        { return d.ID }
-func (d DietDay) TableName() string  { return "days" }
-func (d DietDay) GetDate() time.Time { return d.Date }
-func (d DietDay) Preloads() []string {
-	return []string{"PlannedMeals.Meal.Items.Food", "Plan", "Logs.Meal.Items.Food"}
-}
+func (d DietDay) TableName() string { return "days" }
 
 // DayLog represents a logged meal for a day
 type DayLog struct {
@@ -31,6 +26,4 @@ type DayLog struct {
 	Meal   Meal `json:"meal"`
 }
 
-func (d DayLog) GetID() uint        { return d.ID }
-func (d DayLog) TableName() string  { return "day_logs" }
-func (d DayLog) Preloads() []string { return []string{"Meal.Items.Food"} }
+func (d DayLog) TableName() string { return "day_logs" }

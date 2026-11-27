@@ -302,6 +302,14 @@ func TestPlansGetAll(t *testing.T) {
 	if err != nil || paged.Pagination == nil || len(paged.Data) != 1 {
 		t.Fatalf("paged %+v err %v", paged, err)
 	}
+	// Default order is newest first; the count ignores the page.
+	if paged.Data[0].Name != "B" || paged.Pagination.Total != 2 || paged.Pagination.TotalPages != 2 || !paged.Pagination.HasNext {
+		t.Fatalf("paged %+v pagination %+v", paged.Data, paged.Pagination)
+	}
+	filtered, err := dietrepo.PlansGetAll(ctx, utils.QueryParams{Filters: map[string]string{"name": "A"}})
+	if err != nil || len(filtered.Data) != 1 || filtered.Data[0].Name != "A" {
+		t.Fatalf("filtered %+v err %v", filtered, err)
+	}
 }
 
 func TestDayByIDGeneric_notFound(t *testing.T) {

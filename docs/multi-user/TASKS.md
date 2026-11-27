@@ -23,10 +23,10 @@ parallel. Then D1.
 
 ### A1 Remove dead DB code
 Depends on: none
-- [ ] Delete `internal/generics` (nothing imports it).
-- [ ] Remove `internal/database/repository`: inline what's still used (diet repo, workout
+- [x] Delete `internal/generics` (nothing imports it).
+- [x] Remove `internal/database/repository`: inline what's still used (diet repo, workout
       models/workoutlog repo, `utils/query_helper.go`) or replace with plain gorm.
-- [ ] Remove `internal/database/dumps/` if it's a leftover (confirm nothing references it).
+- [x] Remove `internal/database/dumps/` if it's a leftover (confirm nothing references it).
 - Done when: `go build ./... && go test ./...` pass and neither package exists.
 
 ### A2 Connection pool and app DB role

@@ -11,5 +11,4 @@ type User struct {
 	BirthYear *int   `json:"birth_year"`
 }
 
-func (u User) GetID() uint       { return u.ID }
 func (u User) TableName() string { return "users" }

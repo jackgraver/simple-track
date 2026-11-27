@@ -16,9 +16,7 @@ type Meal struct {
 	ClientID *string `json:"client_id,omitempty" gorm:"type:uuid"`
 }
 
-func (m Meal) GetID() uint        { return m.ID }
-func (m Meal) TableName() string  { return "meals" }
-func (m Meal) Preloads() []string { return []string{"Items.Food"} }
+func (m Meal) TableName() string { return "meals" }
 
 // MealItem represents an item in a meal
 type MealItem struct {
@@ -33,9 +31,7 @@ type MealItem struct {
 	Food            Food    `json:"food"`
 }
 
-func (m MealItem) GetID() uint        { return m.ID }
-func (m MealItem) TableName() string  { return "meal_items" }
-func (m MealItem) Preloads() []string { return []string{"Food"} }
+func (m MealItem) TableName() string { return "meal_items" }
 
 // SavedMeal is a reusable template (e.g. meals you eat often), not tied to a specific day log.
 type SavedMeal struct {
@@ -44,9 +40,7 @@ type SavedMeal struct {
 	Items []SavedMealItem `json:"items" gorm:"constraint:OnDelete:CASCADE;"`
 }
 
-func (s SavedMeal) GetID() uint        { return s.ID }
-func (s SavedMeal) TableName() string  { return "saved_meals" }
-func (s SavedMeal) Preloads() []string { return []string{"Items.Food"} }
+func (s SavedMeal) TableName() string { return "saved_meals" }
 
 // SavedMealItem represents an item in a saved meal
 type SavedMealItem struct {
@@ -61,7 +55,6 @@ type SavedMealItem struct {
 	Food            Food      `json:"food"`
 }
 
-func (s SavedMealItem) GetID() uint       { return s.ID }
 func (s SavedMealItem) TableName() string { return "saved_meal_items" }
 
 // Food represents a food item
@@ -80,7 +73,6 @@ type Food struct {
 	Variants       []Food  `json:"variants,omitempty" gorm:"-"`
 }
 
-func (f Food) GetID() uint       { return f.ID }
 func (f Food) TableName() string { return "foods" }
 
 var quickLogFoodNameSuffix = regexp.MustCompile(`\s*\[ql-\d+\]\s*$`)
@@ -111,9 +103,7 @@ type CompositeFood struct {
 	Items []CompositeFoodItem `json:"items" gorm:"constraint:OnDelete:CASCADE;"`
 }
 
-func (c CompositeFood) GetID() uint        { return c.ID }
-func (c CompositeFood) TableName() string  { return "composite_foods" }
-func (c CompositeFood) Preloads() []string { return []string{"Items.Food"} }
+func (c CompositeFood) TableName() string { return "composite_foods" }
 
 // CompositeFoodItem is one ingredient line in a composite food.
 type CompositeFoodItem struct {
@@ -125,6 +115,4 @@ type CompositeFoodItem struct {
 	Food            Food          `json:"food"`
 }
 
-func (c CompositeFoodItem) GetID() uint        { return c.ID }
-func (c CompositeFoodItem) TableName() string  { return "composite_food_items" }
-func (c CompositeFoodItem) Preloads() []string { return []string{"Food"} }
+func (c CompositeFoodItem) TableName() string { return "composite_food_items" }

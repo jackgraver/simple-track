@@ -78,9 +78,6 @@ frontend-vite/
 
 *.db
 
-backend/internal/database/dumps/*.sql
-backend/internal/database/dumps/*.txt
-
 MD/
 
 

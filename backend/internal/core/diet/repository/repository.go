@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"be-simpletracker/internal/core/diet/models"
-	dbrepo "be-simpletracker/internal/database/repository"
 	"be-simpletracker/internal/utils"
 
 	"gorm.io/gorm"
@@ -530,14 +529,24 @@ func DayByID(id int) (*models.DietDay, error) {
 	return &day, nil
 }
 
+// preloadDietDay loads a day's plan, planned meals and logged meals with their foods.
+func preloadDietDay(db *gorm.DB) *gorm.DB {
+	return db.Preload("PlannedMeals.Meal.Items.Food").Preload("Plan").Preload("Logs.Meal.Items.Food")
+}
+
 func DaysByDateRange(ctx context.Context, start, end time.Time) ([]models.DietDay, error) {
-	repo := dbrepo.NewGormRepository[models.DietDay](conn())
-	return repo.GetByDateRange(ctx, start, end, dbrepo.WithDefaultPreloads())
+	var days []models.DietDay
+	err := conn().WithContext(ctx).Scopes(preloadDietDay).
+		Where("date >= ? AND date <= ?", start, end).
+		Order("date ASC").
+		Find(&days).Error
+	return days, err
 }
 
 func DayByIDGeneric(ctx context.Context, id uint) (models.DietDay, error) {
-	repo := dbrepo.NewGormRepository[models.DietDay](conn())
-	return repo.GetByID(ctx, id, dbrepo.WithDefaultPreloads())
+	var day models.DietDay
+	err := conn().WithContext(ctx).Scopes(preloadDietDay).First(&day, id).Error
+	return day, err
 }
 
 // MealDayTotals aggregates logged macros for one diet day from day_logs.
@@ -669,27 +678,8 @@ func UpdateDayLogMeal(dayID uint, oldMealID uint, newMealID uint) error {
 	return conn().Save(&log).Error
 }
 
-func PlansGetAll(ctx context.Context, params utils.QueryParams) (*utils.GetAllResult[models.Plan], error) {
-	repo := dbrepo.NewGormRepository[models.Plan](conn())
-	opts := utils.BuildQueryOptions(params, "id", true)
-	if params.Page > 0 && params.PageSize > 0 {
-		result, err := repo.GetAllPaginated(ctx, params.Page, params.PageSize, opts...)
-		if err != nil {
-			return nil, err
-		}
-		return &utils.GetAllResult[models.Plan]{
-			Data:       result.Data,
-			Pagination: result,
-		}, nil
-	}
-	entities, err := repo.GetAll(ctx, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return &utils.GetAllResult[models.Plan]{
-		Data:       entities,
-		Pagination: nil,
-	}, nil
+func PlansGetAll(ctx context.Context, params utils.QueryParams) (*utils.ListResult[models.Plan], error) {
+	return utils.List[models.Plan](conn().WithContext(ctx), params, "id", true)
 }
 
 func CompositeFoodByID(id uint) (*models.CompositeFood, error) {

@@ -255,7 +255,7 @@ func QuickLogMeal(params dietrepo.QuickLogParams) (DayWithTotals, error) {
 	return DayWithTotalsByID(int(dayID))
 }
 
-func GetAllPlans(ctx context.Context, params utils.QueryParams) (*utils.GetAllResult[models.Plan], error) {
+func GetAllPlans(ctx context.Context, params utils.QueryParams) (*utils.ListResult[models.Plan], error) {
 	return dietrepo.PlansGetAll(ctx, params)
 }
 
