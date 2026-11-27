@@ -2,6 +2,7 @@ package database
 
 import (
 	"bufio"
+	"errors"
 	"log"
 	"net"
 	"net/http"
@@ -69,7 +70,11 @@ func (w *txWriter) settle() {
 
 func (w *txWriter) writeFailure() {
 	h := w.ResponseWriter.Header()
-	h.Del("Content-Length")
+	// Nothing the handler meant for its success may go out with the 500 (a session cookie for a
+	// user row that was rolled back, a redirect, a cache validator).
+	for _, k := range []string{"Set-Cookie", "Location", "ETag", "Last-Modified", "Content-Disposition", "Content-Length"} {
+		h.Del(k)
+	}
 	h.Set("Content-Type", "application/json; charset=utf-8")
 	w.ResponseWriter.WriteHeader(http.StatusInternalServerError)
 	_, _ = w.ResponseWriter.WriteString(`{"error":"Could not save changes"}`)
@@ -115,5 +120,10 @@ func (w *txWriter) Flush() {
 
 func (w *txWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 	w.settle()
+	if w.failed {
+		return nil, nil, errCommitFailed
+	}
 	return w.ResponseWriter.Hijack()
 }
+
+var errCommitFailed = errors.New("database: request transaction failed to commit")

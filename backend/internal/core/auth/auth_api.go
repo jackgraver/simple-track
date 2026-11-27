@@ -24,11 +24,11 @@ func RegisterRoutes(router *gin.Engine, db *gorm.DB) {
 	auth := group.Group("/auth")
 	{
 		if registerEnabled {
-			auth.POST("/register", func(c *gin.Context) {
+			auth.POST("/register", OutsideRequestTx(db), func(c *gin.Context) {
 				controller.Register(c, service, cookie)
 			})
 		}
-		auth.POST("/login", func(c *gin.Context) {
+		auth.POST("/login", OutsideRequestTx(db), func(c *gin.Context) {
 			controller.Login(c, service, cookie, loginProtection)
 		})
 		auth.POST("/logout", func(c *gin.Context) {

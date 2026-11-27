@@ -186,6 +186,26 @@ func TestFrom_afterTheResponseCarriesErrRequestDone(t *testing.T) {
 	}
 }
 
+// The error handle can't open a stray transaction on the pool either.
+func TestFrom_errorHandleCannotBeginATransaction(t *testing.T) {
+	db := sqliteDB(t)
+	var err error
+	serveOne(t, db, func(c *gin.Context) {
+		c.Status(http.StatusOK)
+		c.Writer.WriteHeaderNow()
+		err = From(c.Request.Context()).Transaction(func(tx *gorm.DB) error {
+			return tx.Create(&note{Body: "late"}).Error
+		})
+		if sqlDB, _ := db.DB(); sqlDB.Stats().InUse != 0 {
+			t.Errorf("%d connections in use after a Transaction on the error handle", sqlDB.Stats().InUse)
+		}
+	})
+	// gorm joins Begin's own error onto it with %v, so match the text.
+	if err == nil || !strings.Contains(err.Error(), ErrRequestDone.Error()) || countNotes(t, db) != 0 {
+		t.Fatalf("err %v, notes %d: want ErrRequestDone and nothing written", err, countNotes(t, db))
+	}
+}
+
 func TestFrom_withoutHandlePanics(t *testing.T) {
 	defer func() {
 		if p := recover(); p == nil || !strings.Contains(fmt.Sprint(p), "no database handle") {
@@ -226,6 +246,12 @@ func TestNestedTransactionIsASavepoint(t *testing.T) {
 				})
 				if err == nil {
 					t.Fatal("inner transaction should fail")
+				}
+				// A best-effort read that fails doesn't poison the request either.
+				if err := Optional(ctx, func() error {
+					return From(ctx).Exec("SELECT * FROM no_such_table").Error
+				}); err == nil {
+					t.Fatal("optional read should fail")
 				}
 				if err := From(ctx).Create(&note{Body: "after"}).Error; err != nil {
 					t.Fatalf("request unusable after a failed savepoint: %v", err)
@@ -290,10 +316,14 @@ func TestMiddleware_failedCommitAnswers500(t *testing.T) {
 		if err := From(c.Request.Context()).Exec("INSERT INTO gate VALUES (1, 99)").Error; err != nil {
 			t.Fatal(err)
 		}
+		c.SetCookie("auth_token", "for-a-rolled-back-user", 60, "/", "", false, true)
 		c.JSON(http.StatusOK, gin.H{"saved": true})
 	})
 	if rec.Code != http.StatusInternalServerError || strings.Contains(rec.Body.String(), "saved") {
 		t.Fatalf("status %d body %s: want a 500 instead of the success body", rec.Code, rec.Body.String())
+	}
+	if c := rec.Header().Get("Set-Cookie"); c != "" {
+		t.Fatalf("the 500 carried the handler's cookie: %s", c)
 	}
 	if countNotes(t, db) != 0 {
 		t.Fatal("note kept although the commit failed")

@@ -2,6 +2,7 @@ package database
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"strconv"
 	"sync"
@@ -83,11 +84,40 @@ func From(ctx context.Context) *gorm.DB {
 	}
 	tx, err := h.req.begin()
 	if err != nil {
+		// A handle that can't reach the pool: its queries fail with err, and a Transaction(...)
+		// on it can't begin a real (identity-less) transaction either.
 		errDB := h.req.root.Session(&gorm.Session{NewDB: true, Context: ctx})
+		errDB.Statement.ConnPool = failedPool{err}
 		_ = errDB.AddError(err)
 		return errDB
 	}
 	return tx.Session(&gorm.Session{NewDB: true, Context: ctx})
+}
+
+// failedPool is the connection of From's error handle: every call fails with err.
+type failedPool struct{ err error }
+
+func (p failedPool) PrepareContext(context.Context, string) (*sql.Stmt, error) { return nil, p.err }
+func (p failedPool) ExecContext(context.Context, string, ...any) (sql.Result, error) {
+	return nil, p.err
+}
+func (p failedPool) QueryContext(context.Context, string, ...any) (*sql.Rows, error) {
+	return nil, p.err
+}
+func (p failedPool) QueryRowContext(context.Context, string, ...any) *sql.Row { return nil }
+
+// Optional runs fn, whose database errors the caller deliberately ignores (best-effort reads), so
+// that a failing statement doesn't abort the request transaction: inside one, fn runs in a
+// savepoint; otherwise (WithDB) it just runs. fn queries through From(ctx) as usual.
+func Optional(ctx context.Context, fn func() error) error {
+	if gc, ok := ctx.(*gin.Context); ok && gc.Request != nil {
+		ctx = gc.Request.Context()
+	}
+	if h, ok := ctx.Value(handleKey{}).(handle); !ok || h.req == nil {
+		return fn()
+	}
+	// The savepoint lives on the request's connection, which From(ctx) also uses.
+	return From(ctx).Transaction(func(*gorm.DB) error { return fn() })
 }
 
 // SetIdentity sets the request's identity: AuthMiddleware calls it once it knows the user. It

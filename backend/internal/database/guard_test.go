@@ -18,7 +18,8 @@ var requestPathForbidden = []struct {
 }{
 	{regexp.MustCompile(`\bGetDB\(|\bSetDB\(`), "global connection; use database.From(ctx)"},
 	{regexp.MustCompile(`(?m)^func conn\(|[^\w.]conn\(\)`), "package-global connection helper; use database.From(ctx)"},
-	{regexp.MustCompile(`(?m)^\s+\w+\s+\*gorm\.DB\s*$`), "*gorm.DB stored in a struct; take ctx and use database.From(ctx)"},
+	{regexp.MustCompile(`(?m)^\s+\w+(?:\s*,\s*\w+)*\s+\*gorm\.DB\b`), "*gorm.DB stored in a struct; take ctx and use database.From(ctx)"},
+	{regexp.MustCompile(`func (?:Register|New)\w*\([^)]*\*gorm\.DB|func \w+\([^)]*\*gorm\.DB[^)]*\) gin\.HandlerFunc`), "handler or route registration closing over a pool"},
 	{regexp.MustCompile(`database\.(ConnectApp|ConnectOwner|Open)\(`), "opens its own pool"},
 	{regexp.MustCompile(`database\.WithDB\(`), "bypasses the request transaction"},
 }
@@ -31,10 +32,12 @@ var requestPaths = []string{"internal/core/", "internal/utils/"}
 var notYetConverted = []string{"internal/core/diet/", "internal/core/workout/"}
 
 // Allowed exceptions, each with its reason.
-var requestPathAllowed = map[string]string{
+var requestPathAllowed = map[string][]string{
 	// The session lookup runs on the pool before the request has a user, so the request
-	// transaction still begins lazily (DECISIONS.md, B2).
-	"internal/core/auth/auth_middleware.go": "database.WithDB",
+	// transaction still begins lazily; login and register run outside it so bcrypt doesn't hold a
+	// connection (DECISIONS.md, B2).
+	"internal/core/auth/auth_middleware.go": {"database.WithDB", "func AuthMiddleware(", "func OutsideRequestTx("},
+	"internal/core/auth/auth_api.go":        {"func RegisterRoutes("},
 }
 
 func TestRequestCodeUsesFrom(t *testing.T) {
@@ -67,7 +70,7 @@ func TestRequestCodeUsesFrom(t *testing.T) {
 		for _, f := range requestPathForbidden {
 			for _, loc := range f.re.FindAllIndex(src, -1) {
 				match := strings.TrimSpace(string(src[loc[0]:loc[1]]))
-				if allowed, ok := requestPathAllowed[rel]; ok && strings.HasPrefix(match, allowed) {
+				if allowedMatch(rel, match) {
 					continue
 				}
 				line := 1 + strings.Count(string(src[:loc[0]]), "\n")
@@ -82,4 +85,13 @@ func TestRequestCodeUsesFrom(t *testing.T) {
 	if checked < 30 {
 		t.Fatalf("only %d files checked; did the layout move?", checked)
 	}
+}
+
+func allowedMatch(rel, match string) bool {
+	for _, prefix := range requestPathAllowed[rel] {
+		if strings.HasPrefix(match, prefix) {
+			return true
+		}
+	}
+	return false
 }

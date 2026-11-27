@@ -85,6 +85,17 @@ func AuthMiddleware(db *gorm.DB) gin.HandlerFunc {
 	}
 }
 
+// OutsideRequestTx runs the rest of the route on the pool, without the request transaction. For
+// /auth/login and /auth/register: there is no user yet, `users` has no row-level security, and
+// they must not hold a connection while bcrypt runs (tens to hundreds of ms per attempt, so a
+// burst of login attempts would otherwise pin the pool).
+func OutsideRequestTx(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		c.Request = c.Request.WithContext(database.WithDB(c.Request.Context(), db))
+		c.Next()
+	}
+}
+
 // crossSiteWrite reports a state-changing request a browser says came from another origin.
 // The SPA only calls the API same-origin (Caddy and vite proxy /api), so anything else with
 // the cookie attached is CSRF, including from sibling subdomains that SameSite=Lax lets through.

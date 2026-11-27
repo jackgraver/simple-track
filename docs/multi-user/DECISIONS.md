@@ -223,14 +223,17 @@ still query the global pool outside the request transaction.
   tests and the session lookup below; the guard test forbids it elsewhere in request code.
 - `database.WithTx(ctx, pool) (ctx, *Request)` with `Commit` / `Rollback` / `Begun`, for code that
   needs a request-shaped transaction outside gin (the Postgres concurrency tests use it).
-- `database.CreateInSavepoint(db, value)`, see "failed statements" below.
+- `database.CreateInSavepoint(db, value)` and `database.Optional(ctx, fn)`, see "failed
+  statements" below.
 - `GetDB` / `SetDB`, the global connection and every package's `conn()` are gone.
 
 **When the transaction ends.** Just before the first byte of the response is written: status
 < 400 commits, 4xx/5xx rolls back. A handler that writes nothing ends it when it returns, and a
 panic rolls it back. Committing before the response means a failed commit becomes a 500
 (`{"error":"Could not save changes"}`) instead of a success the client (and optimistic UI) would
-trust. A `From` call after the response gets `ErrRequestDone`; nothing does that today.
+trust. That 500 drops the handler's `Set-Cookie`/`Location`/cache headers. A `From` call after
+the response gets `ErrRequestDone` (its handle can't reach the pool, not even to begin a
+transaction); nothing does that today.
 **Behaviour change:** a request that answers 4xx/5xx no longer leaves the writes it made before
 failing (e.g. `POST /diet/meals/meal/new` creating the meal, then failing to log it). Every
 response the client sees as an error now means "nothing changed".
@@ -240,7 +243,8 @@ response the client sees as an error now means "nothing changed".
 `SetIdentity`. B1 left moving it in open; kept out so the transaction stays lazy: a route that
 never queries (media lookups, `/auth/logout`) holds no connection. Cost: a DB-touching request
 checks out a connection twice, one after the other (never two at once). `users` has no RLS.
-Login/register run under the middleware without an identity.
+`/auth/login` and `/auth/register` run entirely on the pool (`auth.OutsideRequestTx`), so a
+burst of login attempts doesn't pin connections while bcrypt runs; they need no identity.
 
 **External lookups.** The media lookup routes never call `From`, so no connection or transaction
 is held while TMDB/OpenLibrary/AniList/iTunes answer (`media/controller/media_route_test.go`
@@ -261,7 +265,11 @@ re-keying the advisory locks.
 the same transaction fails with "current transaction is aborted". Code that recovers from a
 statement error (insert, unique violation, read the winner's row) must run the statement in a
 savepoint: `database.CreateInSavepoint(db, &row)` or its own `db.Transaction(...)`. Converted:
-diet day find-or-create (both copies), grocery `CreateItem`, water `CreateWaterLog`. Errors
+diet day find-or-create (both copies), grocery `CreateItem`, water `CreateWaterLog`. Best-effort
+reads whose errors are ignored go through `database.Optional(ctx, fn)` (a savepoint inside a
+request): diet `EnrichFoodVariants` and `CalculateTotals`, workout previous/max logs in
+`GetPreviousWorkoutView`, and `CreateWorkoutProgram`'s active-program check. (Not-found is a gorm
+error, not a SQL one, so plain `First` + `ErrRecordNotFound` checks are fine.) Errors
 injected by the e2e fault hooks never reach Postgres, so e2e can't catch this; review for it.
 
 **Conventions for later lanes:**
