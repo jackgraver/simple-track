@@ -87,9 +87,9 @@ worktree; an Opus session reviews, fixes up and squash-merges the PR into `proj/
 
 ### S1 Login protection (`mu/s1-login-protection`)
 Depends on: none. Files: `auth/controller/login_protection.go` + tests, minimal `auth_route.go`.
-- [ ] #3 Strict counter per (ip, username); looser username-wide counter with growing delay, no hard block.
-- [ ] #4 IPv6 clients keyed by /64; evict oldest entries instead of rejecting every login when full.
-- [ ] #19 (login part) Don't log attempted usernames that don't exist.
+- [x] #3 Strict counter per (ip, username); looser username-wide counter with growing delay, no hard block.
+- [x] #4 IPv6 clients keyed by /64; evict oldest entries instead of rejecting every login when full.
+- [x] #19 (login part) Don't log attempted usernames that don't exist.
 
 ### S2 Frontend storage per user (`mu/s2-frontend-storage`)
 Depends on: none. Frontend only.

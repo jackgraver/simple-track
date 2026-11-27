@@ -361,3 +361,29 @@ session reviews each diff as a security reviewer, fixes it up on the same branch
 `dev test` / `dev check`, ticks BACKLOG and TASKS, and squash-merges the PR into
 `proj/multi-user` once checks pass, one at a time. The owner doesn't review these PRs
 individually. C5 and C6 skip BACKLOG entries an S lane has ticked.
+
+## 2026-11-27: S1 login protection (S lane, reviewed by Opus)
+
+`auth/controller/login_protection.go`, BACKLOG #3, #4, #19 (login part). Env names unchanged.
+
+- **Source** = IPv4 address, or IPv6 /64 (IPv4-mapped unmapped). Used for the per-IP limit
+  (`LOGIN_RATE_LIMIT_MAX_IP`) and the 24 h credential-spray block, so hosts sharing a /64 share
+  them. Intended: per-address keys let one /64 rotate past both.
+- **Strict counter per (source, username)**: `LOGIN_RATE_LIMIT_MAX_USERNAME` attempts per window,
+  then 429. One source can no longer lock a username for everyone.
+- **Username-wide counter is a serialized backoff, not a block.** After 2×`MAX_USERNAME` attempts
+  in a window, each attempt reserves the next slot (250 ms doubling, capped at 5 s per step) and
+  waits for it, so parallel sources still get at most one password check per step. If the queue
+  is over 10 s long the attempt gets 429 `username_backoff`. One source can't reach the
+  threshold (its pair counter stops it first). A plain delay without the queue was rejected in
+  review: it doesn't limit parallel guessing.
+- **Trusted sources**: a successful login trusts that (source, username) for 30 days (in memory,
+  max 1000), and it skips the username-wide queue. A distributed attack can still slow or 429 the
+  owner from a new network, not from one they've signed in from before. A restart forgets trust.
+- **Success resets only that source's pair counter**, not the username-wide backoff.
+- **Full limiter** (100,000 entries): evicts lowest-count, then oldest entries; blocking entries,
+  active spray blocks and the current request's keys last/never. No more global `capacity` 429.
+- **A client that disconnects during the backoff** is dropped without a password check or log.
+- **Logs**: failed attempts log the username only if it exists in `users` (one extra lookup per
+  logged failure), otherwise `unknown`. C6's `auth_events` should follow the same rule.
+- C6 still owns: lockout rows in `auth_events`, login protection on the setup endpoint.
