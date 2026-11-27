@@ -5,6 +5,7 @@ import (
 	"be-simpletracker/internal/core/workout/models"
 	"be-simpletracker/internal/core/workout/services"
 	"be-simpletracker/internal/core/workout/testutil"
+	"be-simpletracker/internal/database"
 	"context"
 	"testing"
 
@@ -12,19 +13,19 @@ import (
 )
 
 func TestCreateExercise_andGetAllExercises(t *testing.T) {
-	testutil.SetupTestDB(t)
-	created, err := services.CreateExercise("Bench Press", 12, "squeeze")
+	ctx := database.WithDB(context.Background(), testutil.SetupTestDB(t))
+	created, err := services.CreateExercise(ctx, "Bench Press", 12, "squeeze")
 	if err != nil {
 		t.Fatal(err)
 	}
-	all, err := services.GetAllExercises(nil)
+	all, err := services.GetAllExercises(ctx, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(all) != 1 || all[0].ID != created.ID {
 		t.Fatalf("got %+v", all)
 	}
-	excluded, err := services.GetAllExercises([]uint{created.ID})
+	excluded, err := services.GetAllExercises(ctx, []uint{created.ID})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -37,12 +38,12 @@ func TestCreateExercise_andGetAllExercises(t *testing.T) {
 }
 
 func TestUpdateExercise_andUpdateExerciseCues(t *testing.T) {
-	testutil.SetupTestDB(t)
-	created, err := services.CreateExercise("Row", 10, "old")
+	ctx := database.WithDB(context.Background(), testutil.SetupTestDB(t))
+	created, err := services.CreateExercise(ctx, "Row", 10, "old")
 	if err != nil {
 		t.Fatal(err)
 	}
-	updated, err := services.UpdateExercise(
+	updated, err := services.UpdateExercise(ctx,
 		created.ID,
 		"Barbell Row",
 		8,
@@ -57,7 +58,7 @@ func TestUpdateExercise_andUpdateExerciseCues(t *testing.T) {
 		updated.LoadType != models.ExerciseLoadTypePlateLoadedWithoutBar {
 		t.Fatalf("got %+v", updated)
 	}
-	updated, err = services.UpdateExercise(
+	updated, err = services.UpdateExercise(ctx,
 		created.ID,
 		"Barbell Row",
 		8,
@@ -70,7 +71,7 @@ func TestUpdateExercise_andUpdateExerciseCues(t *testing.T) {
 	if updated.LoadType != models.ExerciseLoadTypeFreeWeights {
 		t.Fatalf("expected free weights load type, got %q", updated.LoadType)
 	}
-	updated, err = services.UpdateExercise(
+	updated, err = services.UpdateExercise(ctx,
 		created.ID,
 		"Barbell Row",
 		8,
@@ -83,7 +84,7 @@ func TestUpdateExercise_andUpdateExerciseCues(t *testing.T) {
 	if updated.LoadType != models.ExerciseLoadTypePlateLoadedTotal {
 		t.Fatalf("expected total plate load type, got %q", updated.LoadType)
 	}
-	cued, err := services.UpdateExerciseCues(created.ID, "new cue")
+	cued, err := services.UpdateExerciseCues(ctx, created.ID, "new cue")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -93,13 +94,13 @@ func TestUpdateExercise_andUpdateExerciseCues(t *testing.T) {
 }
 
 func TestListExercises_paginates(t *testing.T) {
-	testutil.SetupTestDB(t)
+	ctx := database.WithDB(context.Background(), testutil.SetupTestDB(t))
 	for _, name := range []string{"Alpha", "Beta", "Gamma"} {
-		if _, err := services.CreateExercise(name, 10, ""); err != nil {
+		if _, err := services.CreateExercise(ctx, name, 10, ""); err != nil {
 			t.Fatal(err)
 		}
 	}
-	res, err := services.ListExercises(1, 2, "")
+	res, err := services.ListExercises(ctx, 1, 2, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -110,8 +111,9 @@ func TestListExercises_paginates(t *testing.T) {
 
 func TestLogExercise_UpdateLoggedExercise_DeleteLoggedSet(t *testing.T) {
 	db := testutil.SetupTestDB(t)
+	ctx := database.WithDB(context.Background(), db)
 	today := clock.ZerodTime(0)
-	ex, err := services.CreateExercise("Curl", 12, "")
+	ex, err := services.CreateExercise(ctx, "Curl", 12, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -120,7 +122,7 @@ func TestLogExercise_UpdateLoggedExercise_DeleteLoggedSet(t *testing.T) {
 		t.Fatal(err)
 	}
 	le := models.LoggedExercise{WorkoutLogID: wl.ID, ExerciseID: ex.ID, Sets: []models.LoggedSet{{Reps: 10, Weight: 20}}}
-	if err := services.LogExercise(&le); err != nil {
+	if err := services.LogExercise(ctx, &le); err != nil {
 		t.Fatal(err)
 	}
 	if len(le.Sets) != 1 || le.Sets[0].ID == 0 {
@@ -129,20 +131,20 @@ func TestLogExercise_UpdateLoggedExercise_DeleteLoggedSet(t *testing.T) {
 	setID := le.Sets[0].ID
 	le.Sets[0].Reps = 12
 	le.Sets[0].Weight = 22.5
-	if err := services.UpdateLoggedExercise(le); err != nil {
+	if err := services.UpdateLoggedExercise(ctx, le); err != nil {
 		t.Fatal(err)
 	}
-	loaded, err := services.LoadLoggedExercise(le.ID)
+	loaded, err := services.LoadLoggedExercise(ctx, le.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if loaded.Sets[0].Reps != 12 || loaded.Sets[0].Weight != 22.5 {
 		t.Fatalf("update failed: %+v", loaded.Sets)
 	}
-	if err := services.DeleteLoggedSet(setID); err != nil {
+	if err := services.DeleteLoggedSet(ctx, setID); err != nil {
 		t.Fatal(err)
 	}
-	_, err = services.LoadLoggedExercise(le.ID)
+	_, err = services.LoadLoggedExercise(ctx, le.ID)
 	if err != gorm.ErrRecordNotFound {
 		t.Fatalf("expected logged exercise removed, got %v", err)
 	}
@@ -150,8 +152,9 @@ func TestLogExercise_UpdateLoggedExercise_DeleteLoggedSet(t *testing.T) {
 
 func TestRemoveLoggedExerciseForDay(t *testing.T) {
 	db := testutil.SetupTestDB(t)
+	ctx := database.WithDB(context.Background(), db)
 	today := clock.ZerodTime(0)
-	ex, err := services.CreateExercise("Lat Raise", 15, "")
+	ex, err := services.CreateExercise(ctx, "Lat Raise", 15, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -160,13 +163,13 @@ func TestRemoveLoggedExerciseForDay(t *testing.T) {
 		t.Fatal(err)
 	}
 	le := models.LoggedExercise{WorkoutLogID: wl.ID, ExerciseID: ex.ID}
-	if err := services.LogExercise(&le); err != nil {
+	if err := services.LogExercise(ctx, &le); err != nil {
 		t.Fatal(err)
 	}
-	if err := services.RemoveLoggedExerciseForDay(context.Background(), 0, ex.ID); err != nil {
+	if err := services.RemoveLoggedExerciseForDay(ctx, 0, ex.ID); err != nil {
 		t.Fatal(err)
 	}
-	_, err = services.LoadLoggedExercise(le.ID)
+	_, err = services.LoadLoggedExercise(ctx, le.ID)
 	if err != gorm.ErrRecordNotFound {
 		t.Fatalf("expected removal, got %v", err)
 	}
@@ -174,7 +177,8 @@ func TestRemoveLoggedExerciseForDay(t *testing.T) {
 
 func TestGetExerciseProgression(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	ex, err := services.CreateExercise("OHP", 10, "")
+	ctx := database.WithDB(context.Background(), db)
+	ex, err := services.CreateExercise(ctx, "OHP", 10, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -197,7 +201,7 @@ func TestGetExerciseProgression(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	entries, err := services.GetExerciseProgression(ex.ID)
+	entries, err := services.GetExerciseProgression(ctx, ex.ID)
 	if err != nil {
 		t.Fatal(err)
 	}

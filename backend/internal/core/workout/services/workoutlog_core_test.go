@@ -5,6 +5,7 @@ import (
 	"be-simpletracker/internal/core/workout/models"
 	"be-simpletracker/internal/core/workout/services"
 	"be-simpletracker/internal/core/workout/testutil"
+	"be-simpletracker/internal/database"
 	"context"
 	"strings"
 	"testing"
@@ -12,12 +13,13 @@ import (
 
 func TestGetOrCreateToday_returnsExistingLog(t *testing.T) {
 	db := testutil.SetupTestDB(t)
+	ctx := database.WithDB(context.Background(), db)
 	today := clock.ZerodTime(0)
 	wl := models.WorkoutLog{Date: today}
 	if err := db.Create(&wl).Error; err != nil {
 		t.Fatal(err)
 	}
-	got, err := services.GetOrCreateToday(context.Background(), 0)
+	got, err := services.GetOrCreateToday(ctx, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -28,6 +30,7 @@ func TestGetOrCreateToday_returnsExistingLog(t *testing.T) {
 
 func TestGetOrCreateToday_createsLogWithPlanForDay(t *testing.T) {
 	db := testutil.SetupTestDB(t)
+	ctx := database.WithDB(context.Background(), db)
 	today := clock.ZerodTime(0)
 	dow := int(today.Weekday())
 	var program models.WorkoutProgram
@@ -38,7 +41,7 @@ func TestGetOrCreateToday_createsLogWithPlanForDay(t *testing.T) {
 	if err := db.Create(&plan).Error; err != nil {
 		t.Fatal(err)
 	}
-	got, err := services.GetOrCreateToday(context.Background(), 0)
+	got, err := services.GetOrCreateToday(ctx, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -49,6 +52,7 @@ func TestGetOrCreateToday_createsLogWithPlanForDay(t *testing.T) {
 
 func TestSwitchPlan_updatesPlanAndReturnsView(t *testing.T) {
 	db := testutil.SetupTestDB(t)
+	ctx := database.WithDB(context.Background(), db)
 	today := clock.ZerodTime(0)
 	dow := int(today.Weekday())
 	plan := models.WorkoutPlan{Name: "Legs", DayOfWeek: &dow, PlannedCardioType: "Run", PlannedCardioMinutes: 30}
@@ -67,7 +71,7 @@ func TestSwitchPlan_updatesPlanAndReturnsView(t *testing.T) {
 		t.Fatal(err)
 	}
 	planID := plan.ID
-	res, err := services.SwitchPlan(context.Background(), 0, &planID)
+	res, err := services.SwitchPlan(ctx, 0, &planID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -87,9 +91,9 @@ func TestSwitchPlan_updatesPlanAndReturnsView(t *testing.T) {
 }
 
 func TestSwitchPlan_rejectsMissingPlan(t *testing.T) {
-	testutil.SetupTestDB(t)
+	ctx := database.WithDB(context.Background(), testutil.SetupTestDB(t))
 	missing := uint(9999)
-	_, err := services.SwitchPlan(context.Background(), 0, &missing)
+	_, err := services.SwitchPlan(ctx, 0, &missing)
 	if err == nil || !strings.Contains(err.Error(), "workout plan not found") {
 		t.Fatalf("expected not found error, got %v", err)
 	}
@@ -97,6 +101,7 @@ func TestSwitchPlan_rejectsMissingPlan(t *testing.T) {
 
 func TestGetPreviousWorkoutView_includesPreviousLog(t *testing.T) {
 	db := testutil.SetupTestDB(t)
+	ctx := database.WithDB(context.Background(), db)
 	today := clock.ZerodTime(0)
 	yesterday := clock.ZerodTime(1)
 	ex := models.Exercise{Name: "Deadlift"}
@@ -136,7 +141,7 @@ func TestGetPreviousWorkoutView_includesPreviousLog(t *testing.T) {
 	if err := db.Create(&models.LoggedSet{LoggedExerciseID: leToday.ID, Reps: 5, Weight: 145}).Error; err != nil {
 		t.Fatal(err)
 	}
-	res, err := services.GetPreviousWorkoutView(context.Background(), 0)
+	res, err := services.GetPreviousWorkoutView(ctx, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -157,11 +162,12 @@ func TestGetPreviousWorkoutView_includesPreviousLog(t *testing.T) {
 
 func TestGetMonthWorkoutLogs_returnsLogsInRange(t *testing.T) {
 	db := testutil.SetupTestDB(t)
+	ctx := database.WithDB(context.Background(), db)
 	today := clock.ZerodTime(0)
 	if err := db.Create(&models.WorkoutLog{Date: today}).Error; err != nil {
 		t.Fatal(err)
 	}
-	res, err := services.GetMonthWorkoutLogs(context.Background(), 0)
+	res, err := services.GetMonthWorkoutLogs(ctx, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -174,8 +180,8 @@ func TestGetMonthWorkoutLogs_returnsLogsInRange(t *testing.T) {
 }
 
 func TestGetPlanByDay_returnsNilWhenUnassigned(t *testing.T) {
-	testutil.SetupTestDB(t)
-	plan, err := services.GetPlanByDay(3)
+	ctx := database.WithDB(context.Background(), testutil.SetupTestDB(t))
+	plan, err := services.GetPlanByDay(ctx, 3)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -185,8 +191,8 @@ func TestGetPlanByDay_returnsNilWhenUnassigned(t *testing.T) {
 }
 
 func TestGetPlanByDay_rejectsInvalidDay(t *testing.T) {
-	testutil.SetupTestDB(t)
-	_, err := services.GetPlanByDay(7)
+	ctx := database.WithDB(context.Background(), testutil.SetupTestDB(t))
+	_, err := services.GetPlanByDay(ctx, 7)
 	if err == nil || !strings.Contains(err.Error(), "day_of_week") {
 		t.Fatalf("expected day_of_week error, got %v", err)
 	}

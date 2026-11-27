@@ -4,6 +4,8 @@ import (
 	"be-simpletracker/internal/core/workout/models"
 	workoutrepo "be-simpletracker/internal/core/workout/repository"
 	"be-simpletracker/internal/core/workout/testutil"
+	"be-simpletracker/internal/database"
+	"context"
 	"testing"
 
 	"gorm.io/gorm"
@@ -11,29 +13,30 @@ import (
 
 func TestExerciseExists(t *testing.T) {
 	db := testutil.SetupTestDB(t)
+	ctx := database.WithDB(context.Background(), db)
 	ex := models.Exercise{Name: "Pull-up"}
 	if err := db.Create(&ex).Error; err != nil {
 		t.Fatal(err)
 	}
-	if err := workoutrepo.ExerciseExists(ex.ID); err != nil {
+	if err := workoutrepo.ExerciseExists(ctx, ex.ID); err != nil {
 		t.Fatal(err)
 	}
-	if err := workoutrepo.ExerciseExists(9999); err != gorm.ErrRecordNotFound {
+	if err := workoutrepo.ExerciseExists(ctx, 9999); err != gorm.ErrRecordNotFound {
 		t.Fatalf("expected not found, got %v", err)
 	}
 }
 
 func TestUpdateExercise_notFound(t *testing.T) {
-	testutil.SetupTestDB(t)
-	_, err := workoutrepo.UpdateExercise(9999, "Missing", 10, "")
+	ctx := database.WithDB(context.Background(), testutil.SetupTestDB(t))
+	_, err := workoutrepo.UpdateExercise(ctx, 9999, "Missing", 10, "")
 	if err != gorm.ErrRecordNotFound {
 		t.Fatalf("expected not found, got %v", err)
 	}
 }
 
 func TestUpdateExerciseCues_notFound(t *testing.T) {
-	testutil.SetupTestDB(t)
-	_, err := workoutrepo.UpdateExerciseCues(9999, "cue")
+	ctx := database.WithDB(context.Background(), testutil.SetupTestDB(t))
+	_, err := workoutrepo.UpdateExerciseCues(ctx, 9999, "cue")
 	if err != gorm.ErrRecordNotFound {
 		t.Fatalf("expected not found, got %v", err)
 	}
@@ -41,6 +44,7 @@ func TestUpdateExerciseCues_notFound(t *testing.T) {
 
 func TestFindAllExercises_withExclude(t *testing.T) {
 	db := testutil.SetupTestDB(t)
+	ctx := database.WithDB(context.Background(), db)
 	for _, name := range []string{"One", "Two"} {
 		if err := db.Create(&models.Exercise{Name: name}).Error; err != nil {
 			t.Fatal(err)
@@ -50,7 +54,7 @@ func TestFindAllExercises_withExclude(t *testing.T) {
 	if err := db.Where("name = ?", "Two").First(&second).Error; err != nil {
 		t.Fatal(err)
 	}
-	all, err := workoutrepo.FindAllExercises([]uint{second.ID})
+	all, err := workoutrepo.FindAllExercises(ctx, []uint{second.ID})
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -35,7 +35,7 @@ func GetAllExercises(c *gin.Context) {
 	}
 	search := c.Query("search")
 
-	result, err := services.ListExercises(page, pageSize, search)
+	result, err := services.ListExercises(c.Request.Context(), page, pageSize, search)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -80,18 +80,18 @@ func LogExercise(c *gin.Context) {
 			request.Log.Sets[i].LoggedExerciseID = 0
 			request.Log.Sets[i].ID = 0
 		}
-		err := services.LogExercise(&request.Log)
+		err := services.LogExercise(c.Request.Context(), &request.Log)
 		if errors.Is(err, workoutrepo.ErrLoggedExerciseExists) {
 			// A double tap or retry already created the row (request.Log.ID now points at it).
 			// Treat this request as the full replace it describes instead of adding a duplicate.
-			err = services.UpdateLoggedExercise(request.Log)
+			err = services.UpdateLoggedExercise(c.Request.Context(), request.Log)
 		}
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
 	case "logged":
-		err := services.UpdateLoggedExercise(request.Log)
+		err := services.UpdateLoggedExercise(c.Request.Context(), request.Log)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
@@ -101,7 +101,7 @@ func LogExercise(c *gin.Context) {
 		return
 	}
 
-	savedExercise, err := services.LoadLoggedExercise(request.Log.ID)
+	savedExercise, err := services.LoadLoggedExercise(c.Request.Context(), request.Log.ID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to reload exercise: " + err.Error()})
 		return
@@ -145,7 +145,7 @@ func AddExerciseToWorkout(c *gin.Context) {
 		Sets:         []models.LoggedSet{},
 		Notes:        "",
 	}
-	err := services.LogExercise(&newExercise)
+	err := services.LogExercise(c.Request.Context(), &newExercise)
 	if errors.Is(err, workoutrepo.ErrLoggedExerciseExists) {
 		apierr.Conflict(c, "Exercise already in workout")
 		return
@@ -154,7 +154,7 @@ func AddExerciseToWorkout(c *gin.Context) {
 		apierr.Internal(c, err)
 		return
 	}
-	createdExercise, err := services.LoadLoggedExercise(newExercise.ID)
+	createdExercise, err := services.LoadLoggedExercise(c.Request.Context(), newExercise.ID)
 	if err != nil {
 		apierr.Internal(c, err)
 		return
@@ -192,7 +192,7 @@ func DeleteLoggedSet(c *gin.Context) {
 		return
 	}
 
-	err = services.DeleteLoggedSet(uint(setID))
+	err = services.DeleteLoggedSet(c.Request.Context(), uint(setID))
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Set not found"})
@@ -213,7 +213,7 @@ func GetExerciseProgression(c *gin.Context) {
 		return
 	}
 
-	progression, err := services.GetExerciseProgression(uint(exerciseID))
+	progression, err := services.GetExerciseProgression(c.Request.Context(), uint(exerciseID))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -249,7 +249,7 @@ func CreateExercise(c *gin.Context) {
 		request.RepRollover = 10
 	}
 
-	exercise, err := services.CreateExercise(request.Name, request.RepRollover, request.Cues, request.LoadType)
+	exercise, err := services.CreateExercise(c.Request.Context(), request.Name, request.RepRollover, request.Cues, request.LoadType)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -286,7 +286,7 @@ func UpdateExercise(c *gin.Context) {
 	if req.RepRollover == 0 {
 		req.RepRollover = 10
 	}
-	exercise, err := services.UpdateExerciseWithUnilateral(uint(id64), req.Name, req.RepRollover, req.Cues, req.Unilateral, req.LoadType)
+	exercise, err := services.UpdateExerciseWithUnilateral(c.Request.Context(), uint(id64), req.Name, req.RepRollover, req.Cues, req.Unilateral, req.LoadType)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Exercise not found"})
@@ -314,7 +314,7 @@ func UpdateExerciseCues(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	exercise, err := services.UpdateExerciseCues(uint(id64), req.Cues)
+	exercise, err := services.UpdateExerciseCues(c.Request.Context(), uint(id64), req.Cues)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Exercise not found"})

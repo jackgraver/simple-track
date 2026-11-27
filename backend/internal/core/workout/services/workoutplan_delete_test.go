@@ -5,12 +5,14 @@ import (
 	"be-simpletracker/internal/core/workout/models"
 	"be-simpletracker/internal/core/workout/services"
 	"be-simpletracker/internal/core/workout/testutil"
+	"be-simpletracker/internal/database"
 	"context"
 	"testing"
 )
 
 func TestRenameWorkoutPlan(t *testing.T) {
 	db := testutil.SetupTestDB(t)
+	ctx := database.WithDB(context.Background(), db)
 	var program models.WorkoutProgram
 	if err := db.Where("is_active = ?", true).First(&program).Error; err != nil {
 		t.Fatal(err)
@@ -19,23 +21,24 @@ func TestRenameWorkoutPlan(t *testing.T) {
 	if err := db.Create(&plan).Error; err != nil {
 		t.Fatal(err)
 	}
-	renamed, err := services.RenameWorkoutPlan(plan.ID, "  Push A ")
+	renamed, err := services.RenameWorkoutPlan(ctx, plan.ID, "  Push A ")
 	if err != nil {
 		t.Fatal(err)
 	}
 	if renamed.Name != "Push A" {
 		t.Fatalf("got %q", renamed.Name)
 	}
-	if _, err := services.RenameWorkoutPlan(plan.ID, " "); err == nil {
+	if _, err := services.RenameWorkoutPlan(ctx, plan.ID, " "); err == nil {
 		t.Fatal("expected error for blank name")
 	}
-	if _, err := services.RenameWorkoutPlan(9999, "X"); err == nil {
+	if _, err := services.RenameWorkoutPlan(ctx, 9999, "X"); err == nil {
 		t.Fatal("expected error for missing routine")
 	}
 }
 
 func TestDeleteAndRestoreWorkoutPlanKeepsExercisesAndFreeDays(t *testing.T) {
 	db := testutil.SetupTestDB(t)
+	ctx := database.WithDB(context.Background(), db)
 	var program models.WorkoutProgram
 	if err := db.Where("is_active = ?", true).First(&program).Error; err != nil {
 		t.Fatal(err)
@@ -48,19 +51,19 @@ func TestDeleteAndRestoreWorkoutPlanKeepsExercisesAndFreeDays(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	if err := services.AddExerciseToPlan(push.ID, bench.ID); err != nil {
+	if err := services.AddExerciseToPlan(ctx, push.ID, bench.ID); err != nil {
 		t.Fatal(err)
 	}
 	for _, d := range []int{1, 4} {
-		if _, err := services.AssignPlanToDay(push.ID, d); err != nil {
+		if _, err := services.AssignPlanToDay(ctx, push.ID, d); err != nil {
 			t.Fatal(err)
 		}
 	}
 
-	if err := services.DeleteWorkoutPlan(push.ID); err != nil {
+	if err := services.DeleteWorkoutPlan(ctx, push.ID); err != nil {
 		t.Fatal(err)
 	}
-	plans, err := services.GetAllWorkoutPlans()
+	plans, err := services.GetAllWorkoutPlans(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -70,11 +73,11 @@ func TestDeleteAndRestoreWorkoutPlanKeepsExercisesAndFreeDays(t *testing.T) {
 		}
 	}
 	// Monday goes to Pull while Push is deleted.
-	if _, err := services.AssignPlanToDay(pull.ID, 1); err != nil {
+	if _, err := services.AssignPlanToDay(ctx, pull.ID, 1); err != nil {
 		t.Fatal(err)
 	}
 
-	restored, err := services.RestoreWorkoutPlan(push.ID)
+	restored, err := services.RestoreWorkoutPlan(ctx, push.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -87,13 +90,14 @@ func TestDeleteAndRestoreWorkoutPlanKeepsExercisesAndFreeDays(t *testing.T) {
 	if restored.DayOfWeek == nil || *restored.DayOfWeek != 4 {
 		t.Fatalf("legacy day not refreshed: %v", restored.DayOfWeek)
 	}
-	if _, err := services.RestoreWorkoutPlan(push.ID); err == nil {
+	if _, err := services.RestoreWorkoutPlan(ctx, push.ID); err == nil {
 		t.Fatal("restoring a live routine should fail")
 	}
 }
 
 func TestLogKeepsRoutineAfterDelete(t *testing.T) {
 	db := testutil.SetupTestDB(t)
+	ctx := database.WithDB(context.Background(), db)
 	plan := models.WorkoutPlan{Name: "Legs"}
 	squat := models.Exercise{Name: "Squat"}
 	for _, v := range []any{&plan, &squat} {
@@ -101,17 +105,17 @@ func TestLogKeepsRoutineAfterDelete(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	if err := services.AddExerciseToPlan(plan.ID, squat.ID); err != nil {
+	if err := services.AddExerciseToPlan(ctx, plan.ID, squat.ID); err != nil {
 		t.Fatal(err)
 	}
 	past := models.WorkoutLog{Date: clock.ZerodTime(3), WorkoutPlanID: &plan.ID}
 	if err := db.Create(&past).Error; err != nil {
 		t.Fatal(err)
 	}
-	if err := services.DeleteWorkoutPlan(plan.ID); err != nil {
+	if err := services.DeleteWorkoutPlan(ctx, plan.ID); err != nil {
 		t.Fatal(err)
 	}
-	got, err := services.GetOrCreateToday(context.Background(), 3)
+	got, err := services.GetOrCreateToday(ctx, 3)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -1,6 +1,7 @@
 package workoutrepo
 
 import (
+	"be-simpletracker/internal/database"
 	"context"
 	"errors"
 	"time"
@@ -15,7 +16,7 @@ func DatesWithLoggedSets(ctx context.Context, start, end time.Time) ([]time.Time
 	var rows []struct {
 		D time.Time `gorm:"column:d"`
 	}
-	err := conn().WithContext(ctx).Raw(`
+	err := database.From(ctx).WithContext(ctx).Raw(`
 		SELECT workout_logs.date AS d
 		FROM logged_sets
 		JOIN logged_exercises ON logged_exercises.id = logged_sets.logged_exercise_id
@@ -34,8 +35,8 @@ func DatesWithLoggedSets(ctx context.Context, start, end time.Time) ([]time.Time
 	return out, nil
 }
 
-func DeleteLoggedSet(setID uint) error {
-	res, err := DeleteSet(context.Background(), SetRef{ID: setID})
+func DeleteLoggedSet(ctx context.Context, setID uint) error {
+	res, err := DeleteSet(ctx, SetRef{ID: setID})
 	if err != nil {
 		return err
 	}
@@ -88,7 +89,7 @@ type CreateSetResult struct {
 // the same client_id returns the stored set unchanged (first write wins).
 func CreateSet(ctx context.Context, in CreateSetInput) (CreateSetResult, error) {
 	var out CreateSetResult
-	err := conn().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+	err := database.From(ctx).WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		if existing, ok, err := findReplay(tx, in); err != nil || ok {
 			out = existing
 			return err
@@ -199,7 +200,7 @@ type SetPatch struct {
 // UpdateSet applies patch to one set and returns it. gorm.ErrRecordNotFound if it doesn't exist.
 func UpdateSet(ctx context.Context, ref SetRef, patch SetPatch) (models.LoggedSet, error) {
 	var set models.LoggedSet
-	err := conn().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+	err := database.From(ctx).WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		if err := ref.where(tx).First(&set).Error; err != nil {
 			return err
 		}
@@ -248,7 +249,7 @@ type DeleteSetResult struct {
 // not an error: Deleted is false.
 func DeleteSet(ctx context.Context, ref SetRef) (DeleteSetResult, error) {
 	var out DeleteSetResult
-	err := conn().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+	err := database.From(ctx).WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var set models.LoggedSet
 		if err := ref.where(tx).Limit(1).Find(&set).Error; err != nil {
 			return err

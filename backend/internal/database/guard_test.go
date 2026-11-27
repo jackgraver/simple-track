@@ -27,10 +27,6 @@ var requestPathForbidden = []struct {
 // Code under these paths serves requests.
 var requestPaths = []string{"internal/core/", "internal/utils/"}
 
-// Modules still on the package-global conn(); the next PRs of lane B2 convert them and shrink
-// this list to nothing.
-var notYetConverted = []string{"internal/core/diet/", "internal/core/workout/"}
-
 // Allowed exceptions, each with its reason.
 var requestPathAllowed = map[string][]string{
 	// The session lookup runs on the pool before the request has a user, so the request
@@ -57,11 +53,6 @@ func TestRequestCodeUsesFrom(t *testing.T) {
 		if !inScope || strings.Contains(rel, "/testutil/") {
 			return nil
 		}
-		for _, p := range notYetConverted {
-			if strings.HasPrefix(rel, p) {
-				return nil
-			}
-		}
 		src, err := os.ReadFile(path)
 		if err != nil {
 			return err
@@ -82,7 +73,7 @@ func TestRequestCodeUsesFrom(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if checked < 30 {
+	if checked < 50 {
 		t.Fatalf("only %d files checked; did the layout move?", checked)
 	}
 }

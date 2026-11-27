@@ -4,6 +4,7 @@ import (
 	"be-simpletracker/internal/core/workout/models"
 	workoutrepo "be-simpletracker/internal/core/workout/repository"
 	"be-simpletracker/internal/core/workout/testutil"
+	"be-simpletracker/internal/database"
 	"context"
 	"testing"
 
@@ -12,6 +13,7 @@ import (
 
 func TestUpdateWorkoutPlanID_clearsPlan(t *testing.T) {
 	db := testutil.SetupTestDB(t)
+	ctx := database.WithDB(context.Background(), db)
 	plan := models.WorkoutPlan{Name: "Temp"}
 	if err := db.Create(&plan).Error; err != nil {
 		t.Fatal(err)
@@ -20,7 +22,7 @@ func TestUpdateWorkoutPlanID_clearsPlan(t *testing.T) {
 	if err := db.Create(&wl).Error; err != nil {
 		t.Fatal(err)
 	}
-	if err := workoutrepo.UpdateWorkoutPlanID(context.Background(), wl.ID, nil); err != nil {
+	if err := workoutrepo.UpdateWorkoutPlanID(ctx, wl.ID, nil); err != nil {
 		t.Fatal(err)
 	}
 	var reloaded models.WorkoutLog
@@ -34,12 +36,13 @@ func TestUpdateWorkoutPlanID_clearsPlan(t *testing.T) {
 
 func TestUpdatePostMobilityChecked(t *testing.T) {
 	db := testutil.SetupTestDB(t)
+	ctx := database.WithDB(context.Background(), db)
 	wl := models.WorkoutLog{}
 	if err := db.Create(&wl).Error; err != nil {
 		t.Fatal(err)
 	}
 	checked := []string{"hip", "shoulder"}
-	if err := workoutrepo.UpdatePostMobilityChecked(context.Background(), wl.ID, checked); err != nil {
+	if err := workoutrepo.UpdatePostMobilityChecked(ctx, wl.ID, checked); err != nil {
 		t.Fatal(err)
 	}
 	var reloaded models.WorkoutLog
@@ -52,8 +55,8 @@ func TestUpdatePostMobilityChecked(t *testing.T) {
 }
 
 func TestUpdatePreMobilityChecked_notFound(t *testing.T) {
-	testutil.SetupTestDB(t)
-	err := workoutrepo.UpdatePreMobilityChecked(context.Background(), 9999, []string{"a"})
+	ctx := database.WithDB(context.Background(), testutil.SetupTestDB(t))
+	err := workoutrepo.UpdatePreMobilityChecked(ctx, 9999, []string{"a"})
 	if err != gorm.ErrRecordNotFound {
 		t.Fatalf("expected not found, got %v", err)
 	}

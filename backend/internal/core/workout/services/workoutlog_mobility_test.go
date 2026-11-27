@@ -5,6 +5,7 @@ import (
 	"be-simpletracker/internal/core/workout/models"
 	"be-simpletracker/internal/core/workout/services"
 	"be-simpletracker/internal/core/workout/testutil"
+	"be-simpletracker/internal/database"
 	"context"
 	"strings"
 	"testing"
@@ -12,6 +13,7 @@ import (
 
 func TestUpsertMobilityPre_persistsChecked(t *testing.T) {
 	db := testutil.SetupTestDB(t)
+	ctx := database.WithDB(context.Background(), db)
 	today := clock.ZerodTime(0)
 	plan := models.WorkoutPlan{
 		Name:             "MobilityTestPlan",
@@ -24,7 +26,7 @@ func TestUpsertMobilityPre_persistsChecked(t *testing.T) {
 	if err := db.Create(&wl).Error; err != nil {
 		t.Fatal(err)
 	}
-	view, err := services.UpsertMobilityPre(context.Background(), 0, []string{"A", "C", "invalid"})
+	view, err := services.UpsertMobilityPre(ctx, 0, []string{"A", "C", "invalid"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -45,6 +47,7 @@ func TestUpsertMobilityPre_persistsChecked(t *testing.T) {
 
 func TestUpsertMobilityPost_persistsChecked(t *testing.T) {
 	db := testutil.SetupTestDB(t)
+	ctx := database.WithDB(context.Background(), db)
 	today := clock.ZerodTime(0)
 	plan := models.WorkoutPlan{
 		Name:              "MobilityTestPlan",
@@ -57,7 +60,7 @@ func TestUpsertMobilityPost_persistsChecked(t *testing.T) {
 	if err := db.Create(&wl).Error; err != nil {
 		t.Fatal(err)
 	}
-	view, err := services.UpsertMobilityPost(context.Background(), 0, []string{"Y"})
+	view, err := services.UpsertMobilityPost(ctx, 0, []string{"Y"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -70,8 +73,8 @@ func TestUpsertMobilityPost_persistsChecked(t *testing.T) {
 }
 
 func TestUpsertMobilityPre_errorsWhenNothingPlanned(t *testing.T) {
-	testutil.SetupTestDB(t)
-	_, err := services.UpsertMobilityPre(context.Background(), 0, []string{"A"})
+	ctx := database.WithDB(context.Background(), testutil.SetupTestDB(t))
+	_, err := services.UpsertMobilityPre(ctx, 0, []string{"A"})
 	if err == nil || !strings.Contains(err.Error(), "no dynamic warmup planned") {
 		t.Fatalf("expected no mobility error, got %v", err)
 	}
