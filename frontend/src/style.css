@@ -96,8 +96,6 @@
     --animate-overlay-out: overlay-out 150ms ease-in;
     --animate-sheet-in: sheet-in 250ms ease-out;
     --animate-sheet-out: sheet-out 150ms ease-in;
-    --animate-drawer-in: drawer-in 250ms ease-out;
-    --animate-drawer-out: drawer-out 150ms ease-in;
     --animate-toast-in: toast-in 250ms ease-out;
     --animate-toast-out: toast-out 150ms ease-in;
     @keyframes overlay-in {
@@ -112,13 +110,6 @@
     @keyframes sheet-out {
         from { transform: translateY(var(--sheet-drag, 0px)); }
         to { transform: translateY(100%); }
-    }
-    @keyframes drawer-in {
-        from { transform: translateX(-100%); }
-    }
-    @keyframes drawer-out {
-        from { transform: translateX(var(--drawer-drag, 0px)); }
-        to { transform: translateX(-100%); }
     }
     @keyframes toast-in {
         from { opacity: 0; transform: translateY(0.5rem); }

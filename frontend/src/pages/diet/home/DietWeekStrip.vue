@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import { ChevronLeft, ChevronRight } from "lucide-vue-next";
 import { useDietDays } from "~/api/diet/queries";
-import { withDietDayOffsetQuery } from "~/utils/dateUtil";
-import { Card, ErrorState, IconButton, Skeleton, useDelayedFlag } from "~/shared/ui";
+import { weekLandingOffset, withDietDayOffsetQuery } from "~/utils/dateUtil";
+import { Card, ErrorState, IconButton, Skeleton, useDelayedFlag, WeekCarousel } from "~/shared/ui";
 import { averageLogged, dietWeek, formatInt, isMeaningfullyOver, remaining, type DietWeekDay } from "./dietDay";
 
 const props = defineProps<{ offset: number }>();
@@ -14,7 +14,12 @@ const queries = useDietDays(() => week.value.map((d) => d.offset));
 
 const isPending = computed(() => queries.value.some((q) => q.isPending));
 const failed = computed(() => queries.value.find((q) => q.isError));
-const showSkeleton = useDelayedFlag(isPending);
+// Only the first load shows a skeleton. After that a new week slides in right away and each day's
+// numbers fill in as they arrive, so the strip never unmounts mid-slide.
+const loadedOnce = ref(false);
+watch(isPending, (p) => (loadedOnce.value ||= !p), { immediate: true });
+const firstLoad = computed(() => isPending.value && !loadedOnce.value);
+const showSkeleton = useDelayedFlag(firstLoad);
 
 type Tile = DietWeekDay & { kcal: number | null; target: number; fill: number; over: boolean };
 
@@ -33,6 +38,13 @@ const tiles = computed<Tile[]>(() =>
     }),
 );
 
+// The weeks either side, for the carousel to show while swiping and sliding: dates only (no
+// fetch, and future diet days must not be fetched early); numbers fill in once a week is shown.
+const emptyTiles = (offset: number): Tile[] =>
+    dietWeek(offset).map((d) => ({ ...d, isSelected: false, kcal: null, target: 0, fill: 0, over: false }));
+const prevTiles = computed(() => emptyTiles(props.offset + 7));
+const nextTiles = computed(() => emptyTiles(props.offset - 7));
+
 const isCurrentWeek = computed(() => week.value.some((d) => d.isToday));
 const fmtShort = (d: Date) => d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
 const title = computed(() => {
@@ -49,8 +61,9 @@ const daysLogged = computed(() => tiles.value.filter((t) => !t.isFuture && (t.kc
 
 const to = (d: DietWeekDay) => ({ name: "diet", query: withDietDayOffsetQuery(d.offset, {}) });
 const router = useRouter();
-const shiftWeek = (delta: number) =>
-    router.push({ name: "diet", query: withDietDayOffsetQuery(props.offset + delta, {}) });
+// The arrows (and swipes) land on the new week's Sunday, or today for the current week.
+const goToWeek = (step: 1 | -1) =>
+    router.push({ name: "diet", query: withDietDayOffsetQuery(weekLandingOffset(week.value[0]!.offset, step), {}) });
 
 const dayLabel = (t: Tile) => {
     const date = t.date.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" });
@@ -61,7 +74,8 @@ const dayLabel = (t: Tile) => {
 };
 
 const tileClass = (t: Tile) => [
-    t.isSelected ? "border-accent bg-accent-soft" : "border-transparent hover:bg-surface-3",
+    // Selection is drawn by WeekCarousel's sliding outline.
+    t.isSelected ? "" : "hover:bg-surface-3",
     t.isFuture && !t.isSelected ? "text-fg-subtle" : "text-fg",
 ];
 </script>
@@ -80,10 +94,10 @@ const tileClass = (t: Tile) => [
                         <template v-else-if="!isPending">Nothing logged this week</template>
                     </p>
                 </div>
-                <IconButton label="Previous week" size="sm" @click="shiftWeek(7)">
+                <IconButton label="Previous week" size="sm" @click="goToWeek(-1)">
                     <ChevronLeft />
                 </IconButton>
-                <IconButton label="Next week" size="sm" @click="shiftWeek(-7)">
+                <IconButton label="Next week" size="sm" @click="goToWeek(1)">
                     <ChevronRight />
                 </IconButton>
             </div>
@@ -95,16 +109,24 @@ const tileClass = (t: Tile) => [
                 title="Couldn't load this week"
                 @retry="queries.forEach((q) => q.isError && q.refetch())"
             />
-            <template v-else-if="isPending">
+            <template v-else-if="firstLoad">
                 <Skeleton v-if="showSkeleton" shape="block" height="4.5rem" />
             </template>
-            <ol v-else class="m-0 grid list-none grid-cols-7 gap-1 p-0" aria-label="Days this week">
-                <li v-for="t in tiles" :key="t.key" class="min-w-0">
+            <WeekCarousel
+                v-else
+                :days="tiles"
+                :prev-days="prevTiles"
+                :next-days="nextTiles"
+                label="Days this week"
+                @prev="goToWeek(-1)"
+                @next="goToWeek(1)"
+            >
+                <template #day="{ day: t }">
                     <router-link
                         :to="to(t)"
                         :aria-label="dayLabel(t)"
                         :aria-current="t.isSelected ? 'date' : undefined"
-                        class="flex min-h-touch flex-col items-center gap-1 rounded-control border px-0.5 py-2 no-underline transition-colors duration-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                        class="flex min-h-touch flex-col items-center gap-1 rounded-control border border-transparent px-0.5 py-2 no-underline transition-colors duration-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
                         :class="tileClass(t)"
                     >
                         <span
@@ -116,7 +138,7 @@ const tileClass = (t: Tile) => [
                         <span class="text-base font-semibold tabular-nums">{{ t.date.getDate() }}</span>
                         <span class="h-1 w-3/4 overflow-hidden rounded-full bg-surface-3" aria-hidden="true">
                             <span
-                                class="block h-full rounded-full"
+                                class="block h-full rounded-full transition-[width] duration-250 ease-out"
                                 :class="t.over ? 'bg-warn' : 'bg-macro-calories'"
                                 :style="{ width: `${t.fill}%` }"
                             />
@@ -125,8 +147,8 @@ const tileClass = (t: Tile) => [
                             {{ t.isFuture || !t.kcal ? "–" : formatInt(t.kcal) }}
                         </span>
                     </router-link>
-                </li>
-            </ol>
+                </template>
+            </WeekCarousel>
         </div>
     </Card>
 </template>

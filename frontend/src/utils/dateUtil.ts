@@ -134,3 +134,13 @@ export function withDietDayOffsetQuery(
     if (offset === 0) return query;
     return { ...query, offset: String(offset) };
 }
+
+/**
+ * Where a week strip's arrows (or a swipe) land: the new week's Sunday, or today when that week
+ * is the current one. `sundayOffset` is the shown week's Sunday as a day offset (0 = today,
+ * positive = past); `step` is 1 for the next week, -1 for the previous one.
+ */
+export function weekLandingOffset(sundayOffset: number, step: 1 | -1): number {
+    const sunday = sundayOffset - 7 * step;
+    return sunday >= 0 && sunday <= 6 ? 0 : sunday;
+}

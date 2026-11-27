@@ -1,14 +1,23 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import { Check, ChevronLeft, ChevronRight, Flame } from "lucide-vue-next";
-import { Badge, Card, ErrorState, IconButton, Skeleton, useDelayedFlag } from "~/shared/ui";
-import type { useGymWeek, WeekDay } from "./useGymWeek";
+import { Badge, Card, ErrorState, IconButton, Skeleton, useDelayedFlag, WeekCarousel } from "~/shared/ui";
+import { weekLandingOffset } from "~/utils/dateUtil";
+import { useGymWeek, type WeekDay } from "./useGymWeek";
 
 const props = defineProps<{ week: ReturnType<typeof useGymWeek>; offset: number }>();
 const emit = defineEmits<{ "update:offset": [offset: number] }>();
 
 const showSkeleton = useDelayedFlag(() => props.week.isPending.value);
 const days = computed(() => props.week.days.value);
+
+// The weeks either side, for the carousel to show while swiping and sliding. Built from the same
+// cached programs + activity, so no extra requests. Their selection is the current week's job.
+const unselect = (ds: WeekDay[]) => ds.map((d) => ({ ...d, isSelected: false }));
+const prevWeek = useGymWeek(() => props.offset + 7);
+const nextWeek = useGymWeek(() => props.offset - 7);
+const prevDays = computed(() => unselect(prevWeek.days.value));
+const nextDays = computed(() => unselect(nextWeek.days.value));
 
 const status = (d: WeekDay): "done" | "missed" | "planned" | "rest" => {
     if (d.trained) return "done";
@@ -34,8 +43,12 @@ const rangeLabel = computed(() => {
     return `${fmt(first)} – ${fmt(last)}`;
 });
 
+// The arrows (and swipes) land on the new week's Sunday, or today for the current week.
+const goToWeek = (step: 1 | -1) =>
+    emit("update:offset", weekLandingOffset(days.value[0]?.offset ?? props.offset, step));
+
 const tileClass = (d: WeekDay) => [
-    d.isSelected ? "border-accent bg-accent-soft" : "border-transparent hover:bg-surface-3",
+    d.isSelected ? "" : "hover:bg-surface-3",
     status(d) === "rest" && !d.isSelected ? "text-fg-subtle" : "text-fg",
 ];
 </script>
@@ -66,10 +79,10 @@ const tileClass = (d: WeekDay) => [
                     <span class="tabular-nums">{{ week.streak.value }}</span>
                     <span>in a row</span>
                 </Badge>
-                <IconButton label="Previous week" size="sm" @click="emit('update:offset', offset + 7)">
+                <IconButton label="Previous week" size="sm" @click="goToWeek(-1)">
                     <ChevronLeft />
                 </IconButton>
-                <IconButton label="Next week" size="sm" @click="emit('update:offset', offset - 7)">
+                <IconButton label="Next week" size="sm" @click="goToWeek(1)">
                     <ChevronRight />
                 </IconButton>
             </div>
@@ -84,13 +97,21 @@ const tileClass = (d: WeekDay) => [
             <template v-else-if="week.isPending.value">
                 <Skeleton v-if="showSkeleton" shape="block" height="4.75rem" />
             </template>
-            <ol v-else class="m-0 grid list-none grid-cols-7 gap-1 p-0" aria-label="Days this week">
-                <li v-for="d in days" :key="d.key" class="min-w-0">
+            <WeekCarousel
+                v-else
+                :days="days"
+                :prev-days="prevDays"
+                :next-days="nextDays"
+                label="Days this week"
+                @prev="goToWeek(-1)"
+                @next="goToWeek(1)"
+            >
+                <template #day="{ day: d }">
                     <router-link
                         :to="to(d)"
                         :aria-label="dayLabel(d)"
                         :aria-current="d.isToday ? 'date' : undefined"
-                        class="flex min-h-touch flex-col items-center gap-0.5 rounded-control border px-0.5 py-2 no-underline transition-colors duration-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                        class="flex min-h-touch flex-col items-center gap-0.5 rounded-control border border-transparent px-0.5 py-2 no-underline transition-colors duration-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
                         :class="tileClass(d)"
                     >
                         <span
@@ -112,8 +133,8 @@ const tileClass = (d: WeekDay) => [
                             />
                         </span>
                     </router-link>
-                </li>
-            </ol>
+                </template>
+            </WeekCarousel>
         </div>
     </Card>
 </template>

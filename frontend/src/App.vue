@@ -10,7 +10,7 @@ import SideNav from "./shared/nav/SideNav.vue";
 import MobileHeader from "./shared/nav/mobile/MobileHeader.vue";
 import MobileDrawer from "./shared/nav/mobile/MobileDrawer.vue";
 import { useDrawerGesture } from "./shared/nav/mobile/useDrawerGesture";
-import { useIsDesktop } from "./shared/ui";
+import { MotionConfig, useIsDesktop } from "./shared/ui";
 
 const route = useRoute();
 useDrawerGesture(useIsDesktop());
@@ -27,28 +27,31 @@ const wide = computed(() => route.meta.wide === true);
 </script>
 
 <template>
-    <!-- Solid cover behind the iOS status bar / Dynamic Island so scrolled content doesn't show through. -->
-    <div class="pointer-events-none fixed inset-x-0 top-0 z-nav h-safe-top bg-canvas" aria-hidden="true"></div>
-    <div class="min-h-dvh w-full">
-        <SideNav v-if="showNav" class="max-lg:hidden" />
-        <main class="w-full overflow-x-clip">
-            <div
-                class="flex w-full flex-col items-stretch"
-                :class="[
-                    showNav ? 'max-lg:mx-auto max-lg:max-w-6xl max-lg:px-4 lg:app-content' : 'mx-auto max-w-6xl px-4 lg:px-8',
-                    showNav && wide ? 'lg:app-content-wide' : '',
-                ]"
-            >
-                <MobileHeader v-if="showMobileHeader" class="lg:hidden" />
-                <DateAndBreadcrumbs
-                    v-if="showDate"
-                    :class="showNav ? 'pb-4 lg:pt-4' : 'py-4'"
-                />
-                <RouterView />
-            </div>
-        </main>
-    </div>
-    <MobileDrawer v-if="showNav" />
-    <ToastContainer :top="route.meta.focus === true" />
-    <DialogContainer />
+    <!-- JS animations (motion-v) follow the OS reduced-motion setting, like the CSS ones. -->
+    <MotionConfig reduced-motion="user">
+        <!-- Solid cover behind the iOS status bar / Dynamic Island so scrolled content doesn't show through. -->
+        <div class="pointer-events-none fixed inset-x-0 top-0 z-nav h-safe-top bg-canvas" aria-hidden="true"></div>
+        <div class="min-h-dvh w-full">
+            <SideNav v-if="showNav" class="max-lg:hidden" />
+            <main class="w-full overflow-x-clip">
+                <div
+                    class="flex w-full flex-col items-stretch"
+                    :class="[
+                        showNav ? 'max-lg:mx-auto max-lg:max-w-6xl max-lg:px-4 lg:app-content' : 'mx-auto max-w-6xl px-4 lg:px-8',
+                        showNav && wide ? 'lg:app-content-wide' : '',
+                    ]"
+                >
+                    <MobileHeader v-if="showMobileHeader" class="lg:hidden" />
+                    <DateAndBreadcrumbs
+                        v-if="showDate"
+                        :class="showNav ? 'pb-4 lg:pt-4' : 'py-4'"
+                    />
+                    <RouterView />
+                </div>
+            </main>
+        </div>
+        <MobileDrawer v-if="showNav" />
+        <ToastContainer :top="route.meta.focus === true" />
+        <DialogContainer />
+    </MotionConfig>
 </template>

@@ -7,9 +7,9 @@ import { Drawer, IconButton } from "~/shared/ui";
 import AccountMenu from "../AccountMenu.vue";
 import NavLink from "../NavLink.vue";
 import NavTree from "../NavTree.vue";
-import { drawerWidth, useNavDrawer } from "./useNavDrawer";
+import { useNavDrawer } from "./useNavDrawer";
 
-const { open, dragX, dragging, openedBySwipe } = useNavDrawer();
+const { panel, open } = useNavDrawer();
 const route = useRoute();
 
 // Any navigation (a tapped link, back/forward) closes the drawer.
@@ -20,14 +20,7 @@ watch(
 </script>
 
 <template>
-    <Drawer
-        v-model:open="open"
-        title="Navigation"
-        :offset="dragX"
-        :dragging="dragging"
-        :width="drawerWidth()"
-        :animate-enter="!openedBySwipe"
-    >
+    <Drawer title="Navigation" :panel="panel">
         <div class="flex items-center justify-between gap-2 py-2 pr-2 pl-5">
             <span class="flex items-center gap-2">
                 <NavLink to="/" class="text-lg font-semibold tracking-tight text-fg">simpletrack</NavLink>

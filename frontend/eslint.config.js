@@ -106,10 +106,15 @@ export default [
                 },
             ],
             "no-restricted-syntax": ["error", ...colorLiteralSelectors],
-            // Reka UI is an implementation detail of shared/ui/ (docs/design/PRIMITIVES.md).
+            // Reka UI and motion-v are implementation details of shared/ui/ (docs/design/PRIMITIVES.md).
             "no-restricted-imports": [
                 "error",
-                { patterns: [{ group: ["reka-ui", "reka-ui/*"], message: "Import Reka UI only inside src/shared/ui/. Pages use the shared/ui primitives." }] },
+                {
+                    patterns: [
+                        { group: ["reka-ui", "reka-ui/*"], message: "Import Reka UI only inside src/shared/ui/. Pages use the shared/ui primitives." },
+                        { group: ["motion-v", "motion-v/*"], message: "Import motion-v only inside src/shared/ui/. Pages use the shared/ui motion primitives (WeekCarousel, ...)." },
+                    ],
+                },
             ],
             "vue/no-restricted-syntax": ["error", ...colorLiteralSelectors],
             // Primitives only: raw form controls live in shared/ui/. A legitimate exception
@@ -125,7 +130,7 @@ export default [
         },
     },
 
-    // The only place allowed to import the headless library.
+    // The only place allowed to import the headless and motion libraries.
     {
         files: ["src/shared/ui/**/*.{ts,vue}"],
         rules: { "no-restricted-imports": "off", "vue/no-restricted-html-elements": "off" },
