@@ -32,7 +32,7 @@ func setupLoginRouteTest(t *testing.T, config LoginProtectionConfig) (*gin.Engin
 		database.SetDB(nil)
 	})
 
-	service := services.NewAuthService(func(string) (string, error) {
+	service := services.NewAuthService(func(models.User) (string, error) {
 		return "server-only-token", nil
 	})
 	if _, err := service.Register(services.RegisterInput{

@@ -63,11 +63,11 @@ Depends on: none
 
 ### B1 User identity on the request
 Depends on: none (can start alongside A)
-- [ ] `uid` (and admin flag source) in JWT claims; tokens without `uid` -> 401.
-- [ ] Middleware puts the user on `context.Context`; `auth.UserID(ctx)` / `auth.MustUser(ctx)`.
-- [ ] Dev-token bypass resolves the `dev` user's ID.
-- [ ] Migration: `users.is_admin`, `users.token_version`, `users.disabled_at`; owner account is admin.
-- [ ] `token_version` in the JWT, checked against the user row by the middleware (cache briefly
+- [x] `uid` (and admin flag source) in JWT claims; tokens without `uid` -> 401.
+- [x] Middleware puts the user on `context.Context`; `auth.UserID(ctx)` / `auth.MustUser(ctx)`.
+- [x] Dev-token bypass resolves the `dev` user's ID.
+- [x] Migration: `users.is_admin`, `users.token_version`, `users.disabled_at`; owner account is admin.
+- [x] `token_version` in the JWT, checked against the user row by the middleware (cache briefly
       if needed); disabled users are rejected.
 - Done when: auth tests cover missing/old/revoked tokens and disabled users; `dev api /auth/me`
   returns the ID.

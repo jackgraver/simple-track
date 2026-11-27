@@ -11,6 +11,7 @@ import (
 	"be-simpletracker/internal/env"
 
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
 type CookieConfig struct {
@@ -135,22 +136,12 @@ func Login(c *gin.Context, service *services.AuthService, cookie CookieConfig, p
 	})
 }
 
-func GetCurrentUser(c *gin.Context, service *services.AuthService) {
+// GetCurrentUser answers /auth/me for userID (resolved by AuthMiddleware).
+func GetCurrentUser(c *gin.Context, service *services.AuthService, userID uint) {
 	setAuthResponseHeaders(c)
-	username, exists := c.Get("username")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Not authenticated"})
-		return
-	}
-	usernameStr, ok := username.(string)
-	if !ok {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Not authenticated"})
-		return
-	}
-
-	user, err := service.CurrentUser(usernameStr)
+	user, err := service.CurrentUser(userID)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+		respondUserLookupError(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{
@@ -164,7 +155,7 @@ type updateProfileRequest struct {
 	BirthYear *int `json:"birth_year"`
 }
 
-func UpdateCurrentUser(c *gin.Context, service *services.AuthService) {
+func UpdateCurrentUser(c *gin.Context, service *services.AuthService, userID uint) {
 	var req updateProfileRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -174,12 +165,26 @@ func UpdateCurrentUser(c *gin.Context, service *services.AuthService) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "birth_year is required"})
 		return
 	}
-	user, err := service.UpdateBirthYear(c.GetString("username"), *req.BirthYear)
-	if err != nil {
+	user, err := service.UpdateBirthYear(userID, *req.BirthYear)
+	if errors.Is(err, services.ErrInvalidBirthYear) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+	if err != nil {
+		respondUserLookupError(c, err)
+		return
+	}
 	c.JSON(http.StatusOK, gin.H{"user": user})
+}
+
+// respondUserLookupError: the user vanished after the middleware checked it (404), or the
+// database failed (503, so the client doesn't treat it as signed out).
+func respondUserLookupError(c *gin.Context, err error) {
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+		return
+	}
+	c.JSON(http.StatusServiceUnavailable, gin.H{"error": "Could not load user"})
 }
 
 func Logout(c *gin.Context, cookie CookieConfig) {

@@ -18,6 +18,7 @@ var (
 	ErrPasswordHash       = errors.New("failed to hash password")
 	ErrUserCreation       = errors.New("failed to create user")
 	ErrTokenGeneration    = errors.New("failed to generate token")
+	ErrInvalidBirthYear   = errors.New("birth_year must be between 1900 and the current year")
 )
 
 var dummyPasswordHash = func() []byte {
@@ -28,7 +29,8 @@ var dummyPasswordHash = func() []byte {
 	return hash
 }()
 
-type TokenGenerator func(string) (string, error)
+// TokenGenerator signs a session token for a stored user (see auth.GenerateToken).
+type TokenGenerator func(models.User) (string, error)
 
 type AuthService struct {
 	generateToken TokenGenerator
@@ -77,7 +79,7 @@ func (s *AuthService) Register(input RegisterInput) (AuthResult, error) {
 		return AuthResult{}, fmt.Errorf("%w: %v", ErrUserCreation, err)
 	}
 
-	token, err := s.generateToken(user.Username)
+	token, err := s.generateToken(user)
 	if err != nil {
 		return AuthResult{}, fmt.Errorf("%w: %v", ErrTokenGeneration, err)
 	}
@@ -98,8 +100,12 @@ func (s *AuthService) Login(input LoginInput) (AuthResult, error) {
 	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(input.Password)); err != nil {
 		return AuthResult{}, ErrInvalidCredentials
 	}
+	// Checked after the password so a disabled account answers exactly like a wrong password.
+	if user.DisabledAt != nil {
+		return AuthResult{}, ErrInvalidCredentials
+	}
 
-	token, err := s.generateToken(user.Username)
+	token, err := s.generateToken(user)
 	if err != nil {
 		return AuthResult{}, fmt.Errorf("%w: %v", ErrTokenGeneration, err)
 	}
@@ -108,8 +114,8 @@ func (s *AuthService) Login(input LoginInput) (AuthResult, error) {
 	return AuthResult{Token: token, User: user}, nil
 }
 
-func (s *AuthService) CurrentUser(username string) (models.User, error) {
-	user, err := authrepo.FindUserByUsername(username)
+func (s *AuthService) CurrentUser(userID uint) (models.User, error) {
+	user, err := authrepo.FindUserByID(userID)
 	if err != nil {
 		return models.User{}, err
 	}
@@ -117,12 +123,12 @@ func (s *AuthService) CurrentUser(username string) (models.User, error) {
 	return user, nil
 }
 
-func (s *AuthService) UpdateBirthYear(username string, birthYear int) (models.User, error) {
+func (s *AuthService) UpdateBirthYear(userID uint, birthYear int) (models.User, error) {
 	currentYear := clock.Now().Year()
 	if birthYear < 1900 || birthYear > currentYear {
-		return models.User{}, errors.New("birth_year must be between 1900 and the current year")
+		return models.User{}, ErrInvalidBirthYear
 	}
-	user, err := authrepo.UpdateUserBirthYear(username, &birthYear)
+	user, err := authrepo.UpdateUserBirthYear(userID, &birthYear)
 	if err != nil {
 		return models.User{}, err
 	}

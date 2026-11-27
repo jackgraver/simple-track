@@ -87,7 +87,14 @@ func seedUser(tx *gorm.DB) error {
 		return err
 	}
 	birth := 1995
-	return tx.Create(&authm.User{Username: Username, Password: h, Email: Username + "@localhost", BirthYear: &birth}).Error
+	return tx.Create(&authm.User{
+		Username:     Username,
+		Password:     h,
+		Email:        Username + "@localhost",
+		BirthYear:    &birth,
+		IsAdmin:      true,
+		TokenVersion: authm.InitialTokenVersion,
+	}).Error
 }
 
 func seedGym(tx *gorm.DB) error {

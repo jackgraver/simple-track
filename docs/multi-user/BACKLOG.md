@@ -30,10 +30,10 @@ Nothing Critical was found. Prod today has one account, so most multi-user findi
 | 7 | Medium | No security headers (CSP, frame-ancestors, nosniff, Referrer-Policy); API has none at all | new (H1 headers) |
 | 8 | Medium | No request body size limit outside `/auth` (imports, JSON) | B2 or new (H1) |
 | 9 | Medium | Frontend local storage isn't scoped to the user; logout leaves drafts, timers, last route | C6 (frontend) |
-| 10 | Medium | Tokens without `exp` never expire; 1-year session lifetime | B1 |
-| 11 | Low | JWT signature compared with `!=` (not constant-time) | B1 |
-| 12 | Low | `"Invalid token: " + err` echoes verification details | B1 |
-| 13 | Low | CSRF relies on SameSite=Lax only; JSON endpoints accept `text/plain` bodies | B1 |
+| 10 | Medium | Tokens without `exp` never expire; 1-year session lifetime | B1: **done** (exp/iat/alg enforced; 365-day lifetime accepted by owner) |
+| 11 | Low | JWT signature compared with `!=` (not constant-time) | B1: **done** |
+| 12 | Low | `"Invalid token: " + err` echoes verification details | B1: **done** |
+| 13 | Low | CSRF relies on SameSite=Lax only; JSON endpoints accept `text/plain` bodies | B1: **done** (Sec-Fetch-Site) |
 | 14 | Low | Usernames are case-sensitive unique (`Jack` vs `jack`); no password policy; `max=72` counts runes, bcrypt limit is bytes | C6 |
 | 15 | Low | Shared-catalog cover URLs are arbitrary image URLs shown to every user (tracking pixel) | C5 |
 | 16 | Low | `TRUSTED_PROXIES` depends on an unpinned Docker gateway IP; drift merges all clients into one IP | A2 |
@@ -217,6 +217,9 @@ Nothing Critical was found. Prod today has one account, so most multi-user findi
   a shorter absolute lifetime (e.g. 30–90 days) with sliding re-issue on activity, so an idle
   stolen token dies on its own. Also verify the header's `alg` is `HS256`.
 - **Lane**: B1.
+- **Status (B1)**: `exp`, `iat` and `alg: HS256` are required and `exp - iat` can't exceed
+  `AUTH_COOKIE_MAX_AGE_SEC`. Owner kept the 365-day lifetime (no sliding re-issue); it is set
+  in prod through `AUTH_COOKIE_MAX_AGE_SEC` in `docker-compose.vps.yml`.
 
 ### 11. Low: non-constant-time JWT signature check
 

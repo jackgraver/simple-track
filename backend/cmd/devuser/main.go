@@ -1,7 +1,8 @@
 // Command devuser ensures a local login exists for development.
 //
 // It creates (or resets the password of) DEV_AUTH_USER (default "dev") with
-// password DEV_USER_PASSWORD (default "dev"). Idempotent; refuses to run when
+// password DEV_USER_PASSWORD (default "dev"), as an enabled admin (the dev stand-in for the
+// owner account). Existing sessions stay valid. Idempotent; refuses to run when
 // APP_ENV is production.
 //
 // Usage: go run ./cmd/devuser   (from backend/)
@@ -48,10 +49,17 @@ func run() error {
 	}
 
 	var user models.User
-	err = db.Where("username = ?", username).First(&user).Error
+	// Unscoped: a soft-deleted dev row is revived rather than colliding with the unique username.
+	err = db.Unscoped().Where("username = ?", username).First(&user).Error
 	switch {
 	case errors.Is(err, gorm.ErrRecordNotFound):
-		user = models.User{Username: username, Password: string(hash), Email: username + "@localhost"}
+		user = models.User{
+			Username:     username,
+			Password:     string(hash),
+			Email:        username + "@localhost",
+			IsAdmin:      true,
+			TokenVersion: models.InitialTokenVersion,
+		}
 		if err := db.Create(&user).Error; err != nil {
 			return err
 		}
@@ -59,7 +67,12 @@ func run() error {
 	case err != nil:
 		return err
 	default:
-		if err := db.Model(&user).Update("password", string(hash)).Error; err != nil {
+		if err := db.Unscoped().Model(&user).Updates(map[string]any{
+			"deleted_at":  nil,
+			"password":    string(hash),
+			"is_admin":    true,
+			"disabled_at": nil,
+		}).Error; err != nil {
 			return err
 		}
 		fmt.Printf("devuser: %q exists, password reset to %q\n", username, password)

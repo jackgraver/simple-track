@@ -6,52 +6,132 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
+
+	"be-simpletracker/internal/core/auth/models"
+	"be-simpletracker/internal/database"
 
 	"github.com/gin-gonic/gin"
+	"github.com/glebarez/sqlite"
+	"gorm.io/gorm"
 )
 
 const testDevAuthToken = "dev-bypass-token-for-tests-only"
 
-func TestAuthMiddleware_validCookie_setsUsername(t *testing.T) {
-	t.Setenv("APP_ENV", "prod")
-	gin.SetMode(gin.TestMode)
-	tok, err := GenerateToken("wanda")
+// setupUsers gives the test its own SQLite users table as the global DB.
+func setupUsers(t *testing.T) *gorm.DB {
+	t.Helper()
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	if err != nil {
 		t.Fatal(err)
 	}
+	if err := db.AutoMigrate(&models.User{}); err != nil {
+		t.Fatal(err)
+	}
+	database.SetDB(db)
+	t.Cleanup(func() { database.SetDB(nil) })
+	return db
+}
+
+func createUser(t *testing.T, db *gorm.DB, username string, admin bool) models.User {
+	t.Helper()
+	user := models.User{Username: username, Password: "hash", Email: username + "@example.com", IsAdmin: admin, TokenVersion: models.InitialTokenVersion}
+	if err := db.Create(&user).Error; err != nil {
+		t.Fatal(err)
+	}
+	return user
+}
+
+func tokenFor(t *testing.T, user models.User) string {
+	t.Helper()
+	tok, err := GenerateToken(user)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return tok
+}
+
+type meBody struct {
+	ID       uint   `json:"id"`
+	Username string `json:"username"`
+	Admin    bool   `json:"admin"`
+	GinUser  string `json:"gin_user"`
+	Error    string `json:"error"`
+}
+
+// serve runs one request through AuthMiddleware to a handler that echoes the context user.
+func serve(t *testing.T, cookie string) (int, meBody) {
+	t.Helper()
+	gin.SetMode(gin.TestMode)
 	r := gin.New()
 	r.GET("/x", AuthMiddleware(), func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{"u": c.GetString("username")})
+		u := MustUser(c.Request.Context())
+		c.JSON(http.StatusOK, gin.H{"id": u.ID, "username": u.Username, "admin": u.IsAdmin, "gin_user": c.GetString("username")})
 	})
 	req := httptest.NewRequest(http.MethodGet, "/x", nil)
-	req.AddCookie(&http.Cookie{Name: AuthTokenCookieName, Value: tok})
+	if cookie != "" {
+		req.AddCookie(&http.Cookie{Name: AuthTokenCookieName, Value: cookie})
+	}
 	rec := httptest.NewRecorder()
 	r.ServeHTTP(rec, req)
-	if rec.Code != http.StatusOK {
-		t.Fatalf("status %d body %s", rec.Code, rec.Body.String())
+	var body meBody
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode body %q: %v", rec.Body.String(), err)
+	}
+	return rec.Code, body
+}
+
+func expectRejected(t *testing.T, code int, body meBody) {
+	t.Helper()
+	if code != http.StatusUnauthorized {
+		t.Fatalf("status %d want 401 (body %+v)", code, body)
+	}
+	if body.ID != 0 {
+		t.Fatalf("rejected request reached the handler: %+v", body)
+	}
+}
+
+func TestAuthMiddleware_validToken_putsUserOnContext(t *testing.T) {
+	t.Setenv("APP_ENV", "prod")
+	db := setupUsers(t)
+	createUser(t, db, "first", false)
+	wanda := createUser(t, db, "wanda", true)
+
+	code, body := serve(t, tokenFor(t, wanda))
+	if code != http.StatusOK {
+		t.Fatalf("status %d body %+v", code, body)
+	}
+	if body.ID != wanda.ID || body.Username != "wanda" || !body.Admin || body.GinUser != "wanda" {
+		t.Fatalf("context user: got %+v want id=%d wanda admin", body, wanda.ID)
+	}
+}
+
+func TestAuthMiddleware_adminFlagComesFromTheRowNotTheToken(t *testing.T) {
+	t.Setenv("APP_ENV", "prod")
+	db := setupUsers(t)
+	user := createUser(t, db, "wanda", true)
+	tok := tokenFor(t, user)
+	if err := db.Model(&user).Update("is_admin", false).Error; err != nil {
+		t.Fatal(err)
+	}
+	code, body := serve(t, tok)
+	if code != http.StatusOK || body.Admin {
+		t.Fatalf("demoted admin: status %d body %+v, want 200 non-admin", code, body)
 	}
 }
 
 func TestAuthMiddleware_missingCookie_unauthorized(t *testing.T) {
 	t.Setenv("APP_ENV", "prod")
-	gin.SetMode(gin.TestMode)
-	r := gin.New()
-	r.GET("/", AuthMiddleware(), func(c *gin.Context) {})
-	req := httptest.NewRequest(http.MethodGet, "/", nil)
-	rec := httptest.NewRecorder()
-	r.ServeHTTP(rec, req)
-	if rec.Code != http.StatusUnauthorized {
-		t.Fatalf("status %d want %d", rec.Code, http.StatusUnauthorized)
-	}
+	setupUsers(t)
+	code, body := serve(t, "")
+	expectRejected(t, code, body)
 }
 
 func TestAuthMiddleware_authorizationBearerIgnored_withoutCookie(t *testing.T) {
 	t.Setenv("APP_ENV", "prod")
+	db := setupUsers(t)
+	tok := tokenFor(t, createUser(t, db, "zeus", false))
 	gin.SetMode(gin.TestMode)
-	tok, err := GenerateToken("zeus")
-	if err != nil {
-		t.Fatal(err)
-	}
 	r := gin.New()
 	r.GET("/", AuthMiddleware(), func(c *gin.Context) {})
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
@@ -63,139 +143,236 @@ func TestAuthMiddleware_authorizationBearerIgnored_withoutCookie(t *testing.T) {
 	}
 }
 
-func TestAuthMiddleware_invalidCookie_returnsInvalidTokenError(t *testing.T) {
+func TestAuthMiddleware_invalidCookie_genericError(t *testing.T) {
 	t.Setenv("APP_ENV", "prod")
-	gin.SetMode(gin.TestMode)
-	r := gin.New()
-	r.GET("/", AuthMiddleware(), func(c *gin.Context) {})
-	req := httptest.NewRequest(http.MethodGet, "/", nil)
-	req.AddCookie(&http.Cookie{Name: AuthTokenCookieName, Value: "not-a-valid-jwt"})
-	rec := httptest.NewRecorder()
-	r.ServeHTTP(rec, req)
-	if rec.Code != http.StatusUnauthorized {
-		t.Fatalf("status %d want %d", rec.Code, http.StatusUnauthorized)
+	setupUsers(t)
+	code, body := serve(t, "not-a-valid-jwt")
+	expectRejected(t, code, body)
+	if body.Error != "Invalid or expired session" {
+		t.Fatalf("error body: got %q; the reason must not be echoed to the client", body.Error)
 	}
-	var body struct {
-		Error string `json:"error"`
+}
+
+func TestAuthMiddleware_tokenWithoutUID_rejected(t *testing.T) {
+	t.Setenv("APP_ENV", "prod")
+	db := setupUsers(t)
+	createUser(t, db, "wanda", true)
+	// The shape every token had before multi-user: a valid signature, username, no uid.
+	now := time.Now().Unix()
+	old := mustSignedJWT(t, Claims{Username: "wanda", Timestamp: now, Iat: now, Exp: now + 3600})
+	code, body := serve(t, old)
+	expectRejected(t, code, body)
+}
+
+func TestAuthMiddleware_tokenWithoutVersion_rejected(t *testing.T) {
+	t.Setenv("APP_ENV", "prod")
+	db := setupUsers(t)
+	user := createUser(t, db, "wanda", true)
+	now := time.Now().Unix()
+	tok := mustSignedJWT(t, Claims{UID: user.ID, Username: "wanda", Timestamp: now, Iat: now, Exp: now + 3600})
+	code, body := serve(t, tok)
+	expectRejected(t, code, body)
+}
+
+func TestAuthMiddleware_revokedToken_rejected(t *testing.T) {
+	t.Setenv("APP_ENV", "prod")
+	db := setupUsers(t)
+	user := createUser(t, db, "wanda", true)
+	tok := tokenFor(t, user)
+	if err := db.Model(&user).Update("token_version", gorm.Expr("token_version + 1")).Error; err != nil {
+		t.Fatal(err)
 	}
-	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
-		t.Fatalf("decode body: %v", err)
+	code, body := serve(t, tok)
+	expectRejected(t, code, body)
+
+	// A token issued after the bump works.
+	var fresh models.User
+	if err := db.First(&fresh, user.ID).Error; err != nil {
+		t.Fatal(err)
 	}
-	if !strings.HasPrefix(body.Error, "Invalid token: ") {
-		t.Fatalf("error body: got %q want prefix %q", body.Error, "Invalid token: ")
+	if code, body := serve(t, tokenFor(t, fresh)); code != http.StatusOK || body.ID != user.ID {
+		t.Fatalf("new token after revoke: status %d body %+v", code, body)
+	}
+}
+
+func TestAuthMiddleware_disabledUser_rejected(t *testing.T) {
+	t.Setenv("APP_ENV", "prod")
+	db := setupUsers(t)
+	user := createUser(t, db, "wanda", false)
+	tok := tokenFor(t, user)
+	if err := db.Model(&user).Update("disabled_at", time.Now()).Error; err != nil {
+		t.Fatal(err)
+	}
+	code, body := serve(t, tok)
+	expectRejected(t, code, body)
+	if strings.Contains(strings.ToLower(body.Error), "disabled") {
+		t.Fatalf("error body leaks the reason: %q", body.Error)
+	}
+}
+
+func TestAuthMiddleware_deletedUser_rejected(t *testing.T) {
+	t.Setenv("APP_ENV", "prod")
+	db := setupUsers(t)
+	user := createUser(t, db, "wanda", false)
+	tok := tokenFor(t, user)
+	if err := db.Delete(&user).Error; err != nil {
+		t.Fatal(err)
+	}
+	code, body := serve(t, tok)
+	expectRejected(t, code, body)
+}
+
+func TestAuthMiddleware_uidPicksTheUser_notTheUsernameClaim(t *testing.T) {
+	t.Setenv("APP_ENV", "prod")
+	db := setupUsers(t)
+	alice := createUser(t, db, "alice", false)
+	tok := tokenFor(t, alice)
+	if err := db.Model(&alice).Update("username", "alicia").Error; err != nil {
+		t.Fatal(err)
+	}
+	code, body := serve(t, tok)
+	if code != http.StatusOK || body.ID != alice.ID || body.Username != "alicia" {
+		t.Fatalf("status %d body %+v", code, body)
+	}
+}
+
+func TestAuthMiddleware_databaseError_isNot401(t *testing.T) {
+	t.Setenv("APP_ENV", "prod")
+	db := setupUsers(t)
+	user := createUser(t, db, "wanda", false)
+	tok := tokenFor(t, user)
+	if err := db.Migrator().DropTable(&models.User{}); err != nil {
+		t.Fatal(err)
+	}
+	code, body := serve(t, tok)
+	if code != http.StatusServiceUnavailable || body.ID != 0 {
+		t.Fatalf("DB failure: status %d body %+v, want 503 so the client keeps its session", code, body)
 	}
 }
 
 func TestAuthMiddleware_devTokenDisabledByDefault_evenInDevEnv(t *testing.T) {
+	t.Setenv("APP_ENV", "development")
 	t.Setenv("ALLOW_BYPASS", "")
 	t.Setenv("DEV_AUTH_TOKEN", "")
-	gin.SetMode(gin.TestMode)
-	r := gin.New()
-	r.GET("/", AuthMiddleware(), func(c *gin.Context) {})
-	req := httptest.NewRequest(http.MethodGet, "/", nil)
-	rec := httptest.NewRecorder()
-	r.ServeHTTP(rec, req)
-	if rec.Code != http.StatusUnauthorized {
-		t.Fatalf("without DEV_AUTH_TOKEN must NOT bypass: got %d want 401", rec.Code)
-	}
+	setupUsers(t)
+	code, body := serve(t, "")
+	expectRejected(t, code, body)
 }
 
 func TestAuthMiddleware_devToken_unsetAllowBypass_disabled(t *testing.T) {
+	t.Setenv("APP_ENV", "development")
 	t.Setenv("ALLOW_BYPASS", "")
 	t.Setenv("DEV_AUTH_TOKEN", testDevAuthToken)
-	gin.SetMode(gin.TestMode)
-	r := gin.New()
-	r.GET("/", AuthMiddleware(), func(c *gin.Context) {})
-	req := httptest.NewRequest(http.MethodGet, "/", nil)
-	req.AddCookie(&http.Cookie{Name: AuthTokenCookieName, Value: testDevAuthToken})
-	rec := httptest.NewRecorder()
-	r.ServeHTTP(rec, req)
-	if rec.Code != http.StatusUnauthorized {
-		t.Fatalf("unset ALLOW_BYPASS must disable bypass: got %d want 401", rec.Code)
-	}
+	db := setupUsers(t)
+	createUser(t, db, "dev", true)
+	code, body := serve(t, testDevAuthToken)
+	expectRejected(t, code, body)
 }
 
-func TestAuthMiddleware_devToken_cookieAuthorizes(t *testing.T) {
+func TestAuthMiddleware_devToken_resolvesDevUsersRealID(t *testing.T) {
 	t.Setenv("APP_ENV", "development")
 	t.Setenv("ALLOW_BYPASS", "true")
 	t.Setenv("DEV_AUTH_TOKEN", testDevAuthToken)
-	gin.SetMode(gin.TestMode)
-	r := gin.New()
-	r.GET("/x", AuthMiddleware(), func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{"u": c.GetString("username")})
-	})
-	req := httptest.NewRequest(http.MethodGet, "/x", nil)
-	req.AddCookie(&http.Cookie{Name: AuthTokenCookieName, Value: testDevAuthToken})
-	rec := httptest.NewRecorder()
-	r.ServeHTTP(rec, req)
-	if rec.Code != http.StatusOK {
-		t.Fatalf("status %d body %s", rec.Code, rec.Body.String())
+	t.Setenv("DEV_AUTH_USER", "")
+	db := setupUsers(t)
+	createUser(t, db, "someone", false)
+	dev := createUser(t, db, "dev", true)
+	code, body := serve(t, testDevAuthToken)
+	if code != http.StatusOK {
+		t.Fatalf("status %d body %+v", code, body)
 	}
-	var body struct {
-		U string `json:"u"`
+	if body.ID != dev.ID || body.Username != "dev" || !body.Admin {
+		t.Fatalf("dev user: got %+v want id=%d dev admin", body, dev.ID)
 	}
-	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
-		t.Fatalf("decode body: %v", err)
-	}
-	if body.U != "dev" {
-		t.Fatalf("dev user: got %q want %q", body.U, "dev")
-	}
+}
+
+func TestAuthMiddleware_devToken_missingDevUser_unauthorized(t *testing.T) {
+	t.Setenv("APP_ENV", "development")
+	t.Setenv("ALLOW_BYPASS", "true")
+	t.Setenv("DEV_AUTH_TOKEN", testDevAuthToken)
+	t.Setenv("DEV_AUTH_USER", "")
+	setupUsers(t)
+	code, body := serve(t, testDevAuthToken)
+	expectRejected(t, code, body)
 }
 
 func TestAuthMiddleware_devTokenNeverAuthorizesInProduction(t *testing.T) {
 	t.Setenv("APP_ENV", "production")
 	t.Setenv("ALLOW_BYPASS", "true")
 	t.Setenv("DEV_AUTH_TOKEN", testDevAuthToken)
-	gin.SetMode(gin.TestMode)
-	r := gin.New()
-	r.GET("/", AuthMiddleware(), func(c *gin.Context) {})
-	req := httptest.NewRequest(http.MethodGet, "/", nil)
-	req.AddCookie(&http.Cookie{Name: AuthTokenCookieName, Value: testDevAuthToken})
-	rec := httptest.NewRecorder()
-	r.ServeHTTP(rec, req)
-	if rec.Code != http.StatusUnauthorized {
-		t.Fatalf("production bypass must be disabled: got %d want 401", rec.Code)
-	}
+	db := setupUsers(t)
+	createUser(t, db, "dev", true)
+	code, body := serve(t, testDevAuthToken)
+	expectRejected(t, code, body)
 }
 
 func TestAuthMiddleware_devToken_overrideUser(t *testing.T) {
+	t.Setenv("APP_ENV", "development")
 	t.Setenv("ALLOW_BYPASS", "true")
 	t.Setenv("DEV_AUTH_TOKEN", testDevAuthToken)
 	t.Setenv("DEV_AUTH_USER", "alice")
-	gin.SetMode(gin.TestMode)
-	r := gin.New()
-	r.GET("/x", AuthMiddleware(), func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{"u": c.GetString("username")})
-	})
-	req := httptest.NewRequest(http.MethodGet, "/x", nil)
-	req.AddCookie(&http.Cookie{Name: AuthTokenCookieName, Value: testDevAuthToken})
-	rec := httptest.NewRecorder()
-	r.ServeHTTP(rec, req)
-	if rec.Code != http.StatusOK {
-		t.Fatalf("status %d body %s", rec.Code, rec.Body.String())
-	}
-	var body struct {
-		U string `json:"u"`
-	}
-	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
-		t.Fatalf("decode body: %v", err)
-	}
-	if body.U != "alice" {
-		t.Fatalf("dev user: got %q want %q", body.U, "alice")
+	db := setupUsers(t)
+	createUser(t, db, "dev", true)
+	alice := createUser(t, db, "alice", false)
+	code, body := serve(t, testDevAuthToken)
+	if code != http.StatusOK || body.ID != alice.ID || body.Username != "alice" || body.Admin {
+		t.Fatalf("status %d body %+v want alice id=%d", code, body, alice.ID)
 	}
 }
 
+func TestAuthMiddleware_devToken_disabledDevUser_rejected(t *testing.T) {
+	t.Setenv("APP_ENV", "development")
+	t.Setenv("ALLOW_BYPASS", "true")
+	t.Setenv("DEV_AUTH_TOKEN", testDevAuthToken)
+	t.Setenv("DEV_AUTH_USER", "")
+	db := setupUsers(t)
+	dev := createUser(t, db, "dev", true)
+	if err := db.Model(&dev).Update("disabled_at", time.Now()).Error; err != nil {
+		t.Fatal(err)
+	}
+	code, body := serve(t, testDevAuthToken)
+	expectRejected(t, code, body)
+}
+
 func TestAuthMiddleware_devToken_allowBypassFalse_disabled(t *testing.T) {
+	t.Setenv("APP_ENV", "development")
 	t.Setenv("ALLOW_BYPASS", "false")
 	t.Setenv("DEV_AUTH_TOKEN", testDevAuthToken)
+	db := setupUsers(t)
+	createUser(t, db, "dev", true)
+	code, body := serve(t, testDevAuthToken)
+	expectRejected(t, code, body)
+}
+
+func TestAuthMiddleware_crossSiteWritesRefused(t *testing.T) {
+	t.Setenv("APP_ENV", "prod")
+	db := setupUsers(t)
+	tok := tokenFor(t, createUser(t, db, "wanda", false))
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
-	r.GET("/", AuthMiddleware(), func(c *gin.Context) {})
-	req := httptest.NewRequest(http.MethodGet, "/", nil)
-	req.AddCookie(&http.Cookie{Name: AuthTokenCookieName, Value: testDevAuthToken})
-	rec := httptest.NewRecorder()
-	r.ServeHTTP(rec, req)
-	if rec.Code != http.StatusUnauthorized {
-		t.Fatalf("ALLOW_BYPASS=false must disable bypass: got %d want 401", rec.Code)
+	r.Any("/x", AuthMiddleware(), func(c *gin.Context) { c.Status(http.StatusNoContent) })
+	cases := []struct {
+		method, site string
+		want         int
+	}{
+		{http.MethodPost, "same-origin", http.StatusNoContent},
+		{http.MethodPost, "", http.StatusNoContent}, // non-browser client
+		{http.MethodPost, "none", http.StatusNoContent},
+		{http.MethodPost, "same-site", http.StatusForbidden}, // sibling subdomain
+		{http.MethodDelete, "cross-site", http.StatusForbidden},
+		{http.MethodPatch, "cross-site", http.StatusForbidden},
+		{http.MethodGet, "cross-site", http.StatusNoContent}, // reads aren't state-changing
+	}
+	for _, tc := range cases {
+		req := httptest.NewRequest(tc.method, "/x", strings.NewReader("{}"))
+		req.AddCookie(&http.Cookie{Name: AuthTokenCookieName, Value: tok})
+		if tc.site != "" {
+			req.Header.Set("Sec-Fetch-Site", tc.site)
+		}
+		rec := httptest.NewRecorder()
+		r.ServeHTTP(rec, req)
+		if rec.Code != tc.want {
+			t.Fatalf("%s Sec-Fetch-Site=%q: status %d want %d", tc.method, tc.site, rec.Code, tc.want)
+		}
 	}
 }

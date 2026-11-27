@@ -59,3 +59,68 @@ every other lane, since nothing is reviewed again before the single deploy at D1
   (C2/C3), no binding request JSON into gorm models (C2 + a B3 check), login lockout per username
   and IPv6 keying (C6), require `exp` and check `Origin` in the middleware (B1), user-scoped
   frontend storage cleared on logout (C6).
+
+## 2026-11-27: B1 user identity on the request (agent, lane B1)
+
+- **JWT claims**: `uid` (users.id) and `ver` (users.token_version) join `username`. The middleware
+  picks the user by `uid` only; `username` in the token is informational. A token without `uid`
+  is rejected (every pre-B1 token), so everyone signs in once after D1.
+- **Admin flag is not in the token.** The middleware reads `is_admin` from the users row, so
+  promoting or demoting takes effect on the next request. "Admin flag source" = the row.
+- **token_version check: one primary-key lookup per request, no cache.** The middleware loads
+  the user by `uid` on every authenticated request and rejects when the row is gone
+  (soft-deleted too), `disabled_at` is set, or `ver != token_version`. For a family app this is
+  a sub-millisecond indexed read; a cache would delay revocation and need invalidation across
+  processes, for no measurable gain. Revisit only if profiling says so. B2 may move this
+  lookup into the request transaction; `users` stays outside RLS (README), so it works there.
+- **token_version starts at 1** (column default and `models.InitialTokenVersion`), so a token
+  with no `ver` (decodes as 0) never matches. Revoking = `token_version = token_version + 1`
+  (C6: password change/reset, disable/enable). Code that creates users sets it explicitly
+  (`authrepo.CreateUser`, devuser, e2e seed) rather than relying on gorm reading the default back.
+- **Rejections**: every invalid/revoked/disabled/unknown-user session is 401
+  `{"error":"Invalid or expired session"}`; the reason is logged server-side, never echoed (fixes
+  the "Invalid token: " + err echo flagged for A3). Token errors wrap `auth.ErrInvalidToken`;
+  anything else (DB down, missing JWT_SECRET) is **503**, so the client can tell an outage from
+  a dead session. The frontend doesn't use that yet: `resolveAuthSession` (useAuth.ts) treats
+  any `/auth/me` failure, network errors included, as signed out (pre-existing; owner accepted
+  it, see below).
+- **Context from gin**: `router.ContextWithFallback = true` in `cmd/server`, so a context
+  derived from a `*gin.Context` still carries the user. Prefer passing `c.Request.Context()`.
+- **Login refuses disabled users** with the same "Invalid username or password" as a wrong
+  password (checked after bcrypt, so timing matches). C6 owns the rest of the account flows.
+- **Context API** (`internal/core/auth`): `auth.User{ID, Username, IsAdmin}`, `auth.WithUser`,
+  `auth.CurrentUser`, `auth.UserID(ctx) (uint, bool)`, `auth.MustUser(ctx)` (panics: only for
+  code behind the middleware). They accept a `*gin.Context` too (read via its request
+  context). The middleware still sets the gin key `username` for handlers not yet moved
+  (money's birth-year lookup); the old `timestamp` key is gone (nothing read it).
+  **Import rule**: `internal/database` must not import `internal/core/auth` (auth imports
+  database through its repo: cycle). B2's middleware should read the user with
+  `auth.UserID(ctx)` and pass the ID into `database.WithTx`.
+- **Dev bypass**: resolves `DEV_AUTH_USER` (default `dev`) by username on every request (no
+  cache: e2e truncates and reseeds between tests, so IDs move). A missing or disabled dev user
+  is a 401. devuser and the e2e seed create that user as an enabled admin; devuser also
+  re-enables and re-admins it on every run.
+- **Migration 0009 owner backfill**: with exactly one live user (prod today), it becomes admin;
+  with none (fresh/e2e DBs) nothing happens; with more than one the migration **fails** rather
+  than guess who the owner is. D1's rehearsal on a prod backup will surface it if prod ever
+  gains a second account before then (README says not to).
+- **A3 backlog items done in B1**: #11 constant-time signature compare, #12 no echoed reasons,
+  #10 partly (tokens must carry `exp` and `iat`, `alg` must be HS256, and `exp - iat` must not
+  exceed `AUTH_COOKIE_MAX_AGE_SEC`, so lowering that setting also ends older long-lived tokens).
+  Lifetime: see the owner's answer below.
+- **CSRF (#13)**: AuthMiddleware refuses POST/PUT/PATCH/DELETE with `Sec-Fetch-Site` other
+  than `same-origin` or `none` (403). Chosen over an `Origin` check (would need the public
+  origin behind Caddy) and over forcing `Content-Type: application/json` (would break multipart
+  uploads/imports). The SPA always calls `/api` same-origin (Caddy in prod, vite in dev, the
+  phone proxy). Requests without the header (curl, `dev api`, Playwright's API client, very old
+  browsers) fall back to SameSite=Lax. `/auth/login` and `/auth/logout` aren't behind the
+  middleware and aren't covered.
+
+## 2026-11-27: B1 review answers (owner)
+
+- **Session lifetime stays 365 days**, no sliding re-issue. It must be easy to change:
+  `AUTH_COOKIE_MAX_AGE_SEC` (seconds) is passed through `docker-compose.vps.yml` with a
+  365-day default. Lowering it ends existing sessions issued for longer (the token's
+  `exp - iat` is checked against the current setting), so no stale long sessions survive.
+- **DB outage signing people out is accepted** for now (frontend treats a failed `/auth/me` as
+  signed out). Nice-to-have, unscheduled: keep the session and retry on 5xx/network errors.
