@@ -75,14 +75,18 @@ func TestLoginProtectionUsernameDelayGrowsAndIsCapped(t *testing.T) {
 		MaxPerIP:       100000,
 		MaxPerUsername: 2,
 	}, nil)
+	now := time.Date(2026, 8, 15, 0, 0, 0, 0, time.UTC)
+	protection.now = func() time.Time { return now }
 	var delays []time.Duration
 	for i := 0; i < 60; i++ {
-		// A distinct IP each time so only the username-wide counter grows.
+		// A distinct IP each time so only the username-wide counter grows; each client waits
+		// out its delay before the next one arrives.
 		d := protection.Allow(fmt.Sprintf("10.0.%d.%d", i/250, i%250), "jack")
 		if !d.Allowed {
 			t.Fatalf("attempt %d blocked: %#v", i, d)
 		}
 		delays = append(delays, d.Delay)
+		now = now.Add(d.Delay)
 	}
 	// 2*MaxPerUsername = 4 free attempts, then 250ms doubling.
 	for i := 0; i < 4; i++ {
@@ -100,6 +104,46 @@ func TestLoginProtectionUsernameDelayGrowsAndIsCapped(t *testing.T) {
 	}
 	if delays[len(delays)-1] != usernameDelayMax {
 		t.Fatalf("delay never reached cap: %v", delays[len(delays)-1])
+	}
+}
+
+// Many sources in parallel can't multiply the username-wide rate: their delays queue up one
+// slot after another, and once the queue is longer than usernameQueueMax they're turned away.
+func TestLoginProtectionUsernameBackoffSerializesParallelSources(t *testing.T) {
+	protection := NewLoginProtection(LoginProtectionConfig{
+		Window:         time.Hour,
+		MaxPerIP:       100000,
+		MaxPerUsername: 2,
+	}, nil)
+	now := time.Date(2026, 8, 15, 0, 0, 0, 0, time.UTC)
+	protection.now = func() time.Time { return now }
+	allowed, rejected := 0, 0
+	var last time.Duration
+	for i := 0; i < 200; i++ {
+		d := protection.Allow(fmt.Sprintf("10.2.%d.%d", i/250, i%250), "jack")
+		if !d.Allowed {
+			if d.Reason != "username_backoff" || d.RetryAfter <= 0 {
+				t.Fatalf("attempt %d: unexpected rejection %#v", i, d)
+			}
+			rejected++
+			continue
+		}
+		allowed++
+		if d.Delay < last {
+			t.Fatalf("attempt %d: delay %v shorter than previous %v (not serialized)", i, d.Delay, last)
+		}
+		last = d.Delay
+		if d.Delay > usernameQueueMax+usernameDelayMax {
+			t.Fatalf("attempt %d: delay %v exceeds the queue bound", i, d.Delay)
+		}
+	}
+	if rejected == 0 || allowed > 20 {
+		t.Fatalf("parallel attempts not bounded: allowed=%d rejected=%d", allowed, rejected)
+	}
+	// Rejected attempts don't extend the queue: once it drains, a login gets through again.
+	now = now.Add(time.Minute)
+	if d := protection.Allow("192.0.2.1", "jack"); !d.Allowed || d.Delay > usernameDelayMax {
+		t.Fatalf("after the queue drained: %#v", d)
 	}
 }
 
@@ -178,6 +222,33 @@ func TestLoginProtectionFullLimiterEvictsOldestAndStillAccepts(t *testing.T) {
 	}
 	if _, ok := protection.entries["ip:10.1.1.249"]; !ok {
 		t.Fatal("newest entry missing")
+	}
+}
+
+func TestLoginProtectionFullLimiterKeepsBlockedEntries(t *testing.T) {
+	protection := NewLoginProtection(LoginProtectionConfig{
+		Window:         time.Hour,
+		MaxPerIP:       1000000,
+		MaxPerUsername: 2,
+	}, nil)
+	protection.maxEntries = 100
+	now := time.Date(2026, 8, 15, 0, 0, 0, 0, time.UTC)
+	protection.now = func() time.Time { return now }
+
+	// The attacker's own (ip, username) pair is blocked first, so it is the oldest entry.
+	for i := 0; i < 2; i++ {
+		protection.Allow("203.0.113.9", "jack")
+	}
+	if d := protection.Allow("203.0.113.9", "jack"); d.Allowed {
+		t.Fatal("pair not blocked")
+	}
+	// Then floods the limiter with fresh keys to try to evict that block.
+	for i := 0; i < 500; i++ {
+		now = now.Add(time.Second)
+		protection.Allow(fmt.Sprintf("10.3.%d.%d", i/250, i%250), fmt.Sprintf("user%d", i))
+	}
+	if d := protection.Allow("203.0.113.9", "jack"); d.Allowed {
+		t.Fatal("flooding the limiter evicted an active block")
 	}
 }
 

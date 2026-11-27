@@ -13,12 +13,18 @@ import (
 
 const maxLoginRateEntries = 10000
 
-// Username-wide pressure (all sources combined) never blocks; once a username has seen
-// 2*MaxPerUsername attempts in a window, each further attempt is delayed by
-// usernameDelayBase * 2^(excess-1), capped at usernameDelayMax.
+// Username-wide pressure (all sources combined) doesn't hard-block a username for a window.
+// Once a username has seen 2*MaxPerUsername attempts in a window, each further attempt gets a
+// step of usernameDelayBase * 2^(excess-1), capped at usernameDelayMax, and the steps are
+// serialized: an attempt waits until the previous one's slot has passed, so many sources in
+// parallel still get at most one password check per step for that username. When the queue
+// is already more than usernameQueueMax long, the attempt is rejected (429 with Retry-After)
+// instead of queued. A single source never gets there: its (ip, username) counter blocks it
+// after MaxPerUsername attempts, below the 2*MaxPerUsername threshold.
 const (
 	usernameDelayBase = 250 * time.Millisecond
 	usernameDelayMax  = 5 * time.Second
+	usernameQueueMax  = 2 * usernameDelayMax // worst wait stays well under the server's write timeout
 )
 
 type LoginProtectionConfig struct {
@@ -55,6 +61,8 @@ type loginRateWindow struct {
 	Count           int
 	ResetAt         time.Time
 	RejectionLogged bool
+	// NextAt is the end of the last reserved backoff slot (username-wide counters only).
+	NextAt time.Time
 }
 
 type credentialSprayWindow struct {
@@ -160,20 +168,43 @@ func (p *LoginProtection) Allow(clientIP, username string) LoginDecision {
 		}
 	}
 
+	// Username-wide backoff: reserve the next slot, or reject if the queue is too long.
+	attempt := 1
+	start := now
+	if entry, ok := p.entries[usernameKey]; ok && now.Before(entry.ResetAt) {
+		attempt = entry.Count + 1
+		if entry.NextAt.After(start) {
+			start = entry.NextAt
+		}
+		step := p.usernameStep(attempt)
+		if step > 0 && start.Sub(now) > usernameQueueMax {
+			logRejection := !entry.RejectionLogged
+			entry.RejectionLogged = true
+			return LoginDecision{
+				Allowed:      false,
+				RetryAfter:   start.Sub(now),
+				LogRejection: logRejection,
+				Reason:       "username_backoff",
+			}
+		}
+	}
+
 	p.makeRoom(now, []string{ipKey, pairKey, usernameKey})
 	p.increment(ipKey, now)
 	p.increment(pairKey, now)
 	p.increment(usernameKey, now)
-	return LoginDecision{Allowed: true, Delay: p.usernameDelay(usernameKey)}
+	step := p.usernameStep(attempt)
+	if step == 0 {
+		return LoginDecision{Allowed: true}
+	}
+	entry := p.entries[usernameKey]
+	entry.NextAt = start.Add(step)
+	return LoginDecision{Allowed: true, Delay: entry.NextAt.Sub(now)}
 }
 
-// usernameDelay is the backoff for the username-wide counter (already incremented).
-func (p *LoginProtection) usernameDelay(key string) time.Duration {
-	entry, ok := p.entries[key]
-	if !ok {
-		return 0
-	}
-	excess := entry.Count - 2*p.config.MaxPerUsername
+// usernameStep is the backoff step for the attempt-th attempt on a username in a window.
+func (p *LoginProtection) usernameStep(attempt int) time.Duration {
+	excess := attempt - 2*p.config.MaxPerUsername
 	if excess <= 0 {
 		return 0
 	}
@@ -186,8 +217,22 @@ func (p *LoginProtection) usernameDelay(key string) time.Duration {
 	return d
 }
 
+// limitFor is the count at which an entry starts to matter (block or backoff), by key kind.
+func (p *LoginProtection) limitFor(key string) int {
+	switch {
+	case strings.HasPrefix(key, "ip:"):
+		return p.config.MaxPerIP
+	case strings.HasPrefix(key, "pair:"):
+		return p.config.MaxPerUsername
+	default:
+		return 2 * p.config.MaxPerUsername
+	}
+}
+
 // makeRoom evicts the oldest entries (earliest reset time) when adding the given new keys
 // would exceed the cap, instead of rejecting logins. It frees ~10% extra to amortize the sort.
+// Entries that are blocking or backing off, and active spray blocks, go last, so flooding the
+// limiter with fresh keys can't wipe an attacker's own blocks.
 func (p *LoginProtection) makeRoom(now time.Time, keys []string) {
 	newCount := 0
 	for _, k := range keys {
@@ -205,21 +250,23 @@ func (p *LoginProtection) makeRoom(now time.Time, keys []string) {
 	type aged struct {
 		key   string
 		at    time.Time
+		keep  bool // blocking/backing off: evicted only after every plain entry
 		spray bool
 	}
 	all := make([]aged, 0, len(p.entries)+len(p.sprays))
 	for k, e := range p.entries {
-		all = append(all, aged{k, e.ResetAt, false})
+		live := now.Before(e.ResetAt)
+		all = append(all, aged{k, e.ResetAt, live && e.Count >= p.limitFor(k), false})
 	}
 	for k, sp := range p.sprays {
-		// Active spray blocks go last so they outlive plain counters.
-		at := sp.ResetAt
-		if now.Before(sp.BlockedUntil) {
-			at = sp.BlockedUntil.Add(p.config.Window * 1000)
-		}
-		all = append(all, aged{k, at, true})
+		all = append(all, aged{k, sp.ResetAt, now.Before(sp.BlockedUntil), true})
 	}
-	sort.Slice(all, func(i, j int) bool { return all[i].at.Before(all[j].at) })
+	sort.Slice(all, func(i, j int) bool {
+		if all[i].keep != all[j].keep {
+			return !all[i].keep
+		}
+		return all[i].at.Before(all[j].at)
+	})
 	for i := 0; i < len(all) && len(p.entries)+len(p.sprays) > target; i++ {
 		if all[i].spray {
 			delete(p.sprays, all[i].key)
