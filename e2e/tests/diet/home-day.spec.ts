@@ -63,7 +63,7 @@ test.describe('diet home: week strip', { tag: ['@diet'] }, () => {
     await expect(page.getByText('avg 600 / 2,500 kcal · 2 days logged')).toBeVisible();
 
     await page.getByRole('button', { name: 'Previous week' }).click();
-    await expect(page).toHaveURL(/offset=7/);
+    await expect(page).toHaveURL(/offset=11/); // lands on Sunday Jan 4
     await expect(page.getByRole('heading', { name: 'Jan 4 – Jan 10' })).toBeVisible();
     await expect(tile(page, /^Wednesday, January 7, 400 of 2,500 kcal/)).toBeVisible();
     await expect(page.getByText('avg 400 / 2,500 kcal · 1 day logged')).toBeVisible();

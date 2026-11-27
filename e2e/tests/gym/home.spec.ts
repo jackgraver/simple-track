@@ -229,7 +229,7 @@ test.describe('gym home: week strip', { tag: ['@gym'] }, () => {
     await openHome(page);
     await expect(page.getByRole('heading', { name: 'This week' })).toBeVisible();
     await page.getByRole('button', { name: 'Previous week' }).click();
-    await expect(page).toHaveURL(/\/gym\?offset=7$/);
+    await expect(page).toHaveURL(/\/gym\?offset=11$/); // lands on Sunday Jan 4
     await expect(page.getByRole('heading', { name: 'Jan 4 – Jan 10' })).toBeVisible();
     await expect(tile(page, 'Thursday')).toHaveAccessibleName(/^Thursday, January 8, Legs, missed$/);
     await page.getByRole('button', { name: 'Next week' }).click();
