@@ -47,3 +47,15 @@ every other lane, since nothing is reviewed again before the single deploy at D1
 - One visible difference: `GET /diet/logs/day/:id` for a missing ID still answers 500, but the
   message is gorm's `record not found` instead of `entity not found`.
 
+## 2026-11-27: A3 audit results (A3 agent)
+
+- Findings are in `BACKLOG.md`, each tagged with an owning lane. Lanes tick their entries in the
+  PR that fixes them; D1 checks every High is done.
+- Proposed **new lane H1 "HTTP hardening"** (no dependencies, small): security headers/CSP in
+  Caddy, request body limits (backend middleware + Caddy), `Cache-Control: no-store` on `/api`.
+  Must land before C6 ships the `/setup/<token>` page (Referrer-Policy, frame-ancestors).
+  Owner to confirm or fold into another lane.
+- Gaps the original plan didn't cover, now assigned: advisory-lock keys must include the user
+  (C2/C3), no binding request JSON into gorm models (C2 + a B3 check), login lockout per username
+  and IPv6 keying (C6), require `exp` and check `Origin` in the middleware (B1), user-scoped
+  frontend storage cleared on logout (C6).

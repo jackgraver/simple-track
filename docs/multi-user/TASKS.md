@@ -49,13 +49,15 @@ Depends on: none. Touches compose, j-cicd and prod: read `docs/ARCHITECTURE.md` 
 
 ### A3 Security audit (read-only)
 Depends on: none
-- [ ] Review the whole app (backend handlers, auth/cookies/JWT, CORS defaults, proxy/IP handling,
+- [x] Review the whole app (backend handlers, auth/cookies/JWT, CORS defaults, proxy/IP handling,
       error messages, input validation, file uploads/imports, frontend storage of data, deps).
       Seeds: default CORS list includes LAN IPs (`cmd/server/main.go`); `"Invalid token: " + err`
       echoes internal errors.
-- [ ] Write findings to `docs/multi-user/BACKLOG.md` with severity and a suggested lane. Don't fix
+- [x] Write findings to `docs/multi-user/BACKLOG.md` with severity and a suggested lane. Don't fix
       things that a B/C lane will rewrite anyway; note it instead.
 - Done when: BACKLOG.md exists and anything critical is flagged to the owner.
+- Result: 22 findings, none critical; 2 High (C2/C3), several for B1, C5, C6 and a proposed new
+  lane H1 (HTTP hardening). Lanes: check BACKLOG.md for entries tagged with your lane.
 
 ## Phase B: foundation (sequential, one agent at a time)
 
