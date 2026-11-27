@@ -20,7 +20,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
@@ -41,23 +40,12 @@ func main() {
 	// request context, so auth.UserID works on them.
 	router.ContextWithFallback = true
 
-	if !env.IsProduction() {
-		router.Use(utils.BenchmarkMiddleware(router))
-	}
-
 	// First, so every response (including CORS preflights and 404s) gets it.
 	router.Use(hardening(defaultBodyLimit, bodyLimits))
+	router.Use(corsMiddleware(env.SliceOr("CORS_ORIGINS", ",", nil)))
 
-	// The SPA and API share one origin (Caddy in prod, the Vite proxy in dev), so CORS is only
-	// for origins listed explicitly. No default list (BACKLOG #18).
-	if origins := env.SliceOr("CORS_ORIGINS", ",", nil); len(origins) > 0 {
-		router.Use(cors.New(cors.Config{
-			AllowOrigins:     origins,
-			AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE"},
-			AllowHeaders:     []string{"Origin", "Content-Type", "Authorization"},
-			AllowCredentials: true,
-			MaxAge:           12 * time.Hour,
-		}))
+	if !env.IsProduction() {
+		router.Use(utils.BenchmarkMiddleware(router))
 	}
 
 	trustedProxies := env.SliceOr("TRUSTED_PROXIES", ",", nil)

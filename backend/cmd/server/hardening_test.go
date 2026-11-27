@@ -108,3 +108,36 @@ func TestBodyLimitRoutesExist(t *testing.T) {
 		}
 	}
 }
+
+func TestCORSMiddleware(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	cases := []struct {
+		name    string
+		origins []string
+		origin  string
+		want    int
+	}{
+		{"unset: same origin", nil, "http://api.test", http.StatusOK},
+		{"unset: no Origin", nil, "", http.StatusOK},
+		{"unset: cross origin", nil, "https://evil.example", http.StatusForbidden},
+		{"unset: Origin null", nil, "null", http.StatusForbidden},
+		{"listed origin", []string{"https://app.test"}, "https://app.test", http.StatusOK},
+		{"unlisted origin", []string{"https://app.test"}, "https://evil.example", http.StatusForbidden},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			r := gin.New()
+			r.Use(corsMiddleware(tc.origins))
+			r.POST("/auth/login", func(c *gin.Context) { c.Status(http.StatusOK) })
+			req := httptest.NewRequest(http.MethodPost, "http://api.test/auth/login", nil)
+			if tc.origin != "" {
+				req.Header.Set("Origin", tc.origin)
+			}
+			rec := httptest.NewRecorder()
+			r.ServeHTTP(rec, req)
+			if rec.Code != tc.want {
+				t.Errorf("status = %d, want %d", rec.Code, tc.want)
+			}
+		})
+	}
+}

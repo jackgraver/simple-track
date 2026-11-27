@@ -2,7 +2,9 @@ package main
 
 import (
 	"net/http"
+	"time"
 
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 )
 
@@ -36,4 +38,24 @@ func hardening(def int64, limits map[string]int64) gin.HandlerFunc {
 		c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, limit)
 		c.Next()
 	}
+}
+
+// corsMiddleware allows credentialed requests from the listed origins only. The SPA and API share
+// one origin (Caddy in prod, the Vite proxy in dev and for `dev phone`), so there is no default
+// list (BACKLOG #18). With none listed it still runs, allowing no origin: same-origin requests
+// pass (the library compares Origin with Host) and cross-origin ones get 403, which is what stops
+// cross-site POSTs to the /auth routes that AuthMiddleware's Sec-Fetch-Site check doesn't cover.
+func corsMiddleware(origins []string) gin.HandlerFunc {
+	cfg := cors.Config{
+		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization"},
+		AllowCredentials: true,
+		MaxAge:           12 * time.Hour,
+	}
+	if len(origins) > 0 {
+		cfg.AllowOrigins = origins
+	} else {
+		cfg.AllowOriginFunc = func(string) bool { return false }
+	}
+	return cors.New(cfg)
 }

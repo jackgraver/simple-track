@@ -75,7 +75,7 @@ Touches Caddy: read `docs/ARCHITECTURE.md` and `j-cicd guide` first.
 - [x] #17 `Cache-Control: no-store` on every `/api` response.
 - [x] #18 No default CORS origins (same-origin only); drop `ExposeHeaders: Set-Cookie`.
 - [x] Verify the headers against a local prod-like stack (images + Caddy) and that the app,
-      PWA and phone proxy still work. Add the Caddy deploy order to ROLLOUT 3.3a.
+      PWA and phone proxy still work. Add the Caddy deploy order to ROLLOUT 3.3a (written as 3.5).
 - Done when: a test covers body limits and `Cache-Control`; the CSP produces no console
   violations on any page.
 

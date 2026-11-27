@@ -224,12 +224,16 @@ keeps C6's `/setup/<token>` URL from leaking to other sites.
 **Body limits** (`backend/cmd/server/hardening.go`, kept out of the request middleware B2
 rewrites): one global middleware, first in the chain, with a 1 MiB default and per-route
 overrides keyed by `METHOD /gin/path` (`TestBodyLimitRoutesExist` catches a renamed route).
-Only the Renpho import gets more: 5 MiB and `weight.MaxImportRows` = 10,000 rows (a full export
-at the cap is about 1.4 MB). Caddy's `request_body max_size 6MB` is the outer guard. A route that needs
+Only the Renpho import gets more: 5 MiB, and at most `weight.MaxImportRows` = 10,000 days after
+same-day rows collapse (that's what the transaction writes; a tab-separated export of 10,000
+rows is under 2 MB as JSON). Caddy's `request_body max_size 6MB` is the outer guard. A route that needs
 a larger body adds a `bodyLimits` entry and, above 6 MB, raises Caddy's limit too.
 
 **`Cache-Control: no-store` on every backend response**, set by the same middleware (in the
 backend rather than Caddy so dev and e2e behave like prod). Nothing in the API wants caching.
 
-**CORS**: no default origin list; with `CORS_ORIGINS` unset the middleware isn't installed.
-Production still requires `CORS_ORIGINS` (`APP_ORIGIN`), and `dev/env.sh` / e2e set their own.
+**CORS**: no default origin list. With `CORS_ORIGINS` unset the middleware still runs but allows
+no origin, so same-origin requests pass and any other `Origin` (including `null`) gets 403. That
+keeps cross-site POSTs off the `/auth` routes, which AuthMiddleware's Sec-Fetch-Site check
+doesn't cover. Production still requires `CORS_ORIGINS` (`APP_ORIGIN`); `dev/env.sh` and e2e
+set their own.

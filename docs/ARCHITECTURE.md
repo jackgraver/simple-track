@@ -129,9 +129,10 @@ container is replaced).
   `Cache-Control: no-store`; request bodies are capped at 1 MiB, with larger limits per route
   in `bodyLimits` (5 MiB for the Renpho weight import, which also caps rows). Over the limit:
   413 when `Content-Length` says so, otherwise the read fails and binding returns 400.
-- **CORS** only for origins in `CORS_ORIGINS` (required in production: `APP_ORIGIN`). Unset
-  means no CORS middleware at all, i.e. same-origin only. The SPA always calls the API on its
-  own origin (Caddy in prod, the Vite proxy in dev and for `dev phone`).
+- **CORS** (`corsMiddleware`, same file) allows only the origins in `CORS_ORIGINS` (required in
+  production: `APP_ORIGIN`). There's no default: unset means same-origin only, and requests with
+  any other `Origin` get 403. The SPA always calls the API on its own origin (Caddy in prod, the
+  Vite proxy in dev and for `dev phone`).
 - **Connection pool** (`internal/database/pool.go`): max 20 open, 10 idle, 30 min lifetime,
   5 min idle time. Override with `DB_MAX_OPEN_CONNS`, `DB_MAX_IDLE_CONNS`,
   `DB_CONN_MAX_LIFETIME`, `DB_CONN_MAX_IDLE_TIME`.

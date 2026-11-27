@@ -27,7 +27,7 @@ Nothing Critical was found. Prod today has one account, so most multi-user findi
 | 4 | Medium | IPv6 address rotation defeats per-IP limits and can fill the limiter (global lockout) | C6 |
 | 5 | Medium | TMDB API key can leak to users in lookup error messages | C5 |
 | 6 | Medium | Raw internal errors (SQL, constraint names) returned to clients at ~160 sites | C1–C5, B3 (lint) |
-| 7 | Medium | No security headers (CSP, frame-ancestors, nosniff, Referrer-Policy); API has none at all | H1: **done** (Caddy; deploys after D1, ROLLOUT 3.3a) |
+| 7 | Medium | No security headers (CSP, frame-ancestors, nosniff, Referrer-Policy); API has none at all | H1: **done** (Caddy; deploys at D1, ROLLOUT 3.5) |
 | 8 | Medium | No request body size limit outside `/auth` (imports, JSON) | H1: **done** (1 MiB default, 5 MiB + 10k rows on import; Caddy 6MB) |
 | 9 | Medium | Frontend local storage isn't scoped to the user; logout leaves drafts, timers, last route | C6 (frontend) |
 | 10 | Medium | Tokens without `exp` never expire; 1-year session lifetime | B1: **done** (exp/iat/alg enforced; 365-day lifetime accepted by owner) |
@@ -176,7 +176,7 @@ Nothing Critical was found. Prod today has one account, so most multi-user findi
   `frontend/src/csp.test.ts` keeps them in sync), `X-Frame-Options`, nosniff, `Referrer-Policy:
   same-origin` (not `no-referrer`, which sends `Origin: null` on same-origin POSTs),
   `Permissions-Policy`, `-Server`. Checked on a local prod copy: no CSP violations on any page.
-  Reaches prod via the Caddy j-cicd project after D1 (ROLLOUT 3.3a).
+  Reaches prod via the Caddy j-cicd project at D1, after the app (ROLLOUT 3.5).
 
 ### 8. Medium: no request body size limit outside `/auth`
 
@@ -192,8 +192,8 @@ Nothing Critical was found. Prod today has one account, so most multi-user findi
   under `handle_path /api/*` in Caddy as the outer guard.
 - **Lane**: new (H1), or B2 since it adds request middleware anyway.
 - **Done (H1)**: `cmd/server/hardening.go`: 1 MiB default, per-route `bodyLimits` (5 MiB weight
-  import), 413 on `Content-Length`; `weight.MaxImportRows` = 10,000; Caddy `request_body max_size
-  6MB` on `/api`.
+  import), 413 on `Content-Length`; 10,000 days per import (`weight.MaxImportRows`); Caddy
+  `request_body max_size 6MB` on `/api`.
 
 ### 9. Medium: frontend storage isn't per-user
 
@@ -327,8 +327,8 @@ Nothing Critical was found. Prod today has one account, so most multi-user findi
   is unused in dev too.
 - **Fix**: default to no extra origins (same-origin only) and drop `ExposeHeaders`.
 - **Lane**: new (H1).
-- **Done (H1)**: no default list; without `CORS_ORIGINS` the CORS middleware isn't installed
-  (same-origin only). `ExposeHeaders` removed.
+- **Done (H1)**: no default list; with `CORS_ORIGINS` unset only same-origin requests pass (other
+  origins get 403). `ExposeHeaders` removed.
 
 ### 19. Low: logs carry search terms and attempted usernames
 

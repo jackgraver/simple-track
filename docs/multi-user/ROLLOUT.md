@@ -132,24 +132,7 @@ Each lane adds what its changes need here (README: "Prod changes go in ROLLOUT.m
   file (3.2), default 365 days; no `.env.vps` change.
 - **H1 (HTTP hardening)**: the backend part (body limits, `Cache-Control: no-store`, no default
   CORS origins) ships in the backend image with 3.3; nothing to configure (`APP_ORIGIN` already
-  sets `CORS_ORIGINS`). The Caddy part (security headers, `request_body max_size 6MB` on `/api`)
-  is `deploy/Caddyfile`, which only the separate `simple-track-caddy` j-cicd project deploys
-  (`.cicd-caddy.yaml`, builds `main`). Deploy it **after 3.4 has passed**, as its own step, so a
-  problem in either deploy is easy to attribute. Neither side depends on the other: the CSP's
-  script hash matches the pre-D1 `index.html` too, so either can be rolled back alone.
-  1. `j-cicd run simple-track-caddy --plan`: the revision must be the same `main` commit 3.3
-     deployed. Then `j-cicd deploy simple-track-caddy --brief`. The agent validates, installs,
-     restarts `caddy.service` (connections drop for a second or two) and checks the site; on a
-     failed check it restores the previous Caddyfile by itself.
-  2. Headers: `curl -sI https://st.jackgraver.ca/ | grep -iE 'content-security|x-frame|nosniff|referrer|permissions|^server'`
-     shows the five headers and no `server:` line. `curl -sI https://st.jackgraver.ca/api/health`
-     (404 for HEAD is fine) carries them too, plus `cache-control: no-store`.
-  3. Body limit: `head -c 7000000 /dev/zero | curl -s -o /dev/null -w '%{http_code}\n' -X POST --data-binary @- https://st.jackgraver.ca/api/health`
-     prints `413` (from Caddy, before auth).
-  4. Open the site on the phone (installed PWA) and a desktop browser with devtools: sign in,
-     visit each module, and check the console has no `Content-Security-Policy` errors.
-  - **If something is blocked**: `j-cicd rollback simple-track-caddy` puts the old Caddyfile
-    back (it has no headers at all), then fix the CSP and redeploy.
+  sets `CORS_ORIGINS`). The Caddy part is a separate deploy **after 3.4**: see 3.5.
 
 <!-- Later lanes: add anything else that must happen in this deploy here. -->
 
@@ -172,6 +155,31 @@ docker compose -f docker-compose.vps.yml --env-file .env.vps logs backend --sinc
 ```
 
 Then sign in on the site and use each module once.
+
+### 3.5 Caddy (lane H1)
+
+`deploy/Caddyfile` now sets the security headers and `request_body max_size 6MB` on `/api`. Only
+the separate `simple-track-caddy` j-cicd project deploys it (`.cicd-caddy.yaml`, builds `main`).
+Do this only once 3.4 has passed, so a problem in either deploy is easy to attribute. Neither
+side depends on the other: the CSP's script hash also matches the pre-D1 `index.html`, so either
+can be rolled back alone.
+
+1. `j-cicd run simple-track-caddy --plan`: the revision must be the `main` commit 3.3 deployed.
+   Then `j-cicd deploy simple-track-caddy --brief`. The agent validates, installs, restarts
+   `caddy.service` (connections drop for a second or two) and checks the site; on a failed
+   check it restores the previous Caddyfile by itself.
+2. Headers: `curl -sI https://st.jackgraver.ca/ | grep -iE 'content-security|x-frame|nosniff|referrer|permissions|^server'`
+   shows the five headers and no `server:` line. `curl -sI https://st.jackgraver.ca/api/health`
+   (404 for HEAD is fine) carries them too, plus `cache-control: no-store`.
+3. Body limit: `head -c 7000000 /dev/zero | curl -s -w ' %{http_code}\n' -X POST --data-binary @- https://st.jackgraver.ca/api/health`
+   prints just ` 413` with an empty body: that's Caddy. A JSON body
+   `{"error":"request body too large"}` means the request reached the backend, so Caddy's limit
+   isn't in effect.
+4. Open the site on the phone (installed PWA) and a desktop browser with devtools: sign in,
+   visit each module, and check the console has no `Content-Security-Policy` errors.
+
+If something is blocked: `j-cicd rollback simple-track-caddy` puts the old Caddyfile back (no
+headers at all), then fix the CSP and redeploy.
 
 ## 4. If it goes wrong
 
