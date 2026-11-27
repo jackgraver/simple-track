@@ -12,6 +12,7 @@
 #   dev api <path> [curl args]   curl the backend, authenticated as the dev user
 #   dev off|on <svc>     disable/enable a service file locally
 #   dev ls               list services and tasks
+#   dev phone [on|off|status]  serve this checkout to a phone at a fixed LAN URL
 #   dev <task> [args]    run a task from dev/tasks (e.g. `dev db:psql`)
 set -euo pipefail
 

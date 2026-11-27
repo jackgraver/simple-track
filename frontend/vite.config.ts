@@ -43,6 +43,8 @@ export default defineConfig(({ mode }) => {
     },
     server: {
       host: true,
+      // `dev phone` serves the app at http://<host>.local:<port> (IP hosts are allowed by default).
+      allowedHosts: ['.local'],
       port: 3000,
       proxy: apiProxy(proxyTarget),
     },
