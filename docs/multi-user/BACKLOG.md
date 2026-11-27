@@ -23,8 +23,8 @@ Nothing Critical was found. Prod today has one account, so most multi-user findi
 |---|---|---|---|
 | 1 | High | Request bodies bind straight into gorm models (mass assignment, nested association writes) | C2 (+B3 rule) |
 | 2 | High | Advisory-lock keys and "exists for date" checks are global, not per user | C2, C3 |
-| 3 | Medium | Anyone can lock the owner out of login, from one IP, indefinitely | C6 |
-| 4 | Medium | IPv6 address rotation defeats per-IP limits and can fill the limiter (global lockout) | C6 |
+| 3 | Medium | Anyone can lock the owner out of login, from one IP, indefinitely | S1: **done** (audit-log part: C6) |
+| 4 | Medium | IPv6 address rotation defeats per-IP limits and can fill the limiter (global lockout) | S1: **done** |
 | 5 | Medium | TMDB API key can leak to users in lookup error messages | S3: **done** |
 | 6 | Medium | Raw internal errors (SQL, constraint names) returned to clients at ~160 sites | C1–C5, B3 (lint) |
 | 7 | Medium | No security headers (CSP, frame-ancestors, nosniff, Referrer-Policy); API has none at all | H1: **done** (Caddy; deploys at D1, ROLLOUT 3.5) |
@@ -39,7 +39,7 @@ Nothing Critical was found. Prod today has one account, so most multi-user findi
 | 16 | Low | `TRUSTED_PROXIES` depends on an unpinned Docker gateway IP; drift merges all clients into one IP | A2: deferred to D1 (needs a network recreate on the VPS) |
 | 17 | Low | API responses carry no `Cache-Control`; personal data may sit in browser/bfcache on shared devices | H1: **done** |
 | 18 | Low | Default CORS list (used when `CORS_ORIGINS` is unset) hard-codes home LAN IPs | H1: **done** |
-| 19 | Low | Request logs include full query strings; login logs record attempted usernames | C6 |
+| 19 | Low | Request logs include full query strings; login logs record attempted usernames | S1: login part **done**; request logs: C6 |
 | 20 | Low | No Go vulnerability scan in CI | B3 |
 | 21 | Info | Dev stack: backend listens on 0.0.0.0, `/benchmark` unauthenticated, dev/dev login on LAN | none |
 | 22 | Info | Postgres `sslmode=disable` inside the compose network | none |
@@ -108,6 +108,9 @@ Nothing Critical was found. Prod today has one account, so most multi-user findi
   a hard block; or exempt clients that hold a valid "known device" cookie set on a previous
   successful login. Log lockouts to `auth_events` (C6) so the admin can see them.
 - **Lane**: C6 (owns login protection per the plan).
+- **Done (S1)**: strict counter per (source, username); the username-wide counter is a
+  serialized backoff instead of a block, and a source that signed in to that username skips it
+  (DECISIONS "S1 login protection"). Logging lockouts to `auth_events` stays with C6.
 
 ### 4. Medium: IPv6 rotation defeats per-IP limits
 
@@ -121,6 +124,9 @@ Nothing Critical was found. Prod today has one account, so most multi-user findi
 - **Fix**: normalize IPv6 clients to their /64 before keying. Evict oldest entries instead of
   rejecting everyone when full, or reject only new unknown keys.
 - **Lane**: C6.
+- **Done (S1)**: IPv6 keyed by /64 (IPv4-mapped treated as IPv4), for the per-IP limit and the
+  spray rule. No more `capacity` rejection: a full limiter (now 100,000 entries) evicts
+  lowest-count, oldest entries, never blocking ones or the current request's keys.
 
 ### 5. Medium: TMDB API key can leak in lookup errors
 
@@ -357,6 +363,8 @@ Nothing Critical was found. Prod today has one account, so most multi-user findi
   log the username only if it exists in `users`, otherwise a hash or `unknown`. `auth_events`
   (C6) should follow the same rule.
 - **Lane**: C6.
+- **Login part done (S1)**: failed-login logs carry the username only if it exists, otherwise
+  `unknown`. Request-log query strings are still open (C6).
 
 ### 20. Low: no Go vulnerability scan
 
