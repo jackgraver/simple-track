@@ -93,7 +93,7 @@ Depends on: none. Files: `auth/controller/login_protection.go` + tests, minimal 
 
 ### S2 Frontend storage per user (`mu/s2-frontend-storage`)
 Depends on: none. Frontend only.
-- [ ] #9 Persisted keys namespaced by user ID; `clearUserStorage()` on logout and on the
+- [x] #9 Persisted keys namespaced by user ID; `clearUserStorage()` on logout and on the
       session-expired/401 path, also clearing the `st_last_route` cookie.
 
 ### S3 Lookup errors (`mu/s3-lookup-errors`)

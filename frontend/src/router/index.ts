@@ -282,6 +282,8 @@ router.beforeEach(async (to, from) => {
     // any standalone launch, whatever path it lands on. The saved route is the
     // last page visited, so this matches what a plain reload would show.
     if (from === START_LOCATION && to.name !== "launch" && isStandalone()) {
+        // The saved route is per user, so who is signed in must be known first.
+        if (authStatus.value === "unknown") await resolveAuthSession();
         const saved = resolveSavedRoute();
         if (saved && saved !== to.fullPath) return saved;
     }

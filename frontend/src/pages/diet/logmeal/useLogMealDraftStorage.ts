@@ -1,6 +1,7 @@
 import type { ComputedRef, Ref } from "vue";
 import { computed } from "vue";
 import { useWebStorageJsonSync } from "~/composables/useWebStorageJsonSync";
+import { userKey } from "~/utils/userStorage";
 import type { Food, Meal, MealItem } from "~/types/diet";
 import { PAGE_MODE, type LogMealPageMode } from "./logmealMode";
 
@@ -159,9 +160,9 @@ export function useLogMealDraftStorage(options: {
             return "";
         }
         if (options.pageMode.value === PAGE_MODE.log) {
-            return "simpletracker:diet:logmeal-draft:v2:log";
+            return userKey("diet:logmeal-draft:v2:log") ?? "";
         }
-        return "simpletracker:diet:logmeal-draft:v2:create";
+        return userKey("diet:logmeal-draft:v2:create") ?? "";
     });
 
     const sync = useWebStorageJsonSync<LogMealDraftSnapshot>({

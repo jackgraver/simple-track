@@ -222,6 +222,9 @@ Nothing Critical was found. Prod today has one account, so most multi-user findi
   cookie. One helper (`clearUserStorage()`) called from logout and the 401 handler.
 - **Lane**: C6 (it owns the frontend auth/account flow); each C lane uses the namespaced helper
   for new storage.
+- **Status (S2)**: done in `frontend/src/utils/userStorage.ts`. New storage uses `userKey(name)`
+  (returns null until the user ID is known); `clearUserStorage()` runs on logout and the 401
+  handler. Device-wide prefs stay global: `st:theme`, `st:chunk-reload-at`, dev-only `tune*`.
 
 ### 10. Medium: tokens without `exp` never expire; 1-year sessions
 
