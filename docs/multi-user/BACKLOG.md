@@ -30,7 +30,7 @@ Nothing Critical was found. Prod today has one account, so most multi-user findi
 | 7 | Medium | No security headers (CSP, frame-ancestors, nosniff, Referrer-Policy); API has none at all | new (H1 headers) |
 | 8 | Medium | No request body size limit outside `/auth` (imports, JSON) | B2 or new (H1) |
 | 9 | Medium | Frontend local storage isn't scoped to the user; logout leaves drafts, timers, last route | C6 (frontend) |
-| 10 | Medium | Tokens without `exp` never expire; 1-year session lifetime | B1: **partly done** (exp/iat/alg enforced; lifetime is the owner's call) |
+| 10 | Medium | Tokens without `exp` never expire; 1-year session lifetime | B1: **done** (exp/iat/alg enforced; 365-day lifetime accepted by owner) |
 | 11 | Low | JWT signature compared with `!=` (not constant-time) | B1: **done** |
 | 12 | Low | `"Invalid token: " + err` echoes verification details | B1: **done** |
 | 13 | Low | CSRF relies on SameSite=Lax only; JSON endpoints accept `text/plain` bodies | B1: **done** (Sec-Fetch-Site) |
@@ -218,8 +218,8 @@ Nothing Critical was found. Prod today has one account, so most multi-user findi
   stolen token dies on its own. Also verify the header's `alg` is `HS256`.
 - **Lane**: B1.
 - **Status (B1)**: `exp`, `iat` and `alg: HS256` are required and `exp - iat` can't exceed
-  `AUTH_COOKIE_MAX_AGE_SEC`. Still open, for the owner: a shorter default lifetime (365 days
-  today) and sliding re-issue. Both change how often family members sign in.
+  `AUTH_COOKIE_MAX_AGE_SEC`. Owner kept the 365-day lifetime (no sliding re-issue); it is set
+  in prod through `AUTH_COOKIE_MAX_AGE_SEC` in `docker-compose.vps.yml`.
 
 ### 11. Low: non-constant-time JWT signature check
 

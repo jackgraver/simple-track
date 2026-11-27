@@ -82,8 +82,8 @@ every other lane, since nothing is reviewed again before the single deploy at D1
   the "Invalid token: " + err echo flagged for A3). Token errors wrap `auth.ErrInvalidToken`;
   anything else (DB down, missing JWT_SECRET) is **503**, so the client can tell an outage from
   a dead session. The frontend doesn't use that yet: `resolveAuthSession` (useAuth.ts) treats
-  any `/auth/me` failure, network errors included, as signed out (pre-existing). Follow-up for
-  C6 (it owns the account UI): keep the session on 5xx/network errors and retry.
+  any `/auth/me` failure, network errors included, as signed out (pre-existing; owner accepted
+  it, see below).
 - **Context from gin**: `router.ContextWithFallback = true` in `cmd/server`, so a context
   derived from a `*gin.Context` still carries the user. Prefer passing `c.Request.Context()`.
 - **Login refuses disabled users** with the same "Invalid username or password" as a wrong
@@ -107,7 +107,7 @@ every other lane, since nothing is reviewed again before the single deploy at D1
 - **A3 backlog items done in B1**: #11 constant-time signature compare, #12 no echoed reasons,
   #10 partly (tokens must carry `exp` and `iat`, `alg` must be HS256, and `exp - iat` must not
   exceed `AUTH_COOKIE_MAX_AGE_SEC`, so lowering that setting also ends older long-lived tokens).
-  The default lifetime (365 days) and sliding re-issue are left for the owner to decide.
+  Lifetime: see the owner's answer below.
 - **CSRF (#13)**: AuthMiddleware refuses POST/PUT/PATCH/DELETE with `Sec-Fetch-Site` other
   than `same-origin` or `none` (403). Chosen over an `Origin` check (would need the public
   origin behind Caddy) and over forcing `Content-Type: application/json` (would break multipart
@@ -115,3 +115,12 @@ every other lane, since nothing is reviewed again before the single deploy at D1
   phone proxy). Requests without the header (curl, `dev api`, Playwright's API client, very old
   browsers) fall back to SameSite=Lax. `/auth/login` and `/auth/logout` aren't behind the
   middleware and aren't covered.
+
+## 2026-11-27: B1 review answers (owner)
+
+- **Session lifetime stays 365 days**, no sliding re-issue. It must be easy to change:
+  `AUTH_COOKIE_MAX_AGE_SEC` (seconds) is passed through `docker-compose.vps.yml` with a
+  365-day default. Lowering it ends existing sessions issued for longer (the token's
+  `exp - iat` is checked against the current setting), so no stale long sessions survive.
+- **DB outage signing people out is accepted** for now (frontend treats a failed `/auth/me` as
+  signed out). Nice-to-have, unscheduled: keep the session and retry on 5xx/network errors.
