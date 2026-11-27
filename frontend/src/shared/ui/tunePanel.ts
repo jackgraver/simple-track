@@ -8,8 +8,16 @@ const store = globalThis as { __tunePane?: Pane; __tuneCollapsed?: Set<string> }
 const collapsed = (store.__tuneCollapsed ??= new Set<string>());
 const PANE = "\u0000pane";
 
+// Slider steps add floating-point noise (0.09999999999999999): round to the knob's step.
+function round(g: TuneGroup, key: string, v: number): number {
+    const decimals = (String(g.knobs[key]?.step ?? 1).split(".")[1] ?? "").length;
+    return Number(v.toFixed(decimals));
+}
+
 function format(groups: TuneGroup[]): string {
-    return groups.map((g) => `${g.name}: ${Object.entries(g.values).map(([k, v]) => `${k} ${v}`).join(", ")}`).join("\n");
+    return groups
+        .map((g) => `${g.name}: ${Object.entries(g.values).map(([k, v]) => `${k} ${round(g, k, v)}`).join(", ")}`)
+        .join("\n");
 }
 
 /** A "Copy values" button: copies `groups()` (logged too, in case the clipboard is blocked). */

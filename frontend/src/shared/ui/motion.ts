@@ -59,7 +59,7 @@ export const drawerSpring = (velocity = 0): Transition => spring(drawer.duration
 /** Sliding highlight (desktop nav): how fast the hover and active pills move, and the press shrink. */
 export const highlight = tunable("Nav highlight", {
     duration: {
-        value: 0.15, min: 0.05, max: 0.6, step: 0.01,
+        value: 0.1, min: 0.05, max: 0.6, step: 0.01,
         hint: "Roughly how long the hover highlight and the current-page highlight take to slide to another row, in seconds.",
     },
     pressScale: {

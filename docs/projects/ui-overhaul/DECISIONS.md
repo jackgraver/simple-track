@@ -220,6 +220,6 @@ production build contains none of it (checked by grepping `dist/`).
   (fling above 400px/s, else open past half), and a panel still sliding can be caught.
 - Nav rows no longer paint their own hover/active background: `SlidingHighlight` draws a hover
   pill (`surface-2`, was `surface-3`, so hover and current read apart) and an active pill
-  (`surface-3`) that slide between rows in 150ms, and a mouse press shrinks the row to 0.97.
+  (`surface-3`) that slide between rows in 100ms (owner-tuned), and a mouse press shrinks the row to 0.97.
   Owner asked for "snappy"; 0.97 rather than 0.9 because a full-width row shrinking 10% reads as a
   jump. Both are tunable with `?tune`.
