@@ -1,24 +1,27 @@
 <script setup lang="ts">
 import { useRoute } from "vue-router";
+import { SlidingHighlight } from "~/shared/ui";
 import NavLink from "./NavLink.vue";
 import { isItemActive, itemLocation, navGroups } from "./nav";
 
 // The group/sub-page tree shared by the desktop sidebar and the mobile drawer.
-// Rows are touch-sized below lg and compact from lg.
+// Rows are touch-sized below lg and compact from lg. Hover and active backgrounds are drawn by
+// SlidingHighlight (they slide between rows), so rows only set their text colour.
 const route = useRoute();
 </script>
 
 <template>
-    <nav aria-label="Main">
+    <SlidingHighlight as="nav" aria-label="Main">
         <section v-for="group in navGroups" :key="group.key" class="mb-4">
             <!-- The header links to the group's home (its first item). -->
             <NavLink
                 :to="itemLocation(group.items[0]!, route)"
-                class="flex min-h-touch items-center gap-2 rounded-control px-2 py-1.5 text-xs font-semibold tracking-wide uppercase lg:min-h-0"
+                data-highlight
+                class="relative flex min-h-touch items-center gap-2 rounded-control px-2 py-1.5 text-xs font-semibold tracking-wide uppercase lg:min-h-0"
                 :class="
                     isItemActive(group.items[0]!, route)
-                        ? 'bg-surface-3 text-fg'
-                        : 'text-fg-muted hover:bg-surface-3 hover:text-fg'
+                        ? 'text-fg'
+                        : 'text-fg-muted hover:text-fg'
                 "
                 :aria-current="isItemActive(group.items[0]!, route) ? 'page' : undefined"
             >
@@ -29,11 +32,12 @@ const route = useRoute();
                 <li v-for="item in group.items.slice(1)" :key="item.to">
                     <NavLink
                         :to="itemLocation(item, route)"
-                        class="flex min-h-touch items-center rounded-control px-2 py-1.5 pl-7.5 text-base lg:block lg:min-h-0 lg:text-sm"
+                        data-highlight
+                        class="relative flex min-h-touch items-center rounded-control px-2 py-1.5 pl-7.5 text-base lg:block lg:min-h-0 lg:text-sm"
                         :class="
                             isItemActive(item, route)
-                                ? 'bg-surface-3 font-medium text-fg'
-                                : 'text-fg-muted hover:bg-surface-3 hover:text-fg'
+                                ? 'font-medium text-fg'
+                                : 'text-fg-muted hover:text-fg'
                         "
                         :aria-current="isItemActive(item, route) ? 'page' : undefined"
                         >{{ item.label }}</NavLink
@@ -41,5 +45,5 @@ const route = useRoute();
                 </li>
             </ul>
         </section>
-    </nav>
+    </SlidingHighlight>
 </template>

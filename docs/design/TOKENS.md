@@ -110,9 +110,15 @@ Durations come from bare utilities: `duration-100` (hover, press), `duration-150
 change, default), `duration-250` (enter and exit). Easing: `ease-out` to enter, `ease-in` to
 exit (Tailwind defaults). CSS vars `--duration-fast|base|slow` exist for `<Transition>` CSS
 inside primitives. A global reduced-motion rule clamps all transitions and animations.
-Carousel slides (the gym week strip) use `duration-350 ease-out` on both the incoming and outgoing
-panel, so the two move as one row: a full-width move reads as rushed at 250.
-Overlay animations are tokens in `style.css` (`animate-overlay-in/out`, `animate-sheet-in/out`; centred dialogs and their backdrop are deliberately instant: enter 250ms ease-out, exit 150ms ease-in). Reka waits for the exit animation before unmounting, so overlays use keyframes, not transitions.
+JS motion (motion-v, inside `shared/ui/` only) takes its values from `shared/ui/motion.ts`: springs
+with `bounce: 0` (they settle like ease-out and keep a swipe's velocity), sized by `visualDuration`.
+`carouselSpring` (0.35s) drives `WeekCarousel`: a full-width move reads as rushed at 250ms.
+Values in `motion.ts` are declared with `tunable(...)`: in `npm run dev`, add `?tune` to any URL
+for live sliders (Tweakpane; `?tune=0` hides it), feel the motion, then "Copy values" and make them
+the new defaults. Production gets the plain defaults and no Tweakpane (`shared/ui/tune.ts`).
+`<MotionConfig reduced-motion="user">` in `App.vue` applies the OS setting to JS motion, which the
+CSS reduced-motion rule doesn't reach.
+Overlay animations are tokens in `style.css` (`animate-overlay-in/out`, `animate-sheet-in/out`; centred dialogs and their backdrop are deliberately instant: enter 250ms ease-out, exit 150ms ease-in). Reka waits for the exit animation before unmounting, so overlays use keyframes, not transitions. The nav `Drawer` is the exception: a motion-v spring (`drawerSpring`), so a swipe's speed carries into it and it can be caught mid-slide.
 
 ### z-index (semantic utilities, nothing else)
 | Utility | Value | Layer |

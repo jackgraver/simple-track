@@ -53,6 +53,9 @@ Shared conventions:
 | `Select` | **native `<select>`** | The OS picker wins on mobile. Reka `Select` only if a module needs custom option rendering |
 | `Button`, `IconButton`, `Spinner`, `Field`, `Input`, `Textarea`, `Card`, `Badge`, `List`/`ListRow`, `EmptyState`, `ErrorState`, `Skeleton`, `PageHeader`, `Section` | **ours** | Plain Vue + Tailwind tokens |
 | `Chart` | **ours** | chart.js directly (PrimeVue chart is dropped) |
+| `WeekCarousel` | **motion-v** | Slide, swipe and the gliding outline. motion-v is imported only in `shared/ui/` (lint), like Reka |
+| `Drawer` | Reka `Dialog*` + **motion-v** | Reka for focus/Esc/scroll lock; the slide is a spring driven by a `SlideOver` (`createSlideOver`) |
+| `SlidingHighlight` | **motion-v** | Hover and active pills that slide between nav rows, plus the press shrink |
 
 ---
 
@@ -250,6 +253,35 @@ theme). Callers pass `type`, `data`, `options` and an accessible `label`.
   otherwise a text-free gradient disc (`avatar-a` → `avatar-b`) with a white highlight and inner
   ring. Decorative (aria-hidden) by default because the name sits beside it; pass
   `:decorative="false"` when it stands alone.
+
+## WeekCarousel
+- `<WeekCarousel :days :prev-days :next-days :label @prev @next>` with a `#day="{ day }"` slot per
+  tile. Each week is seven `{ key: "YYYY-MM-DD", isSelected }` (Sunday first; the key orders weeks).
+- A carousel track: the neighbour weeks sit just past either edge, so a swipe drags real days into
+  view and a week change slides the row as one. Pass neighbours with `isSelected: false`, built
+  without fetching (gym: cached program + activity; diet: dates only, numbers fill in on arrival).
+- One selected-day outline rides along while dragging, then glides to its column, also across a
+  week change. Swiping emits `prev`/`next` (far or fast enough, see `shared/ui/motion.ts`); a swipe
+  never selects a day.
+- Tiles draw no selected state of their own: a transparent border, `rounded-control`, a hover fill.
+- Pages decide where a week lands (`weekLandingOffset`: Sunday, or today for the current week) and
+  keep the carousel mounted while a new week loads (data fills in, no skeleton swap).
+- Used by the gym and diet week strips.
+
+## Drawer (mobile nav)
+- `<Drawer :panel title>` where `panel = createSlideOver(widthFn)` (one per drawer, usually module
+  level). `panel.open` is the state (set it, or `settle(open, velocity)`); a gesture calls
+  `panel.follow(px)` while a finger is down and `settle` on release, so the spring starts from the
+  finger and carries its speed. A sliding panel can be caught mid-way. Stays mounted (and modal)
+  until it is off screen. Tunable as "Nav drawer" (`?tune`).
+- The edge swipe lives in `shared/nav/mobile/useDrawerGesture.ts` (it needs the whole screen).
+
+## SlidingHighlight
+- `<SlidingHighlight as="nav">` around a list whose rows carry `data-highlight` and `relative` and
+  no background. It draws the hover pill (`surface-2`, mouse only, slides between rows, fades when
+  the pointer leaves) and the active pill (`surface-3`, on the row matching `active`, default
+  `[aria-current="page"]`, slides when it moves). A mouse press shrinks the row and its pills a
+  touch. Tunable as "Nav highlight" (`?tune`). Used by the nav tree (sidebar and drawer).
 
 ## Patterns without a primitive
 - **Radio cards / ratings / day pickers:** a `<fieldset>` of styled `<label>`s around `sr-only`

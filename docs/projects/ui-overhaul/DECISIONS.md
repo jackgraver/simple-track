@@ -200,3 +200,26 @@ Worked out with the owner. Per exercise (Edit dialog toggle, `exercises.unilater
 - `/gym` drops the global date bar (`meta.dated`) and the desktop "Gym" title bar; the week strip is the day picker, 40px (`lg:mt-10`) from the top on desktop. Gym sub-pages that read a day (weight, steps, cardio, mobility) set `dated: true` themselves.
 - Week arrows land on Sunday of the new week (today when it's the current week). The weeks slide as one continuous row (`duration-350`, picked by the owner from 250-800 with a debug picker), and one selected-day outline outside the sliding weeks glides to the new column over the same 350ms.
 - The Today card trails the strip: it keeps the shown day until the picked day has loaded (`ensureQueryData`), so it never empties mid-switch (that flashed and shifted the page).
+
+## 2026-11-26: motion-v for gesture and layout motion; WeekCarousel primitive
+- Added **motion-v** (Motion for Vue) for motion CSS can't do well: swipes that follow the finger and keep their velocity, enter/exit of keyed elements, measured outlines. CSS stays the default for hover, press, fades and overlays. Lint keeps `motion-v` imports inside `shared/ui/` (like Reka); values live in `shared/ui/motion.ts`; `MotionConfig reduced-motion="user"` at the app root.
+- First user: `WeekCarousel` (gym + diet week strips). It replaces #90's hand-written transition and `calc()` outline: the outline is measured from the selected tile, the weeks can be swiped, and a new week starts right behind wherever the old one is (after a swipe or quick taps), so the row stays continuous.
+- Diet's week strip no longer swaps to a skeleton while a new week loads (that unmounted the carousel mid-slide); only the first load shows one, and calorie bars fill in with a width transition.
+- Both strips land on Sunday of the new week (today for the current week) via `weekLandingOffset`.
+
+## 2026-11-26: live motion tuning with `?tune` (dev only)
+Motion numbers in `shared/ui/motion.ts` are declared with `tunable(...)`. Under `npm run dev`, `?tune`
+opens a Tweakpane panel whose sliders change the values the page reads, so the owner can feel a
+setting and hand back final numbers ("Copy values") instead of asking for one build per value.
+Tweakpane is a devDependency, loaded by a dynamic import behind `import.meta.env.DEV`; the
+production build contains none of it (checked by grepping `dist/`).
+
+## 2026-11-26: nav drawer on springs, sliding nav highlight
+- The mobile nav drawer's slide is a motion-v spring from wherever the panel is (`createSlideOver`),
+  replacing the CSS keyframes (`animate-drawer-in/out`, removed). A released swipe carries its speed
+  (fling above 400px/s, else open past half), and a panel still sliding can be caught.
+- Nav rows no longer paint their own hover/active background: `SlidingHighlight` draws a hover
+  pill (`surface-2`, was `surface-3`, so hover and current read apart) and an active pill
+  (`surface-3`) that slide between rows in 100ms (owner-tuned), and a mouse press shrinks the row to 0.97.
+  Owner asked for "snappy"; 0.97 rather than 0.9 because a full-width row shrinking 10% reads as a
+  jump. Both are tunable with `?tune`.
