@@ -136,6 +136,9 @@ Each lane adds what its changes need here (README: "Prod changes go in ROLLOUT.m
 
 - **B2 (per-request DB handle)**: nothing to do. In 3.4, also check the backend log has no
   `database: commit` or `database: rollback` errors (a failed commit answers 500).
+- **S2 (frontend storage)**: nothing to configure. On first load after the deploy each browser
+  drops its old un-namespaced drafts, rest timer and resume route (ownership unknown), so a
+  half-written draft or an in-progress rest timer is lost once.
 
 <!-- Later lanes: add anything else that must happen in this deploy here. -->
 

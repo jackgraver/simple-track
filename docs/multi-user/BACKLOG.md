@@ -29,7 +29,7 @@ Nothing Critical was found. Prod today has one account, so most multi-user findi
 | 6 | Medium | Raw internal errors (SQL, constraint names) returned to clients at ~160 sites | C1–C5, B3 (lint) |
 | 7 | Medium | No security headers (CSP, frame-ancestors, nosniff, Referrer-Policy); API has none at all | H1: **done** (Caddy; deploys at D1, ROLLOUT 3.5) |
 | 8 | Medium | No request body size limit outside `/auth` (imports, JSON) | H1: **done** (1 MiB default, 5 MiB + 10k rows on import; Caddy 6MB) |
-| 9 | Medium | Frontend local storage isn't scoped to the user; logout leaves drafts, timers, last route | C6 (frontend) |
+| 9 | Medium | Frontend local storage isn't scoped to the user; logout leaves drafts, timers, last route | S2: **done** |
 | 10 | Medium | Tokens without `exp` never expire; 1-year session lifetime | B1: **done** (exp/iat/alg enforced; 365-day lifetime accepted by owner) |
 | 11 | Low | JWT signature compared with `!=` (not constant-time) | B1: **done** |
 | 12 | Low | `"Invalid token: " + err` echoes verification details | B1: **done** |
@@ -222,6 +222,13 @@ Nothing Critical was found. Prod today has one account, so most multi-user findi
   cookie. One helper (`clearUserStorage()`) called from logout and the 401 handler.
 - **Lane**: C6 (it owns the frontend auth/account flow); each C lane uses the namespaced helper
   for new storage.
+- **Status (S2)**: done in `frontend/src/utils/userStorage.ts`. New storage uses `userKey(name)`
+  (returns null until the user ID is known); `clearUserStorage()` runs on logout and the 401
+  handler. Device-wide prefs stay global: `st:theme`, `st:chunk-reload-at`, dev-only `tune*`.
+  A different user signing in clears the previous owner's keys (`st:owner`) before anything is
+  read. A cold start whose `/auth/me` is 401 leaves the keys on disk but unreadable until the
+  next sign-in (same user: kept; different user: cleared). Checked in a browser: login
+  namespaces keys, in-app 401 clears them and the cookie.
 
 ### 10. Medium: tokens without `exp` never expire; 1-year sessions
 

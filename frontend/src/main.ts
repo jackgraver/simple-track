@@ -8,6 +8,7 @@ import { setUnauthorizedRedirect } from './composables/auth/session'
 import { resolveAuthSession } from './composables/auth/useAuth'
 import { queryClient } from './api/queryClient'
 import { initTheme } from './composables/useTheme'
+import { clearUserStorage } from './utils/userStorage'
 
 // After a deploy, a tab still running the previous build asks for chunks
 // that no longer exist. Reload once to pick up the new build instead of
@@ -30,6 +31,7 @@ window.addEventListener('vite:preloadError', (event) => {
 setUnauthorizedRedirect(() => {
   // Session expired: drop the previous user's cached data before the sign-in page.
   queryClient.clear()
+  clearUserStorage()
   if (router.currentRoute.value.name === 'signin') return
   void router.push({
     name: 'signin',

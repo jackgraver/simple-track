@@ -1,12 +1,20 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { isExpiredLoggingResume, LAST_ROUTE_MAX_AGE_MS, LOGGING_RESUME_WINDOW_MS, loadLastRoute, saveLastRoute } from "./lastRoute";
+import { clearUserStorage, setUserStorageOwner, userKey } from "./userStorage";
 
 const store = new Map<string, string>();
-vi.stubGlobal("localStorage", {
+const fakeStorage = {
     getItem: (k: string) => store.get(k) ?? null,
     setItem: (k: string, v: string) => void store.set(k, v),
+    removeItem: (k: string) => void store.delete(k),
+    key: (i: number) => [...store.keys()][i] ?? null,
+    get length() {
+        return store.size;
+    },
     clear: () => store.clear(),
-});
+};
+vi.stubGlobal("localStorage", fakeStorage);
+vi.stubGlobal("window", { localStorage: fakeStorage, sessionStorage: { ...fakeStorage, getItem: () => null, key: () => null, length: 0 } });
 
 let cookie = "";
 vi.stubGlobal("document", {
@@ -23,6 +31,24 @@ describe("lastRoute", () => {
     beforeEach(() => {
         store.clear();
         cookie = "";
+        clearUserStorage();
+        setUserStorageOwner(1);
+    });
+
+    it("ignores another user's route, in storage and in the cookie", () => {
+        saveLastRoute("/finances", 1000);
+        setUserStorageOwner(2);
+        expect(loadLastRoute(2000)).toBeNull();
+    });
+
+    it("returns nothing and saves nothing before the user is known", () => {
+        saveLastRoute("/finances", 1000);
+        clearUserStorage();
+        expect(loadLastRoute(2000)).toBeNull();
+        cookie = "";
+        saveLastRoute("/diet", 1000);
+        expect(store.size).toBe(0);
+        expect(cookie).toBe("");
     });
 
     it("falls back to the cookie when localStorage is empty", () => {
@@ -41,9 +67,10 @@ describe("lastRoute", () => {
         expect(loadLastRoute(LAST_ROUTE_MAX_AGE_MS)?.path).toBe("/diet");
     });
     it("rejects garbage and protocol-relative paths", () => {
-        localStorage.setItem("st:last-route", "nope");
+        const key = userKey("last-route") ?? "";
+        localStorage.setItem(key, "nope");
         expect(loadLastRoute()).toBeNull();
-        localStorage.setItem("st:last-route", JSON.stringify({ path: "//evil.com", at: Date.now() }));
+        localStorage.setItem(key, JSON.stringify({ path: "//evil.com", at: Date.now(), u: 1 }));
         expect(loadLastRoute()).toBeNull();
     });
 

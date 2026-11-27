@@ -10,6 +10,7 @@ import {
     setEnvironment,
     username,
 } from "~/composables/auth/session";
+import { clearUserStorage } from "~/utils/userStorage";
 
 interface AuthResponse {
     username?: string;
@@ -34,7 +35,7 @@ export async function resolveAuthSession(): Promise<void> {
                 setEnvironment(data.environment);
                 const name = data.username ?? data.user?.username;
                 if (name) {
-                    markAuthenticated(name);
+                    markAuthenticated(name, data.user?.ID);
                 } else {
                     markUnauthorized();
                 }
@@ -59,7 +60,7 @@ export function useAuth() {
             const name = response.data.username ?? response.data.user?.username;
             if (name) {
                 setEnvironment(response.data.environment);
-                markAuthenticated(name);
+                markAuthenticated(name, response.data.user?.ID);
             } else {
                 throw new Error("No user in login response");
             }
@@ -79,7 +80,7 @@ export function useAuth() {
             const name = response.data.username ?? response.data.user?.username;
             if (name) {
                 setEnvironment(response.data.environment);
-                markAuthenticated(name);
+                markAuthenticated(name, response.data.user?.ID);
             } else {
                 throw new Error("No user in registration response");
             }
@@ -98,6 +99,7 @@ export function useAuth() {
             return false;
         } finally {
             queryClient.clear();
+            clearUserStorage();
             markUnauthorized();
             void router.push({ name: "signin" });
         }
