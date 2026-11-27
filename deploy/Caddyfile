@@ -10,7 +10,7 @@ st.jackgraver.ca {
 		Content-Security-Policy "default-src 'self'; script-src 'self' 'sha256-44qDB288fdEkKLtlUj7HtSeCbmOHXAR1iVNTw6jxh/0='; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
 		X-Content-Type-Options "nosniff"
 		X-Frame-Options "DENY"
-		# Not no-referrer: that makes browsers send "Origin: null" on same-origin POSTs.
+		# Nothing leaves the site (e.g. the /setup/<token> URL); full referrer within it.
 		Referrer-Policy "same-origin"
 		Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(), usb=()"
 		-Server

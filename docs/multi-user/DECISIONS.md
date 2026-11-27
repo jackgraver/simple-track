@@ -217,9 +217,11 @@ until C5 decides on #15); `font-src 'self' data:`; `object-src 'none'`; `base-ur
 Lanes adding an external fetch, iframe, worker or inline script must extend it, and check the
 console on a local prod copy (ARCHITECTURE.md "Caddy").
 
-**`Referrer-Policy: same-origin`**, not `no-referrer`: under `no-referrer` browsers send
-`Origin: null` on same-origin POSTs and the CORS middleware answers 403. `same-origin` still
-keeps C6's `/setup/<token>` URL from leaking to other sites.
+**`Referrer-Policy: same-origin`**: keeps C6's `/setup/<token>` URL (and every other path) from
+reaching other sites, and costs nothing, since the SPA and API share one origin. `no-referrer`
+would also work: tested in Chromium, it changes `Origin` to `null` only on native form POSTs,
+not on `fetch`/XHR, and every form in the app uses `@submit.prevent` + axios. A native form POST
+under `no-referrer` would get 403 from the CORS middleware, so check that before tightening it.
 
 **Body limits** (`backend/cmd/server/hardening.go`, kept out of the request middleware B2
 rewrites): one global middleware, first in the chain, with a 1 MiB default and per-route

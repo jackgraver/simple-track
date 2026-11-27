@@ -70,8 +70,10 @@ pre-H1 file (no `header` or `request_body`).
     `data:` for Vite-inlined fonts. `frame-ancestors 'none'`.
   - `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Permissions-Policy` denying
     camera, microphone, geolocation, payment and USB, and `-Server` (no version banner).
-  - `Referrer-Policy: same-origin`, not `no-referrer`: with `no-referrer`, browsers send
-    `Origin: null` on same-origin POSTs, which the backend's CORS middleware rejects.
+  - `Referrer-Policy: same-origin`: no referrer to other sites (so C6's `/setup/<token>` URL
+    can't leak), the full one within the site. If this is ever tightened to `no-referrer`, note
+    that browsers then send `Origin: null` on native form POSTs (not on `fetch`/XHR), which the
+    backend's CORS middleware rejects with 403. The SPA submits every form through axios today.
 - **Request body limit:** `request_body max_size 6MB` on `/api` is the outer guard. The backend
   enforces the real per-route limits (below) and Caddy's must stay at or above the largest.
 

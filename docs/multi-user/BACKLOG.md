@@ -174,8 +174,7 @@ Nothing Critical was found. Prod today has one account, so most multi-user findi
   time; must land before C6's setup page ships).
 - **Done (H1)**: `deploy/Caddyfile` sets CSP (inline theme script by hash,
   `frontend/src/csp.test.ts` keeps them in sync), `X-Frame-Options`, nosniff, `Referrer-Policy:
-  same-origin` (not `no-referrer`, which sends `Origin: null` on same-origin POSTs),
-  `Permissions-Policy`, `-Server`. Checked on a local prod copy: no CSP violations on any page.
+  same-origin`, `Permissions-Policy`, `-Server`. Checked on a local prod copy: no CSP violations on any page.
   Reaches prod via the Caddy j-cicd project at D1, after the app (ROLLOUT 3.5).
 
 ### 8. Medium: no request body size limit outside `/auth`
