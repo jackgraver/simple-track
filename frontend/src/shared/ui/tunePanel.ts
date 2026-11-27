@@ -1,6 +1,6 @@
 // The Tweakpane panel behind `?tune` (see tune.ts). Only ever loaded by a dynamic import in dev.
-import { Pane } from "tweakpane";
-import { saveTuning, tuneGroups } from "./tune";
+import { Pane, type FolderApi } from "tweakpane";
+import { saveTuning, tuneGroups, type TuneGroup } from "./tune";
 
 // One panel per page, whatever hot reloads do: the live one is kept on globalThis and replaced on
 // each render, which rebuilds it from every registered group (one folder each).
@@ -8,10 +8,22 @@ const store = globalThis as { __tunePane?: Pane; __tuneCollapsed?: Set<string> }
 const collapsed = (store.__tuneCollapsed ??= new Set<string>());
 const PANE = "\u0000pane";
 
-function format(): string {
-    return tuneGroups()
-        .map((g) => `${g.name}: ${Object.entries(g.values).map(([k, v]) => `${k} ${v}`).join(", ")}`)
-        .join("\n");
+function format(groups: TuneGroup[]): string {
+    return groups.map((g) => `${g.name}: ${Object.entries(g.values).map(([k, v]) => `${k} ${v}`).join(", ")}`).join("\n");
+}
+
+/** A "Copy values" button: copies `groups()` (logged too, in case the clipboard is blocked). */
+function addCopyButton(container: Pane | FolderApi, label: string, groups: () => TuneGroup[]) {
+    const button = container.addButton({ title: label });
+    button.on("click", () => {
+        const text = format(groups());
+        console.info(`[tune]\n${text}`);
+        void navigator.clipboard.writeText(text).then(
+            () => (button.title = "Copied"),
+            () => (button.title = "Copy failed (values in console)"),
+        );
+        setTimeout(() => (button.title = label), 1500);
+    });
 }
 
 // Hover a row to see what its knob changes. One tooltip element, beside the panel (left of the
@@ -52,15 +64,7 @@ export function render(): void {
     pane.on("fold", (e) => (e.expanded ? collapsed.delete(PANE) : collapsed.add(PANE)));
     pane.on("change", saveTuning);
 
-    const copy = pane.addButton({ title: "Copy values" });
-    copy.on("click", () => {
-        console.info(`[tune]\n${format()}`);
-        void navigator.clipboard.writeText(format()).then(
-            () => (copy.title = "Copied"),
-            () => (copy.title = "Copy failed (values in console)"),
-        );
-        setTimeout(() => (copy.title = "Copy values"), 1500);
-    });
+    addCopyButton(pane, "Copy all values", tuneGroups);
 
     for (const group of tuneGroups()) {
         const folder = pane.addFolder({ title: group.name, expanded: !collapsed.has(group.name) });
@@ -69,6 +73,7 @@ export function render(): void {
             const binding = folder.addBinding(group.values, key, { min: knob.min, max: knob.max, step: knob.step });
             attachHint(binding.element, knob.hint);
         }
+        addCopyButton(folder, "Copy values", () => [group]);
         folder.addButton({ title: "Reset to code defaults" }).on("click", () => {
             for (const [key, knob] of Object.entries(group.knobs)) group.values[key] = knob.value;
             folder.refresh();
