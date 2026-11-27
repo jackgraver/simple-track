@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"math/rand/v2"
 	"net/url"
-	"os"
 	"sync"
 	"testing"
 	"time"
@@ -16,6 +15,7 @@ import (
 	workoutrepo "be-simpletracker/internal/core/workout/repository"
 	"be-simpletracker/internal/core/workout/services"
 	"be-simpletracker/internal/database"
+	"be-simpletracker/internal/database/pgtest"
 	"be-simpletracker/internal/migrate"
 	"be-simpletracker/migrations"
 
@@ -29,18 +29,9 @@ import (
 // URL and a *sql.DB. Same convention as internal/migrate's tests.
 func pgTestDB(t *testing.T) (string, *sql.DB) {
 	t.Helper()
-	admin := os.Getenv("TEST_DATABASE_URL")
-	if admin == "" {
-		t.Skip("TEST_DATABASE_URL not set")
-	}
-	adminDB, err := sql.Open("pgx", admin)
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { adminDB.Close() })
-	if err := adminDB.Ping(); err != nil {
-		t.Skipf("TEST_DATABASE_URL unreachable: %v", err)
-	}
+	// Skipped without Postgres, or fails when TEST_DATABASE_REQUIRED is set (CI).
+	adminDB, adminURL := pgtest.Admin(t)
+	admin := adminURL.String()
 	name := fmt.Sprintf("workout_sets_test_%d", rand.Uint32())
 	if _, err := adminDB.Exec("CREATE DATABASE " + name); err != nil {
 		t.Fatal(err)

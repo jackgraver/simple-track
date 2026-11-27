@@ -6,6 +6,7 @@ import (
 	"strconv"
 
 	"be-simpletracker/internal/core/tracking/common"
+	"be-simpletracker/internal/utils/apierr"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -69,7 +70,12 @@ func (h *handler) postWater(c *gin.Context) {
 	}
 	row, err := CreateWaterLog(c.Request.Context(), date, body.AmountOz, body.PresetID, body.ClientID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		// Someone else's preset is ErrPresetNotFound, like a missing one.
+		if errors.Is(err, ErrPresetNotFound) || errors.Is(err, ErrAmountNotPositive) {
+			apierr.BadRequest(c, err.Error())
+			return
+		}
+		apierr.Internal(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"log": row})
@@ -99,10 +105,14 @@ func (h *handler) deleteWater(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"ok": true})
 }
 
+// Preset handlers are the reference for owned endpoints: client errors are 400 with their own
+// message, a missing or someone else's preset is the same 404, anything else a logged 500 with a
+// fixed message (apierr), never the database's text.
+
 func (h *handler) getPresets(c *gin.Context) {
 	rows, err := ListDrinkSizePresets(c.Request.Context())
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		apierr.Internal(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"presets": rows})
@@ -113,15 +123,24 @@ type presetBody struct {
 	AmountOz float64 `json:"amount_oz"`
 }
 
+// presetError answers an error from the preset service.
+func presetError(c *gin.Context, err error) {
+	if errors.Is(err, ErrPresetNameRequired) || errors.Is(err, ErrAmountNotPositive) {
+		apierr.BadRequest(c, err.Error())
+		return
+	}
+	apierr.NotFoundOrInternal(c, err)
+}
+
 func (h *handler) postPreset(c *gin.Context) {
 	var body presetBody
 	if err := c.ShouldBindJSON(&body); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		apierr.BadRequest(c, "invalid body")
 		return
 	}
 	row, err := CreateDrinkSizePreset(c.Request.Context(), body.Name, body.AmountOz)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		presetError(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"preset": row})
@@ -130,21 +149,17 @@ func (h *handler) postPreset(c *gin.Context) {
 func (h *handler) putPreset(c *gin.Context) {
 	id64, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		apierr.BadRequest(c, "invalid id")
 		return
 	}
 	var body presetBody
 	if err := c.ShouldBindJSON(&body); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		apierr.BadRequest(c, "invalid body")
 		return
 	}
 	row, err := UpdateDrinkSizePreset(c.Request.Context(), uint(id64), body.Name, body.AmountOz)
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
-			return
-		}
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		presetError(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"preset": row})
@@ -153,16 +168,11 @@ func (h *handler) putPreset(c *gin.Context) {
 func (h *handler) deletePreset(c *gin.Context) {
 	id64, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		apierr.BadRequest(c, "invalid id")
 		return
 	}
-	err = DeleteDrinkSizePreset(c.Request.Context(), uint(id64))
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
-			return
-		}
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+	if err := DeleteDrinkSizePreset(c.Request.Context(), uint(id64)); err != nil {
+		presetError(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"ok": true})

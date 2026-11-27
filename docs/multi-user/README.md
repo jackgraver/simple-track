@@ -233,3 +233,10 @@ a nullable `group_id` on tables that should be shareable, and the rule becomes
   block returns.
 - **`dev test` points `TEST_DATABASE_URL` at the owner** (`DATABASE_OWNER_URL`), since the app role
   can't create databases.
+- **FK checks bypass RLS** (B3). A plain `REFERENCES parent (id)` accepts another user's parent
+  ID. Children and anything pointing at an owned row use a composite FK on `(id, user_id)`.
+- **gorm soft delete is an UPDATE** (B3), so catalog "only admin deletes" needs the
+  `catalog_guard` trigger, not just a DELETE policy.
+- **Scopes don't reach preloads** (B3): `Preload("X", database.Owned(ctx))`. RLS hides the rest.
+- **Postgres tests skip without `TEST_DATABASE_URL`** but fail with `TEST_DATABASE_REQUIRED=1`
+  (CI). New Postgres tests use `internal/database/pgtest` or `twousers`, never their own skip.

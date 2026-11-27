@@ -1,17 +1,16 @@
 package auth
 
 import (
-	"database/sql"
 	"fmt"
 	"math/rand/v2"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
-	"os"
 	"testing"
 
 	"be-simpletracker/internal/core/auth/models"
 	"be-simpletracker/internal/database"
+	"be-simpletracker/internal/database/pgtest"
 
 	"github.com/gin-gonic/gin"
 	_ "github.com/jackc/pgx/v5/stdlib"
@@ -23,18 +22,9 @@ import (
 // pgUsers is a fresh Postgres database with a users table (TEST_DATABASE_URL; skipped without).
 func pgUsers(t *testing.T) *gorm.DB {
 	t.Helper()
-	admin := os.Getenv("TEST_DATABASE_URL")
-	if admin == "" {
-		t.Skip("TEST_DATABASE_URL not set")
-	}
-	adminDB, err := sql.Open("pgx", admin)
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { adminDB.Close() })
-	if err := adminDB.Ping(); err != nil {
-		t.Skipf("TEST_DATABASE_URL unreachable: %v", err)
-	}
+	// Skipped without Postgres, or fails when TEST_DATABASE_REQUIRED is set (CI).
+	adminDB, adminURL := pgtest.Admin(t)
+	admin := adminURL.String()
 	name := fmt.Sprintf("auth_test_%d", rand.Uint32())
 	if _, err := adminDB.Exec("CREATE DATABASE " + name); err != nil {
 		t.Fatal(err)

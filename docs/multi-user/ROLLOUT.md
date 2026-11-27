@@ -54,6 +54,9 @@ the compose file and `.env.vps` must be updated before the deploy, not after.
    (`DB_MAX_OPEN_CONNS`), migrate a few, so anything ≥ 40 is fine.
 6. Exactly one live account (migration 0009 makes it admin and **fails** with more than one):
    `SELECT count(*) FROM users WHERE deleted_at IS NULL;` must be 1.
+7. (B3) Every owned-table migration backfills existing rows to the one admin and **fails** if
+   there isn't exactly one live admin (0011 `drink_size_presets` first; C lanes copy it). After
+   0009 that's the account from check 6, so nothing to do beyond it; the rehearsal proves it.
 
 ## 2. Rehearsal (D1, locally, before touching the VPS)
 
@@ -139,6 +142,17 @@ Each lane adds what its changes need here (README: "Prod changes go in ROLLOUT.m
 - **S2 (frontend storage)**: nothing to configure. On first load after the deploy each browser
   drops its old un-namespaced drafts, rest timer and resume route (ownership unknown), so a
   half-written draft or an in-progress rest timer is lost once.
+
+- **B3 (owner kit)**: nothing to configure. Effects to know:
+  - The pipeline has three new blocking steps before images are built: `backend-test` now
+    starts a throwaway Postgres container (`dev/ci/backend-test.sh`, needs Docker on the build
+    host, like `e2e`), `backend-vulncheck` (`govulncheck`) and `frontend-audit` (`npm audit
+    --omit=dev --audit-level=high`). The last two fetch from the network (Go proxy and vuln DB,
+    npm registry). **D1 checks before the deploy**: run `j-cicd check simple-track --ref
+    proj/multi-user --brief` (steps only, no deploy) and confirm all three pass on the build
+    host; a new advisory published since the lane merged also fails the run, so fix or decide
+    before deploy day, not during it.
+  - In 3.4, the water page's drink sizes are the owner's (0011 backfilled them).
 
 <!-- Later lanes: add anything else that must happen in this deploy here. -->
 

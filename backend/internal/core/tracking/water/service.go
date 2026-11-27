@@ -7,6 +7,12 @@ import (
 	"time"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
+)
+
+// Errors from CreateWaterLog that the client caused (400, message shown as is).
+var (
+	ErrPresetNotFound = errors.New("preset not found")
 )
 
 // CreateWaterLog inserts a log. With a non-empty clientID it is idempotent: a replay returns the
@@ -14,18 +20,19 @@ import (
 func CreateWaterLog(ctx context.Context, date time.Time, amountOz float64, presetID *uint, clientID string) (*WaterLog, error) {
 	db := database.From(ctx)
 	if clientID != "" {
-		if row, err := findByClientID(db, clientID); err != nil || row != nil {
+		if row, err := findByClientID(ctx, db, clientID); err != nil || row != nil {
 			return row, err
 		}
 	}
 	if amountOz <= 0 {
-		return nil, errors.New("amount_oz must be positive")
+		return nil, ErrAmountNotPositive
 	}
 	if presetID != nil {
+		// Only the user's own presets (someone else's reads as missing).
 		var preset DrinkSizePreset
-		if err := db.First(&preset, *presetID).Error; err != nil {
+		if err := db.Scopes(database.Owned(ctx)).First(&preset, *presetID).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
-				return nil, errors.New("preset not found")
+				return nil, ErrPresetNotFound
 			}
 			return nil, err
 		}
@@ -41,21 +48,21 @@ func CreateWaterLog(ctx context.Context, date time.Time, amountOz float64, prese
 	if err := database.CreateInSavepoint(db, &row); err != nil {
 		// Lost a race with a concurrent replay of the same client_id: return the winner's row.
 		if clientID != "" {
-			if existing, ferr := findByClientID(db, clientID); ferr == nil && existing != nil {
+			if existing, ferr := findByClientID(ctx, db, clientID); ferr == nil && existing != nil {
 				return existing, nil
 			}
 		}
 		return nil, err
 	}
-	if err := db.Preload("Preset").First(&row, row.ID).Error; err != nil {
+	if err := db.Preload("Preset", database.Owned(ctx)).First(&row, row.ID).Error; err != nil {
 		return nil, err
 	}
 	return &row, nil
 }
 
-func findByClientID(db *gorm.DB, clientID string) (*WaterLog, error) {
+func findByClientID(ctx context.Context, db *gorm.DB, clientID string) (*WaterLog, error) {
 	var row WaterLog
-	err := db.Unscoped().Preload("Preset").Where("client_id = ?", clientID).First(&row).Error
+	err := db.Unscoped().Preload("Preset", database.Owned(ctx)).Where("client_id = ?", clientID).First(&row).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, nil
 	}
@@ -68,7 +75,7 @@ func findByClientID(db *gorm.DB, clientID string) (*WaterLog, error) {
 func ListWaterLogsForDate(ctx context.Context, date time.Time) ([]WaterLog, error) {
 	db := database.From(ctx)
 	var rows []WaterLog
-	err := db.Where("date = ?", date).Preload("Preset").Order("created_at DESC").Find(&rows).Error
+	err := db.Where("date = ?", date).Preload("Preset", database.Owned(ctx)).Order("created_at DESC").Find(&rows).Error
 	return rows, err
 }
 
@@ -97,56 +104,61 @@ func DeleteWaterLogByClientID(ctx context.Context, clientID string) error {
 	return nil
 }
 
+// Errors from the preset functions that the client caused (400, message shown as is).
+var (
+	ErrPresetNameRequired = errors.New("name is required")
+	ErrAmountNotPositive  = errors.New("amount_oz must be positive")
+)
+
+// Drink size presets are owned (migration 0011): every query is scoped to the current user with
+// database.Owned, creates are stamped by database.Owner, and someone else's preset is
+// database.ErrNotFound, exactly like a missing one.
+
 func ListDrinkSizePresets(ctx context.Context) ([]DrinkSizePreset, error) {
-	db := database.From(ctx)
 	var rows []DrinkSizePreset
-	err := db.Order("name ASC").Find(&rows).Error
+	err := database.From(ctx).Scopes(database.Owned(ctx)).Order("name ASC").Find(&rows).Error
 	return rows, err
 }
 
-func CreateDrinkSizePreset(ctx context.Context, name string, amountOz float64) (*DrinkSizePreset, error) {
-	db := database.From(ctx)
+func validatePreset(name string, amountOz float64) error {
 	if name == "" {
-		return nil, errors.New("name is required")
+		return ErrPresetNameRequired
 	}
 	if amountOz <= 0 {
-		return nil, errors.New("amount_oz must be positive")
+		return ErrAmountNotPositive
+	}
+	return nil
+}
+
+func CreateDrinkSizePreset(ctx context.Context, name string, amountOz float64) (*DrinkSizePreset, error) {
+	if err := validatePreset(name, amountOz); err != nil {
+		return nil, err
 	}
 	p := DrinkSizePreset{Name: name, AmountOz: amountOz}
-	if err := db.Create(&p).Error; err != nil {
+	if err := database.From(ctx).Omit(clause.Associations).Create(&p).Error; err != nil {
 		return nil, err
 	}
 	return &p, nil
 }
 
 func UpdateDrinkSizePreset(ctx context.Context, id uint, name string, amountOz float64) (*DrinkSizePreset, error) {
+	if err := validatePreset(name, amountOz); err != nil {
+		return nil, err
+	}
 	db := database.From(ctx)
-	if name == "" {
-		return nil, errors.New("name is required")
-	}
-	if amountOz <= 0 {
-		return nil, errors.New("amount_oz must be positive")
-	}
 	var row DrinkSizePreset
-	if err := db.First(&row, id).Error; err != nil {
+	if err := db.Scopes(database.Owned(ctx)).First(&row, id).Error; err != nil {
 		return nil, err
 	}
-	row.Name = name
-	row.AmountOz = amountOz
-	if err := db.Save(&row).Error; err != nil {
+	res := db.Model(&row).Scopes(database.Owned(ctx)).Select("name", "amount_oz", "updated_at").
+		Updates(DrinkSizePreset{Name: name, AmountOz: amountOz})
+	if err := database.Affected(res); err != nil {
 		return nil, err
 	}
+	row.Name, row.AmountOz = name, amountOz
 	return &row, nil
 }
 
 func DeleteDrinkSizePreset(ctx context.Context, id uint) error {
-	db := database.From(ctx)
-	res := db.Delete(&DrinkSizePreset{}, id)
-	if res.Error != nil {
-		return res.Error
-	}
-	if res.RowsAffected == 0 {
-		return gorm.ErrRecordNotFound
-	}
-	return nil
+	return database.Affected(database.From(ctx).Scopes(database.Owned(ctx)).Delete(&DrinkSizePreset{}, id))
 }
