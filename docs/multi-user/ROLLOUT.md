@@ -133,6 +133,11 @@ Each lane adds what its changes need here (README: "Prod changes go in ROLLOUT.m
 - **H1 (HTTP hardening)**: the backend part (body limits, `Cache-Control: no-store`, no default
   CORS origins) ships in the backend image with 3.3; nothing to configure (`APP_ORIGIN` already
   sets `CORS_ORIGINS`). The Caddy part is a separate deploy **after 3.4**: see 3.5.
+- **C6 (accounts)**: migration 0011 runs in pre_swap with the rest (usernames become unique
+  case-insensitively, an empty email becomes NULL, two new tables `user_setup_tokens` and
+  `auth_events`). It relies on pre-check 1.6 (one live account). The `/setup/` nginx location
+  ships in the frontend image. Nothing to configure. The first family accounts come after the
+  deploy: see 3.6.
 
 - **B2 (per-request DB handle)**: nothing to do. In 3.4, also check the backend log has no
   `database: commit` or `database: rollback` errors (a failed commit answers 500).
@@ -186,6 +191,21 @@ can be rolled back alone.
 
 If something is blocked: `j-cicd rollback simple-track-caddy` puts the old Caddyfile back (no
 headers at all), then fix the CSP and redeploy.
+
+### 3.6 First family accounts (lane C6, owner, after 3.4 and 3.5)
+
+1. Sign in as the owner. Account menu → **Account**: if the current password is shorter than 10
+   characters, change it (new passwords must be 10+; changing it signs out other devices).
+2. Account menu → **Users** → add each person by username (lowercase). Each gets a one-time link
+   (`https://st.jackgraver.ca/setup/...`, 48 h, single use). Text it with **Share** or **Copy
+   link**; never email it. A new link for the same person cancels the previous one.
+3. Check on the Users page that each person shows "Last sign-in" once they've used their link,
+   and that **Sign-in activity** lists `Account created`, `Link created`, `Password set with link`.
+4. Optional: `docker compose -f docker-compose.vps.yml --env-file .env.vps logs frontend backend | grep -c /setup/`
+   should be 0 (the token is never logged).
+
+Lost password or phone later: Users → the person's menu → **Password reset link** (signs them out
+everywhere once used). Leaving the family app: **Disable and sign out** (reversible with Enable).
 
 ## 4. If it goes wrong
 

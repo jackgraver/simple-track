@@ -233,3 +233,12 @@ a nullable `group_id` on tables that should be shareable, and the rule becomes
   block returns.
 - **`dev test` points `TEST_DATABASE_URL` at the owner** (`DATABASE_OWNER_URL`), since the app role
   can't create databases.
+- **RLS + `RETURNING`** (C6). An INSERT whose new row fails the table's SELECT policy errors if
+  it has `RETURNING`, and gorm's `Create` always adds `RETURNING id`. For write-only tables
+  (`auth_events`: anyone inserts, only the admin reads) insert with a raw `INSERT` instead.
+- **Acting as the app role in tests** (C6). A gorm pool whose DSN has
+  `options=-c role=simpletrack_app` runs every connection as the app role (the test superuser may
+  assume it even though it's NOLOGIN), so whole HTTP flows run under RLS. See
+  `auth/accounts_pg_test.go`.
+- **Writes that must survive a 4xx/5xx** go through `database.Always` (C6). Success audit rows
+  don't: they belong in the request transaction so they roll back with the change.

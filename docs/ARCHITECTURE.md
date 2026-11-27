@@ -110,6 +110,10 @@ nginx is **not** just a build tool: it is the runtime web server inside the fron
   - `Strict-Transport-Security` on every response. nginx only inherits `add_header` into a
     location that sets none of its own, so the locations repeat it.
 - No gzip in nginx; Caddy compresses.
+- `/setup/<token>` (one-time account setup links) has `access_log off`: the token is a credential
+  until used. Caddy keeps no access log, and the backend logs route patterns only
+  (`cmd/server/requestlog.go`), so the token isn't logged anywhere. The API takes it in request
+  bodies, never in URLs.
 
 Local dev uses neither: Vite serves the frontend on :3000 and proxies `/api` to the backend.
 

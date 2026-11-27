@@ -5,6 +5,7 @@ import (
 	"errors"
 	"time"
 
+	"be-simpletracker/internal/clock"
 	"be-simpletracker/internal/core/auth/models"
 	"be-simpletracker/internal/database"
 
@@ -57,7 +58,7 @@ func SetUserDisabled(ctx context.Context, id uint, at *time.Time) (models.User, 
 
 func bumpUser(ctx context.Context, id uint, fields map[string]any) (models.User, error) {
 	fields["token_version"] = gorm.Expr("token_version + 1")
-	fields["updated_at"] = time.Now()
+	fields["updated_at"] = clock.Now()
 	res := database.From(ctx).Model(&models.User{}).Where("id = ?", id).Updates(fields)
 	if res.Error != nil {
 		return models.User{}, res.Error

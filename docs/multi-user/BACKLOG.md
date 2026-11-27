@@ -23,7 +23,7 @@ Nothing Critical was found. Prod today has one account, so most multi-user findi
 |---|---|---|---|
 | 1 | High | Request bodies bind straight into gorm models (mass assignment, nested association writes) | C2 (+B3 rule) |
 | 2 | High | Advisory-lock keys and "exists for date" checks are global, not per user | C2, C3 |
-| 3 | Medium | Anyone can lock the owner out of login, from one IP, indefinitely | S1: **done** (audit-log part: C6) |
+| 3 | Medium | Anyone can lock the owner out of login, from one IP, indefinitely | S1: **done**; C6: lockouts in `auth_events` (`login_rate_limited`) |
 | 4 | Medium | IPv6 address rotation defeats per-IP limits and can fill the limiter (global lockout) | S1: **done** |
 | 5 | Medium | TMDB API key can leak to users in lookup error messages | S3: **done** |
 | 6 | Medium | Raw internal errors (SQL, constraint names) returned to clients at ~160 sites | C1–C5, B3 (lint) |
@@ -34,12 +34,12 @@ Nothing Critical was found. Prod today has one account, so most multi-user findi
 | 11 | Low | JWT signature compared with `!=` (not constant-time) | B1: **done** |
 | 12 | Low | `"Invalid token: " + err` echoes verification details | B1: **done** |
 | 13 | Low | CSRF relies on SameSite=Lax only; JSON endpoints accept `text/plain` bodies | B1: **done** (Sec-Fetch-Site) |
-| 14 | Low | Usernames are case-sensitive unique (`Jack` vs `jack`); no password policy; `max=72` counts runes, bcrypt limit is bytes | C6 |
+| 14 | Low | Usernames are case-sensitive unique (`Jack` vs `jack`); no password policy; `max=72` counts runes, bcrypt limit is bytes | C6: **done** (lower(username) unique, charset, 10 chars min, 72 bytes max) |
 | 15 | Low | Shared-catalog cover URLs are arbitrary image URLs shown to every user (tracking pixel) | C5 |
 | 16 | Low | `TRUSTED_PROXIES` depends on an unpinned Docker gateway IP; drift merges all clients into one IP | A2: deferred to D1 (needs a network recreate on the VPS) |
 | 17 | Low | API responses carry no `Cache-Control`; personal data may sit in browser/bfcache on shared devices | H1: **done** |
 | 18 | Low | Default CORS list (used when `CORS_ORIGINS` is unset) hard-codes home LAN IPs | H1: **done** |
-| 19 | Low | Request logs include full query strings; login logs record attempted usernames | S1: login part **done**; request logs: C6 |
+| 19 | Low | Request logs include full query strings; login logs record attempted usernames | S1: login part **done**; C6: request logs **done** (route patterns) |
 | 20 | Low | No Go vulnerability scan in CI | S4: manual run **done** (bumped x/net, x/text, Go 1.26); pipeline step: B3 |
 | 21 | Info | Dev stack: backend listens on 0.0.0.0, `/benchmark` unauthenticated, dev/dev login on LAN | none |
 | 22 | Info | Postgres `sslmode=disable` inside the compose network | none |
@@ -296,6 +296,9 @@ Nothing Critical was found. Prod today has one account, so most multi-user findi
   `lower(username)`) with a restricted charset; password minimum (e.g. 10) and a byte-length
   check of 72.
 - **Lane**: C6.
+- **Done (C6)**: new usernames lowercased, `^[a-z0-9][a-z0-9._-]{1,31}$`, unique on
+  `lower(username)`, login case-insensitive; passwords being set need 10+ characters and at most
+  72 bytes; login treats >72 bytes as wrong.
 
 ### 15. Low: arbitrary cover URLs in the shared media catalog
 
@@ -364,7 +367,9 @@ Nothing Critical was found. Prod today has one account, so most multi-user findi
   (C6) should follow the same rule.
 - **Lane**: C6.
 - **Login part done (S1)**: failed-login logs carry the username only if it exists, otherwise
-  `unknown`. Request-log query strings are still open (C6).
+  `unknown`.
+- **Request part done (C6)**: `cmd/server/requestlog.go` logs `c.FullPath()` only, never the
+  raw path or query. `auth_events` never stores attempted usernames either.
 
 ### 20. Low: no Go vulnerability scan
 
