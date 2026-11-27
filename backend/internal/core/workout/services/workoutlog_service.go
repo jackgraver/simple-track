@@ -4,6 +4,7 @@ import (
 	"be-simpletracker/internal/clock"
 	"be-simpletracker/internal/core/workout/models"
 	workoutrepo "be-simpletracker/internal/core/workout/repository"
+	"be-simpletracker/internal/database"
 	"context"
 	"errors"
 	"fmt"
@@ -325,14 +326,7 @@ func GetPreviousWorkoutView(ctx context.Context, offset int) (PreviousWorkoutRes
 			group.Logged = &log
 			delete(loggedMap, p.Name)
 		}
-		prev, err := workoutrepo.GetPreviousExerciseLog(ctx, today.Date, p.Name, 0)
-		if err == nil {
-			group.Previous = &prev
-		}
-		maxLog, err := workoutrepo.GetMaxExerciseLog(ctx, today.Date, p.Name)
-		if err == nil {
-			group.Max = &maxLog
-		}
+		group.Previous, group.Max = previousAndMax(ctx, today.Date, p.Name)
 		results = append(results, group)
 	}
 	for _, l := range loggedMap {
@@ -341,14 +335,7 @@ func GetPreviousWorkoutView(ctx context.Context, offset int) (PreviousWorkoutRes
 			continue
 		}
 		group := ExerciseGroup{Logged: &l}
-		prev, err := workoutrepo.GetPreviousExerciseLog(ctx, today.Date, l.Exercise.Name, 0)
-		if err == nil {
-			group.Previous = &prev
-		}
-		maxLog, err := workoutrepo.GetMaxExerciseLog(ctx, today.Date, l.Exercise.Name)
-		if err == nil {
-			group.Max = &maxLog
-		}
+		group.Previous, group.Max = previousAndMax(ctx, today.Date, l.Exercise.Name)
 		results = append(results, group)
 	}
 	return PreviousWorkoutResponse{
@@ -526,7 +513,11 @@ func CreateWorkoutProgram(ctx context.Context, name string) (*models.WorkoutProg
 		return nil, fmt.Errorf("program name is required")
 	}
 	program := &models.WorkoutProgram{Name: name}
-	if _, err := workoutrepo.FindActiveWorkoutProgram(ctx); err != nil && errors.Is(err, gorm.ErrRecordNotFound) {
+	// Any other lookup error is ignored, as before; Optional keeps it from aborting the request.
+	if err := database.Optional(ctx, func() error {
+		_, err := workoutrepo.FindActiveWorkoutProgram(ctx)
+		return err
+	}); err != nil && errors.Is(err, gorm.ErrRecordNotFound) {
 		program.IsActive = true
 	}
 	if err := workoutrepo.CreateWorkoutProgram(ctx, program); err != nil {
@@ -789,4 +780,25 @@ func RestoreWorkoutPlan(ctx context.Context, id uint) (*models.WorkoutPlan, erro
 		return nil, err
 	}
 	return workoutrepo.LoadPlanWithOrderedExercises(ctx, id)
+}
+
+// previousAndMax loads an exercise's previous and best logs before day. Both are best effort
+// (missing or failed lookups leave them nil); Optional keeps a failed one from aborting the
+// request transaction.
+func previousAndMax(ctx context.Context, day time.Time, exercise string) (previous, max *models.LoggedExercise) {
+	_ = database.Optional(ctx, func() error {
+		prev, err := workoutrepo.GetPreviousExerciseLog(ctx, day, exercise, 0)
+		if err == nil {
+			previous = &prev
+		}
+		return err
+	})
+	_ = database.Optional(ctx, func() error {
+		m, err := workoutrepo.GetMaxExerciseLog(ctx, day, exercise)
+		if err == nil {
+			max = &m
+		}
+		return err
+	})
+	return previous, max
 }
