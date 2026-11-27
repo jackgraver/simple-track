@@ -203,7 +203,7 @@ Worked out with the owner. Per exercise (Edit dialog toggle, `exercises.unilater
 
 ## 2026-11-26: motion-v for gesture and layout motion; WeekCarousel primitive
 - Added **motion-v** (Motion for Vue) for motion CSS can't do well: swipes that follow the finger and keep their velocity, enter/exit of keyed elements, measured outlines. CSS stays the default for hover, press, fades and overlays. Lint keeps `motion-v` imports inside `shared/ui/` (like Reka); values live in `shared/ui/motion.ts`; `MotionConfig reduced-motion="user"` at the app root.
-- First user: `WeekCarousel` (gym + diet week strips). It replaces #90's hand-written transition and `calc()` outline: the outline is measured from the selected tile, the weeks can be swiped, and a new week starts right behind wherever the old one is (after a swipe or quick taps), so the row stays continuous.
+- First user: `WeekCarousel` (gym + diet week strips). It replaced a first hand-written CSS transition and `calc()` outline (never shipped): the outline is measured from the selected tile, the weeks can be swiped, and a new week starts right behind wherever the old one is (after a swipe or quick taps), so the row stays continuous.
 - Diet's week strip no longer swaps to a skeleton while a new week loads (that unmounted the carousel mid-slide); only the first load shows one, and calorie bars fill in with a width transition.
 - Both strips land on Sunday of the new week (today for the current week) via `weekLandingOffset`.
 
