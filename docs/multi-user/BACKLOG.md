@@ -25,7 +25,7 @@ Nothing Critical was found. Prod today has one account, so most multi-user findi
 | 2 | High | Advisory-lock keys and "exists for date" checks are global, not per user | C2, C3 |
 | 3 | Medium | Anyone can lock the owner out of login, from one IP, indefinitely | C6 |
 | 4 | Medium | IPv6 address rotation defeats per-IP limits and can fill the limiter (global lockout) | C6 |
-| 5 | Medium | TMDB API key can leak to users in lookup error messages | C5 |
+| 5 | Medium | TMDB API key can leak to users in lookup error messages | S3: **done** |
 | 6 | Medium | Raw internal errors (SQL, constraint names) returned to clients at ~160 sites | C1–C5, B3 (lint) |
 | 7 | Medium | No security headers (CSP, frame-ancestors, nosniff, Referrer-Policy); API has none at all | H1: **done** (Caddy; deploys at D1, ROLLOUT 3.5) |
 | 8 | Medium | No request body size limit outside `/auth` (imports, JSON) | H1: **done** (1 MiB default, 5 MiB + 10k rows on import; Caddy 6MB) |
@@ -138,6 +138,11 @@ Nothing Critical was found. Prod today has one account, so most multi-user findi
   with the query string redacted (`url.Error.URL` stripped, or log `req.URL.Redacted()`-style
   with `api_key` removed). Prefer the v4 bearer token in prod.
 - **Lane**: C5.
+- **Done (S3)**: lookup errors' `Error()` is the bare sentinel; the detail (host, status,
+  transport error with the URL's query and userinfo stripped, key/token params redacted) is only
+  logged via `lookup.Detail`. Upstream bodies are no longer read. `respondLookupError` returns
+  fixed messages (502 "Lookup service unavailable", 503 "Lookup is not configured", 400, 404).
+  The v4 bearer token is a config choice (`TMDB_API_KEY=eyJ…` already goes in a header).
 
 ### 6. Medium: raw internal errors returned to clients
 

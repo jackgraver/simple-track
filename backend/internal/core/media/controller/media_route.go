@@ -3,6 +3,7 @@ package controller
 import (
 	"be-simpletracker/internal/clock"
 	"errors"
+	"log"
 	"net/http"
 	"strconv"
 
@@ -167,15 +168,21 @@ func (h *MediaHandler) lookupDetails(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"result": result})
 }
 
+// respondLookupError maps lookup errors to fixed client messages. The error text can
+// describe the upstream request (URL, API key, response body), so it is only logged
+// (redacted) and never sent to the client.
 func respondLookupError(c *gin.Context, err error) {
-	status := http.StatusBadGateway
+	status, msg := http.StatusBadGateway, "Lookup service unavailable"
 	switch {
 	case errors.Is(err, lookup.ErrNotConfigured):
-		status = http.StatusServiceUnavailable
+		status, msg = http.StatusServiceUnavailable, "Lookup is not configured"
 	case errors.Is(err, lookup.ErrUnsupported):
-		status = http.StatusBadRequest
+		status, msg = http.StatusBadRequest, "Lookup is not supported for this media type"
 	case errors.Is(err, lookup.ErrNotFound):
-		status = http.StatusNotFound
+		status, msg = http.StatusNotFound, "Lookup result not found"
 	}
-	c.JSON(status, gin.H{"error": err.Error()})
+	if status != http.StatusNotFound && status != http.StatusBadRequest {
+		log.Printf("media lookup failed (%s %s): %s", c.Request.Method, c.Request.URL.Path, lookup.Detail(err))
+	}
+	c.JSON(status, gin.H{"error": msg})
 }
