@@ -52,6 +52,8 @@ the compose file and `.env.vps` must be updated before the deploy, not after.
    (it won't re-enable a role someone disabled): drop it or `ALTER ROLE ... LOGIN` first.
 5. Headroom: `SHOW max_connections;` (default 100). The server uses at most 20
    (`DB_MAX_OPEN_CONNS`), migrate a few, so anything ≥ 40 is fine.
+6. Exactly one live account (migration 0009 makes it admin and **fails** with more than one):
+   `SELECT count(*) FROM users WHERE deleted_at IS NULL;` must be 1.
 
 ## 2. Rehearsal (D1, locally, before touching the VPS)
 
@@ -120,6 +122,16 @@ What happens on the VPS: pull → `pre_deploy` backup → `pre_swap` runs the ne
 `/app/migrate up` as the owner (applies every project migration, creates `simpletrack_app`,
 grants, timeouts, then sets its LOGIN password from `DATABASE_URL_PRODUCTION`) → backend recreated,
 connects as `simpletrack_app` → health check → verify `/version.json`.
+
+### 3.3a Lane additions
+
+Each lane adds what its changes need here (README: "Prod changes go in ROLLOUT.md").
+
+- **B1 (identity)**: every existing session is rejected (pre-B1 tokens carry no `uid`), so the
+  owner signs in again once after the deploy. `AUTH_COOKIE_MAX_AGE_SEC` comes with the compose
+  file (3.2), default 365 days; no `.env.vps` change.
+- **H1 (HTTP hardening)**: Caddy changes deploy through the separate Caddy j-cicd project
+  (`deploy/Caddyfile`, see ARCHITECTURE.md). H1 writes the exact order relative to 3.3 here.
 
 <!-- Later lanes: add anything else that must happen in this deploy here. -->
 

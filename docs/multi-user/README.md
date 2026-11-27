@@ -178,6 +178,12 @@ of a prod backup first. Pre-deploy backups on the VPS cover a bad backfill.
 
 ## Rules for every lane
 
+- **Prod changes go in ROLLOUT.md.** Anything prod needs beyond the new images gets a step in
+  `docs/multi-user/ROLLOUT.md` in the same PR: an env var in `.env.vps`, compose, Caddy, j-cicd
+  or VPS agent config, one-off SQL, a pre-check, or a user-visible effect (e.g. everyone signed
+  out). D1 deploys from that file alone, so if it isn't there it won't happen.
+- **Security findings**: check `BACKLOG.md` for entries tagged with your lane, fix them, and tick
+  them there in the same PR. If you defer one, say why in DECISIONS.
 - Never use `database.GetDB()` / `conn()` in request code after B2. Use `database.From(ctx)`.
 - Every new owned table: `user_id NOT NULL`, per-user uniques, RLS policy, two-user test.
 - Two-user test per endpoint: Alice's data, Bob's token. Bob gets 404 or an empty list, never Alice's rows.
