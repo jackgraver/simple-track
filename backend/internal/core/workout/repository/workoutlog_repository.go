@@ -1,6 +1,7 @@
 package workoutrepo
 
 import (
+	"be-simpletracker/internal/database"
 	"context"
 	"time"
 
@@ -11,7 +12,7 @@ import (
 
 func LoadByDate(ctx context.Context, date time.Time) (models.WorkoutLog, error) {
 	var workoutDay models.WorkoutLog
-	err := conn().WithContext(ctx).
+	err := database.From(ctx).WithContext(ctx).
 		Preload("Cardio").
 		Preload("Exercises.Sets", setsInLoggedOrder).
 		Preload("Exercises.Exercise").
@@ -23,7 +24,7 @@ func LoadByDate(ctx context.Context, date time.Time) (models.WorkoutLog, error) 
 		return models.WorkoutLog{}, err
 	}
 	if workoutDay.WorkoutPlan != nil {
-		ex, err := LoadExercisesOrderedForPlan(workoutDay.WorkoutPlan.ID)
+		ex, err := LoadExercisesOrderedForPlan(ctx, workoutDay.WorkoutPlan.ID)
 		if err != nil {
 			return models.WorkoutLog{}, err
 		}
@@ -37,7 +38,7 @@ func LoadByDate(ctx context.Context, date time.Time) (models.WorkoutLog, error) 
 // check-and-insert is serialized per date with a transaction-scoped advisory lock. If a row
 // already exists, log is left without an ID and nil is returned.
 func CreateMinimalIfMissing(ctx context.Context, log *models.WorkoutLog) error {
-	return conn().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+	return database.From(ctx).WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		if tx.Dialector.Name() == "postgres" {
 			key := "workout_logs.date:" + log.Date.Format("2006-01-02")
 			if err := tx.Exec("SELECT pg_advisory_xact_lock(hashtext(?))", key).Error; err != nil {
@@ -57,7 +58,7 @@ func CreateMinimalIfMissing(ctx context.Context, log *models.WorkoutLog) error {
 
 func GetByDateRange(ctx context.Context, start, end time.Time) ([]models.WorkoutLog, error) {
 	var logs []models.WorkoutLog
-	err := conn().WithContext(ctx).
+	err := database.From(ctx).WithContext(ctx).
 		Preload("Cardio").
 		Preload("Exercises.Sets").
 		Preload("Exercises.Exercise").
@@ -74,25 +75,25 @@ func UpdateWorkoutPlanID(ctx context.Context, workoutLogID uint, planID *uint) e
 	} else {
 		wid = *planID
 	}
-	return conn().WithContext(ctx).Model(&models.WorkoutLog{}).Where("id = ?", workoutLogID).Updates(map[string]any{
+	return database.From(ctx).WithContext(ctx).Model(&models.WorkoutLog{}).Where("id = ?", workoutLogID).Updates(map[string]any{
 		"workout_plan_id": wid,
 	}).Error
 }
 
 func UpdatePreMobilityChecked(ctx context.Context, workoutLogID uint, checked []string) error {
 	var wl models.WorkoutLog
-	if err := conn().WithContext(ctx).First(&wl, workoutLogID).Error; err != nil {
+	if err := database.From(ctx).WithContext(ctx).First(&wl, workoutLogID).Error; err != nil {
 		return err
 	}
 	wl.PreMobilityChecked = checked
-	return conn().WithContext(ctx).Session(&gorm.Session{FullSaveAssociations: false}).Save(&wl).Error
+	return database.From(ctx).WithContext(ctx).Session(&gorm.Session{FullSaveAssociations: false}).Save(&wl).Error
 }
 
 func UpdatePostMobilityChecked(ctx context.Context, workoutLogID uint, checked []string) error {
 	var wl models.WorkoutLog
-	if err := conn().WithContext(ctx).First(&wl, workoutLogID).Error; err != nil {
+	if err := database.From(ctx).WithContext(ctx).First(&wl, workoutLogID).Error; err != nil {
 		return err
 	}
 	wl.PostMobilityChecked = checked
-	return conn().WithContext(ctx).Session(&gorm.Session{FullSaveAssociations: false}).Save(&wl).Error
+	return database.From(ctx).WithContext(ctx).Session(&gorm.Session{FullSaveAssociations: false}).Save(&wl).Error
 }

@@ -5,6 +5,8 @@ import (
 	"be-simpletracker/internal/core/workout/models"
 	workoutrepo "be-simpletracker/internal/core/workout/repository"
 	"be-simpletracker/internal/core/workout/testutil"
+	"be-simpletracker/internal/database"
+	"context"
 	"testing"
 
 	"gorm.io/gorm"
@@ -12,6 +14,7 @@ import (
 
 func TestDeleteLoggedSet_removesOrphanExercise(t *testing.T) {
 	db := testutil.SetupTestDB(t)
+	ctx := database.WithDB(context.Background(), db)
 	today := clock.ZerodTime(0)
 	ex := models.Exercise{Name: "Fly"}
 	if err := db.Create(&ex).Error; err != nil {
@@ -29,7 +32,7 @@ func TestDeleteLoggedSet_removesOrphanExercise(t *testing.T) {
 	if err := db.Create(&set).Error; err != nil {
 		t.Fatal(err)
 	}
-	if err := workoutrepo.DeleteLoggedSet(set.ID); err != nil {
+	if err := workoutrepo.DeleteLoggedSet(ctx, set.ID); err != nil {
 		t.Fatal(err)
 	}
 	if err := db.First(&models.LoggedSet{}, set.ID).Error; err != gorm.ErrRecordNotFound {
@@ -41,8 +44,8 @@ func TestDeleteLoggedSet_removesOrphanExercise(t *testing.T) {
 }
 
 func TestDeleteLoggedSet_notFound(t *testing.T) {
-	testutil.SetupTestDB(t)
-	err := workoutrepo.DeleteLoggedSet(9999)
+	ctx := database.WithDB(context.Background(), testutil.SetupTestDB(t))
+	err := workoutrepo.DeleteLoggedSet(ctx, 9999)
 	if err != gorm.ErrRecordNotFound {
 		t.Fatalf("expected not found, got %v", err)
 	}
@@ -50,6 +53,7 @@ func TestDeleteLoggedSet_notFound(t *testing.T) {
 
 func TestDeleteLoggedSet_keepsExerciseWhenSetsRemain(t *testing.T) {
 	db := testutil.SetupTestDB(t)
+	ctx := database.WithDB(context.Background(), db)
 	le := models.LoggedExercise{WorkoutLogID: 1, ExerciseID: 1}
 	if err := db.Create(&le).Error; err != nil {
 		t.Fatal(err)
@@ -62,7 +66,7 @@ func TestDeleteLoggedSet_keepsExerciseWhenSetsRemain(t *testing.T) {
 	if err := db.Create(&set2).Error; err != nil {
 		t.Fatal(err)
 	}
-	if err := workoutrepo.DeleteLoggedSet(set1.ID); err != nil {
+	if err := workoutrepo.DeleteLoggedSet(ctx, set1.ID); err != nil {
 		t.Fatal(err)
 	}
 	if err := db.First(&models.LoggedExercise{}, le.ID).Error; err != nil {
