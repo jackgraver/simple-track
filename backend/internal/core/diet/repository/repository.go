@@ -25,7 +25,10 @@ func EnrichFoodVariants(ctx context.Context, f *models.Food) {
 		return
 	}
 	var sibs []models.Food
-	if err := database.From(ctx).Where("variant_group_id = ? AND id != ?", *f.VariantGroupID, f.ID).Order("name ASC").Find(&sibs).Error; err != nil {
+	// Best effort: a failed lookup leaves the food without variants.
+	if err := database.Optional(ctx, func() error {
+		return database.From(ctx).Where("variant_group_id = ? AND id != ?", *f.VariantGroupID, f.ID).Order("name ASC").Find(&sibs).Error
+	}); err != nil {
 		return
 	}
 	for i := range sibs {
@@ -561,7 +564,9 @@ type MealDayTotals struct {
 
 func CalculateTotals(ctx context.Context, dayID uint) MealDayTotals {
 	var totals MealDayTotals
-	database.From(ctx).Raw(`
+	// Best effort, as before: on error the totals stay zero.
+	_ = database.Optional(ctx, func() error {
+		return database.From(ctx).Raw(`
         SELECT
             SUM(f.calories * mi.amount) AS calories,
             SUM(f.protein  * mi.amount) AS protein,
@@ -574,7 +579,8 @@ func CalculateTotals(ctx context.Context, dayID uint) MealDayTotals {
         JOIN foods f       ON f.id = mi.food_id
         WHERE dl.day_id = ?
         AND dl.deleted_at IS NULL
-    `, dayID).Scan(&totals)
+    `, dayID).Scan(&totals).Error
+	})
 	return totals
 }
 
