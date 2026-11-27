@@ -103,6 +103,10 @@ docker compose -f docker-compose.vps.yml --env-file .env.vps config >/dev/null &
 
 `config` must succeed (it fails on a missing `APP_DB_PASSWORD`). Don't `up` anything by hand.
 
+If D1 also takes BACKLOG #16 (pin `app-network`'s subnet so `TRUSTED_PROXIES` can't drift), the
+`ipam` change lands in this same file and compose will want to recreate the network. Plan that
+recreate inside the deploy window and re-check `TRUSTED_PROXIES` afterwards.
+
 ### 3.3 Deploy
 
 From the build host, after `main` has the merged project:

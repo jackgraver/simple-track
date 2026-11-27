@@ -36,13 +36,15 @@ Nothing Critical was found. Prod today has one account, so most multi-user findi
 | 13 | Low | CSRF relies on SameSite=Lax only; JSON endpoints accept `text/plain` bodies | B1: **done** (Sec-Fetch-Site) |
 | 14 | Low | Usernames are case-sensitive unique (`Jack` vs `jack`); no password policy; `max=72` counts runes, bcrypt limit is bytes | C6 |
 | 15 | Low | Shared-catalog cover URLs are arbitrary image URLs shown to every user (tracking pixel) | C5 |
-| 16 | Low | `TRUSTED_PROXIES` depends on an unpinned Docker gateway IP; drift merges all clients into one IP | A2 |
+| 16 | Low | `TRUSTED_PROXIES` depends on an unpinned Docker gateway IP; drift merges all clients into one IP | A2: deferred to D1 (needs a network recreate on the VPS) |
 | 17 | Low | API responses carry no `Cache-Control`; personal data may sit in browser/bfcache on shared devices | new (H1) |
 | 18 | Low | Default CORS list (used when `CORS_ORIGINS` is unset) hard-codes home LAN IPs | new (H1) |
 | 19 | Low | Request logs include full query strings; login logs record attempted usernames | C6 |
 | 20 | Low | No Go vulnerability scan in CI | B3 |
 | 21 | Info | Dev stack: backend listens on 0.0.0.0, `/benchmark` unauthenticated, dev/dev login on LAN | none |
 | 22 | Info | Postgres `sslmode=disable` inside the compose network | none |
+| 23 | Low | Owner DB password is in the backend container env (j-cicd pre_swap runs in the backend service) | j-cicd + deploy config (after D1) |
+| 24 | Info | Compose file isn't shipped with releases (`.cicd.yaml` has no `deploy.compose_file`) | j-cicd + deploy config (after D1) |
 
 ## Findings
 
@@ -288,6 +290,12 @@ Nothing Critical was found. Prod today has one account, so most multi-user findi
   match, or have the backend fail its startup check in production when the peer of the first
   request isn't trusted. A2 is already editing the compose file.
 - **Lane**: A2.
+- **Status (A2, 2026-11-27)**: deferred to D1. Pinning `ipam` on a network that already exists
+  makes compose want to recreate it (`docker compose down`/`up` on the VPS, a short outage),
+  and that can't be tested from here. Do it at D1 alongside ROLLOUT step 3.2 (the compose file
+  is copied by hand then anyway): pin the subnet/gateway the network has today (`docker network
+  inspect simple-track_app-network`), recreate during the deploy window, and confirm
+  `TRUSTED_PROXIES` still matches.
 
 ### 17. Low: API responses aren't marked uncacheable
 
@@ -346,3 +354,28 @@ when done.
 `docker-compose.vps.yml` sets `sslmode=disable` with `DATABASE_ALLOW_INSECURE=true`. Postgres
 publishes no port and is reachable only on the bridge network, so this is acceptable. A2's app
 role should keep the same reachability.
+
+### 23. Low: the owner DB password is in the server's environment
+
+- **Where**: `docker-compose.vps.yml` backend `DATABASE_OWNER_URL`; j-cicd agent `pre_swap`.
+- **Why**: j-cicd runs `pre_swap` (`/app/migrate up`) only inside a tracked compose service, so
+  migrate has to run in the `backend` service and gets the server's environment. A2 split the
+  roles (the server logs in as `simpletrack_app`), but code running inside the server process
+  could still read the owner DSN and bypass RLS. The split protects against query bugs, not a
+  compromised server.
+- **Fix**: let j-cicd run `pre_swap` in an untracked compose service that uses the new backend
+  image (e.g. a `migrate` service with `image: ${BACKEND_IMAGE}` and only
+  `DATABASE_OWNER_URL`), then remove `DATABASE_OWNER_URL` from `backend`. Changes in j-cicd
+  (`internal/agent/preswap.go` validation), the VPS agent config and `docker-compose.vps.yml`.
+- **Lane**: j-cicd + deploy config, after D1. Recorded by A2 (DECISIONS 2026-11-27).
+
+### 24. Info: the compose file isn't shipped with releases
+
+- **Where**: `.cicd.yaml` (no `deploy.compose_file`).
+- **Why**: the VPS agent uses its own copy of `docker-compose.vps.yml`, so compose changes reach
+  prod only by hand, and a rollback restores images but not the compose file that went with
+  them. D1 has to work around this (ROLLOUT steps 3.2 and 4).
+- **Fix**: set `deploy.compose_file: docker-compose.vps.yml` so each deploy sends the file from
+  the same commit and rollbacks restore it. Check the VPS agent version supports it, then do one
+  deploy with it on a quiet day. It changes how every deploy works, so it's the owner's call.
+- **Lane**: j-cicd + deploy config, after D1. Would drop ROLLOUT's manual copy and rollback caveats.

@@ -195,3 +195,7 @@ stop accepting, drain for up to 25 s, then force-close and close the DB pool.
 **`.cicd.yaml` unchanged:** it holds no DSNs (the e2e step uses `e2e/infra`, which now wires both).
 `deploy.compose_file` (ship the compose file with each release) would simplify ROLLOUT's
 manual compose-file copy and rollbacks. It changes every deploy, so it's left to the owner.
+
+Follow-ups (owner, 2026-11-27): the owner-DSN gap and `deploy.compose_file` are j-cicd/deploy
+config work after D1, tracked as BACKLOG #23 and #24. BACKLOG #16 (pin the network subnet) is
+deferred to D1, since it needs a network recreate on the VPS.
