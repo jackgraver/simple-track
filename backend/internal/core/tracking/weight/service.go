@@ -1,6 +1,8 @@
 package weight
 
 import (
+	"be-simpletracker/internal/database"
+	"context"
 	"errors"
 	"time"
 
@@ -9,7 +11,8 @@ import (
 
 const defaultListLimit = 365
 
-func UpsertBodyWeight(db *gorm.DB, date time.Time, weightLbs float64) (*BodyWeightLog, error) {
+func UpsertBodyWeight(ctx context.Context, date time.Time, weightLbs float64) (*BodyWeightLog, error) {
+	db := database.From(ctx)
 	if weightLbs <= 0 {
 		return nil, errors.New("weight_lbs must be positive")
 	}
@@ -32,7 +35,8 @@ func UpsertBodyWeight(db *gorm.DB, date time.Time, weightLbs float64) (*BodyWeig
 	return &row, nil
 }
 
-func ListBodyWeights(db *gorm.DB, limit int) ([]BodyWeightLog, error) {
+func ListBodyWeights(ctx context.Context, limit int) ([]BodyWeightLog, error) {
+	db := database.From(ctx)
 	if limit <= 0 {
 		limit = defaultListLimit
 	}

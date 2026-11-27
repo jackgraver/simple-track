@@ -81,7 +81,7 @@ func PutPlanMacros(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "macro targets must be non-negative"})
 		return
 	}
-	plan, err := services.UpdatePlanMacros(uint(id64), req.Calories, req.Protein, req.Fiber, req.Carbs, req.Fat)
+	plan, err := services.UpdatePlanMacros(c.Request.Context(), uint(id64), req.Calories, req.Protein, req.Fiber, req.Carbs, req.Fat)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "plan not found"})

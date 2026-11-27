@@ -6,15 +6,12 @@ import (
 	"be-simpletracker/internal/core/tracking/common"
 
 	"github.com/gin-gonic/gin"
-	"gorm.io/gorm"
 )
 
-type handler struct {
-	db *gorm.DB
-}
+type handler struct{}
 
-func RegisterWeightRoutes(group *gin.RouterGroup, db *gorm.DB) {
-	h := handler{db: db}
+func RegisterWeightRoutes(group *gin.RouterGroup) {
+	h := handler{}
 	group.GET("", h.getWeights)
 	group.POST("", h.postWeight)
 	group.POST("/import", h.importWeights)
@@ -22,7 +19,7 @@ func RegisterWeightRoutes(group *gin.RouterGroup, db *gorm.DB) {
 
 func (h *handler) getWeights(c *gin.Context) {
 	limit := common.ParseLimitQuery(c)
-	rows, err := ListBodyWeights(h.db, limit)
+	rows, err := ListBodyWeights(c.Request.Context(), limit)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -46,7 +43,7 @@ func (h *handler) postWeight(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid date"})
 		return
 	}
-	row, err := UpsertBodyWeight(h.db, date, body.WeightLbs)
+	row, err := UpsertBodyWeight(c.Request.Context(), date, body.WeightLbs)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -69,7 +66,7 @@ func (h *handler) importWeights(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	created, updated, err := ImportBodyWeights(h.db, logs)
+	created, updated, err := ImportBodyWeights(c.Request.Context(), logs)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

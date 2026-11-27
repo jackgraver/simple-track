@@ -1,6 +1,8 @@
 package weight
 
 import (
+	"be-simpletracker/internal/database"
+	"context"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -74,15 +76,15 @@ func TestImportBodyWeightsUpserts(t *testing.T) {
 		t.Fatal(err)
 	}
 	logs, _ := ParseRenphoCSV(renphoHeader + renphoRow)
-	if c, u, err := ImportBodyWeights(db, logs); err != nil || c != 1 || u != 0 {
+	if c, u, err := ImportBodyWeights(database.WithDB(context.Background(), db), logs); err != nil || c != 1 || u != 0 {
 		t.Fatalf("first import: %d %d %v", c, u, err)
 	}
 	// Re-import with a later weight and without body fat: row is replaced, not duplicated.
 	logs2, _ := ParseRenphoCSV("Date,Weight(lb)\n2026.11.19,163.0\n")
-	if c, u, err := ImportBodyWeights(db, logs2); err != nil || c != 0 || u != 1 {
+	if c, u, err := ImportBodyWeights(database.WithDB(context.Background(), db), logs2); err != nil || c != 0 || u != 1 {
 		t.Fatalf("second import: %d %d %v", c, u, err)
 	}
-	rows, _ := ListBodyWeights(db, 0)
+	rows, _ := ListBodyWeights(database.WithDB(context.Background(), db), 0)
 	if len(rows) != 1 || rows[0].WeightLbs != 163.0 || rows[0].BodyFatPct != nil {
 		t.Fatalf("unexpected rows: %+v", rows)
 	}

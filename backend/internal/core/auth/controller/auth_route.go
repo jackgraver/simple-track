@@ -36,7 +36,7 @@ func Register(c *gin.Context, service *services.AuthService, cookie CookieConfig
 		return
 	}
 
-	result, err := service.Register(services.RegisterInput{
+	result, err := service.Register(c.Request.Context(), services.RegisterInput{
 		Username: req.Username,
 		Password: req.Password,
 		Email:    req.Email,
@@ -99,7 +99,7 @@ func Login(c *gin.Context, service *services.AuthService, cookie CookieConfig, p
 		return
 	}
 
-	result, err := service.Login(services.LoginInput{
+	result, err := service.Login(c.Request.Context(), services.LoginInput{
 		Username: req.Username,
 		Password: req.Password,
 	})
@@ -139,7 +139,7 @@ func Login(c *gin.Context, service *services.AuthService, cookie CookieConfig, p
 // GetCurrentUser answers /auth/me for userID (resolved by AuthMiddleware).
 func GetCurrentUser(c *gin.Context, service *services.AuthService, userID uint) {
 	setAuthResponseHeaders(c)
-	user, err := service.CurrentUser(userID)
+	user, err := service.CurrentUser(c.Request.Context(), userID)
 	if err != nil {
 		respondUserLookupError(c, err)
 		return
@@ -165,7 +165,7 @@ func UpdateCurrentUser(c *gin.Context, service *services.AuthService, userID uin
 		c.JSON(http.StatusBadRequest, gin.H{"error": "birth_year is required"})
 		return
 	}
-	user, err := service.UpdateBirthYear(userID, *req.BirthYear)
+	user, err := service.UpdateBirthYear(c.Request.Context(), userID, *req.BirthYear)
 	if errors.Is(err, services.ErrInvalidBirthYear) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return

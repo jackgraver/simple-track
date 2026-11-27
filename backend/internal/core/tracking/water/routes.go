@@ -12,12 +12,10 @@ import (
 	"gorm.io/gorm"
 )
 
-type handler struct {
-	db *gorm.DB
-}
+type handler struct{}
 
-func RegisterWaterRoutes(group *gin.RouterGroup, db *gorm.DB) {
-	h := handler{db: db}
+func RegisterWaterRoutes(group *gin.RouterGroup) {
+	h := handler{}
 	group.GET("", h.getWater)
 	group.POST("", h.postWater)
 	group.DELETE("/:id", h.deleteWater)
@@ -37,7 +35,7 @@ func (h *handler) getWater(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid date"})
 		return
 	}
-	rows, err := ListWaterLogsForDate(h.db, date)
+	rows, err := ListWaterLogsForDate(c.Request.Context(), date)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -69,7 +67,7 @@ func (h *handler) postWater(c *gin.Context) {
 			return
 		}
 	}
-	row, err := CreateWaterLog(h.db, date, body.AmountOz, body.PresetID, body.ClientID)
+	row, err := CreateWaterLog(c.Request.Context(), date, body.AmountOz, body.PresetID, body.ClientID)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -83,9 +81,9 @@ func (h *handler) deleteWater(c *gin.Context) {
 	raw := c.Param("id")
 	var err error
 	if id64, perr := strconv.ParseUint(raw, 10, 32); perr == nil && id64 != 0 {
-		err = DeleteWaterLog(h.db, uint(id64))
+		err = DeleteWaterLog(c.Request.Context(), uint(id64))
 	} else if u, uerr := uuid.Parse(raw); uerr == nil && u != uuid.Nil {
-		err = DeleteWaterLogByClientID(h.db, u.String())
+		err = DeleteWaterLogByClientID(c.Request.Context(), u.String())
 	} else {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
 		return
@@ -102,7 +100,7 @@ func (h *handler) deleteWater(c *gin.Context) {
 }
 
 func (h *handler) getPresets(c *gin.Context) {
-	rows, err := ListDrinkSizePresets(h.db)
+	rows, err := ListDrinkSizePresets(c.Request.Context())
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -121,7 +119,7 @@ func (h *handler) postPreset(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	row, err := CreateDrinkSizePreset(h.db, body.Name, body.AmountOz)
+	row, err := CreateDrinkSizePreset(c.Request.Context(), body.Name, body.AmountOz)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -140,7 +138,7 @@ func (h *handler) putPreset(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	row, err := UpdateDrinkSizePreset(h.db, uint(id64), body.Name, body.AmountOz)
+	row, err := UpdateDrinkSizePreset(c.Request.Context(), uint(id64), body.Name, body.AmountOz)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
@@ -158,7 +156,7 @@ func (h *handler) deletePreset(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
 		return
 	}
-	err = DeleteDrinkSizePreset(h.db, uint(id64))
+	err = DeleteDrinkSizePreset(c.Request.Context(), uint(id64))
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "not found"})

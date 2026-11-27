@@ -1,6 +1,7 @@
 package workoutrepo
 
 import (
+	"be-simpletracker/internal/database"
 	"context"
 	"time"
 
@@ -22,9 +23,9 @@ type ExerciseProgressionEntry struct {
 	ClientID *string `json:"client_id"`
 }
 
-func FindAllExercises(excludeIDs []uint) ([]models.Exercise, error) {
+func FindAllExercises(ctx context.Context, excludeIDs []uint) ([]models.Exercise, error) {
 	var exercises []models.Exercise
-	query := conn().Model(&models.Exercise{})
+	query := database.From(ctx).Model(&models.Exercise{})
 	if len(excludeIDs) > 0 {
 		query = query.Where("id NOT IN ?", excludeIDs)
 	}
@@ -35,8 +36,8 @@ func FindAllExercises(excludeIDs []uint) ([]models.Exercise, error) {
 	return exercises, nil
 }
 
-func ListExercises(page, pageSize int, search string) (ExerciseListResult, error) {
-	query := conn().Model(&models.Exercise{})
+func ListExercises(ctx context.Context, page, pageSize int, search string) (ExerciseListResult, error) {
+	query := database.From(ctx).Model(&models.Exercise{})
 	if search != "" {
 		query = query.Where("name ILIKE ?", "%"+search+"%")
 	}
@@ -58,10 +59,10 @@ func ListExercises(page, pageSize int, search string) (ExerciseListResult, error
 	return ExerciseListResult{Exercises: exercises, Total: total}, nil
 }
 
-func GetExerciseProgression(exerciseID uint) ([]ExerciseProgressionEntry, error) {
+func GetExerciseProgression(ctx context.Context, exerciseID uint) ([]ExerciseProgressionEntry, error) {
 	var entries []ExerciseProgressionEntry
 
-	err := conn().
+	err := database.From(ctx).
 		Table("logged_exercises").
 		Select("workout_logs.date, logged_sets.weight, logged_sets.reps, logged_sets.side, logged_sets.pair_id, logged_sets.client_id").
 		Joins("JOIN workout_logs ON workout_logs.id = logged_exercises.workout_log_id").
@@ -77,23 +78,23 @@ func GetExerciseProgression(exerciseID uint) ([]ExerciseProgressionEntry, error)
 	return entries, nil
 }
 
-func ExerciseExists(id uint) error {
-	return conn().First(&models.Exercise{}, id).Error
+func ExerciseExists(ctx context.Context, id uint) error {
+	return database.From(ctx).First(&models.Exercise{}, id).Error
 }
 
-func CreateExercise(exercise *models.Exercise) error {
-	return conn().Create(exercise).Error
+func CreateExercise(ctx context.Context, exercise *models.Exercise) error {
+	return database.From(ctx).Create(exercise).Error
 }
 
-func UpdateExercise(id uint, name string, repRollover uint, cues string, loadTypes ...models.ExerciseLoadType) (*models.Exercise, error) {
-	return UpdateExerciseWithUnilateral(id, name, repRollover, cues, nil, loadTypes...)
+func UpdateExercise(ctx context.Context, id uint, name string, repRollover uint, cues string, loadTypes ...models.ExerciseLoadType) (*models.Exercise, error) {
+	return UpdateExerciseWithUnilateral(ctx, id, name, repRollover, cues, nil, loadTypes...)
 }
 
 // UpdateExerciseWithUnilateral is UpdateExercise that can also turn one-side-at-a-time logging on
 // or off (nil keeps it), in the same single write.
-func UpdateExerciseWithUnilateral(id uint, name string, repRollover uint, cues string, unilateral *bool, loadTypes ...models.ExerciseLoadType) (*models.Exercise, error) {
+func UpdateExerciseWithUnilateral(ctx context.Context, id uint, name string, repRollover uint, cues string, unilateral *bool, loadTypes ...models.ExerciseLoadType) (*models.Exercise, error) {
 	var exercise models.Exercise
-	if err := conn().First(&exercise, id).Error; err != nil {
+	if err := database.From(ctx).First(&exercise, id).Error; err != nil {
 		return nil, err
 	}
 	loadType := models.NormalizeExerciseLoadType(exercise.LoadType)
@@ -109,21 +110,21 @@ func UpdateExerciseWithUnilateral(id uint, name string, repRollover uint, cues s
 	if unilateral != nil {
 		updates["unilateral"] = *unilateral
 	}
-	if err := conn().Model(&exercise).Updates(updates).Error; err != nil {
+	if err := database.From(ctx).Model(&exercise).Updates(updates).Error; err != nil {
 		return nil, err
 	}
-	if err := conn().First(&exercise, id).Error; err != nil {
+	if err := database.From(ctx).First(&exercise, id).Error; err != nil {
 		return nil, err
 	}
 	return &exercise, nil
 }
 
-func UpdateExerciseCues(exerciseID uint, cues string) (*models.Exercise, error) {
+func UpdateExerciseCues(ctx context.Context, exerciseID uint, cues string) (*models.Exercise, error) {
 	var exercise models.Exercise
-	if err := conn().First(&exercise, exerciseID).Error; err != nil {
+	if err := database.From(ctx).First(&exercise, exerciseID).Error; err != nil {
 		return nil, err
 	}
-	if err := conn().Model(&exercise).Update("cues", cues).Error; err != nil {
+	if err := database.From(ctx).Model(&exercise).Update("cues", cues).Error; err != nil {
 		return nil, err
 	}
 	return &exercise, nil
@@ -133,6 +134,6 @@ func UpdateExerciseCues(exerciseID uint, cues string) (*models.Exercise, error) 
 // sessions may still log against them).
 func ExerciseRowExists(ctx context.Context, id uint) (bool, error) {
 	var count int64
-	err := conn().WithContext(ctx).Unscoped().Model(&models.Exercise{}).Where("id = ?", id).Count(&count).Error
+	err := database.From(ctx).WithContext(ctx).Unscoped().Model(&models.Exercise{}).Where("id = ?", id).Count(&count).Error
 	return count > 0, err
 }

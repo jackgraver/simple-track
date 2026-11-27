@@ -1,6 +1,7 @@
 package workoutrepo
 
 import (
+	"be-simpletracker/internal/database"
 	"context"
 	"errors"
 	"time"
@@ -48,8 +49,8 @@ func upsertLoggedExercise(tx *gorm.DB, workoutLogID, exerciseID uint, notes stri
 // CreateLoggedExercise inserts a logged exercise and its sets. If the workout log already has a
 // live row for the exercise, nothing is written and ErrLoggedExerciseExists is returned with
 // exercise.ID set to the existing row.
-func CreateLoggedExercise(exercise *models.LoggedExercise) error {
-	return conn().Transaction(func(tx *gorm.DB) error {
+func CreateLoggedExercise(ctx context.Context, exercise *models.LoggedExercise) error {
+	return database.From(ctx).Transaction(func(tx *gorm.DB) error {
 		id, created, err := upsertLoggedExercise(tx, exercise.WorkoutLogID, exercise.ExerciseID, exercise.Notes)
 		if err != nil {
 			return err
@@ -69,8 +70,8 @@ func CreateLoggedExercise(exercise *models.LoggedExercise) error {
 	})
 }
 
-func UpdateLoggedExerciseWithSets(exercise models.LoggedExercise) error {
-	return conn().Transaction(func(tx *gorm.DB) error {
+func UpdateLoggedExerciseWithSets(ctx context.Context, exercise models.LoggedExercise) error {
+	return database.From(ctx).Transaction(func(tx *gorm.DB) error {
 		if err := tx.Model(&models.LoggedExercise{}).
 			Where("id = ?", exercise.ID).
 			Updates(map[string]any{
@@ -135,11 +136,11 @@ func UpdateLoggedExerciseWithSets(exercise models.LoggedExercise) error {
 }
 
 func RemoveLoggedExerciseForDay(ctx context.Context, day time.Time, exerciseID uint) error {
-	res := conn().WithContext(ctx).Unscoped().
+	res := database.From(ctx).WithContext(ctx).Unscoped().
 		Where(
 			"exercise_id = ? AND workout_log_id IN (?)",
 			exerciseID,
-			conn().Model(&models.WorkoutLog{}).Select("id").Where("date = ?", day),
+			database.From(ctx).Model(&models.WorkoutLog{}).Select("id").Where("date = ?", day),
 		).
 		Delete(&models.LoggedExercise{})
 	if res.Error != nil {
@@ -151,26 +152,26 @@ func RemoveLoggedExerciseForDay(ctx context.Context, day time.Time, exerciseID u
 	return nil
 }
 
-func LoadLoggedExercise(id uint) (models.LoggedExercise, error) {
+func LoadLoggedExercise(ctx context.Context, id uint) (models.LoggedExercise, error) {
 	var exercise models.LoggedExercise
-	err := conn().Preload("Exercise").
+	err := database.From(ctx).Preload("Exercise").
 		Preload("Sets", setsInLoggedOrder).
 		Where("id = ?", id).First(&exercise).Error
 	if err != nil {
 		return models.LoggedExercise{}, err
 	}
-	if err := attachWorkoutLogDate(&exercise); err != nil {
+	if err := attachWorkoutLogDate(ctx, &exercise); err != nil {
 		return models.LoggedExercise{}, err
 	}
 	return exercise, nil
 }
 
-func attachWorkoutLogDate(exerciseLog *models.LoggedExercise) error {
+func attachWorkoutLogDate(ctx context.Context, exerciseLog *models.LoggedExercise) error {
 	if exerciseLog == nil || exerciseLog.ID == 0 {
 		return nil
 	}
 	var workoutLog models.WorkoutLog
-	err := conn().Select("date").First(&workoutLog, exerciseLog.WorkoutLogID).Error
+	err := database.From(ctx).Select("date").First(&workoutLog, exerciseLog.WorkoutLogID).Error
 	if err != nil {
 		return err
 	}
@@ -180,7 +181,7 @@ func attachWorkoutLogDate(exerciseLog *models.LoggedExercise) error {
 
 func GetPreviousExerciseLog(ctx context.Context, day time.Time, exercise string, offset int) (models.LoggedExercise, error) {
 	var exerciseLog models.LoggedExercise
-	err := conn().WithContext(ctx).
+	err := database.From(ctx).WithContext(ctx).
 		Joins("JOIN workout_logs ON workout_logs.id = logged_exercises.workout_log_id").
 		Joins("JOIN exercises ON exercises.id = logged_exercises.exercise_id").
 		Where("exercises.name = ?", exercise).
@@ -198,7 +199,7 @@ func GetPreviousExerciseLog(ctx context.Context, day time.Time, exercise string,
 	if exerciseLog.ID == 0 {
 		return exerciseLog, nil
 	}
-	if err := attachWorkoutLogDate(&exerciseLog); err != nil {
+	if err := attachWorkoutLogDate(ctx, &exerciseLog); err != nil {
 		return models.LoggedExercise{}, err
 	}
 	return exerciseLog, nil
@@ -206,7 +207,7 @@ func GetPreviousExerciseLog(ctx context.Context, day time.Time, exercise string,
 
 func GetMaxExerciseLog(ctx context.Context, day time.Time, exercise string) (models.LoggedExercise, error) {
 	var exerciseLog models.LoggedExercise
-	err := conn().WithContext(ctx).
+	err := database.From(ctx).WithContext(ctx).
 		Joins("JOIN workout_logs ON workout_logs.id = logged_exercises.workout_log_id").
 		Joins("JOIN exercises ON exercises.id = logged_exercises.exercise_id").
 		Joins("JOIN logged_sets ON logged_sets.logged_exercise_id = logged_exercises.id").
@@ -229,7 +230,7 @@ func GetMaxExerciseLog(ctx context.Context, day time.Time, exercise string) (mod
 	if exerciseLog.ID == 0 {
 		return exerciseLog, nil
 	}
-	if err := attachWorkoutLogDate(&exerciseLog); err != nil {
+	if err := attachWorkoutLogDate(ctx, &exerciseLog); err != nil {
 		return models.LoggedExercise{}, err
 	}
 	return exerciseLog, nil

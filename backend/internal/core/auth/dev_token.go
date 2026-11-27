@@ -1,6 +1,8 @@
 package auth
 
 import (
+	"context"
+
 	"be-simpletracker/internal/core/auth/models"
 	authrepo "be-simpletracker/internal/core/auth/repository"
 	"be-simpletracker/internal/env"
@@ -20,8 +22,8 @@ func devTokenMatches(value string) bool {
 
 // resolveDevUser loads DEV_AUTH_USER (default "dev") so the bypass acts as that real user,
 // with its real ID. Looked up on every request: e2e reseeds the DB between tests.
-func resolveDevUser() (models.User, error) {
-	user, err := authrepo.FindUserByUsername(env.StringOr("DEV_AUTH_USER", "dev"))
+func resolveDevUser(ctx context.Context) (models.User, error) {
+	user, err := authrepo.FindUserByUsername(ctx, env.StringOr("DEV_AUTH_USER", "dev"))
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return models.User{}, errDevUserNotFound

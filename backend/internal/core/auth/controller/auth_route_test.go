@@ -2,6 +2,7 @@ package controller
 
 import (
 	"bytes"
+	"context"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
@@ -27,15 +28,11 @@ func setupLoginRouteTest(t *testing.T, config LoginProtectionConfig) (*gin.Engin
 	if err := db.AutoMigrate(&models.User{}); err != nil {
 		t.Fatal(err)
 	}
-	database.SetDB(db)
-	t.Cleanup(func() {
-		database.SetDB(nil)
-	})
 
 	service := services.NewAuthService(func(models.User) (string, error) {
 		return "server-only-token", nil
 	})
-	if _, err := service.Register(services.RegisterInput{
+	if _, err := service.Register(database.WithDB(context.Background(), db), services.RegisterInput{
 		Username: "alice",
 		Password: "correct-password",
 	}); err != nil {
@@ -52,6 +49,7 @@ func setupLoginRouteTest(t *testing.T, config LoginProtectionConfig) (*gin.Engin
 	}
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
+	router.Use(database.Middleware(db))
 	router.POST("/login", func(c *gin.Context) {
 		Login(c, service, cookie, protection)
 	})

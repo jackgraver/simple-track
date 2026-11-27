@@ -1,6 +1,8 @@
 package water
 
 import (
+	"be-simpletracker/internal/database"
+	"context"
 	"errors"
 	"time"
 
@@ -9,7 +11,8 @@ import (
 
 // CreateWaterLog inserts a log. With a non-empty clientID it is idempotent: a replay returns the
 // existing row (even if it was deleted since) and creates nothing.
-func CreateWaterLog(db *gorm.DB, date time.Time, amountOz float64, presetID *uint, clientID string) (*WaterLog, error) {
+func CreateWaterLog(ctx context.Context, date time.Time, amountOz float64, presetID *uint, clientID string) (*WaterLog, error) {
+	db := database.From(ctx)
 	if clientID != "" {
 		if row, err := findByClientID(db, clientID); err != nil || row != nil {
 			return row, err
@@ -35,7 +38,7 @@ func CreateWaterLog(db *gorm.DB, date time.Time, amountOz float64, presetID *uin
 	if clientID != "" {
 		row.ClientID = &clientID
 	}
-	if err := db.Create(&row).Error; err != nil {
+	if err := database.CreateInSavepoint(db, &row); err != nil {
 		// Lost a race with a concurrent replay of the same client_id: return the winner's row.
 		if clientID != "" {
 			if existing, ferr := findByClientID(db, clientID); ferr == nil && existing != nil {
@@ -62,13 +65,15 @@ func findByClientID(db *gorm.DB, clientID string) (*WaterLog, error) {
 	return &row, nil
 }
 
-func ListWaterLogsForDate(db *gorm.DB, date time.Time) ([]WaterLog, error) {
+func ListWaterLogsForDate(ctx context.Context, date time.Time) ([]WaterLog, error) {
+	db := database.From(ctx)
 	var rows []WaterLog
 	err := db.Where("date = ?", date).Preload("Preset").Order("created_at DESC").Find(&rows).Error
 	return rows, err
 }
 
-func DeleteWaterLog(db *gorm.DB, id uint) error {
+func DeleteWaterLog(ctx context.Context, id uint) error {
+	db := database.From(ctx)
 	res := db.Delete(&WaterLog{}, id)
 	if res.Error != nil {
 		return res.Error
@@ -80,7 +85,8 @@ func DeleteWaterLog(db *gorm.DB, id uint) error {
 }
 
 // DeleteWaterLogByClientID deletes the entry created with clientID (gorm.ErrRecordNotFound if none).
-func DeleteWaterLogByClientID(db *gorm.DB, clientID string) error {
+func DeleteWaterLogByClientID(ctx context.Context, clientID string) error {
+	db := database.From(ctx)
 	res := db.Where("client_id = ?", clientID).Delete(&WaterLog{})
 	if res.Error != nil {
 		return res.Error
@@ -91,13 +97,15 @@ func DeleteWaterLogByClientID(db *gorm.DB, clientID string) error {
 	return nil
 }
 
-func ListDrinkSizePresets(db *gorm.DB) ([]DrinkSizePreset, error) {
+func ListDrinkSizePresets(ctx context.Context) ([]DrinkSizePreset, error) {
+	db := database.From(ctx)
 	var rows []DrinkSizePreset
 	err := db.Order("name ASC").Find(&rows).Error
 	return rows, err
 }
 
-func CreateDrinkSizePreset(db *gorm.DB, name string, amountOz float64) (*DrinkSizePreset, error) {
+func CreateDrinkSizePreset(ctx context.Context, name string, amountOz float64) (*DrinkSizePreset, error) {
+	db := database.From(ctx)
 	if name == "" {
 		return nil, errors.New("name is required")
 	}
@@ -111,7 +119,8 @@ func CreateDrinkSizePreset(db *gorm.DB, name string, amountOz float64) (*DrinkSi
 	return &p, nil
 }
 
-func UpdateDrinkSizePreset(db *gorm.DB, id uint, name string, amountOz float64) (*DrinkSizePreset, error) {
+func UpdateDrinkSizePreset(ctx context.Context, id uint, name string, amountOz float64) (*DrinkSizePreset, error) {
+	db := database.From(ctx)
 	if name == "" {
 		return nil, errors.New("name is required")
 	}
@@ -130,7 +139,8 @@ func UpdateDrinkSizePreset(db *gorm.DB, id uint, name string, amountOz float64) 
 	return &row, nil
 }
 
-func DeleteDrinkSizePreset(db *gorm.DB, id uint) error {
+func DeleteDrinkSizePreset(ctx context.Context, id uint) error {
+	db := database.From(ctx)
 	res := db.Delete(&DrinkSizePreset{}, id)
 	if res.Error != nil {
 		return res.Error

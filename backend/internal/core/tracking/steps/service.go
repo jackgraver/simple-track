@@ -1,6 +1,8 @@
 package steps
 
 import (
+	"be-simpletracker/internal/database"
+	"context"
 	"errors"
 	"time"
 
@@ -9,7 +11,8 @@ import (
 
 const defaultListLimit = 365
 
-func UpsertSteps(db *gorm.DB, date time.Time, stepsVal int) (*StepLog, error) {
+func UpsertSteps(ctx context.Context, date time.Time, stepsVal int) (*StepLog, error) {
+	db := database.From(ctx)
 	if stepsVal < 0 {
 		return nil, errors.New("steps must be non-negative")
 	}
@@ -32,7 +35,8 @@ func UpsertSteps(db *gorm.DB, date time.Time, stepsVal int) (*StepLog, error) {
 	return &row, nil
 }
 
-func ListSteps(db *gorm.DB, limit int) ([]StepLog, error) {
+func ListSteps(ctx context.Context, limit int) ([]StepLog, error) {
+	db := database.From(ctx)
 	if limit <= 0 {
 		limit = defaultListLimit
 	}

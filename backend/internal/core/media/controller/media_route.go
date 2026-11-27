@@ -15,12 +15,13 @@ import (
 )
 
 type MediaHandler struct {
-	db     *gorm.DB
 	lookup *lookup.Service
 }
 
-func RegisterMediaRoutes(group *gin.RouterGroup, db *gorm.DB, lookupService *lookup.Service) {
-	h := MediaHandler{db: db, lookup: lookupService}
+// RegisterMediaRoutes wires the media routes. The lookup routes never call database.From, so
+// they run without a database transaction while they wait on the external sources.
+func RegisterMediaRoutes(group *gin.RouterGroup, lookupService *lookup.Service) {
+	h := MediaHandler{lookup: lookupService}
 	group.GET("", h.list)
 	group.POST("", h.create)
 	group.GET("/meta", h.meta)
@@ -48,7 +49,7 @@ func (h *MediaHandler) list(c *gin.Context) {
 		}
 		filter.Favorite = &fav
 	}
-	items, err := service.ListMedia(h.db, filter)
+	items, err := service.ListMedia(c.Request.Context(), filter)
 	if err != nil {
 		respondError(c, err)
 		return
@@ -61,7 +62,7 @@ func (h *MediaHandler) meta(c *gin.Context) {
 }
 
 func (h *MediaHandler) stats(c *gin.Context) {
-	stats, err := service.GetMediaStats(h.db, clock.Now())
+	stats, err := service.GetMediaStats(c.Request.Context(), clock.Now())
 	if err != nil {
 		respondError(c, err)
 		return
@@ -74,7 +75,7 @@ func (h *MediaHandler) get(c *gin.Context) {
 	if !ok {
 		return
 	}
-	item, err := service.GetMedia(h.db, id)
+	item, err := service.GetMedia(c.Request.Context(), id)
 	if err != nil {
 		respondError(c, err)
 		return
@@ -88,7 +89,7 @@ func (h *MediaHandler) create(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	item, err := service.CreateMedia(h.db, body, clock.Now())
+	item, err := service.CreateMedia(c.Request.Context(), body, clock.Now())
 	if err != nil {
 		respondError(c, err)
 		return
@@ -106,7 +107,7 @@ func (h *MediaHandler) update(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	item, err := service.UpdateMedia(h.db, id, body, clock.Now())
+	item, err := service.UpdateMedia(c.Request.Context(), id, body, clock.Now())
 	if err != nil {
 		respondError(c, err)
 		return
@@ -119,7 +120,7 @@ func (h *MediaHandler) delete(c *gin.Context) {
 	if !ok {
 		return
 	}
-	if err := service.DeleteMedia(h.db, id); err != nil {
+	if err := service.DeleteMedia(c.Request.Context(), id); err != nil {
 		respondError(c, err)
 		return
 	}

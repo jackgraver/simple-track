@@ -3,7 +3,6 @@ package testutil
 import (
 	"be-simpletracker/internal/clock"
 	"be-simpletracker/internal/core/diet/models"
-	"be-simpletracker/internal/database"
 	"testing"
 	"time"
 
@@ -32,7 +31,6 @@ func SetupTestDB(t *testing.T) *gorm.DB {
 	); err != nil {
 		t.Fatal(err)
 	}
-	database.SetDB(db)
 	return db
 }
 

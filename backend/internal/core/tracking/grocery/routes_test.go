@@ -1,6 +1,7 @@
 package grocery
 
 import (
+	"be-simpletracker/internal/database"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -14,7 +15,8 @@ func groceryRouter(t *testing.T) (*gin.Engine, func(string) *httptest.ResponseRe
 	gin.SetMode(gin.TestMode)
 	db := groceryTestDB(t)
 	r := gin.New()
-	RegisterGroceryRoutes(r.Group("/grocery"), db)
+	r.Use(database.Middleware(db))
+	RegisterGroceryRoutes(r.Group("/grocery"))
 	post := func(body string) *httptest.ResponseRecorder {
 		req := httptest.NewRequest(http.MethodPost, "/grocery/items", strings.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
@@ -49,7 +51,8 @@ func TestPostItem_dbErrorIs500WithoutDetails(t *testing.T) {
 	db := groceryTestDB(t)
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
-	RegisterGroceryRoutes(r.Group("/grocery"), db)
+	r.Use(database.Middleware(db))
+	RegisterGroceryRoutes(r.Group("/grocery"))
 	if err := db.Exec("DROP TABLE grocery_items").Error; err != nil {
 		t.Fatal(err)
 	}

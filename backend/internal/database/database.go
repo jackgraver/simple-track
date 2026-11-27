@@ -15,15 +15,6 @@ import (
 	"gorm.io/gorm/logger"
 )
 
-// Global database connection
-var db_conn *gorm.DB
-
-// Set the global database connection
-func SetDB(db *gorm.DB) { db_conn = db }
-
-// Get the global database connection
-func GetDB() *gorm.DB { return db_conn }
-
 // Two database roles (docs/multi-user/DECISIONS.md, "App DB role"):
 //
 //   - the app role (AppRole, DATABASE_URL / DATABASE_URL_PRODUCTION) is what the server
@@ -33,12 +24,15 @@ func GetDB() *gorm.DB { return db_conn }
 //     setup) with a warning: migrations then fail at their first DDL, while DML-only tools
 //     (seeds, devuser) still work.
 
-// ConnectApp opens the server's pool on the app DSN and makes it the global connection.
+// There is no global connection: the server hands its pool to Middleware, and request code
+// reaches it only through From(ctx) (request.go).
+
+// ConnectApp opens the server's pool on the app DSN.
 func ConnectApp() (*gorm.DB, error) {
 	return connect(AppDSN)
 }
 
-// ConnectOwner opens a pool on the owner DSN and makes it the global connection. For
+// ConnectOwner opens a pool on the owner DSN. For
 // migrations, seeds and the other dev/ops tools, never the server.
 func ConnectOwner() (*gorm.DB, error) {
 	return connect(OwnerDSN)
@@ -56,16 +50,10 @@ func connect(dsnFn func() (string, error)) (*gorm.DB, error) {
 	if err != nil {
 		return nil, err
 	}
-	db, err := Open(dsn, pool)
-	if err != nil {
-		return nil, err
-	}
-	db_conn = db
-	return db, nil
+	return Open(dsn, pool)
 }
 
-// Open connects to dsn (retrying briefly while Postgres starts) and applies pool. It does not
-// touch the global connection.
+// Open connects to dsn (retrying briefly while Postgres starts) and applies pool.
 func Open(dsn string, pool Pool) (*gorm.DB, error) {
 	const maxAttempts = 3
 	const retryDelay = time.Second * 3

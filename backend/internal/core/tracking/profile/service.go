@@ -1,6 +1,8 @@
 package profile
 
 import (
+	"be-simpletracker/internal/database"
+	"context"
 	"errors"
 	"strings"
 
@@ -34,7 +36,8 @@ func ValidateActivity(a string) error {
 	return nil
 }
 
-func GetProfile(db *gorm.DB) (*UserProfile, error) {
+func GetProfile(ctx context.Context) (*UserProfile, error) {
+	db := database.From(ctx)
 	var row UserProfile
 	err := db.Order("id ASC").First(&row).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -46,7 +49,8 @@ func GetProfile(db *gorm.DB) (*UserProfile, error) {
 	return &row, nil
 }
 
-func UpsertProfile(db *gorm.DB, heightIn float64, age int, sex, activityLevel string) (*UserProfile, error) {
+func UpsertProfile(ctx context.Context, heightIn float64, age int, sex, activityLevel string) (*UserProfile, error) {
+	db := database.From(ctx)
 	if heightIn <= 0 {
 		return nil, errors.New("height_in must be positive")
 	}

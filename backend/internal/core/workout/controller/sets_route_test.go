@@ -1,6 +1,7 @@
 package controller_test
 
 import (
+	"be-simpletracker/internal/database"
 	"bytes"
 	"encoding/json"
 	"net/http"
@@ -24,6 +25,7 @@ func setsRouter(t *testing.T) (*gin.Engine, models.Exercise) {
 	}
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
+	r.Use(database.Middleware(db))
 	workout.RegisterRoutes(r, func(c *gin.Context) { c.Next() })
 	return r, ex
 }

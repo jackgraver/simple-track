@@ -77,7 +77,7 @@ func PostQuickLog(c *gin.Context) {
 	if !ok {
 		return
 	}
-	result, err := services.QuickLogMeal(dietrepo.QuickLogParams{
+	result, err := services.QuickLogMeal(c.Request.Context(), dietrepo.QuickLogParams{
 		DisplayName:   displayName,
 		FoodRowName:   fmt.Sprintf("%s [ql-%d]", displayName, time.Now().UnixNano()),
 		Calories:      req.Calories,
@@ -102,7 +102,7 @@ func PostFood(c *gin.Context) {
 		apierr.BadRequest(c, err.Error())
 		return
 	}
-	createdFood, err := services.CreateFood(&req.Food, req.RelatedFoodID)
+	createdFood, err := services.CreateFood(c.Request.Context(), &req.Food, req.RelatedFoodID)
 	if errors.Is(err, dietrepo.ErrFoodNameTaken) {
 		apierr.Conflict(c, err.Error())
 		return
@@ -170,12 +170,12 @@ func parseExcludeIDs(c *gin.Context) []uint {
 
 func GetAllFoods(c *gin.Context) {
 	excludeIDs := parseExcludeIDs(c)
-	foods, err := services.AllFoodsForPicker(excludeIDs)
+	foods, err := services.AllFoodsForPicker(c.Request.Context(), excludeIDs)
 	if err != nil {
 		apierr.Internal(c, err)
 		return
 	}
-	composites, err := services.AllCompositeFoods()
+	composites, err := services.AllCompositeFoods(c.Request.Context())
 	if err != nil {
 		apierr.Internal(c, err)
 		return
@@ -201,12 +201,12 @@ func PostNewCompositeFood(c *gin.Context) {
 		apierr.BadRequest(c, "name and at least one item required")
 		return
 	}
-	id, err := services.CreateCompositeFood(&cf)
+	id, err := services.CreateCompositeFood(c.Request.Context(), &cf)
 	if err != nil {
 		apierr.Internal(c, err)
 		return
 	}
-	loaded, err := services.CompositeFoodByID(id)
+	loaded, err := services.CompositeFoodByID(c.Request.Context(), id)
 	if err != nil {
 		apierr.Internal(c, err)
 		return
@@ -215,7 +215,7 @@ func PostNewCompositeFood(c *gin.Context) {
 }
 
 func GetAllMeals(c *gin.Context) {
-	meals, err := services.AllMeals(parseExcludeIDs(c))
+	meals, err := services.AllMeals(c.Request.Context(), parseExcludeIDs(c))
 	if err != nil {
 		apierr.Internal(c, err)
 		return
@@ -224,7 +224,7 @@ func GetAllMeals(c *gin.Context) {
 }
 
 func GetAllSavedMeals(c *gin.Context) {
-	saved, err := services.AllSavedMeals(parseExcludeIDs(c))
+	saved, err := services.AllSavedMeals(c.Request.Context(), parseExcludeIDs(c))
 	if err != nil {
 		apierr.Internal(c, err)
 		return
@@ -239,7 +239,7 @@ func PostNewSavedMeal(c *gin.Context) {
 		return
 	}
 	sm.ID = 0
-	id, err := services.CreateSavedMeal(&sm)
+	id, err := services.CreateSavedMeal(c.Request.Context(), &sm)
 	if err != nil {
 		apierr.Internal(c, err)
 		return
@@ -256,7 +256,7 @@ func DeleteSavedMeal(c *gin.Context) {
 	}
 	id := uint(id64)
 	force := strings.ToLower(strings.TrimSpace(c.Query("force"))) == "true"
-	if _, err := services.SavedMealByID(id); err != nil {
+	if _, err := services.SavedMealByID(c.Request.Context(), id); err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			apierr.NotFound(c, "saved meal not found")
 			return
@@ -265,7 +265,7 @@ func DeleteSavedMeal(c *gin.Context) {
 		return
 	}
 	if !force {
-		info, err := services.SavedMealPlannedUsageInfo(id)
+		info, err := services.SavedMealPlannedUsageInfo(c.Request.Context(), id)
 		if err != nil {
 			apierr.Internal(c, err)
 			return
@@ -275,7 +275,7 @@ func DeleteSavedMeal(c *gin.Context) {
 		})
 		return
 	}
-	if err := services.DeleteSavedMeal(id); err != nil {
+	if err := services.DeleteSavedMeal(c.Request.Context(), id); err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			apierr.NotFound(c, "saved meal not found")
 			return
@@ -293,7 +293,7 @@ func GetSavedMeal(c *gin.Context) {
 		apierr.BadRequest(c, "invalid saved meal id")
 		return
 	}
-	sm, err := services.SavedMealByID(uint(id64))
+	sm, err := services.SavedMealByID(c.Request.Context(), uint(id64))
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			apierr.NotFound(c, "saved meal not found")
@@ -325,7 +325,7 @@ func PutSavedMeal(c *gin.Context) {
 		apierr.BadRequest(c, "name and at least one item required")
 		return
 	}
-	if err := services.ReplaceSavedMeal(uint(id64), &body); err != nil {
+	if err := services.ReplaceSavedMeal(c.Request.Context(), uint(id64), &body); err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			apierr.NotFound(c, "saved meal not found")
 			return
@@ -333,7 +333,7 @@ func PutSavedMeal(c *gin.Context) {
 		apierr.Internal(c, err)
 		return
 	}
-	updated, err := services.SavedMealByID(uint(id64))
+	updated, err := services.SavedMealByID(c.Request.Context(), uint(id64))
 	if err != nil {
 		apierr.Internal(c, err)
 		return
@@ -365,7 +365,7 @@ func GetMeal(c *gin.Context) {
 		apierr.BadRequest(c, "Invalid ID")
 		return
 	}
-	meal, err := services.MealByID(uint(id))
+	meal, err := services.MealByID(c.Request.Context(), uint(id))
 	if err != nil {
 		apierr.Internal(c, err)
 		return
@@ -386,13 +386,13 @@ func PostNewMeal(c *gin.Context) {
 		apierr.BadRequest(c, err.Error())
 		return
 	}
-	mealID, err := services.CreateMeal(&req.Meal)
+	mealID, err := services.CreateMeal(c.Request.Context(), &req.Meal)
 	if err != nil {
 		apierr.Internal(c, err)
 		return
 	}
 	if req.Log {
-		day, err := services.FindMealPlanDay(clock.ZerodTime(req.Offset))
+		day, err := services.FindMealPlanDay(c.Request.Context(), clock.ZerodTime(req.Offset))
 		if err != nil {
 			apierr.Internal(c, err)
 			return
@@ -401,7 +401,7 @@ func PostNewMeal(c *gin.Context) {
 			apierr.NotFound(c, "Day not found")
 			return
 		}
-		if err := services.CreateDayMeal(&models.DayLog{
+		if err := services.CreateDayMeal(c.Request.Context(), &models.DayLog{
 			DayID:  day.ID,
 			MealID: mealID,
 		}); err != nil {
@@ -411,7 +411,7 @@ func PostNewMeal(c *gin.Context) {
 	}
 	if req.Log && req.SaveToLibrary {
 		sm := savedMealFromMealTemplate(&req.Meal)
-		if _, err := services.CreateSavedMeal(sm); err != nil {
+		if _, err := services.CreateSavedMeal(c.Request.Context(), sm); err != nil {
 			apierr.Internal(c, err)
 			return
 		}
@@ -431,7 +431,7 @@ func PostLogPlanned(c *gin.Context) {
 		apierr.BadRequest(c, err.Error())
 		return
 	}
-	day, err := services.FindMealPlanDayByRowIDOrToday(req.DayID)
+	day, err := services.FindMealPlanDayByRowIDOrToday(c.Request.Context(), req.DayID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			apierr.NotFound(c, "Day not found")
@@ -444,7 +444,7 @@ func PostLogPlanned(c *gin.Context) {
 		apierr.NotFound(c, "Day not found")
 		return
 	}
-	if err := services.LogPlannedMeal(day.ID, req.MealID); err != nil {
+	if err := services.LogPlannedMeal(c.Request.Context(), day.ID, req.MealID); err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			apierr.NotFound(c, "Planned meal not found on this day")
 			return
@@ -452,7 +452,7 @@ func PostLogPlanned(c *gin.Context) {
 		apierr.Internal(c, err)
 		return
 	}
-	result, err := services.ReloadDayWithTotals(day)
+	result, err := services.ReloadDayWithTotals(c.Request.Context(), day)
 	if err != nil {
 		apierr.Internal(c, err)
 		return
@@ -473,12 +473,12 @@ func PostLogEdited(c *gin.Context) {
 		apierr.BadRequest(c, err.Error())
 		return
 	}
-	newMealID, err := services.CreateMeal(&req.Meal)
+	newMealID, err := services.CreateMeal(c.Request.Context(), &req.Meal)
 	if err != nil {
 		apierr.Internal(c, err)
 		return
 	}
-	day, err := services.FindMealPlanDayByRowIDOrToday(req.DayID)
+	day, err := services.FindMealPlanDayByRowIDOrToday(c.Request.Context(), req.DayID)
 	if err != nil {
 		apierr.Internal(c, err)
 		return
@@ -487,7 +487,7 @@ func PostLogEdited(c *gin.Context) {
 		apierr.NotFound(c, "Day not found")
 		return
 	}
-	if err := services.CreateDayMeal(&models.DayLog{
+	if err := services.CreateDayMeal(c.Request.Context(), &models.DayLog{
 		DayID:  day.ID,
 		MealID: newMealID,
 	}); err != nil {
@@ -495,12 +495,12 @@ func PostLogEdited(c *gin.Context) {
 		return
 	}
 	if req.PlannedSourceMealID != 0 {
-		if err := services.SetPlannedMealLogged(day.ID, req.PlannedSourceMealID); err != nil {
+		if err := services.SetPlannedMealLogged(c.Request.Context(), day.ID, req.PlannedSourceMealID); err != nil {
 			apierr.Internal(c, err)
 			return
 		}
 	}
-	result, err := services.ReloadDayWithTotals(day)
+	result, err := services.ReloadDayWithTotals(c.Request.Context(), day)
 	if err != nil {
 		apierr.Internal(c, err)
 		return
@@ -514,7 +514,7 @@ func PostEditLogged(c *gin.Context) {
 		apierr.BadRequest(c, err.Error())
 		return
 	}
-	day, err := services.FindMealPlanDayByRowIDOrToday(req.DayID)
+	day, err := services.FindMealPlanDayByRowIDOrToday(c.Request.Context(), req.DayID)
 	if err != nil {
 		apierr.Internal(c, err)
 		return
@@ -523,11 +523,11 @@ func PostEditLogged(c *gin.Context) {
 		apierr.NotFound(c, "Day not found")
 		return
 	}
-	if err := services.EditLoggedMeal(day.ID, req.OldMealID, &req.Meal); err != nil {
+	if err := services.EditLoggedMeal(c.Request.Context(), day.ID, req.OldMealID, &req.Meal); err != nil {
 		apierr.Internal(c, err)
 		return
 	}
-	result, err := services.ReloadDayWithTotals(day)
+	result, err := services.ReloadDayWithTotals(c.Request.Context(), day)
 	if err != nil {
 		apierr.Internal(c, err)
 		return
@@ -546,7 +546,7 @@ func DeleteLoggedMeal(c *gin.Context) {
 		apierr.BadRequest(c, err.Error())
 		return
 	}
-	day, err := services.FindMealPlanDayByRowIDOrToday(req.DayID)
+	day, err := services.FindMealPlanDayByRowIDOrToday(c.Request.Context(), req.DayID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			apierr.NotFound(c, "Day not found")
@@ -559,11 +559,11 @@ func DeleteLoggedMeal(c *gin.Context) {
 		apierr.NotFound(c, "Day not found")
 		return
 	}
-	if err := services.DeleteLoggedMeal(day.ID, req.MealID); err != nil {
+	if err := services.DeleteLoggedMeal(c.Request.Context(), day.ID, req.MealID); err != nil {
 		apierr.Internal(c, err)
 		return
 	}
-	result, err := services.ReloadDayWithTotals(day)
+	result, err := services.ReloadDayWithTotals(c.Request.Context(), day)
 	if err != nil {
 		apierr.Internal(c, err)
 		return
@@ -591,11 +591,11 @@ func PostPlannedFromSaved(c *gin.Context) {
 	if !ok {
 		return
 	}
-	if err := services.AddPlannedMealFromSavedMeal(req.Offset, req.SavedMealID, clientID); err != nil {
+	if err := services.AddPlannedMealFromSavedMeal(c.Request.Context(), req.Offset, req.SavedMealID, clientID); err != nil {
 		apierr.Internal(c, err)
 		return
 	}
-	day, err := services.FindMealPlanDay(clock.ZerodTime(req.Offset))
+	day, err := services.FindMealPlanDay(c.Request.Context(), clock.ZerodTime(req.Offset))
 	if err != nil {
 		apierr.Internal(c, err)
 		return
@@ -604,7 +604,7 @@ func PostPlannedFromSaved(c *gin.Context) {
 		apierr.NotFound(c, "Day not found")
 		return
 	}
-	result, err := services.ReloadDayWithTotals(day)
+	result, err := services.ReloadDayWithTotals(c.Request.Context(), day)
 	if err != nil {
 		apierr.Internal(c, err)
 		return
@@ -632,7 +632,7 @@ func PostPlannedCopyDay(c *gin.Context) {
 		apierr.BadRequest(c, "at most 62 target days")
 		return
 	}
-	n, err := services.CopyPlannedMeals(req.FromOffset, req.ToOffsets)
+	n, err := services.CopyPlannedMeals(c.Request.Context(), req.FromOffset, req.ToOffsets)
 	if err != nil {
 		apierr.Internal(c, err)
 		return
@@ -655,11 +655,11 @@ func PostPlannedReorder(c *gin.Context) {
 		apierr.BadRequest(c, "planned_meal_ids is required")
 		return
 	}
-	if err := services.ReorderPlannedMeals(req.Offset, req.PlannedMealIDs); err != nil {
+	if err := services.ReorderPlannedMeals(c.Request.Context(), req.Offset, req.PlannedMealIDs); err != nil {
 		apierr.BadRequest(c, err.Error())
 		return
 	}
-	day, err := services.FindMealPlanDay(clock.ZerodTime(req.Offset))
+	day, err := services.FindMealPlanDay(c.Request.Context(), clock.ZerodTime(req.Offset))
 	if err != nil {
 		apierr.Internal(c, err)
 		return
@@ -668,7 +668,7 @@ func PostPlannedReorder(c *gin.Context) {
 		apierr.NotFound(c, "Day not found")
 		return
 	}
-	result, err := services.ReloadDayWithTotals(day)
+	result, err := services.ReloadDayWithTotals(c.Request.Context(), day)
 	if err != nil {
 		apierr.Internal(c, err)
 		return
@@ -691,11 +691,11 @@ func DeletePlannedMeal(c *gin.Context) {
 		apierr.BadRequest(c, "planned_meal_id is required")
 		return
 	}
-	if err := services.DeletePlannedMeal(req.Offset, req.PlannedMealID); err != nil {
+	if err := services.DeletePlannedMeal(c.Request.Context(), req.Offset, req.PlannedMealID); err != nil {
 		apierr.Internal(c, err)
 		return
 	}
-	day, err := services.FindMealPlanDay(clock.ZerodTime(req.Offset))
+	day, err := services.FindMealPlanDay(c.Request.Context(), clock.ZerodTime(req.Offset))
 	if err != nil {
 		apierr.Internal(c, err)
 		return
@@ -704,7 +704,7 @@ func DeletePlannedMeal(c *gin.Context) {
 		apierr.NotFound(c, "Day not found")
 		return
 	}
-	result, err := services.ReloadDayWithTotals(day)
+	result, err := services.ReloadDayWithTotals(c.Request.Context(), day)
 	if err != nil {
 		apierr.Internal(c, err)
 		return

@@ -13,12 +13,10 @@ import (
 	"gorm.io/gorm"
 )
 
-type handler struct {
-	db *gorm.DB
-}
+type handler struct{}
 
-func RegisterGroceryRoutes(group *gin.RouterGroup, db *gorm.DB) {
-	h := handler{db: db}
+func RegisterGroceryRoutes(group *gin.RouterGroup) {
+	h := handler{}
 	group.GET("/items", h.getItems)
 	group.POST("/items", h.postItem)
 	group.POST("/items/parse", h.parseItems)
@@ -29,7 +27,7 @@ func RegisterGroceryRoutes(group *gin.RouterGroup, db *gorm.DB) {
 }
 
 func (h *handler) getItems(c *gin.Context) {
-	rows, err := ListActiveItems(h.db)
+	rows, err := ListActiveItems(c.Request.Context())
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -57,7 +55,7 @@ func (h *handler) postItem(c *gin.Context) {
 		}
 		clientID = id.String()
 	}
-	row, err := CreateItem(h.db, body.Name, clientID)
+	row, err := CreateItem(c.Request.Context(), body.Name, clientID)
 	if err != nil {
 		if errors.Is(err, ErrNameRequired) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -94,7 +92,7 @@ func (h *handler) completeItem(c *gin.Context) {
 	if !ok {
 		return
 	}
-	row, err := CompleteItem(h.db, ref)
+	row, err := CompleteItem(c.Request.Context(), ref)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
@@ -111,7 +109,7 @@ func (h *handler) deleteItem(c *gin.Context) {
 	if !ok {
 		return
 	}
-	if err := DeleteItem(h.db, ref); err != nil {
+	if err := DeleteItem(c.Request.Context(), ref); err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
 			return
@@ -123,7 +121,7 @@ func (h *handler) deleteItem(c *gin.Context) {
 }
 
 func (h *handler) getSuggestions(c *gin.Context) {
-	rows, err := ListSuggestions(h.db, c.Query("q"))
+	rows, err := ListSuggestions(c.Request.Context(), c.Query("q"))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -142,7 +140,7 @@ func (h *handler) parseItems(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	lines, err := ParseTextList(h.db, body.Text)
+	lines, err := ParseTextList(c.Request.Context(), body.Text)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -161,7 +159,7 @@ func (h *handler) postItems(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	created, skipped, err := CreateItems(h.db, body.Names)
+	created, skipped, err := CreateItems(c.Request.Context(), body.Names)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

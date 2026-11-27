@@ -134,6 +134,9 @@ Each lane adds what its changes need here (README: "Prod changes go in ROLLOUT.m
   CORS origins) ships in the backend image with 3.3; nothing to configure (`APP_ORIGIN` already
   sets `CORS_ORIGINS`). The Caddy part is a separate deploy **after 3.4**: see 3.5.
 
+- **B2 (per-request DB handle)**: nothing to do. In 3.4, also check the backend log has no
+  `database: commit` or `database: rollback` errors (a failed commit answers 500).
+
 <!-- Later lanes: add anything else that must happen in this deploy here. -->
 
 ### 3.4 Verify

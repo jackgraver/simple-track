@@ -1,6 +1,7 @@
 package services
 
 import (
+	"context"
 	"errors"
 	"testing"
 	"time"
@@ -12,7 +13,7 @@ import (
 	"gorm.io/gorm"
 )
 
-func setupTestDB(t *testing.T) {
+func setupTestDB(t *testing.T) context.Context {
 	t.Helper()
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	if err != nil {
@@ -21,19 +22,16 @@ func setupTestDB(t *testing.T) {
 	if err := db.AutoMigrate(&models.User{}); err != nil {
 		t.Fatal(err)
 	}
-	database.SetDB(db)
-	t.Cleanup(func() {
-		database.SetDB(nil)
-	})
+	return database.WithDB(context.Background(), db)
 }
 
 func TestAuthServiceRegisterRedactsPassword(t *testing.T) {
-	setupTestDB(t)
+	ctx := setupTestDB(t)
 	service := NewAuthService(func(user models.User) (string, error) {
 		return "token-" + user.Username, nil
 	})
 
-	result, err := service.Register(RegisterInput{
+	result, err := service.Register(ctx, RegisterInput{
 		Username: "wanda",
 		Password: "secret",
 		Email:    "wanda@example.com",
@@ -49,7 +47,7 @@ func TestAuthServiceRegisterRedactsPassword(t *testing.T) {
 	}
 
 	var stored models.User
-	if err := database.GetDB().Where("username = ?", "wanda").First(&stored).Error; err != nil {
+	if err := database.From(ctx).Where("username = ?", "wanda").First(&stored).Error; err != nil {
 		t.Fatal(err)
 	}
 	if stored.Password == "" || stored.Password == "secret" {
@@ -58,45 +56,45 @@ func TestAuthServiceRegisterRedactsPassword(t *testing.T) {
 }
 
 func TestAuthServiceRegisterRejectsDuplicateUsername(t *testing.T) {
-	setupTestDB(t)
-	if err := database.GetDB().Create(&models.User{Username: "wanda", Password: "hash"}).Error; err != nil {
+	ctx := setupTestDB(t)
+	if err := database.From(ctx).Create(&models.User{Username: "wanda", Password: "hash"}).Error; err != nil {
 		t.Fatal(err)
 	}
 	service := NewAuthService(func(models.User) (string, error) {
 		return "token", nil
 	})
 
-	_, err := service.Register(RegisterInput{Username: "wanda", Password: "secret"})
+	_, err := service.Register(ctx, RegisterInput{Username: "wanda", Password: "secret"})
 	if !errors.Is(err, ErrUsernameExists) {
 		t.Fatalf("error: got %v want %v", err, ErrUsernameExists)
 	}
 }
 
 func TestAuthServiceLoginRejectsInvalidCredentials(t *testing.T) {
-	setupTestDB(t)
+	ctx := setupTestDB(t)
 	service := NewAuthService(func(models.User) (string, error) {
 		return "token", nil
 	})
-	if _, err := service.Register(RegisterInput{Username: "wanda", Password: "secret"}); err != nil {
+	if _, err := service.Register(ctx, RegisterInput{Username: "wanda", Password: "secret"}); err != nil {
 		t.Fatal(err)
 	}
 
-	_, err := service.Login(LoginInput{Username: "wanda", Password: "wrong"})
+	_, err := service.Login(ctx, LoginInput{Username: "wanda", Password: "wrong"})
 	if !errors.Is(err, ErrInvalidCredentials) {
 		t.Fatalf("error: got %v want %v", err, ErrInvalidCredentials)
 	}
 }
 
 func TestAuthServiceUpdatesBirthYear(t *testing.T) {
-	setupTestDB(t)
+	ctx := setupTestDB(t)
 	service := NewAuthService(func(models.User) (string, error) {
 		return "token", nil
 	})
-	registered, err := service.Register(RegisterInput{Username: "wanda", Password: "secret"})
+	registered, err := service.Register(ctx, RegisterInput{Username: "wanda", Password: "secret"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	user, err := service.UpdateBirthYear(registered.User.ID, 2000)
+	user, err := service.UpdateBirthYear(ctx, registered.User.ID, 2000)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -106,17 +104,17 @@ func TestAuthServiceUpdatesBirthYear(t *testing.T) {
 }
 
 func TestAuthServiceTokenCarriesIDAndVersion(t *testing.T) {
-	setupTestDB(t)
+	ctx := setupTestDB(t)
 	var issued []models.User
 	service := NewAuthService(func(user models.User) (string, error) {
 		issued = append(issued, user)
 		return "token", nil
 	})
-	registered, err := service.Register(RegisterInput{Username: "wanda", Password: "secret"})
+	registered, err := service.Register(ctx, RegisterInput{Username: "wanda", Password: "secret"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := service.Login(LoginInput{Username: "wanda", Password: "secret"}); err != nil {
+	if _, err := service.Login(ctx, LoginInput{Username: "wanda", Password: "secret"}); err != nil {
 		t.Fatal(err)
 	}
 	for _, u := range issued {
@@ -127,17 +125,17 @@ func TestAuthServiceTokenCarriesIDAndVersion(t *testing.T) {
 }
 
 func TestAuthServiceLoginRejectsDisabledUser(t *testing.T) {
-	setupTestDB(t)
+	ctx := setupTestDB(t)
 	service := NewAuthService(func(models.User) (string, error) {
 		return "token", nil
 	})
-	if _, err := service.Register(RegisterInput{Username: "wanda", Password: "secret"}); err != nil {
+	if _, err := service.Register(ctx, RegisterInput{Username: "wanda", Password: "secret"}); err != nil {
 		t.Fatal(err)
 	}
-	if err := database.GetDB().Model(&models.User{}).Where("username = ?", "wanda").Update("disabled_at", time.Now()).Error; err != nil {
+	if err := database.From(ctx).Model(&models.User{}).Where("username = ?", "wanda").Update("disabled_at", time.Now()).Error; err != nil {
 		t.Fatal(err)
 	}
-	_, err := service.Login(LoginInput{Username: "wanda", Password: "secret"})
+	_, err := service.Login(ctx, LoginInput{Username: "wanda", Password: "secret"})
 	if !errors.Is(err, ErrInvalidCredentials) {
 		t.Fatalf("disabled login: got %v want %v", err, ErrInvalidCredentials)
 	}

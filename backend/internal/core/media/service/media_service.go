@@ -1,6 +1,8 @@
 package service
 
 import (
+	"be-simpletracker/internal/database"
+	"context"
 	"errors"
 	"fmt"
 	"math"
@@ -60,7 +62,8 @@ func invalid(format string, args ...any) error {
 	return fmt.Errorf("%w: %s", ErrInvalid, fmt.Sprintf(format, args...))
 }
 
-func ListMedia(db *gorm.DB, f ListFilter) ([]models.MediaItem, error) {
+func ListMedia(ctx context.Context, f ListFilter) ([]models.MediaItem, error) {
+	db := database.From(ctx)
 	order, ok := sortOrders[f.Sort]
 	if !ok {
 		return nil, invalid("unknown sort %q", f.Sort)
@@ -92,7 +95,8 @@ func ListMedia(db *gorm.DB, f ListFilter) ([]models.MediaItem, error) {
 	return items, nil
 }
 
-func GetMedia(db *gorm.DB, id uint) (*models.MediaItem, error) {
+func GetMedia(ctx context.Context, id uint) (*models.MediaItem, error) {
+	db := database.From(ctx)
 	var item models.MediaItem
 	if err := db.First(&item, id).Error; err != nil {
 		return nil, err
@@ -100,7 +104,8 @@ func GetMedia(db *gorm.DB, id uint) (*models.MediaItem, error) {
 	return &item, nil
 }
 
-func CreateMedia(db *gorm.DB, in MediaInput, now time.Time) (*models.MediaItem, error) {
+func CreateMedia(ctx context.Context, in MediaInput, now time.Time) (*models.MediaItem, error) {
+	db := database.From(ctx)
 	item := models.MediaItem{Status: models.MediaStatusPlanned}
 	if !in.Type.Set || in.Type.Value == nil {
 		return nil, invalid("type is required")
@@ -117,8 +122,9 @@ func CreateMedia(db *gorm.DB, in MediaInput, now time.Time) (*models.MediaItem, 
 	return &item, nil
 }
 
-func UpdateMedia(db *gorm.DB, id uint, in MediaInput, now time.Time) (*models.MediaItem, error) {
-	item, err := GetMedia(db, id)
+func UpdateMedia(ctx context.Context, id uint, in MediaInput, now time.Time) (*models.MediaItem, error) {
+	db := database.From(ctx)
+	item, err := GetMedia(ctx, id)
 	if err != nil {
 		return nil, err
 	}
@@ -131,7 +137,8 @@ func UpdateMedia(db *gorm.DB, id uint, in MediaInput, now time.Time) (*models.Me
 	return item, nil
 }
 
-func DeleteMedia(db *gorm.DB, id uint) error {
+func DeleteMedia(ctx context.Context, id uint) error {
+	db := database.From(ctx)
 	result := db.Delete(&models.MediaItem{}, id)
 	if result.Error != nil {
 		return result.Error
@@ -292,7 +299,8 @@ type MediaStats struct {
 	CompletedThisYear int64            `json:"completed_this_year"`
 }
 
-func GetMediaStats(db *gorm.DB, now time.Time) (*MediaStats, error) {
+func GetMediaStats(ctx context.Context, now time.Time) (*MediaStats, error) {
+	db := database.From(ctx)
 	stats := MediaStats{ByType: map[string]int64{}, ByStatus: map[string]int64{}}
 	type row struct {
 		Key   string

@@ -1,12 +1,14 @@
 package auth
 
 import (
+	"context"
 	"errors"
 	"log"
 	"net/http"
 
 	"be-simpletracker/internal/core/auth/models"
 	authrepo "be-simpletracker/internal/core/auth/repository"
+	"be-simpletracker/internal/database"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -28,8 +30,14 @@ var (
 // Every request loads the user row by primary key, so a disabled user, a bumped
 // token_version or a removed admin flag takes effect on the next request. Missing or
 // invalid tokens always produce 401; there is no default user.
-func AuthMiddleware() gin.HandlerFunc {
+//
+// The user lookup runs on db (the pool), outside the request transaction, so that transaction
+// still begins lazily: a handler that does external work before touching the database (media
+// lookups) doesn't hold a connection meanwhile. The user then becomes the transaction's
+// identity (app.user_id, app.is_admin) through database.SetIdentity.
+func AuthMiddleware(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		lookup := database.WithDB(c.Request.Context(), db)
 		if crossSiteWrite(c.Request) {
 			log.Printf("[auth] refused %s %s: Sec-Fetch-Site=%q", c.Request.Method, c.Request.URL.Path, c.GetHeader("Sec-Fetch-Site"))
 			c.JSON(http.StatusForbidden, gin.H{"error": "Cross-site request refused"})
@@ -40,13 +48,15 @@ func AuthMiddleware() gin.HandlerFunc {
 		token, _ := c.Cookie(AuthTokenCookieName)
 
 		if devTokenMatches(token) {
-			user, err := resolveDevUser()
+			user, err := resolveDevUser(lookup)
 			if err != nil {
 				rejectSession(c, err)
 				return
 			}
 			log.Printf("[auth] DEV_AUTH_TOKEN cookie bypass active (user=%q id=%d) — DO NOT USE IN PRODUCTION", user.Username, user.ID)
-			setRequestUser(c, user)
+			if !setRequestUser(c, user) {
+				return
+			}
 			c.Next()
 			return
 		}
@@ -62,13 +72,26 @@ func AuthMiddleware() gin.HandlerFunc {
 			rejectSession(c, err)
 			return
 		}
-		user, err := resolveTokenUser(claims)
+		user, err := resolveTokenUser(lookup, claims)
 		if err != nil {
 			rejectSession(c, err)
 			return
 		}
 
-		setRequestUser(c, user)
+		if !setRequestUser(c, user) {
+			return
+		}
+		c.Next()
+	}
+}
+
+// OutsideRequestTx runs the rest of the route on the pool, without the request transaction. For
+// /auth/login and /auth/register: there is no user yet, `users` has no row-level security, and
+// they must not hold a connection while bcrypt runs (tens to hundreds of ms per attempt, so a
+// burst of login attempts would otherwise pin the pool).
+func OutsideRequestTx(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		c.Request = c.Request.WithContext(database.WithDB(c.Request.Context(), db))
 		c.Next()
 	}
 }
@@ -91,11 +114,11 @@ func crossSiteWrite(r *http.Request) bool {
 }
 
 // resolveTokenUser checks a signature-verified token against the user's current row.
-func resolveTokenUser(claims *Claims) (models.User, error) {
+func resolveTokenUser(ctx context.Context, claims *Claims) (models.User, error) {
 	if claims.UID == 0 {
 		return models.User{}, errNoUID
 	}
-	user, err := authrepo.FindUserByID(claims.UID)
+	user, err := authrepo.FindUserByID(ctx, claims.UID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return models.User{}, errUserGone
@@ -111,7 +134,13 @@ func resolveTokenUser(claims *Claims) (models.User, error) {
 	return user, nil
 }
 
-func setRequestUser(c *gin.Context, user models.User) {
+// setRequestUser puts user on the request context and makes them the request transaction's
+// identity. It answers 503 and returns false if that fails.
+func setRequestUser(c *gin.Context, user models.User) bool {
+	if err := database.SetIdentity(c.Request.Context(), database.Identity{UserID: user.ID, IsAdmin: user.IsAdmin}); err != nil {
+		rejectSession(c, err)
+		return false
+	}
 	c.Request = c.Request.WithContext(WithUser(c.Request.Context(), User{
 		ID:       user.ID,
 		Username: user.Username,
@@ -119,6 +148,7 @@ func setRequestUser(c *gin.Context, user models.User) {
 	}))
 	// Kept for handlers that still read the gin key; new code uses UserID(ctx).
 	c.Set("username", user.Username)
+	return true
 }
 
 func rejectSession(c *gin.Context, reason error) {

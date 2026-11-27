@@ -88,6 +88,11 @@ Nothing Critical was found. Prod today has one account, so most multi-user findi
   existence check by user, including `Unscoped()` ones. Add a two-user test: Alice and Bob both
   start a workout on the same date.
 - **Lane**: C2 (diet), C3 (workout); B3 should provide a `LockKey(ctx, ...)` helper.
+- **Since B2**: locks taken in a request are held until the response is sent (the request
+  transaction), not just for the insert. With the date-only key, Alice's and Bob's first gym
+  load of the same day would wait for each other's whole request. Still only the first load of
+  a day; the per-user key removes it. The diet locks key on `client_id` (random per request), so
+  users never share one.
 
 ### 3. Medium: login lockout of a known username (exploitable now)
 

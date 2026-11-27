@@ -22,7 +22,7 @@ type createWorkoutPlanRequest struct {
 }
 
 func GetAllWorkoutPrograms(c *gin.Context) {
-	programs, err := services.GetAllWorkoutPrograms()
+	programs, err := services.GetAllWorkoutPrograms(c.Request.Context())
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -36,7 +36,7 @@ func CreateWorkoutProgram(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "name is required"})
 		return
 	}
-	program, err := services.CreateWorkoutProgram(body.Name)
+	program, err := services.CreateWorkoutProgram(c.Request.Context(), body.Name)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -55,7 +55,7 @@ func CreateWorkoutPlan(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	plan, err := services.CreateWorkoutPlan(uint(programID), body.Name, body.DayOfWeek)
+	plan, err := services.CreateWorkoutPlan(c.Request.Context(), uint(programID), body.Name, body.DayOfWeek)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -74,7 +74,7 @@ func RenameWorkoutProgram(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "name is required"})
 		return
 	}
-	program, err := services.RenameWorkoutProgram(uint(id), body.Name)
+	program, err := services.RenameWorkoutProgram(c.Request.Context(), uint(id), body.Name)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -97,7 +97,7 @@ func ActivateWorkoutProgram(c *gin.Context) {
 }
 
 func GetAllWorkoutPlans(c *gin.Context) {
-	workoutPlans, err := services.GetAllWorkoutPlans()
+	workoutPlans, err := services.GetAllWorkoutPlans(c.Request.Context())
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -124,7 +124,7 @@ func AddExerciseToPlan(c *gin.Context) {
 		return
 	}
 
-	plan, err := services.LoadPlanWithOrderedExercises(uint(planID))
+	plan, err := services.LoadPlanWithOrderedExercises(c.Request.Context(), uint(planID))
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Plan not found"})
 		return
@@ -136,12 +136,12 @@ func AddExerciseToPlan(c *gin.Context) {
 		}
 	}
 
-	if err := services.AddExerciseToPlan(uint(planID), request.ExerciseID); err != nil {
+	if err := services.AddExerciseToPlan(c.Request.Context(), uint(planID), request.ExerciseID); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	plan, err = services.LoadPlanWithOrderedExercises(uint(planID))
+	plan, err = services.LoadPlanWithOrderedExercises(c.Request.Context(), uint(planID))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -164,7 +164,7 @@ func RemoveExerciseFromPlan(c *gin.Context) {
 		return
 	}
 
-	if err := services.RemoveExerciseFromPlan(uint(planID), request.ExerciseID); err != nil {
+	if err := services.RemoveExerciseFromPlan(c.Request.Context(), uint(planID), request.ExerciseID); err != nil {
 		if err == gorm.ErrRecordNotFound {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Exercise not in plan"})
 			return
@@ -173,7 +173,7 @@ func RemoveExerciseFromPlan(c *gin.Context) {
 		return
 	}
 
-	plan, err := services.LoadPlanWithOrderedExercises(uint(planID))
+	plan, err := services.LoadPlanWithOrderedExercises(c.Request.Context(), uint(planID))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -198,11 +198,11 @@ func ReorderPlanExercises(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	if err := services.ReorderPlanExercises(uint(planID), body.ExerciseIDs); err != nil {
+	if err := services.ReorderPlanExercises(c.Request.Context(), uint(planID), body.ExerciseIDs); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	plan, err := services.LoadPlanWithOrderedExercises(uint(planID))
+	plan, err := services.LoadPlanWithOrderedExercises(c.Request.Context(), uint(planID))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -232,7 +232,7 @@ func AssignPlanToDay(c *gin.Context) {
 		return
 	}
 
-	plan, err := services.AssignPlanToDay(uint(planID), *request.DayOfWeek)
+	plan, err := services.AssignPlanToDay(c.Request.Context(), uint(planID), *request.DayOfWeek)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -258,7 +258,7 @@ func SetPlannedCardio(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	plan, err := services.SetPlannedCardio(uint(planID), body.Type, body.Minutes)
+	plan, err := services.SetPlannedCardio(c.Request.Context(), uint(planID), body.Type, body.Minutes)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -282,7 +282,7 @@ func SetPlannedMobility(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	plan, err := services.SetPlannedMobility(uint(planID), body.PreMobilityItems, body.PostMobilityItems)
+	plan, err := services.SetPlannedMobility(c.Request.Context(), uint(planID), body.PreMobilityItems, body.PostMobilityItems)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -305,9 +305,9 @@ func UnassignPlanFromDay(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid day_of_week"})
 			return
 		}
-		plan, err = services.UnassignPlanFromSpecificDay(uint(planID), day)
+		plan, err = services.UnassignPlanFromSpecificDay(c.Request.Context(), uint(planID), day)
 	} else {
-		plan, err = services.UnassignPlanFromDay(uint(planID))
+		plan, err = services.UnassignPlanFromDay(c.Request.Context(), uint(planID))
 	}
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -343,7 +343,7 @@ func RenameWorkoutPlan(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "name is required"})
 		return
 	}
-	plan, err := services.RenameWorkoutPlan(id, body.Name)
+	plan, err := services.RenameWorkoutPlan(c.Request.Context(), id, body.Name)
 	if err != nil {
 		c.JSON(planErrorStatus(err), gin.H{"error": err.Error()})
 		return
@@ -356,7 +356,7 @@ func DeleteWorkoutPlan(c *gin.Context) {
 	if !ok {
 		return
 	}
-	if err := services.DeleteWorkoutPlan(id); err != nil {
+	if err := services.DeleteWorkoutPlan(c.Request.Context(), id); err != nil {
 		c.JSON(planErrorStatus(err), gin.H{"error": err.Error()})
 		return
 	}
@@ -368,7 +368,7 @@ func RestoreWorkoutPlan(c *gin.Context) {
 	if !ok {
 		return
 	}
-	plan, err := services.RestoreWorkoutPlan(id)
+	plan, err := services.RestoreWorkoutPlan(c.Request.Context(), id)
 	if err != nil {
 		c.JSON(planErrorStatus(err), gin.H{"error": err.Error()})
 		return

@@ -1,6 +1,8 @@
 package grocery
 
 import (
+	"be-simpletracker/internal/database"
+	"context"
 	"testing"
 
 	"github.com/glebarez/sqlite"
@@ -26,11 +28,11 @@ func groceryTestDB(t *testing.T) *gorm.DB {
 func TestCreateItemIdempotentByClientID(t *testing.T) {
 	db := groceryTestDB(t)
 	id := "11111111-1111-4111-8111-111111111111"
-	a, err := CreateItem(db, "milk", id)
+	a, err := CreateItem(database.WithDB(context.Background(), db), "milk", id)
 	if err != nil {
 		t.Fatal(err)
 	}
-	b, err := CreateItem(db, "milk", id)
+	b, err := CreateItem(database.WithDB(context.Background(), db), "milk", id)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -43,10 +45,10 @@ func TestCreateItemIdempotentByClientID(t *testing.T) {
 		t.Fatalf("want 1 row, got %d", n)
 	}
 	// Still returned after being completed.
-	if _, err := CompleteItem(db, itemRef{id: a.ID}); err != nil {
+	if _, err := CompleteItem(database.WithDB(context.Background(), db), itemRef{id: a.ID}); err != nil {
 		t.Fatal(err)
 	}
-	c, err := CreateItem(db, "milk", id)
+	c, err := CreateItem(database.WithDB(context.Background(), db), "milk", id)
 	if err != nil || c.ID != a.ID {
 		t.Fatalf("replay after complete: %v %v", c, err)
 	}
@@ -54,8 +56,8 @@ func TestCreateItemIdempotentByClientID(t *testing.T) {
 
 func TestCreateItemWithoutClientIDAlwaysCreates(t *testing.T) {
 	db := groceryTestDB(t)
-	a, _ := CreateItem(db, "eggs", "")
-	b, _ := CreateItem(db, "eggs", "")
+	a, _ := CreateItem(database.WithDB(context.Background(), db), "eggs", "")
+	b, _ := CreateItem(database.WithDB(context.Background(), db), "eggs", "")
 	if a.ID == b.ID {
 		t.Fatal("expected two rows")
 	}

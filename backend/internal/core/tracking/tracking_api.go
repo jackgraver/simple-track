@@ -9,23 +9,20 @@ import (
 	"be-simpletracker/internal/core/tracking/weight"
 
 	"github.com/gin-gonic/gin"
-	"gorm.io/gorm"
 )
 
-type Handler struct {
-	db *gorm.DB
-}
+type Handler struct{}
 
-func NewHandler(db *gorm.DB) *Handler {
-	return &Handler{db: db}
+func NewHandler() *Handler {
+	return &Handler{}
 }
 
 func (h *Handler) RegisterRoutes(router *gin.Engine, authMiddleware gin.HandlerFunc) {
 	group := router.Group("/tracking", authMiddleware)
-	missed.RegisterMissedRoutes(group, h.db)
-	profile.RegisterProfileRoutes(group.Group("/profile"), h.db)
-	grocery.RegisterGroceryRoutes(group.Group("/grocery"), h.db)
-	weight.RegisterWeightRoutes(group.Group("/weight"), h.db)
-	steps.RegisterStepsRoutes(group.Group("/steps"), h.db)
-	water.RegisterWaterRoutes(group.Group("/water"), h.db)
+	missed.RegisterMissedRoutes(group)
+	profile.RegisterProfileRoutes(group.Group("/profile"))
+	grocery.RegisterGroceryRoutes(group.Group("/grocery"))
+	weight.RegisterWeightRoutes(group.Group("/weight"))
+	steps.RegisterStepsRoutes(group.Group("/steps"))
+	water.RegisterWaterRoutes(group.Group("/water"))
 }
