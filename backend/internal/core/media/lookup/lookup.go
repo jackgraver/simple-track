@@ -25,6 +25,58 @@ var (
 	ErrUpstream      = errors.New("lookup source request failed")
 )
 
+// lookupError wraps a sentinel with detail for the server log. Error() returns only the
+// sentinel text, so nothing about the upstream request (URL, query, API key) or its
+// response body can reach a client that prints the error. Use Detail for logging.
+type lookupError struct {
+	sentinel error
+	detail   string
+}
+
+func (e *lookupError) Error() string { return e.sentinel.Error() }
+func (e *lookupError) Unwrap() error { return e.sentinel }
+
+func newLookupError(sentinel error, format string, args ...any) error {
+	return &lookupError{sentinel: sentinel, detail: fmt.Sprintf(format, args...)}
+}
+
+// Detail returns a log-safe description of err: the sentinel plus any recorded detail,
+// with key/token query parameters redacted.
+func Detail(err error) string {
+	if err == nil {
+		return ""
+	}
+	var le *lookupError
+	if errors.As(err, &le) && le.detail != "" {
+		return le.sentinel.Error() + ": " + redact(le.detail)
+	}
+	return redact(err.Error())
+}
+
+var secretParamRe = regexp.MustCompile(`(?i)\b(api_key|apikey|key|token|access_token|authorization)=[^&\s"']*`)
+
+// redact masks secret-looking query parameters in free text.
+func redact(s string) string {
+	return secretParamRe.ReplaceAllString(s, "$1=REDACTED")
+}
+
+// transportDetail describes a client.Do error without the request URL's query string.
+func transportDetail(err error) string {
+	var ue *url.Error
+	if errors.As(err, &ue) {
+		u := ue.URL
+		if parsed, perr := url.Parse(u); perr == nil {
+			parsed.RawQuery = ""
+			parsed.User = nil
+			u = parsed.String()
+		} else {
+			u = redact(u)
+		}
+		return fmt.Sprintf("%s %q: %s", ue.Op, u, redact(ue.Err.Error()))
+	}
+	return redact(err.Error())
+}
+
 // Result is a provider-neutral match, shaped like the MediaItem fields it fills.
 type Result struct {
 	Source      string `json:"source"`      // tmdb, openlibrary, anilist, itunes
@@ -138,21 +190,20 @@ func (s *Service) do(req *http.Request, out any) error {
 	req.Header.Set("User-Agent", "simple-track/1.0")
 	resp, err := s.client.Do(req)
 	if err != nil {
-		return fmt.Errorf("%w: %v", ErrUpstream, err)
+		return newLookupError(ErrUpstream, "%s", transportDetail(err))
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode == http.StatusNotFound {
 		return ErrNotFound
 	}
 	if resp.StatusCode == http.StatusUnauthorized {
-		return fmt.Errorf("%w: credentials rejected by %s", ErrNotConfigured, req.URL.Host)
+		return newLookupError(ErrNotConfigured, "credentials rejected by %s", req.URL.Host)
 	}
 	if resp.StatusCode >= 300 {
-		body, _ := io.ReadAll(io.LimitReader(resp.Body, 300))
-		return fmt.Errorf("%w: %s returned %d: %s", ErrUpstream, req.URL.Host, resp.StatusCode, strings.TrimSpace(string(body)))
+		return newLookupError(ErrUpstream, "%s returned %d", req.URL.Host, resp.StatusCode)
 	}
 	if err := json.NewDecoder(io.LimitReader(resp.Body, 5<<20)).Decode(out); err != nil {
-		return fmt.Errorf("%w: decoding %s response: %v", ErrUpstream, req.URL.Host, err)
+		return newLookupError(ErrUpstream, "decoding %s response: %v", req.URL.Host, err)
 	}
 	return nil
 }

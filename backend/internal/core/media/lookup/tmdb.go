@@ -12,7 +12,7 @@ import (
 // (bearer JWT); both are shown on the TMDB API settings page.
 func (s *Service) tmdbGet(ctx context.Context, path string, params url.Values, out any) error {
 	if s.tmdbKey == "" {
-		return fmt.Errorf("%w: set TMDB_API_KEY to look up movies and TV", ErrNotConfigured)
+		return newLookupError(ErrNotConfigured, "set TMDB_API_KEY to look up movies and TV")
 	}
 	if params == nil {
 		params = url.Values{}

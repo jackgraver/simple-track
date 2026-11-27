@@ -1,9 +1,12 @@
 package controller
 
 import (
+	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"be-simpletracker/internal/core/media/lookup"
@@ -64,5 +67,29 @@ func TestLookupHoldsNoDatabaseConnection(t *testing.T) {
 	}
 	if calls == 0 {
 		t.Fatal("the fake upstream was never called")
+	}
+}
+
+func TestRespondLookupErrorFixedMessages(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	cases := []struct {
+		err    error
+		status int
+		msg    string
+	}{
+		{fmt.Errorf("%w: Get \"https://x?api_key=SECRET\"", lookup.ErrUpstream), 502, "Lookup service unavailable"},
+		{fmt.Errorf("%w: set SECRET", lookup.ErrNotConfigured), 503, "Lookup is not configured"},
+		{fmt.Errorf("%w: SECRET", lookup.ErrUnsupported), 400, "Lookup is not supported for this media type"},
+		{fmt.Errorf("%w: SECRET", lookup.ErrNotFound), 404, "Lookup result not found"},
+		{errors.New("SECRET"), 502, "Lookup service unavailable"},
+	}
+	for _, tc := range cases {
+		rec := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(rec)
+		c.Request = httptest.NewRequest(http.MethodGet, "/lookup", nil)
+		respondLookupError(c, tc.err)
+		if rec.Code != tc.status || strings.Contains(rec.Body.String(), "SECRET") || !strings.Contains(rec.Body.String(), tc.msg) {
+			t.Errorf("%v: got %d %s", tc.err, rec.Code, rec.Body.String())
+		}
 	}
 }
