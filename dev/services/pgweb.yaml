@@ -1,8 +1,8 @@
-# Web UI for browsing the dev database, http://localhost:$DEV_PGWEB_PORT (8081 in the main checkout)
+# Web UI for browsing the dev database (as the owner: RLS would hide rows from the app role), http://localhost:$DEV_PGWEB_PORT (8081 in the main checkout)
 version: "0.5"
 processes:
   pgweb:
-    command: pgweb --listen=${DEV_PGWEB_PORT} --bind=127.0.0.1 --skip-open --url "${DATABASE_URL}"
+    command: pgweb --listen=${DEV_PGWEB_PORT} --bind=127.0.0.1 --skip-open --url "${DATABASE_OWNER_URL}"
     depends_on:
       postgres:
         condition: process_healthy

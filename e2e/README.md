@@ -63,13 +63,15 @@ globalSetup (once per run; each step cached by a content hash)
   ├─ go build -tags e2e  → .cache/bin/{server,migrate,e2eseed}
   ├─ vite build          → .cache/dist
   ├─ Postgres: long-lived container `simple-track-e2e` (tmpfs, fsync off)
-  ├─ template DB `e2e_template` = migrations + e2eseed
+  ├─ template DB `e2e_template` = migrations + e2eseed (as `postgres`; `migrate up` also gives the
+  │  cluster-wide `simpletrack_app` role its login, see infra/postgres.ts APP_ROLE)
   └─ front door: one small Node server, serves dist/ (or proxies to vite dev) and
      forwards /api to the backend named by the `e2e_backend` cookie
 
 per worker (once per Playwright worker, ~1s)
   ├─ CREATE DATABASE e2e_w<N> TEMPLATE e2e_template
-  └─ start .cache/bin/server on a free port against it (logs to a file)
+  └─ start .cache/bin/server on a free port against it as `simpletrack_app`, like production
+     (logs to a file); its /__e2e reset/seed and the fixtures use `postgres`
 
 per test
   ├─ POST /__e2e/reset: truncate + reseed (~tens of ms), clears clock/faults/holds

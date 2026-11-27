@@ -15,6 +15,7 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"flag"
 	"fmt"
@@ -81,7 +82,7 @@ func run() error {
 	ctx, cancelTimeout := context.WithTimeout(ctx, *timeout)
 	defer cancelTimeout()
 
-	gdb, err := database.ConnectToPostgres()
+	gdb, err := database.ConnectOwner()
 	if err != nil {
 		return err
 	}
@@ -111,7 +112,10 @@ func run() error {
 		if len(done) == 0 {
 			fmt.Println("migrate: already up to date")
 		}
-		return nil
+		if target != 0 && target < m.Latest() {
+			return nil // the app role may not exist yet at an older version
+		}
+		return ensureAppLogin(ctx, db)
 	case "down":
 		steps, err := optionalInt(arg, 1)
 		if err != nil {
@@ -139,6 +143,25 @@ func run() error {
 	default:
 		flag.Usage()
 		os.Exit(2)
+	}
+	return nil
+}
+
+// ensureAppLogin lets the server's role (database.AppRole) log in with the password in the app
+// DSN (DATABASE_URL / DATABASE_URL_PRODUCTION). The migrations create the role without a
+// password, so this is where the secret is applied, from the environment only. A no-op when the
+// app DSN already connects or names another role.
+func ensureAppLogin(ctx context.Context, owner *sql.DB) error {
+	appDSN, err := database.AppDSN()
+	if err != nil {
+		return err
+	}
+	changed, err := database.EnsureAppLogin(ctx, owner, appDSN)
+	if err != nil {
+		return fmt.Errorf("app role: %w", err)
+	}
+	if changed {
+		fmt.Printf("migrate: set login password for %s from the app DSN\n", database.AppRole)
 	}
 	return nil
 }

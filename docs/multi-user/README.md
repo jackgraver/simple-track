@@ -204,3 +204,19 @@ a nullable `group_id` on tables that should be shareable, and the rule becomes
 ## Gotchas
 
 (Add as you hit them.)
+
+- **The server is `simpletrack_app`, not the owner** (A2). It can't `TRUNCATE`, restart
+  sequences, run DDL or write `schema_migrations`. Anything needing that belongs in a migration or
+  a tool on `DATABASE_OWNER_URL` (`database.ConnectOwner`). The e2e build's `/__e2e/reset` already
+  has its own owner pool. psql/pgweb as the owner bypass RLS, so to see what the app sees use
+  `SET ROLE simpletrack_app` plus `set_config('app.user_id', ...)`.
+- **Roles are cluster-wide, migrations per database** (A2). Tests and e2e migrate many databases on
+  one server at once, so a migration that touches roles must be idempotent and survive a
+  concurrent run in another database (see `0010_app_role.sql`). In tests, act as the app with
+  `SET ROLE simpletrack_app` on a single `*sql.Conn`. Role settings like `statement_timeout`
+  only apply at login, not after `SET ROLE`.
+- **The app role has `statement_timeout = 15s` and `idle_in_transaction_session_timeout = 30s`**
+  (A2). B2's per-request transaction must not stay open across slow work (external lookups,
+  e2e holds): after 30 s idle in a transaction Postgres kills the session.
+- **`dev test` points `TEST_DATABASE_URL` at the owner** (`DATABASE_OWNER_URL`), since the app role
+  can't create databases.

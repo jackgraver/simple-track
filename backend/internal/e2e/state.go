@@ -16,14 +16,15 @@ import (
 type state struct {
 	mu     sync.Mutex
 	router *gin.Engine
-	db     *gorm.DB
+	db     *gorm.DB // the server's pool (app role): fault hooks live here
+	seedDB *gorm.DB // owner-role pool for reset/seed (TRUNCATE ... RESTART IDENTITY needs ownership)
 	nextID int
 	faults []*fault
 	holds  []*hold
 }
 
 func newState(router *gin.Engine, db *gorm.DB) *state {
-	return &state{router: router, db: db}
+	return &state{router: router, db: db, seedDB: db}
 }
 
 func (s *state) id() string {
