@@ -201,19 +201,21 @@ Depends on: B1, B2, H1 (all merged). Runs alongside B3 and the S lanes.
 Overlap: S1 owns `login_protection.go` (#3, #4, #19 login part) and S2 owns frontend storage
 cleared on logout (#9). Skip entries they've ticked in BACKLOG and leave those files until their
 PRs have merged into the base; then rebase. B3 also adds migrations: renumber on rebase.
-- [ ] `database.Always(ctx, fn)` as specified in DECISIONS ("Writes that survive a rollback"),
+- [x] `database.Always(ctx, fn)` as specified in DECISIONS ("Writes that survive a rollback"),
       with its tests. Owner reviews this part closely.
-- [ ] `user_setup_tokens` table; admin endpoints: create user, generate setup/reset link, list users,
+- [x] `user_setup_tokens` table; admin endpoints: create user, generate setup/reset link, list users,
       disable/enable user (bumps `token_version`).
-- [ ] `auth_events` audit log written by login, setup, reset, create/disable through
+- [x] `auth_events` audit log written by login, setup, reset, create/disable through
       `database.Always`; admin view. RLS on C6's new tables (policies are C6's call, recorded in DECISIONS).
-- [ ] Signed-in users can change their own password (bumps `token_version`, keeps the current session).
-- [ ] Setup endpoint: validate token, set password, sign in; login protection applies.
-- [ ] Frontend: admin section in settings (create user, copy link), `/setup/:token` page.
+- [x] Signed-in users can change their own password (bumps `token_version`, keeps the current session).
+- [x] Setup endpoint: validate token, set password, sign in; login protection applies.
+- [x] Frontend: admin section in settings (create user, copy link), `/setup/:token` page.
       Follow `docs/design/` and the `ui` skill.
 - [ ] BACKLOG #3 (login lockout of a known username), #4 (IPv6 /64 keying, limiter eviction),
       #9 (per-user frontend storage, cleared on logout and 401), #14 (username/password rules),
       #19 (logs: route patterns, no attempted usernames).
+      C6 did #14 and #19's request-log part; #3, #4, #19's login part (S1) and #9 (S2) are the
+      S lanes' (DECISIONS "C6").
 - Done when: e2e covers create user -> open link -> set password -> sign in -> link no longer works.
 
 ## Phase D: lock-in

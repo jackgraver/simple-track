@@ -18,6 +18,7 @@ import (
 // The transaction ends when the handler first writes its response, so a failed commit can still
 // turn into a 500 instead of a success the client would trust: status < 400 commits, anything
 // else rolls back. A handler that writes nothing ends it when it returns, and a panic rolls it back.
+// Functions registered with Always run after that, whatever the outcome.
 func Middleware(root *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		ctx, req := WithTx(c.Request.Context(), root)
@@ -30,6 +31,10 @@ func Middleware(root *gorm.DB) gin.HandlerFunc {
 			c.Writer = orig
 			if err := req.Rollback(); err != nil {
 				log.Printf("database: rollback %s %s: %v", w.method, w.path, err)
+			}
+			// After the request's connection is back in the pool (database.Always).
+			if err := req.RunAlways(); err != nil {
+				log.Printf("database: always %s %s: %v", w.method, w.path, err)
 			}
 		}()
 		c.Next()

@@ -21,6 +21,13 @@ var rlsExempt = map[string]string{
 	"users":             "read by the session lookup before there is an identity",
 }
 
+// nullableOwnerColumn lists identity columns that may be NULL. C6's auth tables aren't owned
+// data: an event can have no account (unknown username) and a link's creator can be deleted.
+var nullableOwnerColumn = map[string]bool{
+	"auth_events.user_id":          true,
+	"user_setup_tokens.created_by": true,
+}
+
 // rlsPending lists tables not yet converted, with the lane that converts them. Each lane deletes
 // its entries in the PR that adds the policies; D1 requires this to be empty. An entry whose
 // table already has RLS (or no longer exists) only logs a reminder, so lanes can merge in any order.
@@ -90,7 +97,7 @@ func TestRLSCoverage(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, c := range cols {
-		if c.Nullable != "NO" {
+		if c.Nullable != "NO" && !nullableOwnerColumn[c.Table+"."+c.Column] {
 			t.Errorf("%s.%s is nullable; owned rows always have an owner", c.Table, c.Column)
 		}
 		var fks int

@@ -33,7 +33,7 @@ func TestAuthServiceRegisterRedactsPassword(t *testing.T) {
 
 	result, err := service.Register(ctx, RegisterInput{
 		Username: "wanda",
-		Password: "secret",
+		Password: "secret-pass",
 		Email:    "wanda@example.com",
 	})
 	if err != nil {
@@ -64,7 +64,7 @@ func TestAuthServiceRegisterRejectsDuplicateUsername(t *testing.T) {
 		return "token", nil
 	})
 
-	_, err := service.Register(ctx, RegisterInput{Username: "wanda", Password: "secret"})
+	_, err := service.Register(ctx, RegisterInput{Username: "wanda", Password: "secret-pass"})
 	if !errors.Is(err, ErrUsernameExists) {
 		t.Fatalf("error: got %v want %v", err, ErrUsernameExists)
 	}
@@ -75,7 +75,7 @@ func TestAuthServiceLoginRejectsInvalidCredentials(t *testing.T) {
 	service := NewAuthService(func(models.User) (string, error) {
 		return "token", nil
 	})
-	if _, err := service.Register(ctx, RegisterInput{Username: "wanda", Password: "secret"}); err != nil {
+	if _, err := service.Register(ctx, RegisterInput{Username: "wanda", Password: "secret-pass"}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -90,7 +90,7 @@ func TestAuthServiceUpdatesBirthYear(t *testing.T) {
 	service := NewAuthService(func(models.User) (string, error) {
 		return "token", nil
 	})
-	registered, err := service.Register(ctx, RegisterInput{Username: "wanda", Password: "secret"})
+	registered, err := service.Register(ctx, RegisterInput{Username: "wanda", Password: "secret-pass"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -110,11 +110,11 @@ func TestAuthServiceTokenCarriesIDAndVersion(t *testing.T) {
 		issued = append(issued, user)
 		return "token", nil
 	})
-	registered, err := service.Register(ctx, RegisterInput{Username: "wanda", Password: "secret"})
+	registered, err := service.Register(ctx, RegisterInput{Username: "wanda", Password: "secret-pass"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := service.Login(ctx, LoginInput{Username: "wanda", Password: "secret"}); err != nil {
+	if _, err := service.Login(ctx, LoginInput{Username: "wanda", Password: "secret-pass"}); err != nil {
 		t.Fatal(err)
 	}
 	for _, u := range issued {
@@ -129,13 +129,13 @@ func TestAuthServiceLoginRejectsDisabledUser(t *testing.T) {
 	service := NewAuthService(func(models.User) (string, error) {
 		return "token", nil
 	})
-	if _, err := service.Register(ctx, RegisterInput{Username: "wanda", Password: "secret"}); err != nil {
+	if _, err := service.Register(ctx, RegisterInput{Username: "wanda", Password: "secret-pass"}); err != nil {
 		t.Fatal(err)
 	}
 	if err := database.From(ctx).Model(&models.User{}).Where("username = ?", "wanda").Update("disabled_at", time.Now()).Error; err != nil {
 		t.Fatal(err)
 	}
-	_, err := service.Login(ctx, LoginInput{Username: "wanda", Password: "secret"})
+	_, err := service.Login(ctx, LoginInput{Username: "wanda", Password: "secret-pass"})
 	if !errors.Is(err, ErrInvalidCredentials) {
 		t.Fatalf("disabled login: got %v want %v", err, ErrInvalidCredentials)
 	}

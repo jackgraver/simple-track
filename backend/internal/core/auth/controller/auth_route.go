@@ -2,6 +2,7 @@ package controller
 
 import (
 	"errors"
+	"log"
 	"net/http"
 	"strconv"
 	"time"
@@ -24,7 +25,7 @@ type CookieConfig struct {
 
 type RegisterRequest struct {
 	Username string `json:"username" binding:"required,max=128"`
-	Password string `json:"password" binding:"required,max=72"`
+	Password string `json:"password" binding:"required,max=256"`
 	Email    string `json:"email" binding:"max=254"`
 }
 
@@ -44,6 +45,8 @@ func Register(c *gin.Context, service *services.AuthService, cookie CookieConfig
 	})
 	if err != nil {
 		switch {
+		case errors.Is(err, services.ErrInvalidUsername), errors.Is(err, services.ErrPasswordTooShort), errors.Is(err, services.ErrPasswordTooLong):
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		case errors.Is(err, services.ErrUsernameExists):
 			c.JSON(http.StatusConflict, gin.H{"error": "Username already exists"})
 		case errors.Is(err, services.ErrPasswordHash):
@@ -72,9 +75,11 @@ type AuthResponse struct {
 	Environment string      `json:"environment"`
 }
 
+// LoginRequest: max lengths only bound the body; a password over 72 bytes simply fails
+// (services.PasswordMaxBytes).
 type LoginRequest struct {
 	Username string `json:"username" binding:"required,max=128"`
-	Password string `json:"password" binding:"required,max=72"`
+	Password string `json:"password" binding:"required,max=256"`
 }
 
 func Login(c *gin.Context, service *services.AuthService, cookie CookieConfig, protection *LoginProtection) {
@@ -101,6 +106,7 @@ func Login(c *gin.Context, service *services.AuthService, cookie CookieConfig, p
 				outcome = "credential_spray_blocked"
 			}
 			logAttempt(outcome)
+			services.RecordRejection(c.Request.Context(), models.AuthEvent{Event: models.EventLoginRateLimited, ClientIP: clientIP, Detail: decision.Reason})
 		}
 		respondLoginRateLimited(c, decision.RetryAfter)
 		return
@@ -119,6 +125,7 @@ func Login(c *gin.Context, service *services.AuthService, cookie CookieConfig, p
 	if err != nil {
 		switch {
 		case errors.Is(err, services.ErrInvalidCredentials):
+			recordLoginFailure(c, clientIP, err)
 			sprayDecision := protection.RecordFailure(clientIP, req.Username)
 			if !sprayDecision.Allowed {
 				if sprayDecision.LogRejection {
@@ -139,6 +146,9 @@ func Login(c *gin.Context, service *services.AuthService, cookie CookieConfig, p
 		return
 	}
 
+	if err := services.RecordEvent(c.Request.Context(), models.AuthEvent{Event: models.EventLoginOK, UserID: &result.User.ID, ClientIP: clientIP}); err != nil {
+		log.Printf("[auth] audit login_ok: %v", err)
+	}
 	setAuthCookie(c, cookie, result.Token)
 	protection.RecordSuccess(clientIP, result.User.Username)
 	protection.LogAttempt(c.Request.Context(), "success", clientIP, result.User.Username, true)
@@ -147,6 +157,21 @@ func Login(c *gin.Context, service *services.AuthService, cookie CookieConfig, p
 		Username:    result.User.Username,
 		Environment: currentEnvironment(),
 	})
+}
+
+// recordLoginFailure audits a failed login: the account if the username exists, never the
+// attempted name (BACKLOG #19).
+func recordLoginFailure(c *gin.Context, clientIP string, err error) {
+	ev := models.AuthEvent{Event: models.EventLoginFailed, ClientIP: clientIP, Detail: "wrong_password"}
+	var failure *services.LoginFailure
+	if errors.As(err, &failure) {
+		ev.Detail = failure.Reason
+		if failure.UserID != 0 {
+			id := failure.UserID
+			ev.UserID = &id
+		}
+	}
+	services.RecordRejection(c.Request.Context(), ev)
 }
 
 // GetCurrentUser answers /auth/me for userID (resolved by AuthMiddleware).

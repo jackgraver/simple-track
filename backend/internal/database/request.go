@@ -41,6 +41,7 @@ type Request struct {
 	tx       *gorm.DB
 	begunErr error
 	done     bool
+	always   []func(*gorm.DB) error // registered by Always, run by RunAlways
 }
 
 // handle is the context value: a request transaction or, for tools and tests, a plain *gorm.DB.

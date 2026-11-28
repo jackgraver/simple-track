@@ -52,6 +52,15 @@ var rawAdvisoryLockAllowed = map[string]int{
 var ownerFieldWriteAllowed = map[string]int{
 	// database.Identity{UserID: ...}: the request identity itself, not a row's owner.
 	"internal/core/auth/auth_middleware.go": 1,
+	// C6: users, user_setup_tokens and auth_events are identity tables, not owned data. Their
+	// user_id names the account a link or event is about (often not the caller: an admin acts on
+	// someone else, a failed login has no caller), so the Owner hook can't stamp it. RLS guards
+	// them instead (DECISIONS, C6).
+	"internal/core/auth/auth_api.go":                 1,
+	"internal/core/auth/controller/account_route.go": 1,
+	"internal/core/auth/controller/auth_route.go":    2,
+	"internal/core/auth/services/account_service.go": 10,
+	"internal/core/auth/services/auth_service.go":    3,
 }
 
 var (

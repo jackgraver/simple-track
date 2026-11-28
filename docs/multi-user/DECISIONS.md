@@ -506,3 +506,125 @@ makes `water_logs` owned, every user still sees every water log, and another use
 no preset (its preload is scoped with `Owned`). Nothing ships before D1, which needs C1. POST
 `/water` moved to sentinel errors + `apierr` here, since the scoped preset lookup could
 otherwise echo `ErrNoIdentity` or SQL text as a 400; the other water-log handlers stay for C1.
+
+## 2026-11-27: Accounts and setup links (lane C6)
+
+**`database.Always` as built** (`internal/database/always.go`), per the entry above, plus:
+- The middleware runs the queued functions in its deferred cleanup, after `Rollback` (a no-op once
+  settled), so the request's connection is already back in the pool. That is still inside the
+  handler chain: net/http finishes the response only after it, so a rejection reaches the client
+  a few ms later (at most the 5 s limit, if the pool is exhausted). A goroutine would answer
+  sooner but escape graceful shutdown and make tests racy; not worth it for a handful of rows. `Request.RunAlways()` is the
+  hook; other `WithTx` owners call it after `Commit`/`Rollback`.
+- The context is `context.WithoutCancel(request ctx)` with a 5 s limit: a client that hangs up
+  doesn't lose the audit row, and a stuck database doesn't hold the handler goroutine forever.
+- One transaction for all of a request's functions, **each in its own savepoint**: one that fails
+  (a SQL error aborts a Postgres transaction) or panics loses only its own write. Errors and
+  panics are logged (`database: always METHOD /route: ...`) and never reach the response.
+- `fn` gets a `*gorm.DB`, not a context: `From(ctx)` inside it would be the finished request
+  handle (`ErrRequestDone`, tested).
+- Without a request transaction (`WithDB`: login, tools, tests) it runs immediately, still in a
+  transaction, and still only logs failures.
+
+**Which audit writes go through `Always`.** Only rejections (failed login, rate-limited login,
+dead setup link, wrong current password): `services.RecordRejection`. Successful actions
+(user created, link created, disabled/enabled, password set or changed) are written **inside the
+request transaction** with `services.RecordEvent`, so the event commits or rolls back with the
+change it describes. Through `Always` a success event would survive its own rollback (e.g. a
+failed commit turning a password change into a 500) and record something that didn't happen.
+This narrows "auth_events written through database.Always" to the writes that need it, as the
+`Always` entry itself says ("only for writes that must outlive the request's outcome").
+`/auth/login` runs outside the request transaction, so its events go straight to the pool.
+
+**Tables** (migration `0012_accounts.sql`):
+- `user_setup_tokens(user_id, token_hash, purpose setup|reset, created_by, created_at,
+  expires_at, used_at, revoked_at)`. Token: 32 random bytes, base64url (43 chars), stored as
+  SHA-256 hex (a fast hash is enough for 256 bits of entropy). 48 h, single use. Creating a link
+  revokes the user's unused ones; disabling a user revokes them too. Purpose is derived: `setup`
+  if the user has no password, else `reset`.
+- `auth_events(created_at, event, user_id, actor_id, client_ip, detail)`. Events and details are
+  constants in `auth/models/account_models.go`. `detail` never holds an attempted username or a
+  password (BACKLOG #19): a failed login records the account if the name exists, else
+  `unknown_user` with no user. Login rate-limit events are written once per window (when the
+  limiter says `LogRejection`), so a flood doesn't fill the table.
+
+**RLS (C6's call)**:
+- `auth_events`: INSERT for anyone (`WITH CHECK (true)`: failed logins and setup attempts have no
+  identity), SELECT only with `app.is_admin = 'true'`, no UPDATE/DELETE policy and those
+  privileges (plus TRUNCATE) revoked from `simpletrack_app`: append-only for the app. Inserts are
+  raw `INSERT` without `RETURNING`, since RETURNING needs the row to pass the SELECT policy (a
+  gorm `Create` would fail for non-admins).
+- `user_setup_tokens`: everything for the admin; otherwise a row is visible (and updatable) only
+  when `app.setup_token_hash` equals its hash. The setup endpoints set that with
+  `set_config(..., true)` before looking the token up, so only a caller holding the token sees
+  its row, and nobody can list tokens. Bob can't mint one for himself (RLS violation, tested).
+- `users` stays without RLS (session lookup and login need it before there is an identity).
+
+**Endpoints**: admin `GET/POST /admin/users`, `POST /admin/users/:id/setup-link|disable|enable`,
+`GET /admin/auth-events?before=&limit=` (AuthMiddleware + `auth.RequireAdmin`, 403 otherwise);
+public `POST /auth/setup/inspect` and `POST /auth/setup`; signed in `POST /auth/password`.
+- Tokens travel in request **bodies**, never in API URLs. The page URL `/setup/<token>` is the
+  only place it appears, and it is logged nowhere:
+  - nginx serves that location with `access_log off` (via `rewrite ... break`: a `try_files`
+    fallback would finish in `location = /index.html` and log the request line there);
+  - the page's own asset requests would carry the URL as `Referer`, so Caddy sends
+    `Referrer-Policy: no-referrer` under `/setup/*` (H1's `same-origin` everywhere else, as two
+    exclusive matchers) **and** nginx's log format drops `$http_referer` (covers the time before
+    the Caddy deploy, and any later Caddy change). Found in /code-review.
+  - Caddy keeps no access log; the backend logs route patterns only.
+- The setup endpoint validates the password and runs bcrypt **before** its first query, so the
+  request transaction (and the token's `FOR UPDATE` lock) is held only for the short write. It
+  bumps `token_version` (a reset signs out everywhere) and sets a fresh cookie.
+- Setup attempts and password changes are rate-limited with S1's `LoginProtection`, but a
+  **separate instance** from sign-in, so they never spend a shared home IP's sign-in budget.
+  Setup counts against the "username" `setup-link` (per source: `MAX_USERNAME` per window; all
+  sources: S1's username-wide backoff, which the handler waits out like login does), password
+  changes against `password-change:<user id>`. Rejections are audited as `login_rate_limited`
+  with detail `setup_link:<reason>` / `password_change:<reason>`. `inspect` isn't limited
+  (256-bit tokens can't be guessed, and reloading the page shouldn't burn attempts).
+- A username taken by a soft-deleted user (the unique index covers every row) or by a
+  concurrent create is a 409, not a 500: the insert runs in a savepoint and the unique
+  violation on `idx_users_username_lower` maps to `ErrUsernameExists`.
+- Disable/enable are no-ops when the account is already in that state (no sign-out, no event).
+- Password change hashes the new password before its first query, so the request transaction
+  holds its connection for one bcrypt (checking the current one), not two.
+- Wrong current password answers **400**, not 401 (the client treats 401 as signed out).
+- Disabling yourself is refused (400) so the admin can't lock the only admin out.
+- Disabled user: login fails as before, a link can't be created (409) and a live one stops
+  working.
+
+**Username and password rules (BACKLOG #14)**: new usernames are trimmed, lowercased and must
+match `^[a-z0-9][a-z0-9._-]{1,31}$`. Uniqueness is on `lower(username)` (unique index replaces
+the case-sensitive one), and login matches case-insensitively, so an existing mixed-case name
+(the owner's, maybe) keeps working and can't be duplicated in another case. Existing names aren't
+rewritten. Passwords being set: at least 10 characters, at most 72 bytes (bcrypt's limit). Login applies
+neither: an existing password may be shorter, or longer than 72 bytes if it was set when the
+binding counted characters (bcrypt compares the first 72 bytes, as it hashed them). An account without a password can't sign in; it answers
+like a wrong password, in the same time (dummy bcrypt compare).
+- `users.email` unique index now ignores NULL/empty (accounts are username-only; two `''` emails
+  used to collide). `authrepo.CreateUser` stores NULL for an empty email.
+
+**Request logs (BACKLOG #19, request part)**: `gin.Default()`'s logger is replaced by
+`cmd/server/requestlog.go`, which logs the route pattern (`/media/:id`), never the raw path or
+query string; unmatched paths log as `(no route)`. The login-log part of #19 is S1's
+(`login_protection.go`), and auth_events already follows it.
+
+**S lanes** (merged before this PR; C6 rebased on them): #3, #4 and the login-log part of #19 are
+S1's, #9 is S2's. C6 adds #3's audit part: lockouts and backoff rejections are
+`login_rate_limited` rows (once per window per key, like S1's log line). The setup page signs a
+possibly different user in on a shared device: `markAuthenticated(name, id, admin)` passes the
+id to S2's `setUserStorageOwner`, which clears the previous user's storage, and the page clears
+the query cache.
+
+**Frontend**: `/setup/:token` (public route: `meta.public` skips the auth guard, hides the nav,
+and is never saved as the last route), Account menu → **Account** (change password, everyone)
+and **Users** (admin: add someone, link overlay with Share/Copy, disable/enable, sign-in
+activity). `isAdmin` comes from `/auth/me` (`user.is_admin`); the server re-checks on every
+request, the client flag only hides the menu entry and guards the route (`meta.admin`).
+
+**Merged after B3** (owner): migration renumbered to `0012_accounts.sql`. The auth tables are
+identity tables, not owned data, so B3's rules get reasoned exceptions rather than the Owner hook:
+`ownerFieldWriteAllowed` entries for the auth files (their `user_id` is the account acted on, often
+not the caller) and `nullableOwnerColumn` for `auth_events.user_id` and
+`user_setup_tokens.created_by`. `accounts_pg_test.go` now uses `pgtest`, so CI fails instead of
+skipping it.

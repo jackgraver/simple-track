@@ -70,8 +70,10 @@ pre-H1 file (no `header` or `request_body`).
     `data:` for Vite-inlined fonts. `frame-ancestors 'none'`.
   - `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Permissions-Policy` denying
     camera, microphone, geolocation, payment and USB, and `-Server` (no version banner).
-  - `Referrer-Policy: same-origin`: no referrer to other sites (so C6's `/setup/<token>` URL
-    can't leak), the full one within the site. If this is ever tightened to `no-referrer`, note
+  - `Referrer-Policy: same-origin`: no referrer to other sites, the full one within the site.
+    Except under `/setup/*` (C6's one-time links): `no-referrer`, so the page's own asset
+    requests don't carry the token to nginx. Two exclusive matchers (`@setupLink` /
+    `@notSetupLink`), so exactly one value goes out. If this is ever tightened to `no-referrer`, note
     that browsers then send `Origin: null` on native form POSTs (not on `fetch`/XHR), which the
     backend's CORS middleware rejects with 403. The SPA submits every form through axios today.
 - **Request body limit:** `request_body max_size 6MB` on `/api` is the outer guard. The backend
@@ -110,6 +112,12 @@ nginx is **not** just a build tool: it is the runtime web server inside the fron
   - `Strict-Transport-Security` on every response. nginx only inherits `add_header` into a
     location that sets none of its own, so the locations repeat it.
 - No gzip in nginx; Caddy compresses.
+- `/setup/<token>` (one-time account setup links) has `access_log off`: the token is a credential
+  until used. The access log format (`noreferer`) leaves out `$http_referer`, since that page's
+  asset requests would carry the token as Referer (Caddy also sends `Referrer-Policy:
+  no-referrer` under `/setup/*`). Caddy keeps no access log, and the backend logs route patterns
+  only (`cmd/server/requestlog.go`), so the token isn't logged anywhere. The API takes it in
+  request bodies, never in URLs.
 
 Local dev uses neither: Vite serves the frontend on :3000 and proxies `/api` to the backend.
 
