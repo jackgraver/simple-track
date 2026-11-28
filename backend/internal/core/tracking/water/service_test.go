@@ -10,6 +10,12 @@ import (
 	"gorm.io/gorm"
 )
 
+// asUser is a context for module tests on SQLite: the DB plus a signed-in user (there is no RLS here;
+// the two-user Postgres tests cover isolation).
+func asUser(db *gorm.DB, id uint) context.Context {
+	return database.WithIdentity(database.WithDB(context.Background(), db), database.Identity{UserID: id})
+}
+
 func testDB(t *testing.T) *gorm.DB {
 	t.Helper()
 	db, err := gorm.Open(sqlite.Open("file::memory:"), &gorm.Config{})
@@ -19,7 +25,7 @@ func testDB(t *testing.T) *gorm.DB {
 	if err := db.AutoMigrate(&DrinkSizePreset{}, &WaterLog{}); err != nil {
 		t.Fatal(err)
 	}
-	if err := db.Exec("CREATE UNIQUE INDEX uq_water_logs_client_id ON water_logs(client_id) WHERE client_id IS NOT NULL").Error; err != nil {
+	if err := db.Exec("CREATE UNIQUE INDEX uq_water_logs_user_client_id ON water_logs(user_id, client_id) WHERE client_id IS NOT NULL").Error; err != nil {
 		t.Fatal(err)
 	}
 	return db
@@ -30,11 +36,11 @@ func TestCreateWaterLogIdempotentByClientID(t *testing.T) {
 	day := time.Date(2026, 11, 22, 0, 0, 0, 0, time.UTC)
 	id := "6f1c2c1e-0000-4000-8000-000000000001"
 
-	a, err := CreateWaterLog(database.WithDB(context.Background(), db), day, 16, nil, id)
+	a, err := CreateWaterLog(asUser(db, 1), day, 16, nil, id)
 	if err != nil {
 		t.Fatal(err)
 	}
-	b, err := CreateWaterLog(database.WithDB(context.Background(), db), day, 16, nil, id)
+	b, err := CreateWaterLog(asUser(db, 1), day, 16, nil, id)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -48,10 +54,10 @@ func TestCreateWaterLogIdempotentByClientID(t *testing.T) {
 	}
 
 	// Replay after delete does not resurrect or duplicate.
-	if err := DeleteWaterLog(database.WithDB(context.Background(), db), a.ID); err != nil {
+	if err := DeleteWaterLog(asUser(db, 1), a.ID); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := CreateWaterLog(database.WithDB(context.Background(), db), day, 16, nil, id); err != nil {
+	if _, err := CreateWaterLog(asUser(db, 1), day, 16, nil, id); err != nil {
 		t.Fatal(err)
 	}
 	db.Model(&WaterLog{}).Count(&n)
@@ -64,7 +70,7 @@ func TestCreateWaterLogWithoutClientIDAlwaysCreates(t *testing.T) {
 	db := testDB(t)
 	day := time.Date(2026, 11, 22, 0, 0, 0, 0, time.UTC)
 	for i := 0; i < 2; i++ {
-		if _, err := CreateWaterLog(database.WithDB(context.Background(), db), day, 8, nil, ""); err != nil {
+		if _, err := CreateWaterLog(asUser(db, 1), day, 8, nil, ""); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -79,13 +85,13 @@ func TestDeleteWaterLogByClientID(t *testing.T) {
 	db := testDB(t)
 	day := time.Date(2026, 11, 22, 0, 0, 0, 0, time.UTC)
 	id := "6f1c2c1e-0000-4000-8000-000000000009"
-	if _, err := CreateWaterLog(database.WithDB(context.Background(), db), day, 8, nil, id); err != nil {
+	if _, err := CreateWaterLog(asUser(db, 1), day, 8, nil, id); err != nil {
 		t.Fatal(err)
 	}
-	if err := DeleteWaterLogByClientID(database.WithDB(context.Background(), db), id); err != nil {
+	if err := DeleteWaterLogByClientID(asUser(db, 1), id); err != nil {
 		t.Fatal(err)
 	}
-	if err := DeleteWaterLogByClientID(database.WithDB(context.Background(), db), id); err != gorm.ErrRecordNotFound {
+	if err := DeleteWaterLogByClientID(asUser(db, 1), id); err != database.ErrNotFound {
 		t.Fatalf("second delete: want not found, got %v", err)
 	}
 }

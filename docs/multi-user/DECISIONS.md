@@ -628,3 +628,59 @@ identity tables, not owned data, so B3's rules get reasoned exceptions rather th
 not the caller) and `nullableOwnerColumn` for `auth_events.user_id` and
 `user_setup_tokens.created_by`. `accounts_pg_test.go` now uses `pgtest`, so CI fails instead of
 skipping it.
+
+## 2026-11-27: Tracking is per user (lane C1)
+
+Migration `0013_tracking_owned.sql`, one file for all five tables (they share one backfill and
+one admin lookup, and one file renumbers once when C2-C5 merge first). Same shape as B3's
+reference (`drink_size_presets`); tests in each package (`*_pg_test.go`) and
+`internal/database/tracking_migration_pg_test.go`.
+
+- **Owned, no catalogs**: `body_weight_logs`, `step_logs`, `water_logs`, `grocery_items`,
+  `user_profiles`. Each: `user_id` backfilled to the admin (soft-deleted rows too; stops unless
+  exactly one live admin, when there are rows to give away), NOT NULL, FK, `owner` RLS policy.
+  Models embed `database.Owner`; every read is `Scopes(database.Owned(ctx))`, including the
+  client_id lookups, the preset preload and the aggregates (`ParseTextList`, `ListSuggestions`,
+  `GetMissedYesterday`).
+- **Uniques**: `(user_id, date)` on weight and steps (replacing the global date index),
+  `(user_id, client_id) WHERE client_id IS NOT NULL` on water and grocery. The same client_id
+  from two users is two rows, and each user's replay stays idempotent. They are not partial on
+  `deleted_at`, like the indexes they replace (a deleted row still answers its client_id replay).
+- **`water_logs.preset_id`** is the composite FK `(preset_id, user_id) -> drink_size_presets
+  (id, user_id)` that 0011 prepared. With a NULL preset the FK isn't checked (MATCH SIMPLE), so
+  logs without a preset are unaffected. A test inserts a log for Bob with Alice's preset as the
+  schema owner and the FK refuses it.
+- **`user_profiles` is one live row per user**: unique `(user_id) WHERE deleted_at IS NULL`. The
+  row is created on the first `PUT /tracking/profile`; `GET` still answers `{"profile": null}`
+  until then, so a new account sees the onboarding state. The old table was meant to hold one
+  row (the app read and updated the oldest). If prod somehow has several live rows, the
+  migration soft-deletes all but the oldest rather than failing or dropping data (ROLLOUT 1.8
+  checks the count first). The first-save race (two requests for a user with no row) is
+  handled: the loser's insert fails in a savepoint and it updates the winner's row.
+- **Upserts** (weight, steps) do the same: find the user's row for the date, else create in a
+  savepoint, and on a lost race update the winner's row. They answered a raw unique-violation as
+  a 400 before.
+- **Renpho import** writes as the importing user: the create hook stamps each new row and the
+  existing-day lookup is `Owned`, so importing the same days as Alice leaves her rows alone. The
+  update path is `Select("*").Omit(clause.Associations, "user_id").Save(...)`: `Select("*")`
+  writes every column, and without the `Omit` it would write the model's zero `user_id` over
+  the row's. (Rewriting `UserID` by hand is what the rules test forbids, so `Omit` is the way.)
+- **`database.CreateInSavepoint` now omits associations** (it was the one create path the B3
+  rule couldn't see). `WaterLog.Preset` is the one nested struct it matters for.
+- **Errors (BACKLOG #6)**: every tracking handler is on `apierr`. Client mistakes are
+  `common.Invalid(msg)` (400 with our own message, answered by `common.Respond`), a missing or
+  someone else's row is the shared 404, anything else is a logged 500 with a fixed message. The
+  4xx paths that echoed database errors (water delete, grocery complete/delete, weight, steps and
+  profile upserts) now answer 500 for database failures. Bind errors answer `invalid body`
+  instead of the binder's text. Validation messages and the Renpho parser's row/column messages
+  are unchanged. The request bodies were already DTOs (`postWeightBody`, `postWaterBody`,
+  `itemBody`, `putProfileBody`, ...), none binds a model.
+- **Allowlists**: `rlsPending` has no C1 tables; the tracking files are gone from
+  `createWithAssociationsAllowed` and apierr's `rawInternalErrorAllowed` (all their creates and
+  saves now carry `Omit(clause.Associations)`).
+- **Seeds**: devseed's weight and step rows belong to the dev login (the `owner` it already
+  passes); the e2e `large` profile looks the `dev` user up (`devUser`) for its weight, step and
+  grocery rows. The base e2e seed has no tracking rows.
+- **Not done**: no advisory locks anywhere in tracking (upserts rely on the unique indexes, as
+  before), so nothing for B3's `XactLock`. `missed` has no table of its own (it counts weight and
+  step logs), so it only needed `Owned` and `apierr`.

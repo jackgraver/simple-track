@@ -3,14 +3,17 @@ package weight
 import (
 	"time"
 
+	"be-simpletracker/internal/database"
+
 	"gorm.io/gorm"
 )
 
-// BodyWeightLog is one weigh-in per day. WeightLbs is always set; the remaining
+// BodyWeightLog is one weigh-in per day per user (unique on (user_id, date), migration 0013). WeightLbs is always set; the remaining
 // body-composition metrics come from a Renpho import and are nil for manual entries.
 type BodyWeightLog struct {
 	gorm.Model
-	Date      time.Time `json:"date" gorm:"uniqueIndex;not null"`
+	database.Owner
+	Date      time.Time `json:"date" gorm:"not null"`
 	WeightLbs float64   `json:"weight_lbs" gorm:"not null"`
 
 	MeasuredAt *time.Time `json:"measured_at"`
