@@ -24,13 +24,10 @@ import (
 // meal item, BACKLOG #1). Sites that predate the rule; each module's C lane converts its own.
 var createWithAssociationsAllowed = map[string]int{
 	"internal/core/auth/repository/user_repository.go": 1, // C6 (users: no associations)
-	"internal/core/diet/repository/repository.go":      23,
 }
 
 // Advisory locks taken without LockKey (BACKLOG #2): C2 and C3 move them to database.XactLock.
-var rawAdvisoryLockAllowed = map[string]int{
-	"internal/core/diet/repository/repository.go": 1, // C2: lockClientID
-}
+var rawAdvisoryLockAllowed = map[string]int{}
 
 // Code that sets user_id / created_by (or a field named UserID / CreatedBy) other than the
 // Owner / Creator create hooks. Each entry needs a reason.

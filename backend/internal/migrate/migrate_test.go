@@ -327,7 +327,7 @@ func TestEmbeddedMigrationsApply(t *testing.T) {
 	var active int
 	db.QueryRow(`SELECT count(*) FROM workout_programs WHERE is_active`).Scan(&active)
 	// The baseline's placeholder "Default" program belongs to nobody on a fresh database, so
-	// migration 0016 removes it; a new user starts with none and creates one on the plans page.
+	// migration 0017 removes it; a new user starts with none and creates one on the plans page.
 	if active != 0 {
 		t.Errorf("active workout programs = %d, want 0 on a fresh database", active)
 	}

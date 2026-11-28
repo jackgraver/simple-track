@@ -5,15 +5,13 @@ import (
 	dietrepo "be-simpletracker/internal/core/diet/repository"
 	"be-simpletracker/internal/core/diet/services"
 	"be-simpletracker/internal/core/diet/testutil"
-	"be-simpletracker/internal/database"
 	"be-simpletracker/internal/utils"
-	"context"
 	"testing"
 )
 
 func TestMealPlanToday_returnsDayAndTotals(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	ctx := database.WithDB(context.Background(), db)
+	ctx := testutil.Ctx(db)
 	plan := testutil.SeedPlan(t, db, "P")
 	day := testutil.SeedDay(t, db, testutil.Today(), plan.ID)
 	food := testutil.SeedFood(t, db, "Rice", testutil.DefaultMacros())
@@ -31,7 +29,7 @@ func TestMealPlanToday_returnsDayAndTotals(t *testing.T) {
 
 func TestMealPlanWeek_andMonth(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	ctx := database.WithDB(context.Background(), db)
+	ctx := testutil.Ctx(db)
 	plan := testutil.SeedPlan(t, db, "P")
 	testutil.SeedDay(t, db, testutil.Today(), plan.ID)
 	week, err := services.MealPlanWeek(ctx)
@@ -46,7 +44,7 @@ func TestMealPlanWeek_andMonth(t *testing.T) {
 
 func TestMonthPlannedSummary(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	ctx := database.WithDB(context.Background(), db)
+	ctx := testutil.Ctx(db)
 	plan := testutil.SeedPlan(t, db, "P")
 	day := testutil.SeedDay(t, db, testutil.Today(), plan.ID)
 	food := testutil.SeedFood(t, db, "Carrot", testutil.DefaultMacros())
@@ -70,7 +68,7 @@ func TestMonthPlannedSummary(t *testing.T) {
 
 func TestMealPlanDay_andGoalsToday(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	ctx := database.WithDB(context.Background(), db)
+	ctx := testutil.Ctx(db)
 	plan := testutil.SeedPlan(t, db, "Goals")
 	day := testutil.SeedDay(t, db, testutil.Today(), plan.ID)
 	gotDay, tot, err := services.MealPlanDay(ctx, day.ID)
@@ -88,7 +86,7 @@ func TestMealPlanDay_andGoalsToday(t *testing.T) {
 
 func TestDayWithTotalsHelpers(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	ctx := database.WithDB(context.Background(), db)
+	ctx := testutil.Ctx(db)
 	plan := testutil.SeedPlan(t, db, "P")
 	day := testutil.SeedDay(t, db, testutil.Today(), plan.ID)
 	food := testutil.SeedFood(t, db, "Nuts", testutil.DefaultMacros())
@@ -115,7 +113,7 @@ func TestDayWithTotalsHelpers(t *testing.T) {
 
 func TestFindMealPlanDayByRowIDOrToday(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	ctx := database.WithDB(context.Background(), db)
+	ctx := testutil.Ctx(db)
 	plan := testutil.SeedPlan(t, db, "P")
 	day := testutil.SeedDay(t, db, testutil.Today(), plan.ID)
 	byID, err := services.FindMealPlanDayByRowIDOrToday(ctx, day.ID)
@@ -129,7 +127,7 @@ func TestFindMealPlanDayByRowIDOrToday(t *testing.T) {
 }
 
 func TestFoodAndCompositeServices(t *testing.T) {
-	ctx := database.WithDB(context.Background(), testutil.SetupTestDB(t))
+	ctx := testutil.Ctx(testutil.SetupTestDB(t))
 	created, err := services.CreateFood(ctx, &models.Food{
 		Name: "Broccoli", ServingType: "g", ServingAmount: 100, Calories: 34,
 	}, nil)
@@ -166,7 +164,7 @@ func TestFoodAndCompositeServices(t *testing.T) {
 
 func TestMealAndLoggingServices(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	ctx := database.WithDB(context.Background(), db)
+	ctx := testutil.Ctx(db)
 	plan := testutil.SeedPlan(t, db, "P")
 	day := testutil.SeedDay(t, db, testutil.Today(), plan.ID)
 	food := testutil.SeedFood(t, db, "Potato", testutil.DefaultMacros())
@@ -200,7 +198,7 @@ func TestMealAndLoggingServices(t *testing.T) {
 
 func TestSavedMealServices(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	ctx := database.WithDB(context.Background(), db)
+	ctx := testutil.Ctx(db)
 	plan := testutil.SeedPlan(t, db, "P")
 	day := testutil.SeedDay(t, db, testutil.Today(), plan.ID)
 	food := testutil.SeedFood(t, db, "Avocado", testutil.DefaultMacros())
@@ -212,12 +210,7 @@ func TestSavedMealServices(t *testing.T) {
 		t.Fatal(err)
 	}
 	meal := testutil.SeedMeal(t, db, "Toast", food.ID, 1)
-	sid := smID
-	if err := db.Create(&models.PlannedMeal{
-		DayID: day.ID, MealID: meal.ID, SavedMealID: &sid, Logged: false, DisplayOrder: 0,
-	}).Error; err != nil {
-		t.Fatal(err)
-	}
+	testutil.SeedPlannedFromSaved(t, db, day.ID, meal.ID, smID)
 	info, err := services.SavedMealPlannedUsageInfo(ctx, smID)
 	if err != nil || info.ReferenceCount != 1 {
 		t.Fatalf("info %+v err %v", info, err)
@@ -239,7 +232,7 @@ func TestSavedMealServices(t *testing.T) {
 
 func TestSavedMealByID(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	ctx := database.WithDB(context.Background(), db)
+	ctx := testutil.Ctx(db)
 	food := testutil.SeedFood(t, db, "Cheddar", testutil.DefaultMacros())
 	smID, err := services.CreateSavedMeal(ctx, &models.SavedMeal{
 		Name:  "Cheese Snack",
@@ -256,7 +249,7 @@ func TestSavedMealByID(t *testing.T) {
 
 func TestPlannedMealServices(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	ctx := database.WithDB(context.Background(), db)
+	ctx := testutil.Ctx(db)
 	plan := testutil.SeedPlan(t, db, "P")
 	testutil.SeedDay(t, db, testutil.Today(), plan.ID)
 	food := testutil.SeedFood(t, db, "Chicken Breast", testutil.DefaultMacros())
@@ -291,7 +284,7 @@ func TestPlannedMealServices(t *testing.T) {
 
 func TestSetPlannedMealLogged_andDeleteLoggedMeal(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	ctx := database.WithDB(context.Background(), db)
+	ctx := testutil.Ctx(db)
 	plan := testutil.SeedPlan(t, db, "P")
 	day := testutil.SeedDay(t, db, testutil.Today(), plan.ID)
 	food := testutil.SeedFood(t, db, "Cottage Cheese", testutil.DefaultMacros())
@@ -308,7 +301,7 @@ func TestSetPlannedMealLogged_andDeleteLoggedMeal(t *testing.T) {
 
 func TestEditAndQuickLogServices(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	ctx := database.WithDB(context.Background(), db)
+	ctx := testutil.Ctx(db)
 	plan := testutil.SeedPlan(t, db, "P")
 	day := testutil.SeedDay(t, db, testutil.Today(), plan.ID)
 	food := testutil.SeedFood(t, db, "Protein Bar", testutil.DefaultMacros())
@@ -333,7 +326,7 @@ func TestEditAndQuickLogServices(t *testing.T) {
 
 func TestUpdateDayLogMeal(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	ctx := database.WithDB(context.Background(), db)
+	ctx := testutil.Ctx(db)
 	plan := testutil.SeedPlan(t, db, "P")
 	day := testutil.SeedDay(t, db, testutil.Today(), plan.ID)
 	food := testutil.SeedFood(t, db, "Bread", testutil.DefaultMacros())
@@ -351,7 +344,7 @@ func TestUpdateDayLogMeal(t *testing.T) {
 
 func TestGetAllPlans_andUpdatePlanMacros(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	ctx := database.WithDB(context.Background(), db)
+	ctx := testutil.Ctx(db)
 	testutil.SeedPlan(t, db, "One")
 	testutil.SeedPlan(t, db, "Two")
 	all, err := services.GetAllPlans(ctx, utils.QueryParams{})
@@ -366,7 +359,7 @@ func TestGetAllPlans_andUpdatePlanMacros(t *testing.T) {
 
 func TestUpdatePlanMacrosCreatesPlanSnapshotForTodayForward(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	ctx := database.WithDB(context.Background(), db)
+	ctx := testutil.Ctx(db)
 	plan := testutil.SeedPlan(t, db, "P")
 	today := testutil.Today()
 	yesterday := testutil.SeedDay(t, db, today.AddDate(0, 0, -1), plan.ID)
@@ -409,7 +402,7 @@ func TestUpdatePlanMacrosCreatesPlanSnapshotForTodayForward(t *testing.T) {
 
 func TestFindMealPlanDayUsesPlanEffectiveForDate(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	ctx := database.WithDB(context.Background(), db)
+	ctx := testutil.Ctx(db)
 	plan := testutil.SeedPlan(t, db, "P")
 
 	updated, err := services.UpdatePlanMacros(ctx, plan.ID, 2100, 160, 35, 180, 70)
@@ -436,7 +429,7 @@ func TestFindMealPlanDayUsesPlanEffectiveForDate(t *testing.T) {
 
 func TestAllMealDays_andFindMealPlanDay(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	ctx := database.WithDB(context.Background(), db)
+	ctx := testutil.Ctx(db)
 	plan := testutil.SeedPlan(t, db, "P")
 	testutil.SeedDay(t, db, testutil.Today(), plan.ID)
 	days, err := services.AllMealDays(ctx)

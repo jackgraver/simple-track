@@ -21,12 +21,12 @@ Nothing Critical was found. Prod today has one account, so most multi-user findi
 
 | # | Sev | Finding | Lane |
 |---|---|---|---|
-| 1 | High | Request bodies bind straight into gorm models (mass assignment, nested association writes) | C2; B3 rule: **done** (`TestOwnerKitRules`, Owner/Creator hooks) |
-| 2 | High | Advisory-lock keys and "exists for date" checks are global, not per user | C2; C3 **done** (B3 helper: `database.XactLock`/`LockKey`) |
+| 1 | High | Request bodies bind straight into gorm models (mass assignment, nested association writes) | C2: **done**; B3 rule: **done** (`TestOwnerKitRules`, Owner/Creator hooks) |
+| 2 | High | Advisory-lock keys and "exists for date" checks are global, not per user | C2: **done**; C3 **done** (B3 helper **done**: `database.XactLock`/`LockKey`) |
 | 3 | Medium | Anyone can lock the owner out of login, from one IP, indefinitely | S1: **done**; C6: lockouts in `auth_events` (`login_rate_limited`) **done** |
 | 4 | Medium | IPv6 address rotation defeats per-IP limits and can fill the limiter (global lockout) | S1: **done** |
 | 5 | Medium | TMDB API key can leak to users in lookup error messages | S3: **done** |
-| 6 | Medium | Raw internal errors (SQL, constraint names) returned to clients at ~160 sites | C1–C5 (C1, C4, C5 **done**); B3 test **done** (`TestNoRawErrorsIn500s`) |
+| 6 | Medium | Raw internal errors (SQL, constraint names) returned to clients at ~160 sites | C1–C5 (C1, C2, C4, C5 **done**); B3 test **done** (`TestNoRawErrorsIn500s`) |
 | 7 | Medium | No security headers (CSP, frame-ancestors, nosniff, Referrer-Policy); API has none at all | H1: **done** (Caddy; deploys at D1, ROLLOUT 3.5) |
 | 8 | Medium | No request body size limit outside `/auth` (imports, JSON) | H1: **done** (1 MiB default, 5 MiB + 10k rows on import; Caddy 6MB) |
 | 9 | Medium | Frontend local storage isn't scoped to the user; logout leaves drafts, timers, last route | S2: **done** |
@@ -74,6 +74,11 @@ Nothing Critical was found. Prod today has one account, so most multi-user findi
   (existing sites allowlisted per file for the C lanes). The meal_route.go binds above are
   still there and become test failures once C2 adds `Creator`/`Owner` to those models.
 
+- **C2 (done)**: every diet body binds into a DTO (`mealBody`, `savedMealBody`, `compositeFoodBody`,
+  `foodBody`); creates write the parent, then its items, with `Omit(clause.Associations)`; item
+  foods and recipes are checked against what the caller can see. A nested `food` in a body is
+  ignored (`TestDiet_nestedFoodIsIgnored`).
+
 ### 2. High: advisory locks and per-date checks are global
 
 - **Where**: `diet/repository/repository.go:749` (`lockClientID` keys on
@@ -105,6 +110,11 @@ Nothing Critical was found. Prod today has one account, so most multi-user findi
   both users start a workout on the same date and get their own log
   (`TestWorkout_sameDateEachGetsTheirOwnLog`), and Bob doesn't wait while Alice's transaction holds
   her lock (`TestWorkout_bobDoesNotWaitOnAlicesLock`). `idx_workout_logs_user_date` backs it up.
+
+- **C2 (done)**: diet's `lockClientID` is `database.XactLock`; the client_id counts, the
+  `Unscoped()` ones included, and every day lookup are `Owned`. `TestDiet_clientIDsArePerUser` and
+  `TestDiet_lockIsPerUser` cover two users with the same client_id and date. C3 still has
+  `CreateMinimalIfMissing`.
 
 ### 3. Medium: login lockout of a known username (exploitable now)
 
@@ -190,6 +200,8 @@ Nothing Critical was found. Prod today has one account, so most multi-user findi
 - **C3 (done)**: every workout handler goes through `respondError` (`controller/errors.go`):
   validation 400 with its own message, 403, 404 `not found`, 409, else a logged 500 with a fixed
   message. The raw-error allowlist entries are gone.
+
+- **C2 (done)**: all diet handlers (logs, plans, meals, foods) are on `apierr` / `respondErr`.
 
 ### 7. Medium: no security headers
 

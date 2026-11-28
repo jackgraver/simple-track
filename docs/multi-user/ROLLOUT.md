@@ -73,7 +73,24 @@ the compose file and `.env.vps` must be updated before the deploy, not after.
    `SELECT count(*) FROM user_profiles WHERE deleted_at IS NULL;` expect 0 or 1. With more, the
    migration keeps the oldest live row and soft-deletes the rest (nothing is dropped), so note
    which one you expect to survive.
-10. (C3) Duplicate workout days. `workout_logs.date` never had a unique index and migration 0016
+10. (C2) Diet links the old schema never enforced. Migration 0016 adds foreign keys on
+   `meal_items.composite_food_id`, `saved_meal_items.composite_food_id` and
+   `planned_meals.saved_meal_id`; a row pointing at a row that doesn't exist (deleted by hand)
+   would fail validation, so those keys are added `NOT VALID` first and validated only if the data
+   is clean (it logs a notice and moves on otherwise, nothing is changed or dropped). List them to
+   know in advance:
+   ```sql
+   SELECT 'meal_items' AS tbl, count(*) FROM meal_items m WHERE composite_food_id IS NOT NULL
+     AND NOT EXISTS (SELECT 1 FROM composite_foods c WHERE c.id = m.composite_food_id)
+   UNION ALL SELECT 'saved_meal_items', count(*) FROM saved_meal_items m WHERE composite_food_id IS NOT NULL
+     AND NOT EXISTS (SELECT 1 FROM composite_foods c WHERE c.id = m.composite_food_id)
+   UNION ALL SELECT 'planned_meals', count(*) FROM planned_meals p WHERE saved_meal_id IS NOT NULL
+     AND NOT EXISTS (SELECT 1 FROM saved_meals s WHERE s.id = p.saved_meal_id);
+   ```
+   Expect 0 on every line (otherwise a rehearsal run shows which key stayed `NOT VALID`:
+   `SELECT conname FROM pg_constraint WHERE NOT convalidated;`).
+
+11. (C3) Duplicate workout days. `workout_logs.date` never had a unique index and migration 0017
     adds one per user. Prod had one empty pair on 2026-11-27 (ids 124 and 125, 2026-04-03, both
     with no exercises, sets or cardio): the migration keeps the oldest and soft-deletes the empty
     extra. A duplicate that holds data **stops the migration** (nothing changes): merge it by hand
@@ -261,14 +278,58 @@ Each lane adds what its changes need here (README: "Prod changes go in ROLLOUT.m
   - In 3.4, `/media` shows the owner's items as before; the add page lists matching shared
     catalog entries.
 
-- **C3 (workout)**: migration 0016 runs in pre_swap with the rest. `exercises` becomes the shared
+- **C2 (diet)**: migration 0016 runs in pre_swap with the rest. `foods` becomes the shared catalog
+  (`created_by` = the admin for every existing food); days, plans, meals, saved meals, recipes
+  (`composite_foods`), planned meals and everything under them become the admin's, with RLS on and
+  composite foreign keys. Nothing to configure; relies on pre-check 1.6 and it **stops** if rows
+  exist and there isn't exactly one live admin. See pre-check 1.10 for legacy dangling links.
+  **Row counts for the D1 rehearsal**: run before and after `migrate up`, the numbers must match,
+  and after it `owned` must equal `total` on every line:
+  ```sql
+  -- psql_owner (bypasses RLS, so it counts soft-deleted rows too)
+  SELECT 'foods' AS tbl, count(*) AS total FROM foods
+  UNION ALL SELECT 'composite_foods', count(*) FROM composite_foods
+  UNION ALL SELECT 'composite_food_items', count(*) FROM composite_food_items
+  UNION ALL SELECT 'plans', count(*) FROM plans
+  UNION ALL SELECT 'days', count(*) FROM days
+  UNION ALL SELECT 'meals', count(*) FROM meals
+  UNION ALL SELECT 'meal_items', count(*) FROM meal_items
+  UNION ALL SELECT 'saved_meals', count(*) FROM saved_meals
+  UNION ALL SELECT 'saved_meal_items', count(*) FROM saved_meal_items
+  UNION ALL SELECT 'planned_meals', count(*) FROM planned_meals
+  UNION ALL SELECT 'day_logs', count(*) FROM day_logs;
+  -- after the migration, rows given to the admin (foods: created_by) (expect owned = total on every line):
+  SELECT 'foods' AS tbl, count(*) AS owned FROM foods WHERE created_by = (SELECT id FROM users WHERE is_admin AND deleted_at IS NULL)
+  UNION ALL SELECT 'composite_foods', count(*) FROM composite_foods WHERE user_id = (SELECT id FROM users WHERE is_admin AND deleted_at IS NULL)
+  UNION ALL SELECT 'composite_food_items', count(*) FROM composite_food_items WHERE user_id = (SELECT id FROM users WHERE is_admin AND deleted_at IS NULL)
+  UNION ALL SELECT 'plans', count(*) FROM plans WHERE user_id = (SELECT id FROM users WHERE is_admin AND deleted_at IS NULL)
+  UNION ALL SELECT 'days', count(*) FROM days WHERE user_id = (SELECT id FROM users WHERE is_admin AND deleted_at IS NULL)
+  UNION ALL SELECT 'meals', count(*) FROM meals WHERE user_id = (SELECT id FROM users WHERE is_admin AND deleted_at IS NULL)
+  UNION ALL SELECT 'meal_items', count(*) FROM meal_items WHERE user_id = (SELECT id FROM users WHERE is_admin AND deleted_at IS NULL)
+  UNION ALL SELECT 'saved_meals', count(*) FROM saved_meals WHERE user_id = (SELECT id FROM users WHERE is_admin AND deleted_at IS NULL)
+  UNION ALL SELECT 'saved_meal_items', count(*) FROM saved_meal_items WHERE user_id = (SELECT id FROM users WHERE is_admin AND deleted_at IS NULL)
+  UNION ALL SELECT 'planned_meals', count(*) FROM planned_meals WHERE user_id = (SELECT id FROM users WHERE is_admin AND deleted_at IS NULL)
+  UNION ALL SELECT 'day_logs', count(*) FROM day_logs WHERE user_id = (SELECT id FROM users WHERE is_admin AND deleted_at IS NULL);
+  ```
+  Effects to know:
+  - The days, meals, plans and saved meals pages show the owner's data as before. A new account
+    starts with an empty week and gets its own default plan (2000 kcal) on first use.
+  - Foods and their picker stay shared. A quick-logged meal's hidden food row is only visible to
+    whoever logged it. New: `PUT /diet/foods/:id` (creator or admin, else 403) and
+    `DELETE /diet/foods/:id` (admin only, else 403, soft delete; meals that used the food keep it).
+  - A request body can't carry a nested food any more; the diet endpoints take plain IDs. The
+    frontend already sent that shape, so nothing changes for it.
+  - Diet error responses are fixed messages; database errors are only in the backend log.
+  - Rolling back the image does not undo the migration (use the pre-deploy backup).
+
+- **C3 (workout)**: migration 0017 runs in pre_swap with the rest. `exercises` becomes the shared
   catalog (`created_by` = the admin); `machine_settings` moves from `exercises` to the new
   per-user table `exercise_settings` (the admin's row per exercise that had settings); programs,
   plans, plan days/exercises, logs, logged exercises, sets and cardio all go to the admin, with
   composite FKs and RLS. `logged_sets.client_id` uniqueness becomes per user. Nothing to
-  configure; relies on pre-check 1.6 and 1.10. It **stops** if rows exist and there isn't exactly
+  configure; relies on pre-check 1.6 and 1.11. It **stops** if rows exist and there isn't exactly
   one live admin, or if a duplicate-date workout log holds data. Effects:
-  - The empty duplicate log from pre-check 1.10 is soft-deleted (one row, `deleted_at` set).
+  - The empty duplicate log from pre-check 1.11 is soft-deleted (one row, `deleted_at` set).
   - A new family account starts with no program, plans or logs (the plans page shows "No programs
     yet"); it sees every exercise in the shared library, and only edits the ones it added.
   - Plan day and exercise rows whose plan no longer exists (they had no foreign key before) are
@@ -304,7 +365,7 @@ Each lane adds what its changes need here (README: "Prod changes go in ROLLOUT.m
   In 3.4: `/gym` shows the owner's week, today's plan and history as before; open an exercise's
   edit dialog in a routine: the machine settings are the owner's old ones. Error responses from
   the workout endpoints are now fixed messages; database errors are only in the backend log.
-  Rolling back the image does not undo the migration; use the pre-deploy backup if 0016 must be undone.
+  Rolling back the image does not undo the migration; use the pre-deploy backup if 0017 must be undone.
 
 <!-- Later lanes: add anything else that must happen in this deploy here. -->
 

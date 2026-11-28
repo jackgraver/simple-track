@@ -33,7 +33,7 @@ type LoggedSet struct {
 	LoggedExerciseID uint `json:"logged_exercise_id"`
 	// ClientID is a client-generated uuid that makes POST /workout/sets idempotent.
 	// NULL for sets created before migration 0004 or through the legacy full-replace endpoint.
-	// Unique per user (idx_logged_sets_client_id on (user_id, client_id), migration 0016).
+	// Unique per user (idx_logged_sets_client_id on (user_id, client_id), migration 0017).
 	ClientID    *string `json:"client_id" gorm:"type:uuid"`
 	Reps        uint    `json:"reps"`
 	Weight      float32 `json:"weight"`

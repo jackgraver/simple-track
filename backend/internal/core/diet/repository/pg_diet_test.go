@@ -54,6 +54,11 @@ func pgDietDB(t *testing.T) *gorm.DB {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// The user every seeded row belongs to (testutil.UserID is the first identity value).
+	if err := gdb.Exec(`INSERT INTO users (username, password, email, is_admin, created_at)
+		VALUES ('owner', 'x', 'o@x', true, now())`).Error; err != nil {
+		t.Fatal(err)
+	}
 	t.Cleanup(func() {
 		if d, err := gdb.DB(); err == nil {
 			d.Close()
@@ -68,6 +73,9 @@ func pgDietDB(t *testing.T) *gorm.DB {
 // fn succeeds.
 func inRequest(db *gorm.DB, fn func(ctx context.Context) error) error {
 	ctx, req := database.WithTx(context.Background(), db)
+	if err := database.SetIdentity(ctx, database.Identity{UserID: testutil.UserID}); err != nil {
+		return err
+	}
 	if err := fn(ctx); err != nil {
 		req.Rollback()
 		return err

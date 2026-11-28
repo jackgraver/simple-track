@@ -162,6 +162,11 @@ func seedGym(tx *gorm.DB) error {
 }
 
 func seedDiet(tx *gorm.DB) error {
+	owner, err := devUser(tx)
+	if err != nil {
+		return err
+	}
+	added := database.Creator{CreatedBy: owner.UserID}
 	defs := []struct {
 		name, serving            string
 		amt, cal, p, fib, c, fat float32
@@ -177,11 +182,11 @@ func seedDiet(tx *gorm.DB) error {
 	}
 	foods := make([]dietm.Food, len(defs))
 	for i, d := range defs {
-		foods[i] = dietm.Food{Name: d.name, ServingType: d.serving, ServingAmount: d.amt, Calories: d.cal, Protein: d.p, Fiber: d.fib, Carbs: d.c, Fat: d.fat}
+		foods[i] = dietm.Food{Creator: added, Name: d.name, ServingType: d.serving, ServingAmount: d.amt, Calories: d.cal, Protein: d.p, Fiber: d.fib, Carbs: d.c, Fat: d.fat}
 	}
 	if err := tx.Create(&foods).Error; err != nil {
 		return err
 	}
 	from := EpochDay().AddDate(0, 0, -60)
-	return tx.Create(&dietm.Plan{Name: "Maintenance", Calories: 2500, Protein: 180, Fiber: 35, Carbs: 280, Fat: 70, EffectiveFrom: &from}).Error
+	return tx.Create(&dietm.Plan{Owner: owner, Name: "Maintenance", Calories: 2500, Protein: 180, Fiber: 35, Carbs: 280, Fat: 70, EffectiveFrom: &from}).Error
 }

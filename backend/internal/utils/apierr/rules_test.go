@@ -17,10 +17,7 @@ var rawInternalError = regexp.MustCompile(`(StatusInternalServerError|[^0-9]500)
 
 // Sites that predate the rule, as a count per file. Lanes move their handlers to apierr and lower
 // or delete their entries; a file may go below its count, never above.
-var rawInternalErrorAllowed = map[string]int{
-	"internal/core/diet/controller/diet_log_route.go":  6, // C2
-	"internal/core/diet/controller/diet_plan_route.go": 2, // C2
-}
+var rawInternalErrorAllowed = map[string]int{}
 
 func TestNoRawErrorsIn500s(t *testing.T) {
 	root := filepath.Join("..", "..", "..")

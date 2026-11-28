@@ -98,7 +98,8 @@ func seed(tx *gorm.DB, owner uint) error {
 	media := func(tx *gorm.DB) error { return seedMedia(tx, owner) }
 	money := func(tx *gorm.DB) error { return seedMoney(tx, owner) }
 	gym := func(tx *gorm.DB) error { return seedGym(tx, owner) }
-	for _, f := range []func(*gorm.DB) error{gym, seedDiet, tracking, media, money} {
+	diet := func(tx *gorm.DB) error { return seedDiet(tx, owner) }
+	for _, f := range []func(*gorm.DB) error{gym, diet, tracking, media, money} {
 		if err := f(tx); err != nil {
 			return err
 		}
@@ -233,7 +234,9 @@ func seedGym(tx *gorm.DB, owner uint) error {
 	return nil
 }
 
-func seedDiet(tx *gorm.DB) error {
+func seedDiet(tx *gorm.DB, ownerID uint) error {
+	own := database.Owner{UserID: ownerID}
+	added := database.Creator{CreatedBy: ownerID}
 	type fd struct {
 		name, serving          string
 		amt, cal, p, f, c, fat float32
@@ -253,29 +256,29 @@ func seedDiet(tx *gorm.DB) error {
 	// Item Amount below is a number of servings (ServingAmount units each), not grams.
 	foods := make([]dietm.Food, len(defs))
 	for i, d := range defs {
-		foods[i] = dietm.Food{Name: d.name, ServingType: d.serving, ServingAmount: d.amt, Calories: d.cal, Protein: d.p, Fiber: d.f, Carbs: d.c, Fat: d.fat}
+		foods[i] = dietm.Food{Creator: added, Name: d.name, ServingType: d.serving, ServingAmount: d.amt, Calories: d.cal, Protein: d.p, Fiber: d.f, Carbs: d.c, Fat: d.fat}
 	}
 	if err := tx.Create(&foods).Error; err != nil {
 		return err
 	}
 
-	cf := dietm.CompositeFood{Name: "Protein Oats", Items: []dietm.CompositeFoodItem{
-		{FoodID: foods[3].ID, Amount: 1}, {FoodID: foods[9].ID, Amount: 1}, {FoodID: foods[4].ID, Amount: 1},
+	cf := dietm.CompositeFood{Owner: own, Name: "Protein Oats", Items: []dietm.CompositeFoodItem{
+		{Owner: own, FoodID: foods[3].ID, Amount: 1}, {Owner: own, FoodID: foods[9].ID, Amount: 1}, {Owner: own, FoodID: foods[4].ID, Amount: 1},
 	}}
 	if err := tx.Create(&cf).Error; err != nil {
 		return err
 	}
 
 	saved := []dietm.SavedMeal{
-		{Name: "Chicken & Rice", Items: []dietm.SavedMealItem{{FoodID: foods[0].ID, Amount: 2}, {FoodID: foods[1].ID, Amount: 2.5}, {FoodID: foods[6].ID, Amount: 1}}},
-		{Name: "Breakfast", Items: []dietm.SavedMealItem{{FoodID: foods[2].ID, Amount: 3}, {FoodID: foods[4].ID, Amount: 1}}},
+		{Owner: own, Name: "Chicken & Rice", Items: []dietm.SavedMealItem{{Owner: own, FoodID: foods[0].ID, Amount: 2}, {Owner: own, FoodID: foods[1].ID, Amount: 2.5}, {Owner: own, FoodID: foods[6].ID, Amount: 1}}},
+		{Owner: own, Name: "Breakfast", Items: []dietm.SavedMealItem{{Owner: own, FoodID: foods[2].ID, Amount: 3}, {Owner: own, FoodID: foods[4].ID, Amount: 1}}},
 	}
 	if err := tx.Create(&saved).Error; err != nil {
 		return err
 	}
 
 	from := today().AddDate(0, 0, -30)
-	plan := dietm.Plan{Name: "Maintenance", Calories: 2500, Protein: 180, Fiber: 35, Carbs: 280, Fat: 70, EffectiveFrom: &from}
+	plan := dietm.Plan{Owner: own, Name: "Maintenance", Calories: 2500, Protein: 180, Fiber: 35, Carbs: 280, Fat: 70, EffectiveFrom: &from}
 	if err := tx.Create(&plan).Error; err != nil {
 		return err
 	}
@@ -283,27 +286,27 @@ func seedDiet(tx *gorm.DB) error {
 	// Days from two weeks ago through tomorrow, each with a logged meal; today and
 	// tomorrow also get a planned (unlogged) meal.
 	for i := -14; i <= 1; i++ {
-		day := dietm.DietDay{Date: today().AddDate(0, 0, i), PlanID: plan.ID}
+		day := dietm.DietDay{Owner: own, Date: today().AddDate(0, 0, i), PlanID: plan.ID}
 		if err := tx.Create(&day).Error; err != nil {
 			return err
 		}
 		if i <= 0 {
-			meal := dietm.Meal{Name: "Lunch", Items: []dietm.MealItem{
-				{FoodID: foods[0].ID, Amount: 2}, {FoodID: foods[1].ID, Amount: 2.5}, {FoodID: foods[7].ID, Amount: 1},
+			meal := dietm.Meal{Owner: own, Name: "Lunch", Items: []dietm.MealItem{
+				{Owner: own, FoodID: foods[0].ID, Amount: 2}, {Owner: own, FoodID: foods[1].ID, Amount: 2.5}, {Owner: own, FoodID: foods[7].ID, Amount: 1},
 			}}
 			if err := tx.Create(&meal).Error; err != nil {
 				return err
 			}
-			if err := tx.Create(&dietm.DayLog{DayID: day.ID, MealID: meal.ID}).Error; err != nil {
+			if err := tx.Create(&dietm.DayLog{Owner: own, DayID: day.ID, MealID: meal.ID}).Error; err != nil {
 				return err
 			}
 		}
 		if i >= 0 {
-			meal := dietm.Meal{Name: "Dinner", Items: []dietm.MealItem{{FoodID: foods[8].ID, Amount: 1.8}, {FoodID: foods[6].ID, Amount: 1.5}}}
+			meal := dietm.Meal{Owner: own, Name: "Dinner", Items: []dietm.MealItem{{Owner: own, FoodID: foods[8].ID, Amount: 1.8}, {Owner: own, FoodID: foods[6].ID, Amount: 1.5}}}
 			if err := tx.Create(&meal).Error; err != nil {
 				return err
 			}
-			if err := tx.Create(&dietm.PlannedMeal{DayID: day.ID, MealID: meal.ID}).Error; err != nil {
+			if err := tx.Create(&dietm.PlannedMeal{Owner: own, DayID: day.ID, MealID: meal.ID}).Error; err != nil {
 				return err
 			}
 		}

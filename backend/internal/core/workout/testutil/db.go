@@ -41,7 +41,7 @@ func SetupTestDB(t *testing.T) *gorm.DB {
 	); err != nil {
 		t.Fatal(err)
 	}
-	// The per-user uniques from migration 0016 (the set endpoint's ON CONFLICT needs the first).
+	// The per-user uniques from migration 0017 (the set endpoint's ON CONFLICT needs the first).
 	for _, ddl := range []string{
 		`CREATE UNIQUE INDEX idx_logged_sets_client_id ON logged_sets (user_id, client_id)`,
 		`CREATE UNIQUE INDEX idx_workout_logs_user_date ON workout_logs (user_id, date) WHERE deleted_at IS NULL`,

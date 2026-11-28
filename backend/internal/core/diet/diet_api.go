@@ -8,9 +8,13 @@ import (
 )
 
 func RegisterRoutes(router *gin.Engine, authMiddleware gin.HandlerFunc) {
-	dayOffsetMiddleware := utils.DayOffsetMiddleware()
+	RegisterGroup(router.Group("/diet", authMiddleware))
+}
 
-	group := router.Group("/diet", authMiddleware)
+// RegisterGroup mounts the diet routes on group (already behind authentication). Tests mount it
+// on the two-user harness's router.
+func RegisterGroup(group *gin.RouterGroup) {
+	dayOffsetMiddleware := utils.DayOffsetMiddleware()
 	{
 		plans := group.Group("/plans")
 		{
@@ -29,6 +33,8 @@ func RegisterRoutes(router *gin.Engine, authMiddleware gin.HandlerFunc) {
 		foods := group.Group("/foods")
 		{
 			foods.POST("", controller.PostFood)
+			foods.PUT("/:id", controller.PutFood)
+			foods.DELETE("/:id", controller.DeleteFood)
 		}
 		meals := group.Group("/meals")
 		{

@@ -814,9 +814,101 @@ specifies; (5) migration 0013's down is lossy with several users.
   - A legacy row with half a `(source, external_id)` pair stays editable; the "go together" rule
     only applies when an edit sets one of them.
 
+## 2026-11-27: C2 diet (agent, lane C2; shape approved by the owner)
+
+Migration `0016_diet_owned.sql` (after C1, C4, C5; C3 renumbered to 0017). One
+file for all eleven tables, tests in `core/diet/diet_pg_test.go` (twousers) and
+`internal/database/diet_migration_pg_test.go` (legacy-shaped data).
+
+**What is shared and what is personal**
+- **Catalog: `foods` only** (`created_by`, catalog policies, `catalog_guard`). Anyone signed in
+  adds, the creator or an admin edits (403 for others: the row is visible, so 403 leaks nothing),
+  only an admin deletes (soft delete; 403 otherwise). New endpoints `PUT /diet/foods/:id` and
+  `DELETE /diet/foods/:id`; the frontend has no UI for them yet (like C5's catalog delete).
+  Food names stay globally unique (a taken name is a 409, as before).
+- **Recipes are personal** (owner's decision): `composite_foods` and its items are owned, name
+  unique per user (`(user_id, name)`, a repeat is a 409). A recipe is "my pico: 50 g tomatoes,
+  50 g onion", not something to share.
+- **Owned**: `plans`, `days`, `meals`, `planned_meals`, `saved_meals`, `composite_foods`; owned
+  children `day_logs`, `meal_items`, `saved_meal_items`, `composite_food_items`.
+- **Nothing personal lived on a food row** (no favourites, last-used or custom servings in the
+  schema or the frontend), so no per-user food table. A meal item is `food_id` (plain FK to the
+  catalog: everyone may read it, so the composite-FK reason doesn't apply) on the user's own meal
+  (composite FK `(meal_id, user_id)`).
+- **Quick-entry foods** are the hidden food row behind a quick-logged meal: effectively part of
+  that logged meal. They stay catalog rows (`created_by` = the logger) so the item FK shape is the
+  same for every item, but the catalog read policy hides a `quick_entry` food from everyone except
+  its creator (not even the admin), so one person's quick-logged calories can't be read by ID.
+  The picker already filtered them out.
+
+**Schema**
+- Composite FKs (FK checks bypass RLS): every child to its parent as in the kit, plus
+  `days.plan_id -> plans`, `day_logs.meal_id -> meals`, `planned_meals.meal_id -> meals`,
+  `planned_meals.saved_meal_id -> saved_meals` and both `composite_food_id` columns ->
+  `composite_foods`, all on `(id, user_id)`. The last three had no FK at all before; they're added
+  `NOT VALID` and validated in the migration only if the data is clean (a dangling legacy ID
+  logs a notice and leaves the key `NOT VALID`, which still guards new rows; ROLLOUT 1.10 lists
+  them). Nothing is changed or dropped.
+- Uniques per user: `days (user_id, date)`, `meals (user_id, client_id)`, `planned_meals (user_id,
+  client_id)` (both partial on `client_id IS NOT NULL`, as before), `composite_foods (user_id,
+  name)`. `uq_day_logs_day_meal` is unchanged (`day_id` already implies the user).
+- The SQLite module tests no longer have a unique index on `days.date` (the model tag moved to
+  the migration), so the lost-race fallback in `findOrCreateDietDayForCalendarDate` is only
+  exercised on Postgres.
+- Down is lossy only if two users collide on the restored global uniques.
+
+**Code**
+- Owned models embed `database.Owner`, `Food` embeds `database.Creator`. Every read of an owned
+  table is `owned(ctx)` / `ownedTx(ctx, tx)` (`database.Owned`), including the `Unscoped()`
+  client_id counts, updates and deletes by ID (`database.Affected`) and every preload level
+  (`preloadMeal`). `CalculateTotals`'s raw SQL filters `dl.user_id`.
+- **Nested writes are gone** (BACKLOG #1): requests bind into DTOs (`mealBody`, `savedMealBody`,
+  `compositeFoodBody`, `foodBody`), never models, and every create is
+  `Omit(clause.Associations)`; a meal and its lines are written as a meal, then its items
+  (`createMealTx`, `insertMealItems`). A nested `food` object in a body is ignored (tested).
+- Before writing items the repository checks each `food_id` is a live food the caller can see
+  and each `composite_food_id` is the caller's own recipe, else 400 (an FK check would accept
+  another user's ID). A deleted food stays visible on the meals that used it (`Food` preloads
+  are `Unscoped`).
+- **Locks** (BACKLOG #2): `lockClientID` is `database.XactLock(ctx, tx, table+".client_id", id)`;
+  the raw `pg_advisory` call and its allowlist entry are gone. The "does this client_id exist"
+  counts (`Unscoped()` included) are `Owned`, so Alice's replay isn't Bob's and the same
+  `client_id` from both makes two rows. Tests: both users quick-log and plan with the same
+  `client_id` (each replay idempotent) and Bob's quick log doesn't wait while Alice holds the
+  lock. Day lookups and the find-or-create-day path are `Owned` too, so two users on the same
+  date each get a day.
+- **Variant links** (the picker's "ground beef 90/10, 80/20" shortcut): linking never touches
+  meals. Joining an existing group writes only the new food. *Starting* a group writes
+  `variant_group_id` on the related food, which is an edit of a catalog row, so only its creator
+  or an admin may; anyone else gets a 403 and nothing is created. Group IDs are still
+  `MAX(variant_group_id)+1` over the whole catalog, so two people starting groups at the same
+  instant could share one (not worth a lock; the groups would merge, no data is lost).
+- **Errors** (BACKLOG #6): diet handlers are all on `apierr` (`respondErr`: our sentinels,
+  the shared 404, a logged 500). `GET /diet/meals/meal/:id` answered 500 for a missing meal; it
+  is a 404 now. `replace_meal_id` mismatches, reorder mistakes and unknown foods are 400s with
+  our own text. The `diet` files are out of `createWithAssociationsAllowed`, the raw-advisory
+  list and apierr's raw-error list; `foods` and the other ten tables are out of `rlsPending`.
+- **Plans**: a new user gets their own "Default" plan on first use (as the first user did).
+  Targets are `PUT /diet/plans/plan/:id` on your own plan only. An onboarding to set targets at
+  account creation is planned (owner).
+- **Seeds**: devseed and the e2e seeds give every diet row to the dev login
+  (`seedDiet(tx, owner)` / `devUser`), foods `created_by` the same.
+- **Frontend**: no change. Its request bodies already carry only IDs and amounts (extra fields
+  like a nested `food` are now ignored by the DTOs), and responses keep their shapes (foods
+  gain `created_by`).
+- **Review (/code-review high, scoped to this lane)**. Fixed: item checks accept a food the admin
+  soft-deleted (old meals, saved meals and copied days keep working; the picker hides it), and
+  `MAX(variant_group_id)` counts deleted rows so a group ID isn't reused. Known, left as is:
+  (1) a food's creator editing its macros changes everyone's past totals, since meal items
+  reference the shared row (copy-on-write is the fix if it matters); (2) starting a variant group
+  on a food you didn't add is a 403, so non-admins can't group the migrated (admin-owned) foods
+  unless the group exists; (3) pre-existing: `POST /meal/new` with a repeated `client_id` is a 500
+  not a replay, and meal/saved-meal/recipe bodies don't reject negative amounts (only `foodBody`
+  validates).
+
 ## 2026-11-27: C3 workout (agent, lane C3)
 
-Migration `0016_workout_owned.sql` (after C5's 0015; C2 may also add one, renumber on rebase).
+Migration `0017_workout_owned.sql` (after C2's 0016; renumbered when C3 merged second).
 
 **What is shared and what is personal**
 - Catalog (`created_by`, catalog policies, `catalog_guard`): `exercises` (name, rep rollover, cues,
@@ -842,7 +934,7 @@ Migration `0016_workout_owned.sql` (after C5's 0015; C2 may also add one, renumb
 **Duplicate dates (prod)**: prod had one pair of empty logs for 2026-04-03 (ids 124/125, same
 plan, no exercises, sets or cardio). Step 0 of the migration keeps the oldest live log per date
 and soft-deletes extras that are empty; an extra holding exercises, cardio or mobility ticks
-**raises** instead of merging (ROLLOUT 1.10 has the query to re-check). Soft-delete, not hard:
+**raises** instead of merging (ROLLOUT 1.11 has the query to re-check). Soft-delete, not hard:
 nothing is lost and the partial index ignores it.
 
 **Fresh databases and new accounts**: the baseline inserted a placeholder "Default" program that
@@ -892,7 +984,7 @@ already read `machine_settings`, which is now the caller's.
 **Tests**: `controller/workout_pg_test.go` (twousers: every endpoint family, same-date start, no
 waiting on Alice's lock, forged `user_id`/`created_by`, catalog permissions with the admin,
 per-user machine settings, composite-FK refusals through the owner role, RLS backstop as Bob per
-table); `services/migration_0016_pg_test.go` (backfill on legacy-shaped data, the duplicate pair,
+table); `services/migration_0017_pg_test.go` (backfill on legacy-shaped data, the duplicate pair,
 the stop on a duplicate with data, the fresh database); `pg_sets_test.go` adapted (an admin user,
 `created_by`/`user_id` on raw inserts). SQLite module tests act as user 1 through `testutil.Ctx`
 (`SetupTestDB` returns a db whose statements carry the identity). `twousers.Harness.Engine` is new:
@@ -906,5 +998,5 @@ login's machine settings on Lat Pulldown.
 - First writer wins on an exercise name, like C5's external IDs: only the creator or the admin can
   fix a wrong name or cue on a shared exercise.
 - `workout_plan_exercises.exercise_id` has no FK (never had one).
-- Migration 0016's down is lossy with several users (lowest user's machine settings win, the
+- Migration 0017's down is lossy with several users (lowest user's machine settings win, the
   global `client_id` index fails if two users share one); the empty duplicate log stays deleted.

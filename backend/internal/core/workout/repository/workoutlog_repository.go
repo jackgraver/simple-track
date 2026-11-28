@@ -49,7 +49,7 @@ func LoadByDate(ctx context.Context, date time.Time) (models.WorkoutLog, error) 
 // log.Date. The check-and-insert is serialized per user and date with a transaction-scoped
 // advisory lock (database.XactLock puts the user in the key, so two users never wait on each
 // other), and the count only sees the caller's rows. If a row already exists, log is left without
-// an ID and nil is returned. idx_workout_logs_user_date (migration 0016) is the backstop.
+// an ID and nil is returned. idx_workout_logs_user_date (migration 0017) is the backstop.
 func CreateMinimalIfMissing(ctx context.Context, log *models.WorkoutLog) error {
 	return database.From(ctx).WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		if err := database.XactLock(ctx, tx, "workout_logs.date", log.Date.Format("2006-01-02")); err != nil {

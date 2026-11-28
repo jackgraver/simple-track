@@ -9,10 +9,10 @@ import (
 	"be-simpletracker/migrations"
 )
 
-// Migration 0016 on legacy-shaped data: every row goes to the one admin, machine settings move to
+// Migration 0017 on legacy-shaped data: every row goes to the one admin, machine settings move to
 // exercise_settings, the empty duplicate-date log is soft-deleted (the one prod had), and a
 // duplicate that holds data stops the migration instead of being guessed at. Postgres only.
-func TestPostgres_migration0016Backfill(t *testing.T) {
+func TestPostgres_migration0017Backfill(t *testing.T) {
 	_, sqlDB := pgTestDB(t)
 	ctx := context.Background()
 	m, err := migrate.New(sqlDB, migrations.FS, nil)
@@ -87,7 +87,7 @@ func TestPostgres_migration0016Backfill(t *testing.T) {
 	}
 }
 
-func TestPostgres_migration0016StopsOnDuplicateWithData(t *testing.T) {
+func TestPostgres_migration0017StopsOnDuplicateWithData(t *testing.T) {
 	_, sqlDB := pgTestDB(t)
 	ctx := context.Background()
 	m, err := migrate.New(sqlDB, migrations.FS, nil)
@@ -108,7 +108,7 @@ func TestPostgres_migration0016StopsOnDuplicateWithData(t *testing.T) {
 }
 
 // A fresh database has no admin and no workout data: the baseline's placeholder program goes.
-func TestPostgres_migration0016FreshDatabase(t *testing.T) {
+func TestPostgres_migration0017FreshDatabase(t *testing.T) {
 	_, sqlDB := pgTestDB(t)
 	m, err := migrate.New(sqlDB, migrations.FS, nil)
 	if err != nil {

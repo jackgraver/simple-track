@@ -19,6 +19,10 @@ func dietRouter(t *testing.T) *gin.Engine {
 	db := testutil.SetupTestDB(t)
 	r := gin.New()
 	r.Use(database.Middleware(db))
+	r.Use(func(c *gin.Context) {
+		c.Request = c.Request.WithContext(database.WithIdentity(c.Request.Context(), database.Identity{UserID: testutil.UserID}))
+		c.Next()
+	})
 	r.POST("/quick-log", controller.PostQuickLog)
 	r.POST("/planned/from-saved", controller.PostPlannedFromSaved)
 	r.DELETE("/meal/logged", controller.DeleteLoggedMeal)

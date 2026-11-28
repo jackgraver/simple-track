@@ -34,9 +34,116 @@ func normalizeClientID(c *gin.Context, s string) (string, bool) {
 	return id.String(), true
 }
 
+// Request bodies are their own types, never gorm models (BACKLOG #1): a body can't set user_id,
+// created_by, timestamps or a nested food, and ingredient lines point at foods by ID only.
+
+type foodBody struct {
+	Name          string  `json:"name"`
+	ServingType   string  `json:"serving_type"`
+	ServingAmount float32 `json:"serving_amount"`
+	Calories      float32 `json:"calories"`
+	Protein       float32 `json:"protein"`
+	Fiber         float32 `json:"fiber"`
+	Carbs         float32 `json:"carbs"`
+	Fat           float32 `json:"fat"`
+}
+
+func (b foodBody) validate() string {
+	switch {
+	case strings.TrimSpace(b.Name) == "":
+		return "name is required"
+	case b.ServingAmount < 0 || b.Calories < 0 || b.Protein < 0 || b.Fiber < 0 || b.Carbs < 0 || b.Fat < 0:
+		return "serving and macro values must not be negative"
+	}
+	return ""
+}
+
 type CreateFoodRequest struct {
-	models.Food
+	foodBody
 	RelatedFoodID *uint `json:"related_food_id,omitempty"`
+}
+
+type mealItemBody struct {
+	FoodID          uint    `json:"food_id"`
+	Amount          float32 `json:"amount"`
+	GroupID         string  `json:"group_id"`
+	GroupLabel      string  `json:"group_label"`
+	CompositeFoodID *uint   `json:"composite_food_id"`
+}
+
+type mealBody struct {
+	Name     string         `json:"name"`
+	Items    []mealItemBody `json:"items"`
+	ClientID string         `json:"client_id"`
+}
+
+// toModel builds the meal to create. The client_id has been through normalizeClientID by the
+// caller (empty means not idempotent).
+func (b mealBody) toModel(clientID string) models.Meal {
+	m := models.Meal{Name: b.Name, ClientID: nilIfEmpty(clientID)}
+	for _, it := range b.Items {
+		m.Items = append(m.Items, models.MealItem{
+			FoodID: it.FoodID, Amount: it.Amount, GroupID: it.GroupID,
+			GroupLabel: it.GroupLabel, CompositeFoodID: it.CompositeFoodID,
+		})
+	}
+	return m
+}
+
+type savedMealItemBody struct {
+	FoodID          uint    `json:"food_id"`
+	Amount          float64 `json:"amount"`
+	GroupID         string  `json:"group_id"`
+	GroupLabel      string  `json:"group_label"`
+	CompositeFoodID *uint   `json:"composite_food_id"`
+}
+
+type savedMealBody struct {
+	Name  string              `json:"name"`
+	Items []savedMealItemBody `json:"items"`
+}
+
+func (b savedMealBody) toModel() models.SavedMeal {
+	sm := models.SavedMeal{Name: b.Name}
+	for _, it := range b.Items {
+		sm.Items = append(sm.Items, models.SavedMealItem{
+			FoodID: it.FoodID, Amount: it.Amount, GroupID: it.GroupID,
+			GroupLabel: it.GroupLabel, CompositeFoodID: it.CompositeFoodID,
+		})
+	}
+	return sm
+}
+
+type compositeFoodBody struct {
+	Name  string `json:"name"`
+	Items []struct {
+		FoodID uint    `json:"food_id"`
+		Amount float32 `json:"amount"`
+	} `json:"items"`
+}
+
+func nilIfEmpty(s string) *string {
+	if s == "" {
+		return nil
+	}
+	return &s
+}
+
+// respondErr answers an error from the diet services: our own sentinels with their messages, a
+// missing or someone else's row as the shared 404, anything else as a logged 500.
+func respondErr(c *gin.Context, err error) {
+	switch {
+	case errors.Is(err, dietrepo.ErrUnknownFood):
+		apierr.BadRequest(c, "unknown food or recipe in the request")
+	case errors.Is(err, dietrepo.ErrForbidden):
+		apierr.Forbidden(c, "only the person who added this, or an admin, can do that")
+	case errors.Is(err, dietrepo.ErrFoodNameTaken), errors.Is(err, dietrepo.ErrCompositeNameTaken):
+		apierr.Conflict(c, err.Error())
+	case errors.Is(err, dietrepo.ErrInvalidRequest):
+		apierr.BadRequest(c, err.Error())
+	default:
+		apierr.NotFoundOrInternal(c, err)
+	}
 }
 
 type QuickLogRequest struct {
@@ -90,7 +197,7 @@ func PostQuickLog(c *gin.Context) {
 		ClientID:      clientID,
 	})
 	if err != nil {
-		apierr.Internal(c, err)
+		respondErr(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, dayWithTotalsResponse(result))
@@ -102,16 +209,69 @@ func PostFood(c *gin.Context) {
 		apierr.BadRequest(c, err.Error())
 		return
 	}
-	createdFood, err := services.CreateFood(c.Request.Context(), &req.Food, req.RelatedFoodID)
-	if errors.Is(err, dietrepo.ErrFoodNameTaken) {
-		apierr.Conflict(c, err.Error())
+	if msg := req.validate(); msg != "" {
+		apierr.BadRequest(c, msg)
 		return
 	}
+	food := models.Food{
+		Name: strings.TrimSpace(req.Name), ServingType: req.ServingType, ServingAmount: req.ServingAmount,
+		Calories: req.Calories, Protein: req.Protein, Fiber: req.Fiber, Carbs: req.Carbs, Fat: req.Fat,
+	}
+	createdFood, err := services.CreateFood(c.Request.Context(), &food, req.RelatedFoodID)
 	if err != nil {
-		apierr.Internal(c, err)
+		respondErr(c, err)
 		return
 	}
 	c.JSON(http.StatusCreated, gin.H{"food": createdFood})
+}
+
+func parseFoodID(c *gin.Context) (uint, bool) {
+	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
+	if err != nil || id == 0 {
+		apierr.BadRequest(c, "invalid food id")
+		return 0, false
+	}
+	return uint(id), true
+}
+
+// PutFood edits a catalog food: its creator or an admin (403 for anyone else).
+func PutFood(c *gin.Context) {
+	id, ok := parseFoodID(c)
+	if !ok {
+		return
+	}
+	var req foodBody
+	if err := c.ShouldBindJSON(&req); err != nil {
+		apierr.BadRequest(c, "invalid body")
+		return
+	}
+	if msg := req.validate(); msg != "" {
+		apierr.BadRequest(c, msg)
+		return
+	}
+	food, err := services.UpdateFood(c.Request.Context(), id, dietrepo.FoodFields{
+		Name: strings.TrimSpace(req.Name), ServingType: req.ServingType, ServingAmount: req.ServingAmount,
+		Calories: req.Calories, Protein: req.Protein, Fiber: req.Fiber, Carbs: req.Carbs, Fat: req.Fat,
+	})
+	if err != nil {
+		respondErr(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"food": food})
+}
+
+// DeleteFood removes a food from the shared catalog: admin only (403 for anyone else). Meals that
+// used it keep showing it.
+func DeleteFood(c *gin.Context) {
+	id, ok := parseFoodID(c)
+	if !ok {
+		return
+	}
+	if err := services.DeleteFood(c.Request.Context(), id); err != nil {
+		respondErr(c, err)
+		return
+	}
+	c.Status(http.StatusNoContent)
 }
 
 type compositeFoodWithMacros struct {
@@ -172,12 +332,12 @@ func GetAllFoods(c *gin.Context) {
 	excludeIDs := parseExcludeIDs(c)
 	foods, err := services.AllFoodsForPicker(c.Request.Context(), excludeIDs)
 	if err != nil {
-		apierr.Internal(c, err)
+		respondErr(c, err)
 		return
 	}
 	composites, err := services.AllCompositeFoods(c.Request.Context())
 	if err != nil {
-		apierr.Internal(c, err)
+		respondErr(c, err)
 		return
 	}
 	compositeDTOs := make([]compositeFoodWithMacros, 0, len(composites))
@@ -191,24 +351,27 @@ func GetAllFoods(c *gin.Context) {
 }
 
 func PostNewCompositeFood(c *gin.Context) {
-	var cf models.CompositeFood
-	if err := c.ShouldBindJSON(&cf); err != nil {
-		apierr.BadRequest(c, err.Error())
+	var body compositeFoodBody
+	if err := c.ShouldBindJSON(&body); err != nil {
+		apierr.BadRequest(c, "invalid body")
 		return
 	}
-	cf.ID = 0
-	if cf.Name == "" || len(cf.Items) == 0 {
+	if strings.TrimSpace(body.Name) == "" || len(body.Items) == 0 {
 		apierr.BadRequest(c, "name and at least one item required")
 		return
 	}
+	cf := models.CompositeFood{Name: strings.TrimSpace(body.Name)}
+	for _, it := range body.Items {
+		cf.Items = append(cf.Items, models.CompositeFoodItem{FoodID: it.FoodID, Amount: it.Amount})
+	}
 	id, err := services.CreateCompositeFood(c.Request.Context(), &cf)
 	if err != nil {
-		apierr.Internal(c, err)
+		respondErr(c, err)
 		return
 	}
 	loaded, err := services.CompositeFoodByID(c.Request.Context(), id)
 	if err != nil {
-		apierr.Internal(c, err)
+		respondErr(c, err)
 		return
 	}
 	c.JSON(http.StatusCreated, gin.H{"composite_food": compositeToResponse(*loaded)})
@@ -217,7 +380,7 @@ func PostNewCompositeFood(c *gin.Context) {
 func GetAllMeals(c *gin.Context) {
 	meals, err := services.AllMeals(c.Request.Context(), parseExcludeIDs(c))
 	if err != nil {
-		apierr.Internal(c, err)
+		respondErr(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"meals": meals})
@@ -226,22 +389,22 @@ func GetAllMeals(c *gin.Context) {
 func GetAllSavedMeals(c *gin.Context) {
 	saved, err := services.AllSavedMeals(c.Request.Context(), parseExcludeIDs(c))
 	if err != nil {
-		apierr.Internal(c, err)
+		respondErr(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"saved_meals": saved})
 }
 
 func PostNewSavedMeal(c *gin.Context) {
-	var sm models.SavedMeal
-	if err := c.ShouldBindJSON(&sm); err != nil {
-		apierr.BadRequest(c, err.Error())
+	var body savedMealBody
+	if err := c.ShouldBindJSON(&body); err != nil {
+		apierr.BadRequest(c, "invalid body")
 		return
 	}
-	sm.ID = 0
+	sm := body.toModel()
 	id, err := services.CreateSavedMeal(c.Request.Context(), &sm)
 	if err != nil {
-		apierr.Internal(c, err)
+		respondErr(c, err)
 		return
 	}
 	c.JSON(http.StatusCreated, gin.H{"saved_meal_id": id})
@@ -261,13 +424,13 @@ func DeleteSavedMeal(c *gin.Context) {
 			apierr.NotFound(c, "saved meal not found")
 			return
 		}
-		apierr.Internal(c, err)
+		respondErr(c, err)
 		return
 	}
 	if !force {
 		info, err := services.SavedMealPlannedUsageInfo(c.Request.Context(), id)
 		if err != nil {
-			apierr.Internal(c, err)
+			respondErr(c, err)
 			return
 		}
 		c.JSON(http.StatusOK, gin.H{
@@ -280,7 +443,7 @@ func DeleteSavedMeal(c *gin.Context) {
 			apierr.NotFound(c, "saved meal not found")
 			return
 		}
-		apierr.Internal(c, err)
+		respondErr(c, err)
 		return
 	}
 	c.Status(http.StatusNoContent)
@@ -299,7 +462,7 @@ func GetSavedMeal(c *gin.Context) {
 			apierr.NotFound(c, "saved meal not found")
 			return
 		}
-		apierr.Internal(c, err)
+		respondErr(c, err)
 		return
 	}
 	for i := range sm.Items {
@@ -315,27 +478,27 @@ func PutSavedMeal(c *gin.Context) {
 		apierr.BadRequest(c, "invalid saved meal id")
 		return
 	}
-	var body models.SavedMeal
-	if err := c.ShouldBindJSON(&body); err != nil {
-		apierr.BadRequest(c, err.Error())
+	var req savedMealBody
+	if err := c.ShouldBindJSON(&req); err != nil {
+		apierr.BadRequest(c, "invalid body")
 		return
 	}
-	body.ID = 0
-	if body.Name == "" || len(body.Items) == 0 {
+	if req.Name == "" || len(req.Items) == 0 {
 		apierr.BadRequest(c, "name and at least one item required")
 		return
 	}
+	body := req.toModel()
 	if err := services.ReplaceSavedMeal(c.Request.Context(), uint(id64), &body); err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			apierr.NotFound(c, "saved meal not found")
 			return
 		}
-		apierr.Internal(c, err)
+		respondErr(c, err)
 		return
 	}
 	updated, err := services.SavedMealByID(c.Request.Context(), uint(id64))
 	if err != nil {
-		apierr.Internal(c, err)
+		respondErr(c, err)
 		return
 	}
 	for i := range updated.Items {
@@ -367,17 +530,17 @@ func GetMeal(c *gin.Context) {
 	}
 	meal, err := services.MealByID(c.Request.Context(), uint(id))
 	if err != nil {
-		apierr.Internal(c, err)
+		respondErr(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, meal)
 }
 
 type CreateMealRequest struct {
-	Meal          models.Meal `json:"meal"`
-	Log           bool        `json:"log"`
-	SaveToLibrary bool        `json:"save_to_library"`
-	Offset        int         `json:"offset"`
+	Meal          mealBody `json:"meal"`
+	Log           bool     `json:"log"`
+	SaveToLibrary bool     `json:"save_to_library"`
+	Offset        int      `json:"offset"`
 }
 
 func PostNewMeal(c *gin.Context) {
@@ -386,15 +549,20 @@ func PostNewMeal(c *gin.Context) {
 		apierr.BadRequest(c, err.Error())
 		return
 	}
-	mealID, err := services.CreateMeal(c.Request.Context(), &req.Meal)
+	clientID, ok := normalizeClientID(c, req.Meal.ClientID)
+	if !ok {
+		return
+	}
+	meal := req.Meal.toModel(clientID)
+	mealID, err := services.CreateMeal(c.Request.Context(), &meal)
 	if err != nil {
-		apierr.Internal(c, err)
+		respondErr(c, err)
 		return
 	}
 	if req.Log {
 		day, err := services.FindMealPlanDay(c.Request.Context(), clock.ZerodTime(req.Offset))
 		if err != nil {
-			apierr.Internal(c, err)
+			respondErr(c, err)
 			return
 		}
 		if day == nil {
@@ -405,14 +573,14 @@ func PostNewMeal(c *gin.Context) {
 			DayID:  day.ID,
 			MealID: mealID,
 		}); err != nil {
-			apierr.Internal(c, err)
+			respondErr(c, err)
 			return
 		}
 	}
 	if req.Log && req.SaveToLibrary {
-		sm := savedMealFromMealTemplate(&req.Meal)
+		sm := savedMealFromMealTemplate(&meal)
 		if _, err := services.CreateSavedMeal(c.Request.Context(), sm); err != nil {
-			apierr.Internal(c, err)
+			respondErr(c, err)
 			return
 		}
 	}
@@ -437,7 +605,7 @@ func PostLogPlanned(c *gin.Context) {
 			apierr.NotFound(c, "Day not found")
 			return
 		}
-		apierr.Internal(c, err)
+		respondErr(c, err)
 		return
 	}
 	if day == nil {
@@ -449,22 +617,22 @@ func PostLogPlanned(c *gin.Context) {
 			apierr.NotFound(c, "Planned meal not found on this day")
 			return
 		}
-		apierr.Internal(c, err)
+		respondErr(c, err)
 		return
 	}
 	result, err := services.ReloadDayWithTotals(c.Request.Context(), day)
 	if err != nil {
-		apierr.Internal(c, err)
+		respondErr(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, dayWithTotalsResponse(result))
 }
 
 type EditLoggedMealRequest struct {
-	Meal                models.Meal `json:"meal"`
-	OldMealID           uint        `json:"oldMealID"`
-	PlannedSourceMealID uint        `json:"planned_source_meal_id"`
-	DayID               uint        `json:"day_id"`
+	Meal                mealBody `json:"meal"`
+	OldMealID           uint     `json:"oldMealID"`
+	PlannedSourceMealID uint     `json:"planned_source_meal_id"`
+	DayID               uint     `json:"day_id"`
 }
 
 func PostLogEdited(c *gin.Context) {
@@ -473,14 +641,19 @@ func PostLogEdited(c *gin.Context) {
 		apierr.BadRequest(c, err.Error())
 		return
 	}
-	newMealID, err := services.CreateMeal(c.Request.Context(), &req.Meal)
+	clientID, ok := normalizeClientID(c, req.Meal.ClientID)
+	if !ok {
+		return
+	}
+	meal := req.Meal.toModel(clientID)
+	newMealID, err := services.CreateMeal(c.Request.Context(), &meal)
 	if err != nil {
-		apierr.Internal(c, err)
+		respondErr(c, err)
 		return
 	}
 	day, err := services.FindMealPlanDayByRowIDOrToday(c.Request.Context(), req.DayID)
 	if err != nil {
-		apierr.Internal(c, err)
+		respondErr(c, err)
 		return
 	}
 	if day == nil {
@@ -491,18 +664,18 @@ func PostLogEdited(c *gin.Context) {
 		DayID:  day.ID,
 		MealID: newMealID,
 	}); err != nil {
-		apierr.Internal(c, err)
+		respondErr(c, err)
 		return
 	}
 	if req.PlannedSourceMealID != 0 {
 		if err := services.SetPlannedMealLogged(c.Request.Context(), day.ID, req.PlannedSourceMealID); err != nil {
-			apierr.Internal(c, err)
+			respondErr(c, err)
 			return
 		}
 	}
 	result, err := services.ReloadDayWithTotals(c.Request.Context(), day)
 	if err != nil {
-		apierr.Internal(c, err)
+		respondErr(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, dayWithTotalsResponse(result))
@@ -516,20 +689,25 @@ func PostEditLogged(c *gin.Context) {
 	}
 	day, err := services.FindMealPlanDayByRowIDOrToday(c.Request.Context(), req.DayID)
 	if err != nil {
-		apierr.Internal(c, err)
+		respondErr(c, err)
 		return
 	}
 	if day == nil {
 		apierr.NotFound(c, "Day not found")
 		return
 	}
-	if err := services.EditLoggedMeal(c.Request.Context(), day.ID, req.OldMealID, &req.Meal); err != nil {
-		apierr.Internal(c, err)
+	clientID, ok := normalizeClientID(c, req.Meal.ClientID)
+	if !ok {
+		return
+	}
+	meal := req.Meal.toModel(clientID)
+	if err := services.EditLoggedMeal(c.Request.Context(), day.ID, req.OldMealID, &meal); err != nil {
+		respondErr(c, err)
 		return
 	}
 	result, err := services.ReloadDayWithTotals(c.Request.Context(), day)
 	if err != nil {
-		apierr.Internal(c, err)
+		respondErr(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, dayWithTotalsResponse(result))
@@ -552,7 +730,7 @@ func DeleteLoggedMeal(c *gin.Context) {
 			apierr.NotFound(c, "Day not found")
 			return
 		}
-		apierr.Internal(c, err)
+		respondErr(c, err)
 		return
 	}
 	if day == nil {
@@ -560,12 +738,12 @@ func DeleteLoggedMeal(c *gin.Context) {
 		return
 	}
 	if err := services.DeleteLoggedMeal(c.Request.Context(), day.ID, req.MealID); err != nil {
-		apierr.Internal(c, err)
+		respondErr(c, err)
 		return
 	}
 	result, err := services.ReloadDayWithTotals(c.Request.Context(), day)
 	if err != nil {
-		apierr.Internal(c, err)
+		respondErr(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, dayWithTotalsResponse(result))
@@ -592,12 +770,12 @@ func PostPlannedFromSaved(c *gin.Context) {
 		return
 	}
 	if err := services.AddPlannedMealFromSavedMeal(c.Request.Context(), req.Offset, req.SavedMealID, clientID); err != nil {
-		apierr.Internal(c, err)
+		respondErr(c, err)
 		return
 	}
 	day, err := services.FindMealPlanDay(c.Request.Context(), clock.ZerodTime(req.Offset))
 	if err != nil {
-		apierr.Internal(c, err)
+		respondErr(c, err)
 		return
 	}
 	if day == nil {
@@ -606,7 +784,7 @@ func PostPlannedFromSaved(c *gin.Context) {
 	}
 	result, err := services.ReloadDayWithTotals(c.Request.Context(), day)
 	if err != nil {
-		apierr.Internal(c, err)
+		respondErr(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, dayWithTotalsResponse(result))
@@ -634,7 +812,7 @@ func PostPlannedCopyDay(c *gin.Context) {
 	}
 	n, err := services.CopyPlannedMeals(c.Request.Context(), req.FromOffset, req.ToOffsets)
 	if err != nil {
-		apierr.Internal(c, err)
+		respondErr(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"copied_meals": n, "days": len(req.ToOffsets)})
@@ -656,12 +834,12 @@ func PostPlannedReorder(c *gin.Context) {
 		return
 	}
 	if err := services.ReorderPlannedMeals(c.Request.Context(), req.Offset, req.PlannedMealIDs); err != nil {
-		apierr.BadRequest(c, err.Error())
+		respondErr(c, err)
 		return
 	}
 	day, err := services.FindMealPlanDay(c.Request.Context(), clock.ZerodTime(req.Offset))
 	if err != nil {
-		apierr.Internal(c, err)
+		respondErr(c, err)
 		return
 	}
 	if day == nil {
@@ -670,7 +848,7 @@ func PostPlannedReorder(c *gin.Context) {
 	}
 	result, err := services.ReloadDayWithTotals(c.Request.Context(), day)
 	if err != nil {
-		apierr.Internal(c, err)
+		respondErr(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, dayWithTotalsResponse(result))
@@ -692,12 +870,12 @@ func DeletePlannedMeal(c *gin.Context) {
 		return
 	}
 	if err := services.DeletePlannedMeal(c.Request.Context(), req.Offset, req.PlannedMealID); err != nil {
-		apierr.Internal(c, err)
+		respondErr(c, err)
 		return
 	}
 	day, err := services.FindMealPlanDay(c.Request.Context(), clock.ZerodTime(req.Offset))
 	if err != nil {
-		apierr.Internal(c, err)
+		respondErr(c, err)
 		return
 	}
 	if day == nil {
@@ -706,7 +884,7 @@ func DeletePlannedMeal(c *gin.Context) {
 	}
 	result, err := services.ReloadDayWithTotals(c.Request.Context(), day)
 	if err != nil {
-		apierr.Internal(c, err)
+		respondErr(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, dayWithTotalsResponse(result))
