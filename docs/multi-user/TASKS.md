@@ -237,11 +237,13 @@ Depends on: all A, B and C lanes
       are stateless lookups.)
 - [x] BACKLOG: every High done; every Medium done or deferred with a reason in DECISIONS.
 - [x] #16 Pin `app-network`'s subnet/gateway in compose (done); owner confirms the live network matches (ROLLOUT 3.2).
-- [ ] ROLLOUT.md is complete: every lane's prod-side change has a step, and the rehearsal ran it.
-- [ ] Rehearse: restore a copy of a recent prod backup locally, run every migration as the
+- [x] ROLLOUT.md is complete: every lane's prod-side change has a step, and the rehearsal ran it.
+      (Added 3.0 `prod-prep.sql`: prod's legacy uuid `user_id` columns and a second account.)
+- [x] Rehearse (2026-11-27 backup; all row counts matched, every row owned by the admin, 30 GET
+      routes 200 as the owner, server ran as `simpletrack_app`, graceful shutdown OK): restore a copy of a recent prod backup locally, run every migration as the
       deploy would, start the server as the app role, click through each module as the owner.
       Check the backfill assigned every row and nothing disappeared (row counts before/after).
-- [ ] Prod rollout plan from A2 (app role, secrets, compose/j-cicd) checked against the rehearsal.
+- [x] Prod rollout plan from A2 (app role, secrets, compose/j-cicd) checked against the rehearsal.
 - [ ] Merge `origin/main` into the base, renumber migrations if needed, mark the base PR ready.
 - [ ] With the owner: merge to `main`, deploy via j-cicd, verify, then the owner creates the
       first family account. ARCHITECTURE.md current.

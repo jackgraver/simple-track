@@ -52,7 +52,8 @@ the compose file and `.env.vps` must be updated before the deploy, not after.
    (it won't re-enable a role someone disabled): drop it or `ALTER ROLE ... LOGIN` first.
 5. Headroom: `SHOW max_connections;` (default 100). The server uses at most 20
    (`DB_MAX_OPEN_CONNS`), migrate a few, so anything ≥ 40 is fine.
-6. Exactly one live account (migration 0009 makes it admin and **fails** with more than one):
+6. Exactly one live account (migration 0009 makes it admin and **fails** with more than one; prod
+   had two on 2026-11-27, 3.0 deals with it):
    `SELECT count(*) FROM users WHERE deleted_at IS NULL;` must be 1.
 7. (B3) Every owned-table migration backfills existing rows to the one admin and **fails** if
    there isn't exactly one live admin (0011 `drink_size_presets` first; C lanes copy it). After
@@ -133,6 +134,29 @@ On a copy of the latest prod backup, with the D1 build of the backend image:
 
 Do 3.1–3.3 back to back. Nothing else may deploy in between: any backend recreate with the new
 compose file before the D1 migrations ran would try to log in as a role that doesn't exist yet.
+
+### 3.0 Prod prep SQL (before 3.1, found by the D1 rehearsal)
+
+Prod's schema had drifted from the baseline, which the rehearsal on the 2026-11-27 backup
+caught: ten tables (`body_weight_logs`, `days`, `drink_size_presets`, `meals`, `plans`,
+`saved_meals`, `step_logs`, `water_logs`, `workout_logs`, `workout_plans`) still have a legacy
+`uuid user_id` column from an abandoned earlier design, which collides with the `bigint user_id`
+every C lane adds (migration 0011 failed first), and a second live account (`gen`, created
+2026-05-11, empty) stops migration 0009. [prod-prep.sql](prod-prep.sql) drops the legacy columns
+(only if they are uuid) and soft-deletes `gen`, in one transaction. Take a manual dump first, then
+run it as the owner:
+
+```sh
+cd ~/simple-track
+docker compose -f docker-compose.vps.yml --env-file .env.vps exec -T postgres \
+  pg_dump -U simpletracker simpletracker | gzip > ~/backups/pre-prep-$(date +%Y%m%d-%H%M%S).sql.gz
+docker compose -f docker-compose.vps.yml --env-file .env.vps exec -T postgres \
+  psql -U simpletracker -d simpletracker -v ON_ERROR_STOP=1 -f - < prod-prep.sql
+```
+
+It ends with `live_accounts = 1, legacy_columns_left = 0`. The running (old) app doesn't read
+those columns or `gen`, so this is safe before the deploy. Re-check the `gen` assumption (the
+account is unused) and whether new accounts or `uuid user_id` columns have appeared since.
 
 ### 3.1 Secret
 

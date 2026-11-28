@@ -1000,3 +1000,22 @@ login's machine settings on Lat Pulldown.
 - `workout_plan_exercises.exercise_id` has no FK (never had one).
 - Migration 0017's down is lossy with several users (lowest user's machine settings win, the
   global `client_id` index fails if two users share one); the empty duplicate log stays deleted.
+
+## 2026-11-27: D1 rehearsal findings (agent, lane D1)
+
+Ran every migration on the 2026-11-27 23:31 prod backup (restored into postgres:16-alpine, backend
+image built from `proj/multi-user`). Two things stopped it, neither visible in dev:
+- **Two live accounts** (`jack` and `gen`): migration 0009 refuses, as designed.
+- **Legacy `uuid user_id` columns** on ten tables (prod's schema drifted from the baseline; also
+  legacy tables `accounts`, `groups`, `group_members`, `transactions`, `transaction_categories`,
+  `migrations`, which don't collide and are left alone). Migration 0011 failed on the first one.
+
+Fix: `docs/multi-user/prod-prep.sql` (ROLLOUT 3.0), run once before the deploy, rather than editing
+0009: it's applied on every dev DB and editing it would make `migrate` refuse on all of them. After
+it, all nine migrations apply; every table's count is unchanged (the one empty duplicate workout log
+is soft-deleted, as ROLLOUT 1.11 says), every owned row belongs to the admin, no constraint is left
+`NOT VALID`, and `exercise_settings` is 0 because prod had no machine settings.
+
+Not changed, for the owner to know: `workout_logs.skipped_exercise_ids`, `planned_meals.sort_order`
+and `investment_account_types.contribution_start_age` exist only in prod (nullable or defaulted, so
+harmless), and `plans` had a row stamped with `gen`'s old uuid; it now belongs to the admin like the rest.
