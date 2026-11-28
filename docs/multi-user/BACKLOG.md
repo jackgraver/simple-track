@@ -21,12 +21,12 @@ Nothing Critical was found. Prod today has one account, so most multi-user findi
 
 | # | Sev | Finding | Lane |
 |---|---|---|---|
-| 1 | High | Request bodies bind straight into gorm models (mass assignment, nested association writes) | C2 (+B3 rule) |
-| 2 | High | Advisory-lock keys and "exists for date" checks are global, not per user | C2, C3 |
+| 1 | High | Request bodies bind straight into gorm models (mass assignment, nested association writes) | C2; B3 rule: **done** (`TestOwnerKitRules`, Owner/Creator hooks) |
+| 2 | High | Advisory-lock keys and "exists for date" checks are global, not per user | C2, C3 (B3 helper **done**: `database.XactLock`/`LockKey`) |
 | 3 | Medium | Anyone can lock the owner out of login, from one IP, indefinitely | S1: **done** (audit-log part: C6) |
 | 4 | Medium | IPv6 address rotation defeats per-IP limits and can fill the limiter (global lockout) | S1: **done** |
 | 5 | Medium | TMDB API key can leak to users in lookup error messages | S3: **done** |
-| 6 | Medium | Raw internal errors (SQL, constraint names) returned to clients at ~160 sites | C1–C5, B3 (lint) |
+| 6 | Medium | Raw internal errors (SQL, constraint names) returned to clients at ~160 sites | C1–C5; B3 test **done** (`TestNoRawErrorsIn500s`) |
 | 7 | Medium | No security headers (CSP, frame-ancestors, nosniff, Referrer-Policy); API has none at all | H1: **done** (Caddy; deploys at D1, ROLLOUT 3.5) |
 | 8 | Medium | No request body size limit outside `/auth` (imports, JSON) | H1: **done** (1 MiB default, 5 MiB + 10k rows on import; Caddy 6MB) |
 | 9 | Medium | Frontend local storage isn't scoped to the user; logout leaves drafts, timers, last route | S2: **done** |
@@ -40,7 +40,7 @@ Nothing Critical was found. Prod today has one account, so most multi-user findi
 | 17 | Low | API responses carry no `Cache-Control`; personal data may sit in browser/bfcache on shared devices | H1: **done** |
 | 18 | Low | Default CORS list (used when `CORS_ORIGINS` is unset) hard-codes home LAN IPs | H1: **done** |
 | 19 | Low | Request logs include full query strings; login logs record attempted usernames | S1: login part **done**; request logs: C6 |
-| 20 | Low | No Go vulnerability scan in CI | S4: manual run **done** (bumped x/net, x/text, Go 1.26); pipeline step: B3 |
+| 20 | Low | No Go vulnerability scan in CI | S4: manual run **done** (bumped x/net, x/text, Go 1.26); pipeline steps: B3 **done** (govulncheck + npm audit) |
 | 21 | Info | Dev stack: backend listens on 0.0.0.0, `/benchmark` unauthenticated, dev/dev login on LAN | none |
 | 22 | Info | Postgres `sslmode=disable` inside the compose network | none |
 | 23 | Low | Owner DB password is in the backend container env (j-cicd pre_swap runs in the backend service) | j-cicd + deploy config (after D1) |
@@ -68,6 +68,11 @@ Nothing Critical was found. Prod today has one account, so most multi-user findi
   `user_id`/`created_by`. Add a B3 rule: no `ShouldBindJSON` into a type that has a `UserID` or
   `CreatedBy` field (a grep test is enough).
 - **Lane**: C2 for the diet handlers; B3 for the rule/test.
+- **B3 (done)**: `database.Owner`/`Creator` stamp `user_id`/`created_by` in a `BeforeCreate` hook
+  (`json:"-"` on `user_id`); `TestOwnerKitRules` fails on a bind into an owner-carrying type, on
+  writes of those fields elsewhere, and on new creates without `Omit(clause.Associations)`
+  (existing sites allowlisted per file for the C lanes). The meal_route.go binds above are
+  still there and become test failures once C2 adds `Creator`/`Owner` to those models.
 
 ### 2. High: advisory locks and per-date checks are global
 
@@ -88,6 +93,8 @@ Nothing Critical was found. Prod today has one account, so most multi-user findi
   existence check by user, including `Unscoped()` ones. Add a two-user test: Alice and Bob both
   start a workout on the same date.
 - **Lane**: C2 (diet), C3 (workout); B3 should provide a `LockKey(ctx, ...)` helper.
+- **B3 (done)**: `database.XactLock(ctx, tx, parts...)` / `database.LockKey`; raw `pg_advisory`
+  calls are allowlisted only at the two sites above.
 - **Since B2**: locks taken in a request are held until the response is sent (the request
   transaction), not just for the insert. With the date-only key, Alice's and Bob's first gym
   load of the same day would wait for each other's whole request. Still only the first load of
@@ -169,6 +176,8 @@ Nothing Critical was found. Prod today has one account, so most multi-user findi
   B3 adds a grep test that fails on new `"error": err.Error()` in `StatusInternalServerError`
   responses.
 - **Lane**: C1 (tracking), C2 (diet), C3 (workout), C4 (money), C5 (media); B3 for the test.
+- **B3 (done)**: `internal/utils/apierr/rules_test.go` counts 500 responses with `.Error()` per
+  file; lanes lower their entries. 4xx responses echoing database errors aren't caught by it.
 
 ### 7. Medium: no security headers
 
@@ -375,6 +384,8 @@ Nothing Critical was found. Prod today has one account, so most multi-user findi
 - **Fix**: add a `govulncheck ./...` step (and `npm audit --omit=dev --audit-level=high`) to the
   pipeline next to `backend-test`. Run it once by hand now.
 - **Lane**: B3 (already editing the CI test step).
+- **Done (B3)**: `backend-vulncheck` (govulncheck v1.10.0, the version S4 audited with) and
+  `frontend-audit` steps in `.cicd.yaml`. The dependency bump is S4's (below).
 
 **S4 audit result (2026-11-27)**: govulncheck v1.10.0 (DB updated 2026-11-24), go1.27.4 locally,
 node v22.23.5 / npm 10.9.9.

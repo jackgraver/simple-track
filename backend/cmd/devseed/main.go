@@ -14,10 +14,12 @@ import (
 	"os"
 	"time"
 
+	authm "be-simpletracker/internal/core/auth/models"
 	dietm "be-simpletracker/internal/core/diet/models"
 	mediam "be-simpletracker/internal/core/media/models"
 	moneym "be-simpletracker/internal/core/money/models"
 	"be-simpletracker/internal/core/tracking/steps"
+	"be-simpletracker/internal/core/tracking/water"
 	"be-simpletracker/internal/core/tracking/weight"
 	workm "be-simpletracker/internal/core/workout/models"
 	"be-simpletracker/internal/database"
@@ -54,7 +56,12 @@ func run() error {
 		return nil
 	}
 
-	if err := db.Transaction(seed); err != nil {
+	// Owned rows belong to the dev login (devuser creates it; `dev start` runs devuser first).
+	owner, err := devOwner(db)
+	if err != nil {
+		return err
+	}
+	if err := db.Transaction(func(tx *gorm.DB) error { return seed(tx, owner) }); err != nil {
 		return err
 	}
 	fmt.Println("devseed: sample data created")
@@ -68,8 +75,26 @@ func today() time.Time {
 	return time.Date(n.Year(), n.Month(), n.Day(), 0, 0, 0, 0, time.Local)
 }
 
-func seed(tx *gorm.DB) error {
-	for _, f := range []func(*gorm.DB) error{seedGym, seedDiet, seedTracking, seedMedia, seedMoney} {
+// devOwner is the ID of the dev login (DEV_AUTH_USER, default "dev"), which owns every seeded
+// owned row. devseed runs on the owner role with no request identity, so it sets user_id itself
+// (database.Owner's create hook accepts a preset owner only when there is no identity).
+func devOwner(db *gorm.DB) (uint, error) {
+	username := env.StringOr("DEV_AUTH_USER", "dev")
+	var user authm.User
+	if err := db.Where("username = ?", username).First(&user).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return 0, fmt.Errorf("user %q not found: run devuser first (dev start does)", username)
+		}
+		return 0, err
+	}
+	return user.ID, nil
+}
+
+// seed creates the sample data. owner is the dev login: owned tables set user_id to it (lanes
+// converting a table pass it to that module's seed function).
+func seed(tx *gorm.DB, owner uint) error {
+	tracking := func(tx *gorm.DB) error { return seedTracking(tx, owner) }
+	for _, f := range []func(*gorm.DB) error{seedGym, seedDiet, tracking, seedMedia, seedMoney} {
 		if err := f(tx); err != nil {
 			return err
 		}
@@ -275,7 +300,13 @@ func seedDiet(tx *gorm.DB) error {
 	return nil
 }
 
-func seedTracking(tx *gorm.DB) error {
+func seedTracking(tx *gorm.DB, owner uint) error {
+	for _, p := range []water.DrinkSizePreset{{Name: "Glass", AmountOz: 8}, {Name: "Bottle", AmountOz: 24}} {
+		p.Owner = database.Owner{UserID: owner}
+		if err := tx.Create(&p).Error; err != nil {
+			return err
+		}
+	}
 	for i := 30; i >= 0; i-- {
 		d := today().AddDate(0, 0, -i)
 		if err := tx.Create(&weight.BodyWeightLog{Date: d, WeightLbs: 182 - float64(30-i)*0.1 + float64(i%3)*0.4}).Error; err != nil {

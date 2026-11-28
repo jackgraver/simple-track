@@ -187,6 +187,12 @@ GHCR, and has the VPS agent pull and restart the compose stack. `.cicd.yaml` set
 in its config): **changes to that file reach production only when copied there by hand**. It then checks
 `https://st.jackgraver.ca/version.json` for the new commit.
 
+Steps that need more than the checkout: `backend-test` runs `dev/ci/backend-test.sh`, which starts
+a throwaway `postgres:16-alpine` container (random localhost port, tmpfs) and runs the Go tests
+with `TEST_DATABASE_REQUIRED=1`, so the Postgres-only tests (RLS, two-user, migrations) fail
+instead of skipping; `e2e` has its own container (`e2e/infra`). Both need Docker on the build host.
+`backend-vulncheck` (`govulncheck`) and `frontend-audit` (`npm audit`) need the network.
+
 ## Stale artifact
 
 `frontend/fly.toml` is a leftover from an old Fly.io deployment (`st-backend.fly.dev`). Production

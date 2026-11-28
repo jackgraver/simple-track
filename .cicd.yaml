@@ -12,11 +12,22 @@ steps:
   - name: backend-vet
     run: go vet ./... && go vet -tags e2e ./...
     dir: backend
+  # Postgres-backed tests run against a throwaway container and fail instead of skipping
+  # (dev/ci/backend-test.sh). Needs Docker, like the e2e step.
   - name: backend-test
-    run: go test ./... && go test -tags e2e ./internal/e2e/...
+    run: ../dev/ci/backend-test.sh
+    dir: backend
+  # Known vulnerabilities in reachable Go code (BACKLOG #20). Fetches the tool and the vuln DB,
+  # so a network outage fails the run; pinned so the step doesn't change under us.
+  - name: backend-vulncheck
+    run: go run golang.org/x/vuln/cmd/govulncheck@v1.10.0 ./...
     dir: backend
   - name: frontend-install
     run: mise exec node@22 -- npm ci --no-audit --no-fund
+    dir: frontend
+  # High/critical advisories in what ships (runtime deps only; dev tooling isn't in the image).
+  - name: frontend-audit
+    run: mise exec node@22 -- npm audit --omit=dev --audit-level=high
     dir: frontend
   - name: frontend-lint
     run: mise exec node@22 -- npx eslint .
