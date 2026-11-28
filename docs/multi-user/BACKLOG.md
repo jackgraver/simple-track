@@ -176,6 +176,8 @@ Nothing Critical was found. Prod today has one account, so most multi-user findi
   B3 adds a grep test that fails on new `"error": err.Error()` in `StatusInternalServerError`
   responses.
 - **Lane**: C1 (tracking), C2 (diet), C3 (workout), C4 (money), C5 (media); B3 for the test.
+- **C4 (done)**: money handlers moved to `apierr` (`respondError`, the birth-year lookup); the
+  raw-error allowlist entry is gone.
 - **B3 (done)**: `internal/utils/apierr/rules_test.go` counts 500 responses with `.Error()` per
   file; lanes lower their entries. 4xx responses echoing database errors aren't caught by it.
 - **C1 (done)**: all tracking handlers (weight, steps, water, grocery, profile, missed) are on

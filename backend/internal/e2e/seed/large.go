@@ -215,12 +215,26 @@ func largeMedia(tx *gorm.DB) error {
 	return tx.CreateInBatches(&items, batch).Error
 }
 
+// seedOwner is the seeded login's ID: the owner of every owned row the profiles add. The seed
+// runs on the owner role with no request identity, so rows carry their user_id by hand.
+func seedOwner(tx *gorm.DB) (database.Owner, error) {
+	var user authm.User
+	if err := tx.Select("id").Where("username = ?", Username).First(&user).Error; err != nil {
+		return database.Owner{}, fmt.Errorf("seed login %q: %w", Username, err)
+	}
+	return database.Owner{UserID: user.ID}, nil
+}
+
 func largeMoney(tx *gorm.DB) error {
+	own, err := seedOwner(tx)
+	if err != nil {
+		return err
+	}
 	accts := []moneym.Account{
-		{Name: "Everyday Chequing", Kind: moneym.AccountKindChequing, Institution: "Sample Bank", CurrentBalance: 3200},
-		{Name: "Savings", Kind: moneym.AccountKindSavings, Institution: "Sample Bank", CurrentBalance: 12000},
-		{Name: "Brokerage", Kind: moneym.AccountKindInvestment, Institution: "Sample Brokerage", CurrentBalance: 1_250_000.55},
-		{Name: "Overdrawn", Kind: moneym.AccountKindChequing, Institution: "Sample Bank", CurrentBalance: -420.10},
+		{Owner: own, Name: "Everyday Chequing", Kind: moneym.AccountKindChequing, Institution: "Sample Bank", CurrentBalance: 3200},
+		{Owner: own, Name: "Savings", Kind: moneym.AccountKindSavings, Institution: "Sample Bank", CurrentBalance: 12000},
+		{Owner: own, Name: "Brokerage", Kind: moneym.AccountKindInvestment, Institution: "Sample Brokerage", CurrentBalance: 1_250_000.55},
+		{Owner: own, Name: "Overdrawn", Kind: moneym.AccountKindChequing, Institution: "Sample Bank", CurrentBalance: -420.10},
 	}
 	if err := tx.Create(&accts).Error; err != nil {
 		return err
@@ -229,11 +243,11 @@ func largeMoney(tx *gorm.DB) error {
 	var txs []moneym.AccountTransaction
 	for _, a := range accts {
 		for m := 24; m >= 0; m-- {
-			bals = append(bals, moneym.AccountBalance{AccountID: a.ID, Date: EpochDay().AddDate(0, -m, 0), Balance: a.CurrentBalance - float64(m)*137.5})
+			bals = append(bals, moneym.AccountBalance{Owner: own, AccountID: a.ID, Date: EpochDay().AddDate(0, -m, 0), Balance: a.CurrentBalance - float64(m)*137.5})
 		}
 	}
 	for m := 24; m >= 1; m-- {
-		txs = append(txs, moneym.AccountTransaction{AccountID: accts[2].ID, Kind: moneym.TransactionDeposit, Amount: 500, Date: EpochDay().AddDate(0, -m, 0), Note: "Monthly contribution"})
+		txs = append(txs, moneym.AccountTransaction{Owner: own, AccountID: accts[2].ID, Kind: moneym.TransactionDeposit, Amount: 500, Date: EpochDay().AddDate(0, -m, 0), Note: "Monthly contribution"})
 	}
 	if err := tx.CreateInBatches(&bals, batch).Error; err != nil {
 		return err

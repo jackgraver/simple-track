@@ -22,11 +22,11 @@ type NetWorthPoint struct {
 func NetWorthHistory(ctx context.Context) ([]NetWorthPoint, error) {
 	db := database.From(ctx)
 	var accounts []models.Account
-	if err := db.Find(&accounts).Error; err != nil {
+	if err := db.Scopes(database.Owned(ctx)).Find(&accounts).Error; err != nil {
 		return nil, err
 	}
 	var balances []models.AccountBalance
-	if err := db.Order("date ASC").Find(&balances).Error; err != nil {
+	if err := db.Scopes(database.Owned(ctx)).Order("date ASC").Find(&balances).Error; err != nil {
 		return nil, err
 	}
 	return buildNetWorthHistory(accounts, balances), nil

@@ -3,6 +3,8 @@ package models
 import (
 	"time"
 
+	"be-simpletracker/internal/database"
+
 	"gorm.io/gorm"
 )
 
@@ -50,6 +52,7 @@ func (k AccountKind) IsLiability() bool {
 // carries over.
 type Account struct {
 	gorm.Model
+	database.Owner
 	Name               string            `json:"name" gorm:"not null"`
 	Kind               AccountKind       `json:"kind" gorm:"type:varchar(32);not null;default:'investment'"`
 	Institution        string            `json:"institution" gorm:"not null;default:''"`
@@ -69,6 +72,7 @@ func (Account) TableName() string { return "investment_accounts" }
 // accounts it is the amount owed.
 type AccountBalance struct {
 	gorm.Model
+	database.Owner
 	AccountID uint      `json:"account_id" gorm:"not null;uniqueIndex:idx_account_balance_day,priority:1"`
 	Date      time.Time `json:"date" gorm:"not null;uniqueIndex:idx_account_balance_day,priority:2"`
 	Balance   float64   `json:"balance" gorm:"type:numeric(14,2);not null"`
@@ -91,6 +95,7 @@ func (k TransactionKind) Valid() bool {
 // account. Deposits into an account with a contribution type use up room.
 type AccountTransaction struct {
 	gorm.Model
+	database.Owner
 	AccountID uint            `json:"account_id" gorm:"not null;index"`
 	Kind      TransactionKind `json:"kind" gorm:"type:varchar(16);not null;default:'deposit'"`
 	Amount    float64         `json:"amount" gorm:"type:numeric(14,2);not null"`
@@ -101,13 +106,16 @@ type AccountTransaction struct {
 func (AccountTransaction) TableName() string { return "investment_deposits" }
 
 // ContributionType is a registered account type such as a TFSA, RRSP or FHSA
-// whose contribution room is shared by every account assigned to it.
+// whose contribution room is shared by every account assigned to it. It is a
+// shared catalog row: everyone reads it, anyone adds one, its creator or the
+// admin edits it. What is personal (start year, opening room) lives in
+// ContributionRoom.
 type ContributionType struct {
 	gorm.Model
+	database.Creator
 	Name string `json:"name" gorm:"not null;uniqueIndex"`
-	// StartYear is the first year room accrues. When nil it is derived from
-	// the user's birth year plus EligibilityAge, or the first limit year.
-	StartYear      *int `json:"start_year" gorm:"column:contribution_start_year"`
+	// EligibilityAge is the age at which room starts accruing; the start year
+	// is derived from the user's birth year plus it.
 	EligibilityAge *int `json:"eligibility_age"`
 	// CarryForwardCap limits how much unused room rolls into the next year.
 	// nil means unlimited, 0 means unused room is lost.
@@ -116,13 +124,8 @@ type ContributionType struct {
 	LifetimeLimit *float64 `json:"lifetime_limit" gorm:"type:numeric(14,2)"`
 	// WithdrawalsRestoreRoom adds withdrawals back as room on January 1 of
 	// the following year (TFSA behaviour).
-	WithdrawalsRestoreRoom bool `json:"withdrawals_restore_room" gorm:"not null;default:false"`
-	// OpeningRoomYear/OpeningRoom anchor the calculation to a known figure,
-	// e.g. "available room on Jan 1, 2025" from CRA. Earlier history is then
-	// ignored.
-	OpeningRoomYear *int                `json:"opening_room_year"`
-	OpeningRoom     *float64            `json:"opening_room" gorm:"type:numeric(14,2)"`
-	Limits          []ContributionLimit `json:"limits" gorm:"foreignKey:ContributionTypeID;constraint:OnDelete:CASCADE"`
+	WithdrawalsRestoreRoom bool                `json:"withdrawals_restore_room" gorm:"not null;default:false"`
+	Limits                 []ContributionLimit `json:"limits" gorm:"foreignKey:ContributionTypeID;constraint:OnDelete:CASCADE"`
 }
 
 func (ContributionType) TableName() string { return "investment_account_types" }
@@ -131,9 +134,32 @@ func (ContributionType) TableName() string { return "investment_account_types" }
 // later years until another limit replaces it.
 type ContributionLimit struct {
 	gorm.Model
+	database.Creator
 	ContributionTypeID uint    `json:"contribution_type_id" gorm:"column:investment_account_type_id;not null;uniqueIndex:idx_investment_account_type_contribution_rule,priority:1"`
 	Year               int     `json:"year" gorm:"not null;uniqueIndex:idx_investment_account_type_contribution_rule,priority:2"`
 	AnnualLimit        float64 `json:"annual_limit" gorm:"type:numeric(14,2);not null"`
 }
 
 func (ContributionLimit) TableName() string { return "investment_contribution_rules" }
+
+// ContributionRoom is one user's own settings for a contribution type: the
+// figures that anchor their room calculation. It is owned (per user), unlike
+// the type's shared rules.
+type ContributionRoom struct {
+	ID        uint `gorm:"primaryKey"`
+	CreatedAt time.Time
+	UpdatedAt time.Time
+	database.Owner
+	ContributionTypeID uint `gorm:"column:investment_account_type_id;not null"`
+	// StartYear is the first year room accrues for this user, e.g. the year
+	// they opened their first FHSA. When nil it is derived from the birth year
+	// plus the type's eligibility age, or the first limit year.
+	StartYear *int `gorm:"column:contribution_start_year"`
+	// OpeningRoomYear/OpeningRoom anchor the calculation to a known figure,
+	// e.g. "available room on Jan 1, 2025" from CRA. Earlier history is then
+	// ignored.
+	OpeningRoomYear *int     `gorm:"column:opening_room_year"`
+	OpeningRoom     *float64 `gorm:"type:numeric(14,2)"`
+}
+
+func (ContributionRoom) TableName() string { return "investment_contribution_room" }

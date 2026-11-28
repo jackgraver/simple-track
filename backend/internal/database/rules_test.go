@@ -26,8 +26,6 @@ var createWithAssociationsAllowed = map[string]int{
 	"internal/core/auth/repository/user_repository.go":               1, // C6 (users: no associations)
 	"internal/core/diet/repository/repository.go":                    23,
 	"internal/core/media/service/media_service.go":                   2,
-	"internal/core/money/service/accounts.go":                        4,
-	"internal/core/money/service/contribution_types.go":              6,
 	"internal/core/workout/repository/cardio_repository.go":          2,
 	"internal/core/workout/repository/exercise_repository.go":        1,
 	"internal/core/workout/repository/logged_exercise_repository.go": 3,
