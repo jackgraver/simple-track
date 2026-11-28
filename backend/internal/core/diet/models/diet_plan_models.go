@@ -3,12 +3,15 @@ package models
 import (
 	"time"
 
+	"be-simpletracker/internal/database"
+
 	"gorm.io/gorm"
 )
 
 // Plan represents a diet plan
 type Plan struct {
 	gorm.Model
+	database.Owner
 	Name          string     `json:"name"`
 	Calories      float32    `json:"calories"`
 	Protein       float32    `json:"protein"`
@@ -23,6 +26,7 @@ func (p Plan) TableName() string { return "plans" }
 // PlannedMeal represents a meal that is planned for a day
 type PlannedMeal struct {
 	gorm.Model
+	database.Owner
 	DayID        uint    `json:"day_id" gorm:"not null"`
 	DietDay      DietDay `gorm:"foreignKey:DayID" json:"day"`
 	MealID       uint    `json:"meal_id" gorm:"not null"`

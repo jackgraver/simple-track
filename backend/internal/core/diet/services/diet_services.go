@@ -117,6 +117,19 @@ func CreateFood(ctx context.Context, food *models.Food, relatedFoodID *uint) (*m
 	return food, nil
 }
 
+func UpdateFood(ctx context.Context, id uint, in dietrepo.FoodFields) (*models.Food, error) {
+	food, err := dietrepo.FoodUpdate(ctx, id, in)
+	if err != nil {
+		return nil, err
+	}
+	dietrepo.EnrichFoodVariants(ctx, food)
+	return food, nil
+}
+
+func DeleteFood(ctx context.Context, id uint) error {
+	return dietrepo.FoodDelete(ctx, id)
+}
+
 func AllCompositeFoods(ctx context.Context) ([]models.CompositeFood, error) {
 	return dietrepo.CompositeFoodsAll(ctx)
 }

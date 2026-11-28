@@ -18,8 +18,6 @@ var rawInternalError = regexp.MustCompile(`(StatusInternalServerError|[^0-9]500)
 // Sites that predate the rule, as a count per file. Lanes move their handlers to apierr and lower
 // or delete their entries; a file may go below its count, never above.
 var rawInternalErrorAllowed = map[string]int{
-	"internal/core/diet/controller/diet_log_route.go":       6,  // C2
-	"internal/core/diet/controller/diet_plan_route.go":      2,  // C2
 	"internal/core/workout/controller/exercises_route.go":   10, // C3
 	"internal/core/workout/controller/workoutlog_route.go":  4,  // C3
 	"internal/core/workout/controller/workoutplan_route.go": 11, // C3
