@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 const suggestionLimit = 20
@@ -19,18 +20,21 @@ func normalizeName(name string) string {
 	return strings.Join(strings.Fields(name), " ")
 }
 
+// Every query below is the current user's (database.Owned), and creates are stamped with them.
+
 func ListActiveItems(ctx context.Context) ([]GroceryItem, error) {
-	return listActiveItems(database.From(ctx))
+	return listActiveItems(ctx, database.From(ctx))
 }
 
-func listActiveItems(db *gorm.DB) ([]GroceryItem, error) {
+func listActiveItems(ctx context.Context, db *gorm.DB) ([]GroceryItem, error) {
 	var rows []GroceryItem
-	err := db.Where("completed_at IS NULL").Order("created_at ASC, id ASC").Find(&rows).Error
+	err := db.Scopes(database.Owned(ctx)).Where("completed_at IS NULL").Order("created_at ASC, id ASC").Find(&rows).Error
 	return rows, err
 }
 
-// CreateItem adds an item. A non-empty clientID makes the call idempotent: if an item with that
-// id already exists (even completed or deleted since), it is returned and nothing is created.
+// CreateItem adds an item. A non-empty clientID makes the call idempotent: if the user already has
+// an item with that id (even completed or deleted since), it is returned and nothing is created.
+// Another user's item with the same client_id is not a match.
 func CreateItem(ctx context.Context, name, clientID string) (*GroceryItem, error) {
 	db := database.From(ctx)
 	name = normalizeName(name)
@@ -39,14 +43,14 @@ func CreateItem(ctx context.Context, name, clientID string) (*GroceryItem, error
 	}
 	row := GroceryItem{Name: name}
 	if clientID == "" {
-		if err := db.Create(&row).Error; err != nil {
+		if err := db.Omit(clause.Associations).Create(&row).Error; err != nil {
 			return nil, err
 		}
 		return &row, nil
 	}
 	find := func() (*GroceryItem, error) {
 		var existing GroceryItem
-		err := db.Unscoped().Where("client_id = ?", clientID).First(&existing).Error
+		err := db.Unscoped().Scopes(database.Owned(ctx)).Where("client_id = ?", clientID).First(&existing).Error
 		if err != nil {
 			return nil, err
 		}
@@ -79,7 +83,7 @@ func ParseTextList(ctx context.Context, text string) ([]ParsedLine, error) {
 		Name string
 		Uses int
 	}
-	if err := db.Model(&GroceryItem{}).
+	if err := db.Model(&GroceryItem{}).Scopes(database.Owned(ctx)).
 		Select("name, COUNT(*) AS uses, MAX(created_at) AS last_used").
 		Group("name").
 		Order("uses DESC, last_used DESC").
@@ -109,7 +113,7 @@ func CreateItems(ctx context.Context, names []string) ([]GroceryItem, []string, 
 	created := make([]GroceryItem, 0, len(names))
 	skipped := make([]string, 0)
 	err := db.Transaction(func(tx *gorm.DB) error {
-		active, err := listActiveItems(tx)
+		active, err := listActiveItems(ctx, tx)
 		if err != nil {
 			return err
 		}
@@ -129,7 +133,7 @@ func CreateItems(ctx context.Context, names []string) ([]GroceryItem, []string, 
 			}
 			seen[key] = struct{}{}
 			row := GroceryItem{Name: name}
-			if err := tx.Create(&row).Error; err != nil {
+			if err := tx.Omit(clause.Associations).Create(&row).Error; err != nil {
 				return err
 			}
 			created = append(created, row)
@@ -142,8 +146,11 @@ func CreateItems(ctx context.Context, names []string) ([]GroceryItem, []string, 
 	return created, skipped, nil
 }
 
-func findItem(db *gorm.DB, ref itemRef) (GroceryItem, error) {
+// findItem loads the current user's item by id or client_id (ErrNotFound for a missing item or
+// someone else's).
+func findItem(ctx context.Context, db *gorm.DB, ref itemRef) (GroceryItem, error) {
 	var row GroceryItem
+	db = db.Scopes(database.Owned(ctx))
 	if ref.clientID != "" {
 		return row, db.Where("client_id = ?", ref.clientID).First(&row).Error
 	}
@@ -153,14 +160,14 @@ func findItem(db *gorm.DB, ref itemRef) (GroceryItem, error) {
 // CompleteItem marks the item done. Idempotent: completing a completed item returns it unchanged.
 func CompleteItem(ctx context.Context, ref itemRef) (*GroceryItem, error) {
 	db := database.From(ctx)
-	row, err := findItem(db, ref)
+	row, err := findItem(ctx, db, ref)
 	if err != nil {
 		return nil, err
 	}
 	if row.CompletedAt == nil {
 		now := clock.Now()
 		row.CompletedAt = &now
-		if err := db.Save(&row).Error; err != nil {
+		if err := db.Omit(clause.Associations).Save(&row).Error; err != nil {
 			return nil, err
 		}
 	}
@@ -169,11 +176,11 @@ func CompleteItem(ctx context.Context, ref itemRef) (*GroceryItem, error) {
 
 func DeleteItem(ctx context.Context, ref itemRef) error {
 	db := database.From(ctx)
-	row, err := findItem(db, ref)
+	row, err := findItem(ctx, db, ref)
 	if err != nil {
 		return err
 	}
-	return db.Delete(&row).Error
+	return db.Scopes(database.Owned(ctx)).Delete(&row).Error
 }
 
 func ListSuggestions(ctx context.Context, query string) ([]string, error) {
@@ -182,7 +189,7 @@ func ListSuggestions(ctx context.Context, query string) ([]string, error) {
 	rows := make([]struct {
 		Name string
 	}, 0)
-	tx := db.Model(&GroceryItem{}).
+	tx := db.Model(&GroceryItem{}).Scopes(database.Owned(ctx)).
 		Select("name, MAX(completed_at) AS last_completed_at").
 		Where("completed_at IS NOT NULL").
 		Group("name").

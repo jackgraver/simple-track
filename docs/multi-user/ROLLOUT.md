@@ -58,6 +58,11 @@ the compose file and `.env.vps` must be updated before the deploy, not after.
    there isn't exactly one live admin (0011 `drink_size_presets` first; C lanes copy it). After
    0009 that's the account from check 6, so nothing to do beyond it; the rehearsal proves it.
 
+8. (C1) `user_profiles` should hold at most one live row (the app only ever kept one):
+   `SELECT count(*) FROM user_profiles WHERE deleted_at IS NULL;` expect 0 or 1. With more, the
+   migration keeps the oldest live row and soft-deletes the rest (nothing is dropped), so note
+   which one you expect to survive.
+
 ## 2. Rehearsal (D1, locally, before touching the VPS)
 
 On a copy of the latest prod backup, with the D1 build of the backend image:
@@ -159,7 +164,30 @@ Each lane adds what its changes need here (README: "Prod changes go in ROLLOUT.m
     before deploy day, not during it.
   - In 3.4, the water page's drink sizes are the owner's (0011 backfilled them).
 
-- **C4 (money)**: migration 0013 runs in pre_swap with the rest. It moves each account type's
+- **C1 (tracking)**: migration 0013 runs in pre_swap with the rest and makes `body_weight_logs`,
+  `step_logs`, `water_logs`, `grocery_items` and `user_profiles` owned (every row goes to the one
+  admin, RLS on, `water_logs.preset_id` becomes a composite FK to the owner's presets). Nothing to
+  configure; relies on pre-check 1.6. It **stops** if rows exist and there isn't exactly one live
+  admin. **Row counts for the D1 rehearsal**: run before and after `migrate up`, the numbers must
+  match, and after it `owned` must equal `total` for every table:
+  ```sql
+  -- psql_owner (bypasses RLS, so it counts soft-deleted rows too)
+  SELECT 'body_weight_logs' AS tbl, count(*) AS total FROM body_weight_logs
+  UNION ALL SELECT 'step_logs',     count(*) FROM step_logs
+  UNION ALL SELECT 'water_logs',    count(*) FROM water_logs
+  UNION ALL SELECT 'grocery_items', count(*) FROM grocery_items
+  UNION ALL SELECT 'user_profiles', count(*) FROM user_profiles;
+  -- after the migration, rows given to the admin (expect owned = total on every line):
+  SELECT 'body_weight_logs' AS tbl, count(*) AS owned FROM body_weight_logs WHERE user_id = (SELECT id FROM users WHERE is_admin AND deleted_at IS NULL)
+  UNION ALL SELECT 'step_logs',     count(*) FROM step_logs     WHERE user_id = (SELECT id FROM users WHERE is_admin AND deleted_at IS NULL)
+  UNION ALL SELECT 'water_logs',    count(*) FROM water_logs    WHERE user_id = (SELECT id FROM users WHERE is_admin AND deleted_at IS NULL)
+  UNION ALL SELECT 'grocery_items', count(*) FROM grocery_items WHERE user_id = (SELECT id FROM users WHERE is_admin AND deleted_at IS NULL)
+  UNION ALL SELECT 'user_profiles', count(*) FROM user_profiles WHERE user_id = (SELECT id FROM users WHERE is_admin AND deleted_at IS NULL);
+  ```
+  In 3.4: the weight, steps, water, grocery and profile pages show the owner's data as before
+  (a new account starts with an empty profile and no history). Error responses from these
+  endpoints are now fixed messages; database errors are only in the backend log.
+- **C4 (money)**: migration 0014 runs in pre_swap with the rest. It moves each account type's
   start year and opening room to a new per-user table (`investment_contribution_room`, the
   admin's row), drops those three columns from `investment_account_types`, and gives every
   account, balance, deposit, type and limit row to the admin. Nothing to configure. **D1

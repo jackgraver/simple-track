@@ -164,18 +164,19 @@ func ParseRenphoCSV(text string) ([]BodyWeightLog, error) {
 	return out, nil
 }
 
-// ImportBodyWeights upserts every log by date in one transaction, replacing all
-// metric columns for matching days. It returns how many rows were created/updated.
+// ImportBodyWeights upserts every log by date for the current user (the importing user owns every
+// row it writes) in one transaction, replacing all metric columns for matching days. It returns
+// how many rows were created/updated.
 func ImportBodyWeights(ctx context.Context, logs []BodyWeightLog) (created, updated int, err error) {
 	db := database.From(ctx)
 	err = db.Transaction(func(tx *gorm.DB) error {
 		for i := range logs {
 			l := logs[i]
 			var existing BodyWeightLog
-			e := tx.Where("date = ?", l.Date).First(&existing).Error
+			e := tx.Scopes(database.Owned(ctx)).Where("date = ?", l.Date).First(&existing).Error
 			switch {
 			case errors.Is(e, gorm.ErrRecordNotFound):
-				if e := tx.Create(&l).Error; e != nil {
+				if e := tx.Omit(clause.Associations).Create(&l).Error; e != nil {
 					return e
 				}
 				created++
@@ -183,7 +184,8 @@ func ImportBodyWeights(ctx context.Context, logs []BodyWeightLog) (created, upda
 				return e
 			default:
 				l.ID, l.CreatedAt = existing.ID, existing.CreatedAt
-				if e := tx.Select("*").Omit(clause.Associations).Save(&l).Error; e != nil {
+				// user_id is never rewritten; the row is the caller's (Owned above).
+				if e := tx.Select("*").Omit(clause.Associations, "user_id").Save(&l).Error; e != nil {
 					return e
 				}
 				updated++

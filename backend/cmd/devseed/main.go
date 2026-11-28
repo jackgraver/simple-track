@@ -310,10 +310,10 @@ func seedTracking(tx *gorm.DB, owner uint) error {
 	}
 	for i := 30; i >= 0; i-- {
 		d := today().AddDate(0, 0, -i)
-		if err := tx.Create(&weight.BodyWeightLog{Date: d, WeightLbs: 182 - float64(30-i)*0.1 + float64(i%3)*0.4}).Error; err != nil {
+		if err := tx.Create(&weight.BodyWeightLog{Owner: database.Owner{UserID: owner}, Date: d, WeightLbs: 182 - float64(30-i)*0.1 + float64(i%3)*0.4}).Error; err != nil {
 			return err
 		}
-		if err := tx.Create(&steps.StepLog{Date: d, Steps: 6000 + (i*937)%6000}).Error; err != nil {
+		if err := tx.Create(&steps.StepLog{Owner: database.Owner{UserID: owner}, Date: d, Steps: 6000 + (i*937)%6000}).Error; err != nil {
 			return err
 		}
 	}

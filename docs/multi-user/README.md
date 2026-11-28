@@ -249,3 +249,6 @@ a nullable `group_id` on tables that should be shareable, and the rule becomes
   `auth/accounts_pg_test.go`.
 - **Writes that must survive a 4xx/5xx** go through `database.Always` (C6). Success audit rows
   don't: they belong in the request transaction so they roll back with the change.
+- **`Save` with `Select("*")` writes `user_id` too** (C1). Updating a row you built by hand (the
+  Renpho import's replace-all-columns) would set a zero `user_id`; add `Omit("user_id")`.
+  `CreateInSavepoint` omits associations now.
