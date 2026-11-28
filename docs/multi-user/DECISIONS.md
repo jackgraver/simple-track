@@ -387,6 +387,126 @@ individually. C5 and C6 skip BACKLOG entries an S lane has ticked.
 - **Logs**: failed attempts log the username only if it exists in `users` (one extra lookup per
   logged failure), otherwise `unknown`. C6's `auth_events` should follow the same rule.
 - C6 still owns: lockout rows in `auth_events`, login protection on the setup endpoint.
+
+## 2026-11-27: B3 owner kit (agent, lane B3)
+
+Everything a C lane needs to convert a table. Reference conversion: `drink_size_presets`
+(migration `0011_owner_kit.sql`, `tracking/water`, `water/presets_pg_test.go`). Copy those.
+
+**Go API** (`internal/database`: `owner.go`, `notfound.go`, `lock.go`):
+- Owned model: embed `database.Owner` (`UserID`, `json:"-"`, so it's never bound from or sent
+  in JSON). Catalog model: embed `database.Creator` (`CreatedBy`, visible in responses).
+- **Stamping is a gorm `BeforeCreate` hook on `Owner`/`Creator`**, the only code that sets
+  `user_id`/`created_by`. It reads the user from the statement's context, so every create path
+  (`Create`, batch, `Save` of a new row, `FirstOrCreate`) is covered without callers remembering
+  a helper. A preset `UserID` that differs from the user is an error, never overwritten. With no
+  user on the context (seeds, tools on the owner role) the caller must set it, or the create
+  fails with `database.ErrNoIdentity`. Chosen over an explicit `Stamp(ctx, &row)` call because a
+  forgotten call would only show up on Postgres (FK error) and pass on SQLite module tests. A
+  model with its own `BeforeCreate` must call `x.Owner.BeforeCreate(tx)` (rules test). Not
+  covered: `Create(map...)` and raw `INSERT`, which skip hooks; RLS `WITH CHECK` still refuses
+  them.
+- Reads: `database.From(ctx).Scopes(database.Owned(ctx))`. The column is qualified with the
+  statement's table (safe in joins) and survives `Unscoped()`. **Preloads don't inherit
+  scopes**: `Preload("Items", database.Owned(ctx))`. No user on ctx -> the query fails with
+  `ErrNoIdentity`, never runs unfiltered.
+- Not found or not yours: `database.IsNotFound(err)`, `database.Affected(res)` (update/delete by
+  ID: `ErrNotFound` when 0 rows), and in handlers `apierr.NotFoundOrInternal(c, err)`: 404
+  `{"error":"not found"}` or a logged 500. Same body for missing and someone else's.
+- Identity: `database.CurrentIdentity(ctx)` (the request's, from `SetIdentity`), and
+  `database.WithIdentity(ctx, id)` for SQLite module tests and tools only (rules test forbids it
+  in request code). SQLite test: `ctx := database.WithIdentity(database.WithDB(bg, db), database.Identity{UserID: 1})`.
+- Advisory locks (#2): `database.XactLock(ctx, tx, "workout_logs.date", date)` takes
+  `pg_advisory_xact_lock(hashtext("u<uid>:workout_logs.date:<date>"))`; `database.LockKey(ctx,
+  parts...)` builds the key. Two users never share a key (tested: Bob doesn't wait on Alice).
+  Raw `pg_advisory` calls outside `internal/database` are allowlisted for C2 (`lockClientID`) and
+  C3 (`CreateMinimalIfMissing`), which also need their existence checks scoped (`Unscoped()` too).
+- Creates: `Omit(clause.Associations)` in the chain (#1). `database.CreateInSavepoint` (B2,
+  `request.go`, which C6 is editing) doesn't omit them yet; values passed to it must not carry
+  nested structs until it does.
+
+**SQL** (migration 0011 adds `public.app_user_id()`, `public.app_is_admin()` and
+`public.catalog_guard()`). The tested copy of every pattern is
+`backend/internal/database/testdata/rls_patterns.sql` (run by `TestRLSPatterns` against legacy-
+shaped tables); copy from there. In short, per table, in the same migration as the code:
+- **Owned**: `ADD COLUMN user_id bigint`; backfill DO block (rows -> the one live admin, else
+  `RAISE`, see 0011); `SET NOT NULL`; `FOREIGN KEY (user_id) REFERENCES users (id)` (no cascade:
+  users are soft-deleted); index on `user_id`; per-user uniques (`(user_id, name)`,
+  `(user_id, client_id) WHERE client_id IS NOT NULL`, `(user_id, date)`); `UNIQUE (id, user_id)`
+  if anything points at it; `ENABLE ROW LEVEL SECURITY`; policy
+  `owner USING (user_id = public.app_user_id()) WITH CHECK (user_id = public.app_user_id())`.
+- **Owned child**: same column, backfilled from the parent (`UPDATE child c SET user_id =
+  p.user_id FROM parent p WHERE p.id = c.parent_id`; nullable parents fall back to the admin),
+  then the parent FK becomes composite `(parent_id, user_id) REFERENCES parent (id, user_id)`
+  with the old `ON DELETE`. Index `(user_id, parent_id)`. Same `owner` policy. **Why composite:
+  FK checks bypass RLS**, so with a plain FK Bob could attach a row to Alice's parent by ID.
+  Also applies to non-child references such as `water_logs.preset_id` (C1:
+  `(preset_id, user_id) REFERENCES drink_size_presets (id, user_id)`; 0011 added the key).
+- **Catalog**: `created_by` like `user_id` (backfill to admin, NOT NULL, FK, index); policies
+  `catalog_read FOR SELECT USING (app_user_id() IS NOT NULL)` (signed-in users only, so a missing
+  identity still sees nothing), `catalog_add FOR INSERT WITH CHECK (created_by = app_user_id())`,
+  `catalog_edit FOR UPDATE USING/WITH CHECK (created_by = app_user_id() OR app_is_admin())`,
+  `catalog_delete FOR DELETE USING (app_is_admin())`, and
+  `CREATE TRIGGER catalog_guard BEFORE UPDATE ... EXECUTE FUNCTION public.catalog_guard()`.
+  The trigger exists because gorm's soft delete is an `UPDATE deleted_at`, which no DELETE policy
+  sees: it refuses `deleted_at` changes by non-admins and any `created_by` change. It only acts
+  where RLS does (`row_security_active`), so migrations and seeds on the owner role are free.
+  Handlers still check admin before deleting so the user gets a clean 403/404, not a 500.
+- `app_user_id()` is `NULLIF(current_setting('app.user_id', true), '')::bigint`: after a pooled
+  session has served a request the setting reads `''`, which a bare cast would turn into an error
+  (`TestAppUserIDAfterRequest`).
+
+**Tests**:
+- `internal/database/pgtest`: `Migrated(t, prefix)` (fresh DB copied from a template built once
+  per migration set), `NewDatabase`, `Open` (owner), `OpenAsApp` (every session `SET ROLE
+  simpletrack_app`, so RLS applies), `Admin`. Skips without `TEST_DATABASE_URL`; **fails** with
+  `TEST_DATABASE_REQUIRED=1`. Every existing Postgres test now goes through it (migrate's own
+  tests copy the rule, since pgtest imports migrate).
+- `internal/database/twousers`: `h := twousers.New(t)` gives a migrated DB with `h.Admin`,
+  `h.Alice`, `h.Bob`, `h.Owner` (bypasses RLS: arrange and inspect), `h.App` (app role);
+  `h.Router(register)` serves routes through `database.Middleware` + `auth.AuthMiddleware` like
+  the server, `api.Do(h.Bob, "GET", path, body)`, `res.Status(t, 200)`, `res.NotFound(t)`;
+  `h.Run(h.Alice, func(ctx) error)` for service tests. Sets `JWT_SECRET` (no `t.Parallel`).
+  Per endpoint: Bob sees an empty list, gets the same 404 as a missing ID for Alice's rows on
+  GET/PUT/DELETE, can't create a child under (or point at) Alice's row, and a forged
+  `user_id` in a body is ignored. Plus one RLS backstop test per module (unscoped query as Bob).
+- `TestRLSCoverage` (`internal/database/ownerkit_pg_test.go`): every public table has RLS with
+  a policy, except `schema_migrations` and `users` (exempt) and the `rlsPending` allowlist (each
+  table tagged with its C lane; delete yours in your PR; D1 needs it empty). Also every
+  `user_id`/`created_by` column is NOT NULL with an FK to users. **C6's new tables need RLS or an
+  entry with a reason.**
+- `TestOwnerKitRules` (`internal/database/rules_test.go`, #1/#2): no gin bind into a type that
+  (transitively, by type name) carries `UserID`/`CreatedBy`/`Owner`/`Creator`, and every bind
+  target's type must be visible (`var body T`); no writes of `UserID`/`CreatedBy`/`"user_id"`/
+  `"created_by"` outside the hooks; no model embedding both `Owner` and `Creator` (neither hook
+  would be promoted); no `Create`/`Save`/`FirstOrCreate` without
+  `Omit(clause.Associations)`; no raw `pg_advisory`; no shadowing `BeforeCreate`. Allowlists are
+  per-file counts of today's sites: a file may drop below its count (or vanish), never exceed it.
+  C6's `user_setup_tokens.user_id` (set by an admin for another user) needs an allowlist entry.
+- `TestNoRawErrorsIn500s` (`internal/utils/apierr/rules_test.go`, #6): same per-file counts
+  for 500 responses containing `.Error()`. It doesn't catch 4xx responses that echo a database
+  error (water logs, grocery do today): C lanes fix those by eye when moving to `apierr`.
+
+**CI (#20 and Postgres tests)**: `backend-test` runs `dev/ci/backend-test.sh` (throwaway
+`postgres:16-alpine` container, `TEST_DATABASE_REQUIRED=1`); new steps `backend-vulncheck`
+(`govulncheck@v1.10.0`, pinned to the version S4 audited with) and `frontend-audit` (`npm audit --omit=dev --audit-level=high`).
+Proved locally by running the step's exact command from `backend/` (full suite green, and
+`TEST_DATABASE_REQUIRED=1` without Postgres fails). On the rebased branch (S4's x/net and x/text
+bump) govulncheck reports 0 reachable vulnerabilities and `npm audit` 0 findings. govulncheck
+judges the standard library by the build host's Go, not the image's: keep the image's Go minor
+current.
+
+**Seeds**: devseed gives seeded owned rows to the dev login (`devOwner`; devseed now runs after
+devuser) and seeds two presets as the pattern; lanes pass `owner` to their module's seed
+function. The e2e seed has no presets (specs create them through the API as `dev`, and expect
+none at start), so it's unchanged.
+
+**Not done here**: water logs, grocery and everything else in `rlsPending` (C lanes). Until C1
+makes `water_logs` owned, every user still sees every water log, and another user's log shows
+no preset (its preload is scoped with `Owned`). Nothing ships before D1, which needs C1. POST
+`/water` moved to sentinel errors + `apierr` here, since the scoped preset lookup could
+otherwise echo `ErrNoIdentity` or SQL text as a 400; the other water-log handlers stay for C1.
+
 ## 2026-11-27: Accounts and setup links (lane C6)
 
 **`database.Always` as built** (`internal/database/always.go`), per the entry above, plus:
@@ -416,7 +536,7 @@ This narrows "auth_events written through database.Always" to the writes that ne
 `Always` entry itself says ("only for writes that must outlive the request's outcome").
 `/auth/login` runs outside the request transaction, so its events go straight to the pool.
 
-**Tables** (migration `0011_accounts.sql`):
+**Tables** (migration `0012_accounts.sql`):
 - `user_setup_tokens(user_id, token_hash, purpose setup|reset, created_by, created_at,
   expires_at, used_at, revoked_at)`. Token: 32 random bytes, base64url (43 chars), stored as
   SHA-256 hex (a fast hash is enough for 256 bits of entropy). 48 h, single use. Creating a link
@@ -501,3 +621,10 @@ and is never saved as the last route), Account menu → **Account** (change pass
 and **Users** (admin: add someone, link overlay with Share/Copy, disable/enable, sign-in
 activity). `isAdmin` comes from `/auth/me` (`user.is_admin`); the server re-checks on every
 request, the client flag only hides the menu entry and guards the route (`meta.admin`).
+
+**Merged after B3** (owner): migration renumbered to `0012_accounts.sql`. The auth tables are
+identity tables, not owned data, so B3's rules get reasoned exceptions rather than the Owner hook:
+`ownerFieldWriteAllowed` entries for the auth files (their `user_id` is the account acted on, often
+not the caller) and `nullableOwnerColumn` for `auth_events.user_id` and
+`user_setup_tokens.created_by`. `accounts_pg_test.go` now uses `pgtest`, so CI fails instead of
+skipping it.

@@ -5,28 +5,20 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"math/rand/v2"
 	"net/http"
 	"net/http/httptest"
-	"net/url"
-	"os"
 	"strings"
 	"testing"
 	"time"
 
-	"database/sql"
-
 	"be-simpletracker/internal/core/auth/models"
 	"be-simpletracker/internal/core/auth/services"
 	"be-simpletracker/internal/database"
-	"be-simpletracker/internal/migrate"
-	"be-simpletracker/migrations"
+	"be-simpletracker/internal/database/pgtest"
 
 	"github.com/gin-gonic/gin"
 	"golang.org/x/crypto/bcrypt"
-	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
-	"gorm.io/gorm/logger"
 )
 
 // accountsEnv is a fully migrated Postgres database with the auth routes served the way
@@ -41,59 +33,10 @@ type accountsEnv struct {
 
 func newAccountsEnv(t *testing.T) *accountsEnv {
 	t.Helper()
-	admin := os.Getenv("TEST_DATABASE_URL")
-	if admin == "" {
-		t.Skip("TEST_DATABASE_URL not set")
-	}
-	adminDB, err := sql.Open("pgx", admin)
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { adminDB.Close() })
-	if err := adminDB.Ping(); err != nil {
-		t.Skipf("TEST_DATABASE_URL unreachable: %v", err)
-	}
-	name := fmt.Sprintf("accounts_test_%d", rand.Uint32())
-	if _, err := adminDB.Exec("CREATE DATABASE " + name); err != nil {
-		t.Fatal(err)
-	}
-	u, err := url.Parse(admin)
-	if err != nil {
-		t.Fatal(err)
-	}
-	u.Path = "/" + name
-	sqlDB, err := sql.Open("pgx", u.String())
-	if err != nil {
-		t.Fatal(err)
-	}
-	m, err := migrate.New(sqlDB, migrations.FS, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := m.Up(context.Background(), 0); err != nil {
-		t.Fatal(err)
-	}
-	cfg := &gorm.Config{Logger: logger.Default.LogMode(logger.Silent)}
-	owner, err := gorm.Open(postgres.New(postgres.Config{Conn: sqlDB}), cfg)
-	if err != nil {
-		t.Fatal(err)
-	}
-	// Every connection of this pool starts as simpletrack_app (the role is NOLOGIN in test
-	// clusters, but the test's superuser may assume it at connect time).
-	q := u.Query()
-	q.Set("options", "-c role="+database.AppRole)
-	u.RawQuery = q.Encode()
-	app, err := gorm.Open(postgres.Open(u.String()), cfg)
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() {
-		if d, err := app.DB(); err == nil {
-			d.Close()
-		}
-		sqlDB.Close()
-		adminDB.Exec("DROP DATABASE IF EXISTS " + name + " WITH (FORCE)")
-	})
+	// Skipped without Postgres, or fails when TEST_DATABASE_REQUIRED is set (CI).
+	dsn := pgtest.Migrated(t, "accounts")
+	owner := pgtest.Open(t, dsn)
+	app := pgtest.OpenAsApp(t, dsn)
 	var role string
 	if err := app.Raw("SELECT current_user").Scan(&role).Error; err != nil || role != database.AppRole {
 		t.Fatalf("app pool runs as %q (%v), want %s", role, err, database.AppRole)

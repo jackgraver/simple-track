@@ -3,11 +3,16 @@ package water
 import (
 	"time"
 
+	"be-simpletracker/internal/database"
+
 	"gorm.io/gorm"
 )
 
+// DrinkSizePreset is owned: each user has their own sizes (migration 0011). The reference
+// conversion for owned tables (docs/multi-user/DECISIONS.md, "B3 owner kit").
 type DrinkSizePreset struct {
 	gorm.Model
+	database.Owner
 	Name     string  `json:"name" gorm:"not null"`
 	AmountOz float64 `json:"amount_oz" gorm:"not null"`
 }

@@ -133,22 +133,25 @@ Depends on: A1, A2, B1
 
 ### B3 Owner kit
 Depends on: B2
-- [ ] `database.Owned(ctx)` gorm scope; helper to stamp `UserID` on create; 404 helper for
+- [x] `database.Owned(ctx)` gorm scope; helper to stamp `UserID` on create; 404 helper for
       not-found-or-not-yours.
-- [ ] SQL pattern for owned tables, children (composite FK) and catalogs, as a worked example
+- [x] SQL pattern for owned tables, children (composite FK) and catalogs, as a worked example
       in DECISIONS that C lanes copy.
-- [ ] Two-user Postgres test harness (Alice/Bob, tokens, DB) usable from any module's tests.
-- [ ] RLS coverage test (fails for any table without RLS, with an allowlist C lanes shrink).
-- [ ] Postgres-backed tests run in the j-cicd `backend-test` step. Today it runs `go test`
+- [x] Two-user Postgres test harness (Alice/Bob, tokens, DB) usable from any module's tests.
+- [x] RLS coverage test (fails for any table without RLS, with an allowlist C lanes shrink).
+- [x] Postgres-backed tests run in the j-cicd `backend-test` step. Today it runs `go test`
       without `TEST_DATABASE_URL`, so they're skipped. Give it a throwaway Postgres and make
       those tests fail instead of skip in CI (`CI=true` or similar).
-- [ ] #1 Rule + grep test: no `ShouldBindJSON` into a type with a `UserID` or `CreatedBy` field;
+- [x] #1 Rule + grep test: no `ShouldBindJSON` into a type with a `UserID` or `CreatedBy` field;
       only the stamp helper sets `user_id` / `created_by`; creates use `Omit(clause.Associations)`.
-- [ ] #2 `database.LockKey(ctx, ...)` helper that puts the user ID into every advisory-lock key.
-- [ ] #6 Grep test: no new `"error": err.Error()` in 500 responses (allowlist the existing
+- [x] #2 `database.LockKey(ctx, ...)` helper that puts the user ID into every advisory-lock key.
+- [x] #6 Grep test: no new `"error": err.Error()` in 500 responses (allowlist the existing
       sites; C lanes shrink it by moving to `apierr`).
-- [ ] #20 `govulncheck ./...` and `npm audit --omit=dev --audit-level=high` in the pipeline.
+- [x] #20 `govulncheck ./...` and `npm audit --omit=dev --audit-level=high` in the pipeline.
 - Done when: one small table (suggest `drink_size_presets`) is fully converted as the reference.
+- Result: DECISIONS "B3 owner kit" (API, SQL patterns, harness, rules tests, CI). Reference:
+  `drink_size_presets` (migration 0011). C lanes: delete your tables from `rlsPending`
+  (`internal/database/ownerkit_pg_test.go`) and shrink the rules-test allowlists.
 
 ## Phase C: modules (parallel)
 
@@ -159,8 +162,8 @@ entries tagged with the lane.
 
 ### C1 Tracking
 Depends on: B3
-- [ ] body_weight_logs (incl. Renpho import), step_logs, water_logs (client_id), drink_size_presets
-      (if not done in B3), grocery_items (client_id), user_profiles -> 1:1 with user, missed.
+- [ ] body_weight_logs (incl. Renpho import), step_logs, water_logs (client_id; composite FK on
+      preset_id, see DECISIONS B3), grocery_items (client_id), user_profiles -> 1:1 with user, missed.
 - [ ] BACKLOG #6.
 
 ### C2 Diet

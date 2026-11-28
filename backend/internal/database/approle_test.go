@@ -6,10 +6,10 @@ import (
 	"fmt"
 	"math/rand/v2"
 	"net/url"
-	"os"
 	"strings"
 	"testing"
 
+	"be-simpletracker/internal/database/pgtest"
 	"be-simpletracker/internal/migrate"
 	"be-simpletracker/migrations"
 
@@ -20,23 +20,8 @@ import (
 // test` points it at the dev Postgres as its owner). Skipped when unset or unreachable.
 func pgAdmin(t *testing.T) (*sql.DB, *url.URL) {
 	t.Helper()
-	admin := os.Getenv("TEST_DATABASE_URL")
-	if admin == "" {
-		t.Skip("TEST_DATABASE_URL not set")
-	}
-	db, err := sql.Open("pgx", admin)
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { db.Close() })
-	if err := db.Ping(); err != nil {
-		t.Skipf("TEST_DATABASE_URL unreachable: %v", err)
-	}
-	u, err := url.Parse(admin)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return db, u
+	// Skipped without Postgres, or fails when TEST_DATABASE_REQUIRED is set (CI).
+	return pgtest.Admin(t)
 }
 
 // migratedDB creates a fresh database with every migration applied, connected as the owner.

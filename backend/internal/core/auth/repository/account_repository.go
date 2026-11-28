@@ -77,7 +77,7 @@ func ReplaceSetupToken(ctx context.Context, token *models.SetupToken, now time.T
 		Update("revoked_at", now).Error; err != nil {
 		return err
 	}
-	return db.Create(token).Error
+	return db.Omit(clause.Associations).Create(token).Error
 }
 
 // RevokeSetupTokens revokes every unused link of a user (on disable). Admin identity.
