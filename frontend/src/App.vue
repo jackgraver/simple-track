@@ -15,7 +15,8 @@ import { MotionConfig, useIsDesktop } from "./shared/ui";
 const route = useRoute();
 useDrawerGesture(useIsDesktop());
 
-const showNav = computed(() => isAuthenticated.value);
+// Public pages (the setup link) stand alone even when someone is signed in on this device.
+const showNav = computed(() => isAuthenticated.value && route.meta.public !== true);
 // Focus pages (e.g. exercise logging) bring their own header, so the mobile top bar
 // (which holds the menu button for the nav drawer) is dropped there.
 const showMobileHeader = computed(

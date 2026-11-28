@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ChevronsUpDown, LogOut, Monitor, Moon, Sun, UserRound } from "lucide-vue-next";
+import { ChevronsUpDown, KeyRound, LogOut, Monitor, Moon, Sun, UserRound, UsersRound } from "lucide-vue-next";
 import { computed, ref } from "vue";
 import { useRoute } from "vue-router";
 import { useAuth } from "~/composables/auth/useAuth";
@@ -8,12 +8,14 @@ import { useTheme, type ThemeMode } from "~/composables/useTheme";
 import { Avatar, DropdownMenu, MenuAction, MenuLabel, MenuRadioGroup, MenuSeparator } from "~/shared/ui";
 
 const route = useRoute();
-const { username, logout } = useAuth();
+const { username, isAdmin, logout } = useAuth();
 const { mode, setThemeMode } = useTheme();
 const open = ref(false);
 const signingOut = ref(false);
 
-const onProfilePage = computed(() => route.name === "settings-profile");
+const onProfilePage = computed(() =>
+    ["settings-profile", "settings-account", "settings-users"].includes(String(route.name)),
+);
 const themeOptions: { label: string; value: ThemeMode; icon: typeof Sun }[] = [
     { label: "Light", value: "light", icon: Sun },
     { label: "Dark", value: "dark", icon: Moon },
@@ -66,6 +68,8 @@ function report(confirmed: boolean) {
         </MenuLabel>
         <MenuSeparator v-if="username" />
         <MenuAction :icon="UserRound" :to="{ name: 'settings-profile' }">Body profile</MenuAction>
+        <MenuAction :icon="KeyRound" :to="{ name: 'settings-account' }">Account</MenuAction>
+        <MenuAction v-if="isAdmin" :icon="UsersRound" :to="{ name: 'settings-users' }">Users</MenuAction>
         <MenuSeparator />
         <MenuLabel>Theme</MenuLabel>
         <MenuRadioGroup label="Theme" :options="themeOptions" :model-value="mode" @update:model-value="setThemeMode" />

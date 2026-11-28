@@ -496,3 +496,8 @@ possibly different user in on a shared device: `markAuthenticated(name, id, admi
 id to S2's `setUserStorageOwner`, which clears the previous user's storage, and the page clears
 the query cache.
 
+**Frontend**: `/setup/:token` (public route: `meta.public` skips the auth guard, hides the nav,
+and is never saved as the last route), Account menu → **Account** (change password, everyone)
+and **Users** (admin: add someone, link overlay with Share/Copy, disable/enable, sign-in
+activity). `isAdmin` comes from `/auth/me` (`user.is_admin`); the server re-checks on every
+request, the client flag only hides the menu entry and guards the route (`meta.admin`).
