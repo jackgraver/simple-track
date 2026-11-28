@@ -12,9 +12,9 @@ import (
 	"be-simpletracker/internal/core/money/models"
 	"be-simpletracker/internal/core/money/service"
 	"be-simpletracker/internal/core/tracking/common"
+	"be-simpletracker/internal/utils/apierr"
 
 	"github.com/gin-gonic/gin"
-	"gorm.io/gorm"
 )
 
 type Handler struct{}
@@ -45,6 +45,7 @@ func RegisterRoutes(group *gin.RouterGroup) {
 	types.POST("/presets", h.createFromPreset)
 	types.GET("/:id", h.getContributionType)
 	types.PUT("/:id", h.updateContributionType)
+	types.PUT("/:id/room", h.setContributionRoom)
 	types.DELETE("/:id", h.deleteContributionType)
 	types.PUT("/:id/limits/:year", h.upsertLimit)
 	types.DELETE("/:id/limits/:year", h.deleteLimit)
@@ -83,7 +84,7 @@ type createAccountBody struct {
 func (h *Handler) createAccount(c *gin.Context) {
 	var body createAccountBody
 	if err := c.ShouldBindJSON(&body); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		apierr.BadRequest(c, err.Error())
 		return
 	}
 	date, ok := parseDate(c, body.BalanceDate)
@@ -105,7 +106,7 @@ func (h *Handler) updateAccount(c *gin.Context) {
 	}
 	var body service.AccountInput
 	if err := c.ShouldBindJSON(&body); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		apierr.BadRequest(c, err.Error())
 		return
 	}
 	account, err := service.UpdateAccount(c.Request.Context(), id, body)
@@ -155,11 +156,11 @@ func (h *Handler) setBalance(c *gin.Context) {
 	}
 	var body balanceBody
 	if err := c.ShouldBindJSON(&body); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		apierr.BadRequest(c, err.Error())
 		return
 	}
 	if body.Balance == nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "balance is required"})
+		apierr.BadRequest(c, "balance is required")
 		return
 	}
 	date, ok := parseDate(c, body.Date)
@@ -181,7 +182,7 @@ type balancesBody struct {
 func (h *Handler) setBalances(c *gin.Context) {
 	var body balancesBody
 	if err := c.ShouldBindJSON(&body); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		apierr.BadRequest(c, err.Error())
 		return
 	}
 	date, ok := parseDate(c, body.Date)
@@ -247,7 +248,7 @@ func (h *Handler) createTransaction(c *gin.Context) {
 	}
 	var body transactionBody
 	if err := c.ShouldBindJSON(&body); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		apierr.BadRequest(c, err.Error())
 		return
 	}
 	date, ok := parseDate(c, body.Date)
@@ -319,7 +320,7 @@ func (h *Handler) listPresets(c *gin.Context) {
 func (h *Handler) createFromPreset(c *gin.Context) {
 	var body service.PresetInput
 	if err := c.ShouldBindJSON(&body); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		apierr.BadRequest(c, err.Error())
 		return
 	}
 	contributionType, err := service.CreateContributionTypeFromPreset(c.Request.Context(), body)
@@ -331,9 +332,9 @@ func (h *Handler) createFromPreset(c *gin.Context) {
 }
 
 func (h *Handler) createContributionType(c *gin.Context) {
-	var body service.ContributionTypeInput
+	var body service.ContributionTypeCreateInput
 	if err := c.ShouldBindJSON(&body); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		apierr.BadRequest(c, err.Error())
 		return
 	}
 	contributionType, err := service.CreateContributionType(c.Request.Context(), body)
@@ -351,10 +352,38 @@ func (h *Handler) updateContributionType(c *gin.Context) {
 	}
 	var body service.ContributionTypeInput
 	if err := c.ShouldBindJSON(&body); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		apierr.BadRequest(c, err.Error())
 		return
 	}
 	contributionType, err := service.UpdateContributionType(c.Request.Context(), id, body)
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"contribution_type": contributionType})
+}
+
+// setContributionRoom saves the caller's own room figures (start year, opening room) for a type.
+// They are per user, so anyone signed in may set theirs on a shared type.
+func (h *Handler) setContributionRoom(c *gin.Context) {
+	id, ok := parseUintParam(c, "id")
+	if !ok {
+		return
+	}
+	var body service.RoomInput
+	if err := c.ShouldBindJSON(&body); err != nil {
+		apierr.BadRequest(c, err.Error())
+		return
+	}
+	if err := service.SetContributionRoom(c.Request.Context(), id, body); err != nil {
+		respondError(c, err)
+		return
+	}
+	birthYear, ok := h.currentUserBirthYear(c)
+	if !ok {
+		return
+	}
+	contributionType, err := service.GetContributionType(c.Request.Context(), id, birthYear, clock.Now())
 	if err != nil {
 		respondError(c, err)
 		return
@@ -389,11 +418,11 @@ func (h *Handler) upsertLimit(c *gin.Context) {
 	}
 	var body limitBody
 	if err := c.ShouldBindJSON(&body); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		apierr.BadRequest(c, err.Error())
 		return
 	}
 	if body.AnnualLimit == nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "annual_limit is required"})
+		apierr.BadRequest(c, "annual_limit is required")
 		return
 	}
 	limit, err := service.UpsertContributionLimit(c.Request.Context(), id, year, *body.AnnualLimit)
@@ -425,7 +454,7 @@ func (h *Handler) deleteLimit(c *gin.Context) {
 func parseUintParam(c *gin.Context, name string) (uint, bool) {
 	value, err := strconv.ParseUint(c.Param(name), 10, 32)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid " + name})
+		apierr.BadRequest(c, "invalid "+name)
 		return 0, false
 	}
 	return uint(value), true
@@ -434,7 +463,7 @@ func parseUintParam(c *gin.Context, name string) (uint, bool) {
 func parseYearParam(c *gin.Context) (int, bool) {
 	year, err := strconv.Atoi(c.Param("year"))
 	if err != nil || year < 1900 || year > 9999 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid year"})
+		apierr.BadRequest(c, "invalid year")
 		return 0, false
 	}
 	return year, true
@@ -444,36 +473,38 @@ func parseYearParam(c *gin.Context) (int, bool) {
 func parseDate(c *gin.Context, value string) (time.Time, bool) {
 	date, err := common.ParseDateString(value)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid date, expected YYYY-MM-DD"})
+		apierr.BadRequest(c, "invalid date, expected YYYY-MM-DD")
 		return time.Time{}, false
 	}
 	return date, true
 }
 
+// respondError maps a service error to a response: 400 for bad input, 403 for a shared row the
+// caller can see but may not change, 404 for a missing or someone else's row, else a logged 500.
 func respondError(c *gin.Context, err error) {
 	var validation service.ValidationError
 	switch {
-	case errors.Is(err, gorm.ErrRecordNotFound):
-		c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
 	case errors.As(err, &validation):
-		c.JSON(http.StatusBadRequest, gin.H{"error": validation.Message})
+		apierr.BadRequest(c, validation.Message)
+	case errors.Is(err, service.ErrForbidden):
+		apierr.Forbidden(c, "not allowed")
 	default:
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		apierr.NotFoundOrInternal(c, err)
 	}
 }
 
 func (h *Handler) currentUserBirthYear(c *gin.Context) (*int, bool) {
-	username := c.GetString("username")
-	if username == "" {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Not authenticated"})
+	id, ok := database.CurrentIdentity(c.Request.Context())
+	if !ok {
+		apierr.Unauthorized(c, "Not authenticated")
 		return nil, false
 	}
 	var user authmodels.User
-	if err := database.From(c.Request.Context()).Select("birth_year").Where("username = ?", username).First(&user).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
+	if err := database.From(c.Request.Context()).Select("birth_year").First(&user, id.UserID).Error; err != nil {
+		if database.IsNotFound(err) {
 			return nil, true
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		apierr.Internal(c, err)
 		return nil, false
 	}
 	return user.BirthYear, true

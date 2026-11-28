@@ -628,3 +628,53 @@ identity tables, not owned data, so B3's rules get reasoned exceptions rather th
 not the caller) and `nullableOwnerColumn` for `auth_events.user_id` and
 `user_setup_tokens.created_by`. `accounts_pg_test.go` now uses `pgtest`, so CI fails instead of
 skipping it.
+
+## 2026-11-27: C4 money (agent, lane C4; split approved by the owner)
+
+Migration `0013_money_owned.sql` (renumber if another lane merges first, then `dev db:drop-worktree`).
+
+**What is shared and what is personal**
+- Catalog (`created_by`, catalog policies, `catalog_guard`): `investment_account_types` (name,
+  eligibility age, carry-forward cap, lifetime limit, withdrawals-restore) and
+  `investment_contribution_rules` (the per-year limits). Anyone signed in adds, the creator or the
+  admin edits (handler answers 403, not 404: the row is visible), only the admin deletes (403).
+- Per user, new table `investment_contribution_room` (`user_id`, type, `contribution_start_year`,
+  `opening_room_year`, `opening_room`; unique per user and type; plain FK to the catalog type).
+  **Start year moved here too**, not just opening room: it is "the first year *you* could
+  contribute" (e.g. when you opened an FHSA). The migration copies each type's three old
+  columns into an admin-owned row and drops them. Birth year still lives on `users` (C1 moves
+  it with the profile: update `currentUserBirthYear` in `money/controller/routes.go` then).
+- Owned: `investment_accounts`; children `account_balances` and `investment_deposits` with
+  composite FKs `(account_id, user_id)`. An account's type FK stays a plain FK to the catalog.
+  Net worth, room flows and every total only read the caller's rows (`Owned`).
+
+**API**
+- `PUT /money/contribution-types/:id` takes the shared rules only (creator or admin, else 403).
+  `PUT /money/contribution-types/:id/room` saves the caller's own figures (any signed-in user;
+  all null clears them) and returns the type. `POST /contribution-types` and the preset POST still
+  accept `start_year` / `opening_room*` and store them as the caller's room.
+- `GET` types merges the caller's room figures into each type under the same JSON names
+  (`start_year`, `opening_room_year`, `opening_room`) and adds `created_by` and `can_edit`.
+  The frontend dialog saves rules and room separately and hides the rules (and the limit form)
+  from users who can't edit; delete buttons show for the admin only.
+- **Preset reuse**: creating a preset whose name already exists (another user added their TFSA
+  first) reuses that type and only saves the caller's room, instead of a 400. A manual create
+  with a taken name is still a 400. Two users both have their own accounts called "TFSA"
+  (account names were never unique); both use the one shared TFSA type, each with their own room.
+- Deleting a type is admin-only and refused (400) while an account of the admin's uses it; if
+  another user's account uses it the FK stops it (also a 400, via 23503). Admin can't see other
+  users' accounts, so the FK is the only check there. Limits: delete is admin-only (hard delete
+  by policy); upsert is creator or admin.
+- Limit rows: `investment_contribution_rules.created_by` is the type's creator at migration time
+  and the caller afterwards. Their UPDATE policy also lets the **type's** creator edit, so a limit
+  the admin added to Bob's type stays editable by Bob (plain catalog policy would not).
+- `respondError` now uses `apierr`: 400 for validation, 403 for `ErrForbidden`, 404/500 via
+  `NotFoundOrInternal`. A 500 shows "Internal server error" instead of the raw error, so the e2e
+  atomic-deposit spec asserts that text (the raw error is in the backend log).
+
+**Not done / for later**: two users creating the same new preset at the same instant would hit
+the unique name index on the second (a 500, then retry works); not worth a lock. devseed and the
+e2e `large` profile give the seeded accounts to the dev login (`seedOwner`). The browser
+click-through was not possible in this session (the shared Playwright browser was busy); the
+e2e finances specs and a before/after API comparison across `migrate down 1` + `up` (net worth,
+accounts, types and room unchanged) stand in for it.

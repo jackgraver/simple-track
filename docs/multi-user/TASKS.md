@@ -188,10 +188,10 @@ Depends on: B3
 
 ### C4 Money
 Depends on: B3
-- [ ] Split investment_account_types: shared rules vs per-user opening room. Contribution rules
+- [x] Split investment_account_types: shared rules vs per-user opening room. Contribution rules
       are catalog.
-- [ ] Owned: investment_accounts, account_balances, investment_deposits. Net worth per user.
-- [ ] BACKLOG #6.
+- [x] Owned: investment_accounts, account_balances, investment_deposits. Net worth per user.
+- [x] BACKLOG #6.
 
 ### C5 Media
 Depends on: B3

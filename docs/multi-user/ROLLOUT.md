@@ -159,6 +159,38 @@ Each lane adds what its changes need here (README: "Prod changes go in ROLLOUT.m
     before deploy day, not during it.
   - In 3.4, the water page's drink sizes are the owner's (0011 backfilled them).
 
+- **C4 (money)**: migration 0013 runs in pre_swap with the rest. It moves each account type's
+  start year and opening room to a new per-user table (`investment_contribution_room`, the
+  admin's row), drops those three columns from `investment_account_types`, and gives every
+  account, balance, deposit, type and limit row to the admin. Nothing to configure. **D1
+  rehearsal check** (run on the restored prod copy as `psql_owner`, before and after `migrate up`;
+  the numbers must match exactly):
+  ```sql
+  -- row counts (all five tables, deleted rows included)
+  SELECT 'accounts' t, count(*) FROM investment_accounts UNION ALL
+  SELECT 'balances', count(*) FROM account_balances UNION ALL
+  SELECT 'deposits', count(*) FROM investment_deposits UNION ALL
+  SELECT 'types', count(*) FROM investment_account_types UNION ALL
+  SELECT 'limits', count(*) FROM investment_contribution_rules;
+  -- net worth today: latest balance per live, unarchived account; liabilities subtract
+  SELECT round(sum(CASE WHEN a.kind IN ('credit_card','loan') THEN -b.balance ELSE b.balance END), 2) AS net_worth
+  FROM investment_accounts a
+  JOIN LATERAL (SELECT balance FROM account_balances
+                WHERE account_id = a.id AND deleted_at IS NULL ORDER BY date DESC LIMIT 1) b ON true
+  WHERE a.deleted_at IS NULL AND a.archived_at IS NULL;
+  ```
+  Before `migrate up` also note the room settings the types carry
+  (`SELECT name, contribution_start_year, opening_room_year, opening_room FROM investment_account_types ORDER BY id;`);
+  after it, the same rows must be in
+  `SELECT t.name, r.contribution_start_year, r.opening_room_year, r.opening_room FROM investment_contribution_room r JOIN investment_account_types t ON t.id = r.investment_account_type_id ORDER BY t.id;`
+  (types with all three NULL have no row, and `types` and `limits` counts are unchanged). Then in
+  the app as the owner: `/finances` net worth and `/finances/rules` room figures equal what they
+  were before the rehearsal. In 3.4, the same two pages are the check on prod. The migration
+  fails (changing nothing) unless there is exactly one live admin.
+  Effects to know: other family accounts see the owner's contribution types (TFSA, ...) and their
+  limits, but never the owner's accounts, balances or room figures. They can't edit the owner's
+  types; only the admin deletes types or limits.
+
 <!-- Later lanes: add anything else that must happen in this deploy here. -->
 
 ### 3.4 Verify

@@ -94,7 +94,8 @@ func devOwner(db *gorm.DB) (uint, error) {
 // converting a table pass it to that module's seed function).
 func seed(tx *gorm.DB, owner uint) error {
 	tracking := func(tx *gorm.DB) error { return seedTracking(tx, owner) }
-	for _, f := range []func(*gorm.DB) error{seedGym, seedDiet, tracking, seedMedia, seedMoney} {
+	money := func(tx *gorm.DB) error { return seedMoney(tx, owner) }
+	for _, f := range []func(*gorm.DB) error{seedGym, seedDiet, tracking, seedMedia, money} {
 		if err := f(tx); err != nil {
 			return err
 		}
@@ -333,22 +334,23 @@ func seedMedia(tx *gorm.DB) error {
 	return tx.Create(&items).Error
 }
 
-func seedMoney(tx *gorm.DB) error {
+func seedMoney(tx *gorm.DB, owner uint) error {
+	own := database.Owner{UserID: owner}
 	accts := []moneym.Account{
-		{Name: "Everyday Chequing", Kind: moneym.AccountKindChequing, Institution: "Sample Bank", CurrentBalance: 3200},
-		{Name: "Savings", Kind: moneym.AccountKindSavings, Institution: "Sample Bank", CurrentBalance: 12000},
-		{Name: "Brokerage", Kind: moneym.AccountKindInvestment, Institution: "Sample Brokerage", CurrentBalance: 18500},
+		{Owner: own, Name: "Everyday Chequing", Kind: moneym.AccountKindChequing, Institution: "Sample Bank", CurrentBalance: 3200},
+		{Owner: own, Name: "Savings", Kind: moneym.AccountKindSavings, Institution: "Sample Bank", CurrentBalance: 12000},
+		{Owner: own, Name: "Brokerage", Kind: moneym.AccountKindInvestment, Institution: "Sample Brokerage", CurrentBalance: 18500},
 	}
 	if err := tx.Create(&accts).Error; err != nil {
 		return err
 	}
 	for _, a := range accts {
 		for m := 5; m >= 0; m-- {
-			b := moneym.AccountBalance{AccountID: a.ID, Date: today().AddDate(0, -m, 0), Balance: a.CurrentBalance - float64(m)*250}
+			b := moneym.AccountBalance{Owner: own, AccountID: a.ID, Date: today().AddDate(0, -m, 0), Balance: a.CurrentBalance - float64(m)*250}
 			if err := tx.Create(&b).Error; err != nil {
 				return err
 			}
 		}
 	}
-	return tx.Create(&moneym.AccountTransaction{AccountID: accts[2].ID, Kind: moneym.TransactionDeposit, Amount: 500, Date: today().AddDate(0, -1, 0), Note: "Monthly contribution"}).Error
+	return tx.Create(&moneym.AccountTransaction{Owner: own, AccountID: accts[2].ID, Kind: moneym.TransactionDeposit, Amount: 500, Date: today().AddDate(0, -1, 0), Note: "Monthly contribution"}).Error
 }

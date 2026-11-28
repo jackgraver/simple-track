@@ -21,7 +21,6 @@ var rawInternalErrorAllowed = map[string]int{
 	"internal/core/diet/controller/diet_log_route.go":       6,  // C2
 	"internal/core/diet/controller/diet_plan_route.go":      2,  // C2
 	"internal/core/media/controller/media_route.go":         1,  // C5
-	"internal/core/money/controller/routes.go":              2,  // C4
 	"internal/core/tracking/grocery/routes.go":              4,  // C1
 	"internal/core/tracking/missed/routes.go":               1,  // C1
 	"internal/core/tracking/profile/routes.go":              1,  // C1

@@ -43,9 +43,6 @@ var rlsPending = map[string]string{
 	"workout_plan_exercises": "C3", "workout_logs": "C3", "logged_exercises": "C3",
 	"logged_sets": "C3", "cardios": "C3",
 
-	"investment_account_types": "C4", "investment_contribution_rules": "C4",
-	"investment_accounts": "C4", "account_balances": "C4", "investment_deposits": "C4",
-
 	"media_items": "C5",
 }
 

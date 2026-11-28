@@ -6,6 +6,8 @@ import type {
     AccountTransaction,
     ContributionPreset,
     ContributionType,
+    ContributionRoomSettings,
+    ContributionTypeRules,
     ContributionTypeSettings,
     NetWorthPoint,
     TransactionKind,
@@ -143,11 +145,20 @@ export async function createContributionType(payload: ContributionTypeSettings) 
     await apiClient.post("/money/contribution-types", payload);
 }
 
+/** Edits the shared rules (creator or admin only). */
 export async function updateContributionType(
     id: number,
-    payload: ContributionTypeSettings,
+    payload: ContributionTypeRules,
 ) {
     await apiClient.put(`/money/contribution-types/${id}`, payload);
+}
+
+/** Saves the signed-in user's own start year and opening room for a type. */
+export async function setContributionRoom(
+    id: number,
+    payload: ContributionRoomSettings,
+) {
+    await apiClient.put(`/money/contribution-types/${id}/room`, payload);
 }
 
 export async function deleteContributionType(id: number) {
