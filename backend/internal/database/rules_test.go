@@ -23,20 +23,13 @@ import (
 // chain: gorm would also write whatever nested structs the value carries (a food inside a saved
 // meal item, BACKLOG #1). Sites that predate the rule; each module's C lane converts its own.
 var createWithAssociationsAllowed = map[string]int{
-	"internal/core/auth/repository/user_repository.go":               1, // C6 (users: no associations)
-	"internal/core/diet/repository/repository.go":                    23,
-	"internal/core/workout/repository/cardio_repository.go":          2,
-	"internal/core/workout/repository/exercise_repository.go":        1,
-	"internal/core/workout/repository/logged_exercise_repository.go": 3,
-	"internal/core/workout/repository/logged_set_repository.go":      1,
-	"internal/core/workout/repository/workoutlog_repository.go":      3,
-	"internal/core/workout/repository/workoutplan_repository.go":     4,
+	"internal/core/auth/repository/user_repository.go": 1, // C6 (users: no associations)
+	"internal/core/diet/repository/repository.go":      23,
 }
 
 // Advisory locks taken without LockKey (BACKLOG #2): C2 and C3 move them to database.XactLock.
 var rawAdvisoryLockAllowed = map[string]int{
-	"internal/core/diet/repository/repository.go":               1, // C2: lockClientID
-	"internal/core/workout/repository/workoutlog_repository.go": 1, // C3: CreateMinimalIfMissing
+	"internal/core/diet/repository/repository.go": 1, // C2: lockClientID
 }
 
 // Code that sets user_id / created_by (or a field named UserID / CreatedBy) other than the

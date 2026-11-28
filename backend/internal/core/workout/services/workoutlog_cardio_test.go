@@ -5,15 +5,13 @@ import (
 	"be-simpletracker/internal/core/workout/models"
 	"be-simpletracker/internal/core/workout/services"
 	"be-simpletracker/internal/core/workout/testutil"
-	"be-simpletracker/internal/database"
-	"context"
 	"strings"
 	"testing"
 )
 
 func TestUpsertCardioForWorkoutLog_usesPlannedTypeWhenTypeEmpty(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	ctx := database.WithDB(context.Background(), db)
+	ctx := testutil.Ctx(db)
 	today := clock.ZerodTime(0)
 	dow := int(today.Weekday())
 	plan := models.WorkoutPlan{Name: "Test", DayOfWeek: &dow, PlannedCardioType: "Bike"}
@@ -35,7 +33,7 @@ func TestUpsertCardioForWorkoutLog_usesPlannedTypeWhenTypeEmpty(t *testing.T) {
 
 func TestUpsertCardio_updatesExistingRow(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	ctx := database.WithDB(context.Background(), db)
+	ctx := testutil.Ctx(db)
 	today := clock.ZerodTime(0)
 	wl := models.WorkoutLog{Date: today}
 	if err := db.Create(&wl).Error; err != nil {
@@ -55,7 +53,7 @@ func TestUpsertCardio_updatesExistingRow(t *testing.T) {
 }
 
 func TestUpsertCardio_requiresTypeWhenNoPlan(t *testing.T) {
-	ctx := database.WithDB(context.Background(), testutil.SetupTestDB(t))
+	ctx := testutil.Ctx(testutil.SetupTestDB(t))
 	_, err := services.UpsertCardio(ctx, 0, 20, "", "")
 	if err == nil || !strings.Contains(err.Error(), "cardio type is required") {
 		t.Fatalf("expected type required error, got %v", err)

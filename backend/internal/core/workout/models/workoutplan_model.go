@@ -1,6 +1,8 @@
 package models
 
 import (
+	"be-simpletracker/internal/database"
+
 	"gorm.io/gorm"
 )
 
@@ -8,6 +10,7 @@ import (
 // that can be assigned to workout logs for tracking training sessions
 type WorkoutPlan struct {
 	gorm.Model
+	database.Owner
 	Name                 string          `json:"name"`
 	WorkoutProgramID     *uint           `json:"workout_program_id"`
 	WorkoutProgram       *WorkoutProgram `json:"workout_program,omitempty" gorm:"foreignKey:WorkoutProgramID"`

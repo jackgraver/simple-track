@@ -5,15 +5,13 @@ import (
 	"be-simpletracker/internal/core/workout/models"
 	"be-simpletracker/internal/core/workout/services"
 	"be-simpletracker/internal/core/workout/testutil"
-	"be-simpletracker/internal/database"
-	"context"
 	"testing"
 
 	"gorm.io/gorm"
 )
 
 func TestCreateExercise_andGetAllExercises(t *testing.T) {
-	ctx := database.WithDB(context.Background(), testutil.SetupTestDB(t))
+	ctx := testutil.Ctx(testutil.SetupTestDB(t))
 	created, err := services.CreateExercise(ctx, "Bench Press", 12, "squeeze")
 	if err != nil {
 		t.Fatal(err)
@@ -38,7 +36,7 @@ func TestCreateExercise_andGetAllExercises(t *testing.T) {
 }
 
 func TestUpdateExercise_andUpdateExerciseCues(t *testing.T) {
-	ctx := database.WithDB(context.Background(), testutil.SetupTestDB(t))
+	ctx := testutil.Ctx(testutil.SetupTestDB(t))
 	created, err := services.CreateExercise(ctx, "Row", 10, "old")
 	if err != nil {
 		t.Fatal(err)
@@ -94,7 +92,7 @@ func TestUpdateExercise_andUpdateExerciseCues(t *testing.T) {
 }
 
 func TestListExercises_paginates(t *testing.T) {
-	ctx := database.WithDB(context.Background(), testutil.SetupTestDB(t))
+	ctx := testutil.Ctx(testutil.SetupTestDB(t))
 	for _, name := range []string{"Alpha", "Beta", "Gamma"} {
 		if _, err := services.CreateExercise(ctx, name, 10, ""); err != nil {
 			t.Fatal(err)
@@ -111,7 +109,7 @@ func TestListExercises_paginates(t *testing.T) {
 
 func TestLogExercise_UpdateLoggedExercise_DeleteLoggedSet(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	ctx := database.WithDB(context.Background(), db)
+	ctx := testutil.Ctx(db)
 	today := clock.ZerodTime(0)
 	ex, err := services.CreateExercise(ctx, "Curl", 12, "")
 	if err != nil {
@@ -152,7 +150,7 @@ func TestLogExercise_UpdateLoggedExercise_DeleteLoggedSet(t *testing.T) {
 
 func TestRemoveLoggedExerciseForDay(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	ctx := database.WithDB(context.Background(), db)
+	ctx := testutil.Ctx(db)
 	today := clock.ZerodTime(0)
 	ex, err := services.CreateExercise(ctx, "Lat Raise", 15, "")
 	if err != nil {
@@ -177,7 +175,7 @@ func TestRemoveLoggedExerciseForDay(t *testing.T) {
 
 func TestGetExerciseProgression(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	ctx := database.WithDB(context.Background(), db)
+	ctx := testutil.Ctx(db)
 	ex, err := services.CreateExercise(ctx, "OHP", 10, "")
 	if err != nil {
 		t.Fatal(err)

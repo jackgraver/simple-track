@@ -22,7 +22,7 @@ Nothing Critical was found. Prod today has one account, so most multi-user findi
 | # | Sev | Finding | Lane |
 |---|---|---|---|
 | 1 | High | Request bodies bind straight into gorm models (mass assignment, nested association writes) | C2; B3 rule: **done** (`TestOwnerKitRules`, Owner/Creator hooks) |
-| 2 | High | Advisory-lock keys and "exists for date" checks are global, not per user | C2, C3 (B3 helper **done**: `database.XactLock`/`LockKey`) |
+| 2 | High | Advisory-lock keys and "exists for date" checks are global, not per user | C2; C3 **done** (B3 helper: `database.XactLock`/`LockKey`) |
 | 3 | Medium | Anyone can lock the owner out of login, from one IP, indefinitely | S1: **done**; C6: lockouts in `auth_events` (`login_rate_limited`) **done** |
 | 4 | Medium | IPv6 address rotation defeats per-IP limits and can fill the limiter (global lockout) | S1: **done** |
 | 5 | Medium | TMDB API key can leak to users in lookup error messages | S3: **done** |
@@ -100,6 +100,11 @@ Nothing Critical was found. Prod today has one account, so most multi-user findi
   load of the same day would wait for each other's whole request. Still only the first load of
   a day; the per-user key removes it. The diet locks key on `client_id` (random per request), so
   users never share one.
+- **C3 (done)**: `CreateMinimalIfMissing` takes `database.XactLock(ctx, tx, "workout_logs.date", date)`
+  and counts only the caller's rows; the `pg_advisory` allowlist entry is gone. Two-user tests:
+  both users start a workout on the same date and get their own log
+  (`TestWorkout_sameDateEachGetsTheirOwnLog`), and Bob doesn't wait while Alice's transaction holds
+  her lock (`TestWorkout_bobDoesNotWaitOnAlicesLock`). `idx_workout_logs_user_date` backs it up.
 
 ### 3. Medium: login lockout of a known username (exploitable now)
 
@@ -182,6 +187,9 @@ Nothing Critical was found. Prod today has one account, so most multi-user findi
   file; lanes lower their entries. 4xx responses echoing database errors aren't caught by it.
 - **C1 (done)**: all tracking handlers (weight, steps, water, grocery, profile, missed) are on
   `apierr` / `common.Respond`, including the 4xx paths that echoed database errors.
+- **C3 (done)**: every workout handler goes through `respondError` (`controller/errors.go`):
+  validation 400 with its own message, 403, 404 `not found`, 409, else a logged 500 with a fixed
+  message. The raw-error allowlist entries are gone.
 
 ### 7. Medium: no security headers
 

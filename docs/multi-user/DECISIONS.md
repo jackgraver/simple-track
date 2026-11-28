@@ -813,3 +813,98 @@ specifies; (5) migration 0013's down is lossy with several users.
     because gorm's `Save` falls back to an upsert when a concurrent soft delete leaves 0 rows.
   - A legacy row with half a `(source, external_id)` pair stays editable; the "go together" rule
     only applies when an edit sets one of them.
+
+## 2026-11-27: C3 workout (agent, lane C3)
+
+Migration `0016_workout_owned.sql` (after C5's 0015; C2 may also add one, renumber on rebase).
+
+**What is shared and what is personal**
+- Catalog (`created_by`, catalog policies, `catalog_guard`): `exercises` (name, rep rollover, cues,
+  load type, unilateral). Anyone signed in adds, the creator or the admin edits (the handler answers
+  **403**, the row is visible), only the admin deletes. `exercises.name` stays globally unique, so
+  adding a name someone already added is a 409.
+- Per user, new table `exercise_settings` (`user_id`, `exercise_id`, `machine_settings` jsonb;
+  unique `(user_id, exercise_id)`). `exercise_id` is a **plain FK** to the catalog (everyone reads
+  it, so the composite-FK reason doesn't apply, as in C5). The migration copies each exercise's
+  0003 `machine_settings` into an admin-owned row and drops the column. Nothing else on an exercise
+  row was personal (`rep_rollover` is arguably a preference; left shared). Notes already live on
+  `logged_exercises`.
+- Owned: `workout_programs`, `workout_plans`, `workout_logs`; children `workout_plan_days`,
+  `workout_plan_exercises` (no `id`: composite PKs stay), `logged_exercises`, `logged_sets`,
+  `cardios`. Composite FKs `(parent_id, user_id)` everywhere a row points at an owned row,
+  including `workout_logs.workout_plan_id` and `workout_plans.workout_program_id`. Plain FKs to the
+  catalog from `workout_plan_exercises.exercise_id` and `logged_exercises.exercise_id` (the plan
+  exercise one never existed and still doesn't).
+- Uniques per user: `idx_workout_logs_user_date` on `(user_id, date) WHERE deleted_at IS NULL`
+  (new: the date had no unique index) and `idx_logged_sets_client_id` on `(user_id, client_id)`
+  (was global). `CreateSet`'s `ON CONFLICT` targets `(user_id, client_id)`.
+
+**Duplicate dates (prod)**: prod had one pair of empty logs for 2026-04-03 (ids 124/125, same
+plan, no exercises, sets or cardio). Step 0 of the migration keeps the oldest live log per date
+and soft-deletes extras that are empty; an extra holding exercises, cardio or mobility ticks
+**raises** instead of merging (ROLLOUT 1.10 has the query to re-check). Soft-delete, not hard:
+nothing is lost and the partial index ignores it.
+
+**Fresh databases and new accounts**: the baseline inserted a placeholder "Default" program that
+nobody can own on an empty database, so the migration deletes it when there is no admin and no
+other workout data (prod keeps it, as the admin's). A new user therefore has **no program**; the
+plans page already has a "No programs yet" state and the first program created becomes the active
+one (`CreateWorkoutProgram`), so no lazily created default. The migrate test now expects 0 active
+programs on a fresh database.
+
+**API**
+- Exercise JSON gains `created_by` and `can_edit`, and `machine_settings` is the **caller's own**
+  (filled by `DecorateExercises` in one query wherever exercises leave the module: library list,
+  plan exercises, a day's logged and planned exercises, a logged exercise). Month views and the
+  previous/max logs don't decorate (they never show settings).
+- New `PUT /workout/exercises/:id/settings` (`{"machine_settings":[{"label","value"}]}`): any
+  signed-in user, for any catalog exercise, saves their own; an empty list clears them; blank rows
+  dropped, labels required, 20 rows and 60 characters max. 404 for a missing exercise.
+- New `DELETE /workout/exercises/:id`: admin only (403 otherwise), 409 while the admin's own plan or
+  log uses it, soft delete. **API only, no UI.** Other users' use is invisible to the admin (RLS),
+  so deleting an exercise someone else still logs hides it from their old logs (preloads skip
+  soft-deleted rows). Fine at family scale; the fix would be a `SECURITY DEFINER` usage count.
+- Logging against a soft-deleted exercise still works (old sessions), as before.
+- Everything that names an owned row by ID answers the shared 404 body (`not found`) for missing
+  and someone else's: plan, program, set, logged exercise, workout log. `RemoveExerciseFromPlan`
+  checks the plan first, so "exercise not in plan" (`ErrNotInPlan`, 404) only ever means *your* plan
+  lacks it.
+- `POST /workout/exercises/log` (the legacy full replace the notes save still uses) now binds a DTO
+  (`logExerciseRequest`): no `user_id`, no nested exercise, no `client_id`; the log and exercise it
+  names must be the caller's / exist, else 404 before any write.
+- Handlers use `respondError` (`controller/errors.go`) instead of echoing errors: validation errors
+  are `workoutrepo.ValidationError` (400 with the message), the rest map as in the BACKLOG #6
+  note. The old "400 for everything" handlers (create program/plan, rename, activate, cardio,
+  mobility, switch plan) now return 500 for real failures; the e2e "switch failure" spec accepts the
+  fixed text.
+
+**Code shape**: models embed `database.Owner` (`Creator` on `Exercise`); every read uses
+`database.Owned(ctx)` including preloads, joins in `GetExerciseProgression`, previous/max logs and
+the activity SQL (explicit `user_id = ?` on each joined table); creates `Omit(clause.Associations)`;
+updates go through `database.Affected`. `SaveCardio` and the mobility updates write only their
+columns (not `Save`). `CreateMinimalIfMissing` uses `database.XactLock` (BACKLOG #2).
+
+**Frontend**: the exercise edit dialog (routine page) has a "Your machine settings" list (label /
+value rows, add and remove); the shared fields are disabled with a note unless `can_edit`. Saving
+sends the exercise update only when the user can edit it, then the settings. The logging screens
+already read `machine_settings`, which is now the caller's.
+
+**Tests**: `controller/workout_pg_test.go` (twousers: every endpoint family, same-date start, no
+waiting on Alice's lock, forged `user_id`/`created_by`, catalog permissions with the admin,
+per-user machine settings, composite-FK refusals through the owner role, RLS backstop as Bob per
+table); `services/migration_0016_pg_test.go` (backfill on legacy-shaped data, the duplicate pair,
+the stop on a duplicate with data, the fresh database); `pg_sets_test.go` adapted (an admin user,
+`created_by`/`user_id` on raw inserts). SQLite module tests act as user 1 through `testutil.Ctx`
+(`SetupTestDB` returns a db whose statements carry the identity). `twousers.Harness.Engine` is new:
+the same stack as `Router` for modules that register on the engine (`workout.RegisterRoutes`). e2e:
+a spec for editing machine settings. Seeds: devseed and the e2e seed give exercises to
+`created_by` = the dev login and everything else `user_id` = dev; devseed also seeds the dev
+login's machine settings on Lat Pulldown.
+
+**Not done / for later**
+- No UI for the admin's exercise delete (API only).
+- First writer wins on an exercise name, like C5's external IDs: only the creator or the admin can
+  fix a wrong name or cue on a shared exercise.
+- `workout_plan_exercises.exercise_id` has no FK (never had one).
+- Migration 0016's down is lossy with several users (lowest user's machine settings win, the
+  global `client_id` index fails if two users share one); the empty duplicate log stays deleted.

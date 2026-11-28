@@ -34,12 +34,7 @@ var nullableOwnerColumn = map[string]bool{
 var rlsPending = map[string]string{
 	"foods": "C2", "composite_foods": "C2", "composite_food_items": "C2", "days": "C2",
 	"day_logs": "C2", "plans": "C2", "meals": "C2", "meal_items": "C2", "planned_meals": "C2",
-	"saved_meals": "C2", "saved_meal_items": "C2",
-
-	"exercises": "C3", "workout_programs": "C3", "workout_plans": "C3", "workout_plan_days": "C3",
-	"workout_plan_exercises": "C3", "workout_logs": "C3", "logged_exercises": "C3",
-	"logged_sets": "C3", "cardios": "C3",
-}
+	"saved_meals": "C2", "saved_meal_items": "C2"}
 
 // Every table has row-level security with at least one policy, and every user_id / created_by
 // column is NOT NULL with a foreign key to users.

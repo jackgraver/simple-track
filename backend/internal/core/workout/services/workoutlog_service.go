@@ -58,7 +58,7 @@ func SwitchPlan(ctx context.Context, offset int, planID *uint) (PreviousWorkoutR
 			return PreviousWorkoutResponse{}, err
 		}
 		if !exists {
-			return PreviousWorkoutResponse{}, fmt.Errorf("workout plan not found")
+			return PreviousWorkoutResponse{}, fmt.Errorf("workout plan not found: %w", gorm.ErrRecordNotFound)
 		}
 	}
 	if err := workoutrepo.UpdateWorkoutPlanID(ctx, day.ID, planID); err != nil {
@@ -272,7 +272,7 @@ func UpsertCardio(ctx context.Context, offset int, minutes int, cardioType strin
 		ctype = strings.TrimSpace(t.WorkoutPlan.PlannedCardioType)
 	}
 	if ctype == "" {
-		return nil, fmt.Errorf("cardio type is required when the plan has no planned cardio")
+		return nil, workoutrepo.Invalid("cardio type is required when the plan has no planned cardio")
 	}
 	existing, err := workoutrepo.FirstCardioByWorkoutLogID(ctx, t.ID)
 	if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -360,7 +360,7 @@ func UpsertMobilityPre(ctx context.Context, offset int, checked []string) (*Mobi
 		items = append([]string{}, t.WorkoutPlan.PreMobilityItems...)
 	}
 	if len(items) == 0 {
-		return nil, fmt.Errorf("no dynamic warmup planned for this day")
+		return nil, workoutrepo.Invalid("no dynamic warmup planned for this day")
 	}
 	filtered := filterCheckedToItems(items, checked)
 	if err := workoutrepo.UpdatePreMobilityChecked(ctx, t.ID, filtered); err != nil {
@@ -383,7 +383,7 @@ func UpsertMobilityPost(ctx context.Context, offset int, checked []string) (*Mob
 		items = append([]string{}, t.WorkoutPlan.PostMobilityItems...)
 	}
 	if len(items) == 0 {
-		return nil, fmt.Errorf("no static stretching planned for this day")
+		return nil, workoutrepo.Invalid("no static stretching planned for this day")
 	}
 	filtered := filterCheckedToItems(items, checked)
 	if err := workoutrepo.UpdatePostMobilityChecked(ctx, t.ID, filtered); err != nil {
@@ -485,9 +485,45 @@ func DeleteLoggedSet(ctx context.Context, setID uint) error {
 	return workoutrepo.DeleteLoggedSet(ctx, setID)
 }
 
+// DeleteExercise soft-deletes a shared exercise (admin only).
+func DeleteExercise(ctx context.Context, id uint) error {
+	return workoutrepo.DeleteExercise(ctx, id)
+}
+
+// SaveMachineSettings stores the caller's own machine settings for a shared exercise. Blank rows
+// (no label and no value) are dropped; an empty result clears them.
+func SaveMachineSettings(ctx context.Context, exerciseID uint, settings []models.MachineSetting) (*models.Exercise, error) {
+	clean := make([]models.MachineSetting, 0, len(settings))
+	for _, m := range settings {
+		m.Label, m.Value = strings.TrimSpace(m.Label), strings.TrimSpace(m.Value)
+		if m.Label == "" && m.Value == "" {
+			continue
+		}
+		if m.Label == "" {
+			return nil, workoutrepo.Invalid("every machine setting needs a label")
+		}
+		if len(m.Label) > 60 || len(m.Value) > 60 {
+			return nil, workoutrepo.Invalid("machine setting labels and values are at most 60 characters")
+		}
+		clean = append(clean, m)
+	}
+	if len(clean) > 20 {
+		return nil, workoutrepo.Invalid("at most 20 machine settings per exercise")
+	}
+	return workoutrepo.SaveMachineSettings(ctx, exerciseID, clean)
+}
+
 func GetAllExercises(ctx context.Context, excludeIDs []uint) ([]models.Exercise, error) {
 	return workoutrepo.FindAllExercises(ctx, excludeIDs)
 }
+
+// ValidationError and ErrForbidden come from the repository; handlers map them to 400 and 403.
+type ValidationError = workoutrepo.ValidationError
+
+var (
+	ErrForbidden     = workoutrepo.ErrForbidden
+	ErrExerciseInUse = workoutrepo.ErrExerciseInUse
+)
 
 type ExerciseProgressionEntry = workoutrepo.ExerciseProgressionEntry
 
@@ -503,6 +539,8 @@ func GetAllWorkoutPlans(ctx context.Context) ([]models.WorkoutPlan, error) {
 	return workoutrepo.FindAllWorkoutPlans(ctx)
 }
 
+// GetAllWorkoutPrograms lists the caller's programs. A new account has none: the plans page shows
+// its "No programs yet" state and the first program created becomes the active one.
 func GetAllWorkoutPrograms(ctx context.Context) ([]models.WorkoutProgram, error) {
 	return workoutrepo.FindAllWorkoutPrograms(ctx)
 }
@@ -510,7 +548,7 @@ func GetAllWorkoutPrograms(ctx context.Context) ([]models.WorkoutProgram, error)
 func CreateWorkoutProgram(ctx context.Context, name string) (*models.WorkoutProgram, error) {
 	name = strings.TrimSpace(name)
 	if name == "" {
-		return nil, fmt.Errorf("program name is required")
+		return nil, workoutrepo.Invalid("program name is required")
 	}
 	program := &models.WorkoutProgram{Name: name}
 	// Any other lookup error is ignored, as before; Optional keeps it from aborting the request.
@@ -529,13 +567,13 @@ func CreateWorkoutProgram(ctx context.Context, name string) (*models.WorkoutProg
 func CreateWorkoutPlan(ctx context.Context, programID uint, name string, dayOfWeek *int) (*models.WorkoutPlan, error) {
 	name = strings.TrimSpace(name)
 	if name == "" {
-		return nil, fmt.Errorf("plan name is required")
+		return nil, workoutrepo.Invalid("plan name is required")
 	}
 	if _, err := workoutrepo.FindWorkoutProgramByID(ctx, programID); err != nil {
 		return nil, fmt.Errorf("program not found: %w", err)
 	}
 	if dayOfWeek != nil && (*dayOfWeek < 0 || *dayOfWeek > 6) {
-		return nil, fmt.Errorf("day_of_week must be between 0 and 6")
+		return nil, workoutrepo.Invalid("day_of_week must be between 0 and 6")
 	}
 	plan := &models.WorkoutPlan{Name: name, WorkoutProgramID: &programID}
 	if err := workoutrepo.CreateWorkoutPlan(ctx, plan); err != nil {
@@ -552,7 +590,7 @@ func CreateWorkoutPlan(ctx context.Context, programID uint, name string, dayOfWe
 func RenameWorkoutProgram(ctx context.Context, id uint, name string) (*models.WorkoutProgram, error) {
 	name = strings.TrimSpace(name)
 	if name == "" {
-		return nil, fmt.Errorf("program name is required")
+		return nil, workoutrepo.Invalid("program name is required")
 	}
 	if err := workoutrepo.UpdateWorkoutProgramName(ctx, id, name); err != nil {
 		return nil, err
@@ -586,6 +624,11 @@ func AddExerciseToPlan(ctx context.Context, planID uint, exerciseID uint) error 
 }
 
 func RemoveExerciseFromPlan(ctx context.Context, planID uint, exerciseID uint) error {
+	// The plan first, so someone else's plan answers like a missing one ("not found"), apart from
+	// "that exercise isn't in your plan".
+	if _, err := workoutrepo.FindWorkoutPlanByID(ctx, planID); err != nil {
+		return err
+	}
 	return workoutrepo.RemoveExerciseFromPlan(ctx, planID, exerciseID)
 }
 
@@ -622,7 +665,7 @@ func UpdateExerciseWithUnilateral(ctx context.Context, id uint, name string, rep
 
 func AssignPlanToDay(ctx context.Context, planID uint, dayOfWeek int) (*models.WorkoutPlan, error) {
 	if dayOfWeek < 0 || dayOfWeek > 6 {
-		return nil, fmt.Errorf("day_of_week must be between 0 (Sunday) and 6 (Saturday)")
+		return nil, workoutrepo.Invalid("day_of_week must be between 0 (Sunday) and 6 (Saturday)")
 	}
 	plan, err := workoutrepo.FindWorkoutPlanByID(ctx, planID)
 	if err != nil {
@@ -657,7 +700,7 @@ func UnassignPlanFromDay(ctx context.Context, planID uint) (*models.WorkoutPlan,
 
 func UnassignPlanFromSpecificDay(ctx context.Context, planID uint, dayOfWeek int) (*models.WorkoutPlan, error) {
 	if dayOfWeek < 0 || dayOfWeek > 6 {
-		return nil, fmt.Errorf("day_of_week must be between 0 (Sunday) and 6 (Saturday)")
+		return nil, workoutrepo.Invalid("day_of_week must be between 0 (Sunday) and 6 (Saturday)")
 	}
 	return unassignPlanFromDay(ctx, planID, &dayOfWeek)
 }
@@ -684,7 +727,7 @@ func unassignPlanFromDay(ctx context.Context, planID uint, dayOfWeek *int) (*mod
 
 func GetPlanByDay(ctx context.Context, dayOfWeek int) (*models.WorkoutPlan, error) {
 	if dayOfWeek < 0 || dayOfWeek > 6 {
-		return nil, fmt.Errorf("day_of_week must be between 0 (Sunday) and 6 (Saturday)")
+		return nil, workoutrepo.Invalid("day_of_week must be between 0 (Sunday) and 6 (Saturday)")
 	}
 	program, err := workoutrepo.FindActiveWorkoutProgram(ctx)
 	if err != nil {
@@ -719,7 +762,7 @@ func LoadLoggedExercise(ctx context.Context, id uint) (models.LoggedExercise, er
 
 func SetPlannedCardio(ctx context.Context, planID uint, cardioType string, minutes int) (*models.WorkoutPlan, error) {
 	if minutes < 0 {
-		return nil, errors.New("planned cardio minutes cannot be negative")
+		return nil, workoutrepo.Invalid("planned cardio minutes cannot be negative")
 	}
 	cardioType = strings.TrimSpace(cardioType)
 	if cardioType == "" {
@@ -760,7 +803,7 @@ func SetPlannedMobility(ctx context.Context, planID uint, preItems, postItems []
 func RenameWorkoutPlan(ctx context.Context, id uint, name string) (*models.WorkoutPlan, error) {
 	name = strings.TrimSpace(name)
 	if name == "" {
-		return nil, fmt.Errorf("routine name is required")
+		return nil, workoutrepo.Invalid("routine name is required")
 	}
 	if err := workoutrepo.UpdateWorkoutPlanName(ctx, id, name); err != nil {
 		return nil, err

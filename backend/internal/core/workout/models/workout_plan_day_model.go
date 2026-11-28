@@ -1,8 +1,13 @@
 package models
 
-import "time"
+import (
+	"time"
+
+	"be-simpletracker/internal/database"
+)
 
 type WorkoutPlanDay struct {
+	database.Owner
 	WorkoutPlanID uint      `json:"workout_plan_id" gorm:"primaryKey"`
 	DayOfWeek     int       `json:"day_of_week" gorm:"primaryKey"`
 	CreatedAt     time.Time `json:"created_at"`

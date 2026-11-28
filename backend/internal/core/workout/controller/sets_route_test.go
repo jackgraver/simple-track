@@ -26,7 +26,13 @@ func setsRouter(t *testing.T) (*gin.Engine, models.Exercise) {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
 	r.Use(database.Middleware(db))
-	workout.RegisterRoutes(r, func(c *gin.Context) { c.Next() })
+	// Stands in for AuthMiddleware: the request acts as the admin (user 1).
+	workout.RegisterRoutes(r, func(c *gin.Context) {
+		if err := database.SetIdentity(c.Request.Context(), testutil.Identity); err != nil {
+			t.Fatal(err)
+		}
+		c.Next()
+	})
 	return r, ex
 }
 

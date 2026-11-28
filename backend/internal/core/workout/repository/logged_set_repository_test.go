@@ -5,8 +5,6 @@ import (
 	"be-simpletracker/internal/core/workout/models"
 	workoutrepo "be-simpletracker/internal/core/workout/repository"
 	"be-simpletracker/internal/core/workout/testutil"
-	"be-simpletracker/internal/database"
-	"context"
 	"testing"
 
 	"gorm.io/gorm"
@@ -14,7 +12,7 @@ import (
 
 func TestDeleteLoggedSet_removesOrphanExercise(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	ctx := database.WithDB(context.Background(), db)
+	ctx := testutil.Ctx(db)
 	today := clock.ZerodTime(0)
 	ex := models.Exercise{Name: "Fly"}
 	if err := db.Create(&ex).Error; err != nil {
@@ -44,7 +42,7 @@ func TestDeleteLoggedSet_removesOrphanExercise(t *testing.T) {
 }
 
 func TestDeleteLoggedSet_notFound(t *testing.T) {
-	ctx := database.WithDB(context.Background(), testutil.SetupTestDB(t))
+	ctx := testutil.Ctx(testutil.SetupTestDB(t))
 	err := workoutrepo.DeleteLoggedSet(ctx, 9999)
 	if err != gorm.ErrRecordNotFound {
 		t.Fatalf("expected not found, got %v", err)
@@ -53,7 +51,7 @@ func TestDeleteLoggedSet_notFound(t *testing.T) {
 
 func TestDeleteLoggedSet_keepsExerciseWhenSetsRemain(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	ctx := database.WithDB(context.Background(), db)
+	ctx := testutil.Ctx(db)
 	le := models.LoggedExercise{WorkoutLogID: 1, ExerciseID: 1}
 	if err := db.Create(&le).Error; err != nil {
 		t.Fatal(err)

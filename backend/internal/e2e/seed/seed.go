@@ -20,6 +20,7 @@ import (
 	authm "be-simpletracker/internal/core/auth/models"
 	dietm "be-simpletracker/internal/core/diet/models"
 	workm "be-simpletracker/internal/core/workout/models"
+	"be-simpletracker/internal/database"
 )
 
 // Username and Password of the seeded login (the same as the dev stack's devuser).
@@ -98,6 +99,11 @@ func seedUser(tx *gorm.DB) error {
 }
 
 func seedGym(tx *gorm.DB) error {
+	owner, err := devUser(tx)
+	if err != nil {
+		return err
+	}
+	o := owner
 	defs := []struct {
 		name string
 		lt   workm.ExerciseLoadType
@@ -117,14 +123,14 @@ func seedGym(tx *gorm.DB) error {
 	}
 	exs := make([]workm.Exercise, len(defs))
 	for i, d := range defs {
-		exs[i] = workm.Exercise{Name: d.name, LoadType: d.lt, RepRollover: 12}
+		exs[i] = workm.Exercise{Creator: database.Creator{CreatedBy: o.UserID}, Name: d.name, LoadType: d.lt, RepRollover: 12}
 	}
 	if err := tx.Create(&exs).Error; err != nil {
 		return err
 	}
 
 	// The app expects exactly one active program.
-	prog := workm.WorkoutProgram{Name: "Push Pull Legs", IsActive: true}
+	prog := workm.WorkoutProgram{Owner: o, Name: "Push Pull Legs", IsActive: true}
 	if err := tx.Create(&prog).Error; err != nil {
 		return err
 	}
@@ -139,15 +145,15 @@ func seedGym(tx *gorm.DB) error {
 	}
 	for _, p := range plans {
 		day := int(p.day)
-		wp := workm.WorkoutPlan{Name: p.name, WorkoutProgramID: &prog.ID, DayOfWeek: &day}
+		wp := workm.WorkoutPlan{Owner: o, Name: p.name, WorkoutProgramID: &prog.ID, DayOfWeek: &day}
 		if err := tx.Create(&wp).Error; err != nil {
 			return err
 		}
-		if err := tx.Create(&workm.WorkoutPlanDay{WorkoutPlanID: wp.ID, DayOfWeek: day}).Error; err != nil {
+		if err := tx.Create(&workm.WorkoutPlanDay{Owner: o, WorkoutPlanID: wp.ID, DayOfWeek: day}).Error; err != nil {
 			return err
 		}
 		for order, ei := range p.idx {
-			if err := tx.Create(&workm.WorkoutPlanExercise{WorkoutPlanID: wp.ID, ExerciseID: exs[ei].ID, DisplayOrder: order}).Error; err != nil {
+			if err := tx.Create(&workm.WorkoutPlanExercise{Owner: o, WorkoutPlanID: wp.ID, ExerciseID: exs[ei].ID, DisplayOrder: order}).Error; err != nil {
 				return err
 			}
 		}

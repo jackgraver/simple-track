@@ -1,6 +1,7 @@
 package models
 
 import (
+	"be-simpletracker/internal/database"
 	"time"
 
 	"gorm.io/gorm"
@@ -10,6 +11,7 @@ import (
 // Contains the exercises performed, sets logged, and optional cardio activity
 type WorkoutLog struct {
 	gorm.Model
+	database.Owner
 	Date                time.Time        `json:"date"`
 	WorkoutPlanID       *uint            `json:"workout_plan_id"`
 	WorkoutPlan         *WorkoutPlan     `json:"workout_plan" gorm:"foreignKey:WorkoutPlanID"`

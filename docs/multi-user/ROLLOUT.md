@@ -73,6 +73,21 @@ the compose file and `.env.vps` must be updated before the deploy, not after.
    `SELECT count(*) FROM user_profiles WHERE deleted_at IS NULL;` expect 0 or 1. With more, the
    migration keeps the oldest live row and soft-deletes the rest (nothing is dropped), so note
    which one you expect to survive.
+10. (C3) Duplicate workout days. `workout_logs.date` never had a unique index and migration 0016
+    adds one per user. Prod had one empty pair on 2026-11-27 (ids 124 and 125, 2026-04-03, both
+    with no exercises, sets or cardio): the migration keeps the oldest and soft-deletes the empty
+    extra. A duplicate that holds data **stops the migration** (nothing changes): merge it by hand
+    first. Re-check close to deploy day:
+    ```sql
+    SELECT w.id, w.date, w.workout_plan_id,
+      (SELECT count(*) FROM logged_exercises e WHERE e.workout_log_id = w.id AND e.deleted_at IS NULL) AS exercises,
+      (SELECT count(*) FROM cardios c WHERE c.workout_log_id = w.id AND c.deleted_at IS NULL) AS cardio,
+      jsonb_array_length(COALESCE(w.pre_mobility_checked, '[]')) + jsonb_array_length(COALESCE(w.post_mobility_checked, '[]')) AS mobility
+    FROM workout_logs w
+    WHERE w.deleted_at IS NULL AND w.date IN (SELECT date FROM workout_logs WHERE deleted_at IS NULL GROUP BY date HAVING count(*) > 1)
+    ORDER BY w.date, w.id;
+    ```
+    Every row except the first per date must show 0, 0, 0.
 
 ## 2. Rehearsal (D1, locally, before touching the VPS)
 
@@ -245,6 +260,51 @@ Each lane adds what its changes need here (README: "Prod changes go in ROLLOUT.m
     old backend can't read the new schema. Use the pre-deploy backup if 0013 must be undone.
   - In 3.4, `/media` shows the owner's items as before; the add page lists matching shared
     catalog entries.
+
+- **C3 (workout)**: migration 0016 runs in pre_swap with the rest. `exercises` becomes the shared
+  catalog (`created_by` = the admin); `machine_settings` moves from `exercises` to the new
+  per-user table `exercise_settings` (the admin's row per exercise that had settings); programs,
+  plans, plan days/exercises, logs, logged exercises, sets and cardio all go to the admin, with
+  composite FKs and RLS. `logged_sets.client_id` uniqueness becomes per user. Nothing to
+  configure; relies on pre-check 1.6 and 1.10. It **stops** if rows exist and there isn't exactly
+  one live admin, or if a duplicate-date workout log holds data. Effects:
+  - The empty duplicate log from pre-check 1.10 is soft-deleted (one row, `deleted_at` set).
+  - A new family account starts with no program, plans or logs (the plans page shows "No programs
+    yet"); it sees every exercise in the shared library, and only edits the ones it added.
+  - Plan day and exercise rows whose plan no longer exists (they had no foreign key before) are
+    deleted by the migration; the rehearsal counts show if any.
+  **Row counts for the D1 rehearsal**: run before and after `migrate up`; every count must match,
+  except `workout_plan_days` and `workout_plan_exercises` which may only drop by orphans, and
+  `exercise_settings` which must equal the number of exercises that had `machine_settings`:
+  ```sql
+  -- psql_owner (bypasses RLS, so it counts soft-deleted rows too)
+  SELECT 'exercises' AS tbl, count(*) AS total FROM exercises
+  UNION ALL SELECT 'workout_programs', count(*) FROM workout_programs
+  UNION ALL SELECT 'workout_plans', count(*) FROM workout_plans
+  UNION ALL SELECT 'workout_plan_days', count(*) FROM workout_plan_days
+  UNION ALL SELECT 'workout_plan_exercises', count(*) FROM workout_plan_exercises
+  UNION ALL SELECT 'workout_logs', count(*) FROM workout_logs
+  UNION ALL SELECT 'logged_exercises', count(*) FROM logged_exercises
+  UNION ALL SELECT 'logged_sets', count(*) FROM logged_sets
+  UNION ALL SELECT 'cardios', count(*) FROM cardios;
+  -- before only: exercises that carry machine settings (= exercise_settings rows afterwards)
+  SELECT count(*) FROM exercises WHERE machine_settings IS NOT NULL;
+  -- after only: rows given to the admin (owned = total on every line; exercises use created_by)
+  WITH a AS (SELECT id FROM users WHERE is_admin AND deleted_at IS NULL)
+  SELECT 'exercises' AS tbl, count(*) AS owned FROM exercises WHERE created_by = (SELECT id FROM a)
+  UNION ALL SELECT 'workout_programs', count(*) FROM workout_programs WHERE user_id = (SELECT id FROM a)
+  UNION ALL SELECT 'workout_plans', count(*) FROM workout_plans WHERE user_id = (SELECT id FROM a)
+  UNION ALL SELECT 'workout_plan_days', count(*) FROM workout_plan_days WHERE user_id = (SELECT id FROM a)
+  UNION ALL SELECT 'workout_plan_exercises', count(*) FROM workout_plan_exercises WHERE user_id = (SELECT id FROM a)
+  UNION ALL SELECT 'workout_logs', count(*) FROM workout_logs WHERE user_id = (SELECT id FROM a)
+  UNION ALL SELECT 'logged_exercises', count(*) FROM logged_exercises WHERE user_id = (SELECT id FROM a)
+  UNION ALL SELECT 'logged_sets', count(*) FROM logged_sets WHERE user_id = (SELECT id FROM a)
+  UNION ALL SELECT 'cardios', count(*) FROM cardios WHERE user_id = (SELECT id FROM a);
+  ```
+  In 3.4: `/gym` shows the owner's week, today's plan and history as before; open an exercise's
+  edit dialog in a routine: the machine settings are the owner's old ones. Error responses from
+  the workout endpoints are now fixed messages; database errors are only in the backend log.
+  Rolling back the image does not undo the migration; use the pre-deploy backup if 0016 must be undone.
 
 <!-- Later lanes: add anything else that must happen in this deploy here. -->
 

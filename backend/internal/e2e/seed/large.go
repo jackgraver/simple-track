@@ -57,6 +57,10 @@ func day(back int) time.Time { return EpochDay().AddDate(0, 0, -back) }
 const batch = 500
 
 func largeGym(tx *gorm.DB) error {
+	o, err := devUser(tx)
+	if err != nil {
+		return err
+	}
 	var plans []workm.WorkoutPlan
 	if err := tx.Order("id").Find(&plans).Error; err != nil {
 		return err
@@ -89,7 +93,7 @@ func largeGym(tx *gorm.DB) error {
 			continue
 		}
 		id := p.ID
-		logs = append(logs, workm.WorkoutLog{Date: day(back), WorkoutPlanID: &id})
+		logs = append(logs, workm.WorkoutLog{Owner: o, Date: day(back), WorkoutPlanID: &id})
 	}
 	if err := tx.CreateInBatches(&logs, batch).Error; err != nil {
 		return fmt.Errorf("workout logs: %w", err)
@@ -98,7 +102,7 @@ func largeGym(tx *gorm.DB) error {
 	var les []workm.LoggedExercise
 	for _, l := range logs {
 		for _, ex := range byPlan[*l.WorkoutPlanID] {
-			les = append(les, workm.LoggedExercise{WorkoutLogID: l.ID, ExerciseID: ex})
+			les = append(les, workm.LoggedExercise{Owner: o, WorkoutLogID: l.ID, ExerciseID: ex})
 		}
 	}
 	if err := tx.CreateInBatches(&les, batch).Error; err != nil {
@@ -110,7 +114,7 @@ func largeGym(tx *gorm.DB) error {
 		// Slow progression in 2.5 lb steps, with a deload every ~3 months.
 		base := float32(45+int(le.ExerciseID)*10) + 2.5*float32((i/len(byWeekday))%40)
 		for s := 0; s < 3; s++ {
-			sets = append(sets, workm.LoggedSet{LoggedExerciseID: le.ID, Reps: uint(10 - s), Weight: base})
+			sets = append(sets, workm.LoggedSet{Owner: o, LoggedExerciseID: le.ID, Reps: uint(10 - s), Weight: base})
 		}
 	}
 	// Edge values on the oldest session: a zero-weight set and a very heavy one.

@@ -249,6 +249,11 @@ a nullable `group_id` on tables that should be shareable, and the rule becomes
   `auth/accounts_pg_test.go`.
 - **Writes that must survive a 4xx/5xx** go through `database.Always` (C6). Success audit rows
   don't: they belong in the request transaction so they roll back with the change.
+- **Child tables with no ID of their own need the same care** (C3). `workout_plan_days` and
+  `workout_plan_exercises` have composite primary keys and no `id`, so they pointed at `workout_plans`
+  with no FK at all; 0016 adds composite FKs and deletes orphans. Updates by hand-built rows
+  (`Save`) rewrite `user_id` and can turn into an insert when a concurrent soft delete leaves 0
+  rows: use explicit `Select(...).Updates` plus `database.Affected`.
 - **`Save` with `Select("*")` writes `user_id` too** (C1). Updating a row you built by hand (the
   Renpho import's replace-all-columns) would set a zero `user_id`; add `Omit("user_id")`.
   `CreateInSavepoint` omits associations now.
