@@ -161,9 +161,19 @@ docker compose -f docker-compose.vps.yml --env-file .env.vps config >/dev/null &
 
 `config` must succeed (it fails on a missing `APP_DB_PASSWORD`). Don't `up` anything by hand.
 
-If D1 also takes BACKLOG #16 (pin `app-network`'s subnet so `TRUSTED_PROXIES` can't drift), the
-`ipam` change lands in this same file and compose will want to recreate the network. Plan that
-recreate inside the deploy window and re-check `TRUSTED_PROXIES` afterwards.
+D1 takes BACKLOG #16: `app-network` is pinned to 172.18.0.0/16 with gateway 172.18.0.1 (what
+`TRUSTED_PROXIES` already says). Before the deploy, check the live network matches:
+
+```sh
+docker network inspect simple-track_app-network --format '{{range .IPAM.Config}}{{.Subnet}} {{.Gateway}}{{end}}'
+```
+
+Expect `172.18.0.0/16 172.18.0.1`. If it differs, fix `TRUSTED_PROXIES` in `.env.vps` to the pinned
+gateway (or change the pin to the live values) before deploying. Compose sees the new `ipam`
+config as a change and recreates the network, which needs its containers stopped: that happens
+inside the deploy window as the stack is recreated. After the deploy, re-run the command above and
+`docker inspect simple-track-backend-1 | grep TRUSTED`, then log in once and look at a
+`login_failed` / auth event to confirm client IPs aren't all the gateway's.
 
 ### 3.3 Deploy
 

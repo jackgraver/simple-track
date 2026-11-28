@@ -580,3 +580,22 @@ func TestWorkout_rlsBackstop(t *testing.T) {
 		t.Errorf("admin soft delete: %v", err)
 	}
 }
+
+// PATCH /workout/logs/switch-plan: Bob can't point his day at Alice's plan, and the 404 matches a missing plan.
+func TestWorkout_switchPlanIsOwned(t *testing.T) {
+	h, api := workoutAPI(t)
+	alices := newPlan(t, api, h.Alice, "Alice's plan")
+	bobs := newPlan(t, api, h.Bob, "Bob's plan")
+
+	api.Do(h.Alice, http.MethodPatch, "/workout/logs/switch-plan", map[string]any{"plan_id": alices.ID}).Status(t, http.StatusOK)
+	api.Do(h.Bob, http.MethodPatch, "/workout/logs/switch-plan", map[string]any{"plan_id": bobs.ID}).Status(t, http.StatusOK)
+
+	missing := api.Do(h.Bob, http.MethodPatch, "/workout/logs/switch-plan", map[string]any{"plan_id": 999999}).Status(t, http.StatusNotFound)
+	other := api.Do(h.Bob, http.MethodPatch, "/workout/logs/switch-plan", map[string]any{"plan_id": alices.ID}).Status(t, http.StatusNotFound)
+	if string(missing.Body) != string(other.Body) {
+		t.Fatalf("Alice's plan answers %s, a missing plan %s: they must match", other.Body, missing.Body)
+	}
+	if n := count(t, h, `SELECT count(*) FROM workout_logs WHERE user_id = ? AND workout_plan_id = ?`, h.Bob.ID, alices.ID); n != 0 {
+		t.Fatalf("Bob's log points at Alice's plan")
+	}
+}
