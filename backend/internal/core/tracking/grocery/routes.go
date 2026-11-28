@@ -10,7 +10,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"gorm.io/gorm"
 )
 
 type handler struct{}
@@ -29,7 +28,7 @@ func RegisterGroceryRoutes(group *gin.RouterGroup) {
 func (h *handler) getItems(c *gin.Context) {
 	rows, err := ListActiveItems(c.Request.Context())
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		apierr.Internal(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"items": rows})
@@ -43,14 +42,14 @@ type itemBody struct {
 func (h *handler) postItem(c *gin.Context) {
 	var body itemBody
 	if err := c.ShouldBindJSON(&body); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		apierr.BadRequest(c, "invalid body")
 		return
 	}
 	clientID := strings.TrimSpace(body.ClientID)
 	if clientID != "" {
 		id, err := uuid.Parse(clientID)
 		if err != nil || id == uuid.Nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid client_id"})
+			apierr.BadRequest(c, "invalid client_id")
 			return
 		}
 		clientID = id.String()
@@ -58,10 +57,9 @@ func (h *handler) postItem(c *gin.Context) {
 	row, err := CreateItem(c.Request.Context(), body.Name, clientID)
 	if err != nil {
 		if errors.Is(err, ErrNameRequired) {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			apierr.BadRequest(c, err.Error())
 			return
 		}
-		// Don't echo driver errors to the client.
 		apierr.Internal(c, err)
 		return
 	}
@@ -83,7 +81,7 @@ func parseItemRef(c *gin.Context) (itemRef, bool) {
 	if u, err := uuid.Parse(raw); err == nil && u != uuid.Nil {
 		return itemRef{clientID: u.String()}, true
 	}
-	c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+	apierr.BadRequest(c, "invalid id")
 	return itemRef{}, false
 }
 
@@ -94,11 +92,7 @@ func (h *handler) completeItem(c *gin.Context) {
 	}
 	row, err := CompleteItem(c.Request.Context(), ref)
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
-			return
-		}
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		apierr.NotFoundOrInternal(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"item": row})
@@ -110,11 +104,7 @@ func (h *handler) deleteItem(c *gin.Context) {
 		return
 	}
 	if err := DeleteItem(c.Request.Context(), ref); err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
-			return
-		}
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		apierr.NotFoundOrInternal(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"ok": true})
@@ -123,7 +113,7 @@ func (h *handler) deleteItem(c *gin.Context) {
 func (h *handler) getSuggestions(c *gin.Context) {
 	rows, err := ListSuggestions(c.Request.Context(), c.Query("q"))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		apierr.Internal(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"suggestions": rows})
@@ -137,12 +127,12 @@ type parseBody struct {
 func (h *handler) parseItems(c *gin.Context) {
 	var body parseBody
 	if err := c.ShouldBindJSON(&body); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		apierr.BadRequest(c, "invalid body")
 		return
 	}
 	lines, err := ParseTextList(c.Request.Context(), body.Text)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		apierr.Internal(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"lines": lines})
@@ -156,12 +146,12 @@ type bulkBody struct {
 func (h *handler) postItems(c *gin.Context) {
 	var body bulkBody
 	if err := c.ShouldBindJSON(&body); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		apierr.BadRequest(c, "invalid body")
 		return
 	}
 	created, skipped, err := CreateItems(c.Request.Context(), body.Names)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		apierr.Internal(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"items": created, "skipped": skipped})

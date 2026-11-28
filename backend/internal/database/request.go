@@ -9,6 +9,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 // Per-request database handle (docs/multi-user/README.md, "Per-request database handle").
@@ -218,6 +219,9 @@ func (r *Request) finish(commit bool) error {
 // failing (a unique violation from a concurrent replay, then reading the winner's row). On
 // Postgres a failed statement aborts the whole transaction; the savepoint keeps the request's
 // transaction usable for that follow-up read.
+//
+// Associations aren't written (Omit(clause.Associations), BACKLOG #1): nested structs on value are
+// ignored, so a request can't create or overwrite rows through them.
 func CreateInSavepoint(db *gorm.DB, value any) error {
-	return db.Transaction(func(sp *gorm.DB) error { return sp.Create(value).Error })
+	return db.Transaction(func(sp *gorm.DB) error { return sp.Omit(clause.Associations).Create(value).Error })
 }

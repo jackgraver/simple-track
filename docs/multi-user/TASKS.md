@@ -165,9 +165,10 @@ entries tagged with the lane.
 
 ### C1 Tracking
 Depends on: B3
-- [ ] body_weight_logs (incl. Renpho import), step_logs, water_logs (client_id; composite FK on
+- [x] body_weight_logs (incl. Renpho import), step_logs, water_logs (client_id; composite FK on
       preset_id, see DECISIONS B3), grocery_items (client_id), user_profiles -> 1:1 with user, missed.
-- [ ] BACKLOG #6.
+- [x] BACKLOG #6.
+- Result: migration 0013, DECISIONS "C1 tracking", ROLLOUT 1.8 and 3.3a (row counts for D1).
 
 ### C2 Diet
 Depends on: B3
