@@ -4,9 +4,8 @@ Lanes are sized for one agent each. **Depends on** must be merged into `proj/mul
 Branch/worktree per lane: `mu/<lane>-<name>` in `.worktrees/mu-<lane>-<name>` (see README).
 Tick boxes in the PR that does the work.
 
-Worktrees created so far: `mu-a1-cleanup`, `mu-a2-pool-role`, `mu-a3-audit`, `mu-b1-identity`
-(all merged), `mu-b2-request-db`, `mu-h1-http-hardening`. Create the others when their
-dependencies have merged, so they start from an up-to-date base.
+Worktrees created so far: every A, B, H, S lane and C6 (all merged), and `mu-c1-tracking`,
+`mu-c2-diet`, `mu-c3-workout`, `mu-c4-money`, `mu-c5-media` (created after C6 merged).
 
 Security findings from A3 live in [BACKLOG.md](BACKLOG.md); the `#n` references below point there.
 
@@ -20,8 +19,12 @@ H1 HTTP hardening (any time; before C6's setup page ships) ───────
                                                                   └─> C5 media ────┘
 ```
 
-Parallel now: A1, A2, A3. Then B1–B3 one at a time (they touch every module). Then C1–C6 in
-parallel. Then D1.
+Done: A1–A3, H1, B1–B3, S1–S4, C6. **Parallel now: C1–C5.** Then D1.
+
+C lanes all add a migration numbered after the base's latest, so they collide: whoever merges
+second renumbers on rebase (README, migration renumbering) and runs `dev db:drop-worktree`. They
+also all shrink the same allowlists (`rlsPending`, `createWithAssociationsAllowed`, apierr's):
+on a conflict, keep the other lane's deletions and your own.
 
 ## Phase A: groundwork (parallel)
 
