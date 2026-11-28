@@ -96,6 +96,12 @@ services:
 networks:
     app-network:
         driver: bridge
+        # Pinned so TRUSTED_PROXIES (.env.vps) can't drift: Caddy reaches the backend through the
+        # gateway, and the backend trusts X-Forwarded-For only from it (docs/ARCHITECTURE.md).
+        ipam:
+            config:
+                - subnet: 172.18.0.0/16
+                  gateway: 172.18.0.1
 
 volumes:
     postgres_data:

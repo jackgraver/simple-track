@@ -664,3 +664,35 @@ func TestDiet_rlsBackstop(t *testing.T) {
 		}
 	}
 }
+
+// GET /diet/logs/month-planned-summary counts only the caller's unlogged planned meals.
+func TestDiet_monthPlannedSummaryIsPerUser(t *testing.T) {
+	h, api := dietAPI(t)
+	rice := food(t, api, h.Alice, "Rice", nil)
+	today(t, api, h.Alice)
+	today(t, api, h.Bob)
+	var created struct {
+		ID uint `json:"saved_meal_id"`
+	}
+	do(t, api, h.Alice, http.MethodPost, "/diet/meals/saved-meal/new", map[string]any{
+		"name": "Bowl", "items": []map[string]any{{"food_id": rice, "amount": 2}},
+	}, http.StatusCreated).JSON(t, &created)
+	do(t, api, h.Alice, http.MethodPost, "/diet/meals/planned/from-saved", map[string]any{"saved_meal_id": created.ID}, http.StatusOK)
+
+	sum := func(u twousers.User) (total int) {
+		var out struct {
+			Counts []int `json:"planned_counts"`
+		}
+		do(t, api, u, http.MethodGet, "/diet/logs/month-planned-summary", nil, http.StatusOK).JSON(t, &out)
+		for _, n := range out.Counts {
+			total += n
+		}
+		return total
+	}
+	if got := sum(h.Alice); got != 1 {
+		t.Fatalf("Alice's planned count = %d, want 1", got)
+	}
+	if got := sum(h.Bob); got != 0 {
+		t.Fatalf("Bob's planned count = %d, want 0 (Alice's plan leaked)", got)
+	}
+}

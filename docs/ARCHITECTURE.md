@@ -95,7 +95,8 @@ Caveat: the gateway is assigned by Docker, not pinned. If the network is ever re
 (`docker compose down`, Docker upgrade) the subnet may change and the setting silently stops
 matching. Re-check with
 `docker network inspect simple-track_app-network --format '{{range .IPAM.Config}}{{.Gateway}}{{end}}'`.
-Pinning the subnet under `networks.app-network.ipam` in `docker-compose.vps.yml` would remove this risk.
+The subnet is now pinned under `networks.app-network.ipam` in `docker-compose.vps.yml` (172.18.0.0/16, gateway
+172.18.0.1, matching `TRUSTED_PROXIES`), so it can't drift once the multi-user deploy has recreated the network.
 
 ## nginx
 

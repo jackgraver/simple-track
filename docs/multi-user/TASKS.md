@@ -19,7 +19,7 @@ H1 HTTP hardening (any time; before C6's setup page ships) ───────
                                                                   └─> C5 media ────┘
 ```
 
-Done: A1–A3, H1, B1–B3, S1–S4, C6. **Parallel now: C1–C5.** Then D1.
+Done: A1–A3, H1, B1–B3, S1–S4, C1–C6. **Now: D1** (agent part done, owner steps remain).
 
 C lanes all add a migration numbered after the base's latest, so they collide: whoever merges
 second renumbers on rebase (README, migration renumbering) and runs `dev db:drop-worktree`. They
@@ -231,9 +231,12 @@ PRs have merged into the base; then rebase. B3 also adds migrations: renumber on
 
 ### D1 Verify, rehearse, ship
 Depends on: all A, B and C lanes
-- [ ] RLS allowlist is empty; every endpoint has a two-user test; CI runs them.
-- [ ] BACKLOG: every High done; every Medium done or deferred with a reason in DECISIONS.
-- [ ] #16 Pin `app-network`'s subnet/gateway in compose and confirm `TRUSTED_PROXIES` (ROLLOUT 3.2).
+- [x] RLS allowlist is empty; every endpoint has a two-user test; CI runs them. (Audit of 139 routes found
+      two untested: `GET /diet/logs/month-planned-summary` and `PATCH /workout/logs/switch-plan`, now covered.
+      Admin/auth routes are covered in `auth/accounts_pg_test.go`; `/media/meta` and `/media/lookup/details`
+      are stateless lookups.)
+- [x] BACKLOG: every High done; every Medium done or deferred with a reason in DECISIONS.
+- [x] #16 Pin `app-network`'s subnet/gateway in compose (done); owner confirms the live network matches (ROLLOUT 3.2).
 - [ ] ROLLOUT.md is complete: every lane's prod-side change has a step, and the rehearsal ran it.
 - [ ] Rehearse: restore a copy of a recent prod backup locally, run every migration as the
       deploy would, start the server as the app role, click through each module as the owner.
