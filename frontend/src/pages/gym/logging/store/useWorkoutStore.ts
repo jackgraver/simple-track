@@ -7,13 +7,14 @@ import {
     useUpsertMobilityPre,
     useUpsertMobilityPost,
 } from "~/api/workout/queries";
+import { userKey } from "~/utils/userStorage";
 import { useWebStorageJsonSync } from "~/composables/useWebStorageJsonSync";
 import { sortExerciseGroupsByLogOrder } from "./sortExerciseGroupsByLogOrder";
 import { computed, ref, toValue, watch, type MaybeRefOrGetter } from "vue";
 import { offsetToDate } from "~/api/workout/dates";
 import type { SetRow } from "~/api/workout/setsCache";
 
-const HIDDEN_EXERCISES_STORAGE_PREFIX = "simpletracker:workout:hidden-exercises:";
+const HIDDEN_EXERCISES_STORAGE_PREFIX = "workout:hidden-exercises:";
 
 type HiddenExercisesSnapshot = { ids: number[] };
 
@@ -44,7 +45,7 @@ export function useWorkoutStore(offset: MaybeRefOrGetter<number> = 0) {
     const hiddenExercisesStorageKey = computed(() => {
         const id = workoutLogsQuery.data.value?.day?.ID;
         if (id == null) return "";
-        return `${HIDDEN_EXERCISES_STORAGE_PREFIX}${id}`;
+        return userKey(`${HIDDEN_EXERCISES_STORAGE_PREFIX}${id}`) ?? "";
     });
 
     const hiddenExercisesSync = useWebStorageJsonSync<HiddenExercisesSnapshot>({

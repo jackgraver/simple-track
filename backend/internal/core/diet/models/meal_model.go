@@ -4,25 +4,27 @@ import (
 	"regexp"
 	"strings"
 
+	"be-simpletracker/internal/database"
+
 	"gorm.io/gorm"
 )
 
 // Meal represents a logged meal instance (foods eaten in one sitting); day_logs reference this.
 type Meal struct {
 	gorm.Model
+	database.Owner
 	Name  string     `json:"name" gorm:"not null"`
 	Items []MealItem `json:"items" gorm:"constraint:OnDelete:CASCADE;"`
 	// ClientID is a client-generated uuid that makes creates idempotent (unique when set).
 	ClientID *string `json:"client_id,omitempty" gorm:"type:uuid"`
 }
 
-func (m Meal) GetID() uint        { return m.ID }
-func (m Meal) TableName() string  { return "meals" }
-func (m Meal) Preloads() []string { return []string{"Items.Food"} }
+func (m Meal) TableName() string { return "meals" }
 
 // MealItem represents an item in a meal
 type MealItem struct {
 	gorm.Model
+	database.Owner
 	MealID          uint    `json:"meal_id" gorm:"not null;index"`
 	FoodID          uint    `json:"food_id" gorm:"not null;index"`
 	Amount          float32 `json:"amount"`
@@ -33,24 +35,22 @@ type MealItem struct {
 	Food            Food    `json:"food"`
 }
 
-func (m MealItem) GetID() uint        { return m.ID }
-func (m MealItem) TableName() string  { return "meal_items" }
-func (m MealItem) Preloads() []string { return []string{"Food"} }
+func (m MealItem) TableName() string { return "meal_items" }
 
 // SavedMeal is a reusable template (e.g. meals you eat often), not tied to a specific day log.
 type SavedMeal struct {
 	gorm.Model
+	database.Owner
 	Name  string          `json:"name" gorm:"not null"`
 	Items []SavedMealItem `json:"items" gorm:"constraint:OnDelete:CASCADE;"`
 }
 
-func (s SavedMeal) GetID() uint        { return s.ID }
-func (s SavedMeal) TableName() string  { return "saved_meals" }
-func (s SavedMeal) Preloads() []string { return []string{"Items.Food"} }
+func (s SavedMeal) TableName() string { return "saved_meals" }
 
 // SavedMealItem represents an item in a saved meal
 type SavedMealItem struct {
 	gorm.Model
+	database.Owner
 	SavedMealID     uint      `json:"saved_meal_id" gorm:"not null;index"`
 	FoodID          uint      `json:"food_id" gorm:"not null;index"`
 	Amount          float64   `json:"amount"`
@@ -61,12 +61,12 @@ type SavedMealItem struct {
 	Food            Food      `json:"food"`
 }
 
-func (s SavedMealItem) GetID() uint       { return s.ID }
 func (s SavedMealItem) TableName() string { return "saved_meal_items" }
 
 // Food represents a food item
 type Food struct {
 	gorm.Model
+	database.Creator
 	Name           string  `json:"name" gorm:"not null;uniqueIndex"`
 	ServingType    string  `json:"serving_type" gorm:"not null"`
 	ServingAmount  float32 `json:"serving_amount" gorm:"not null"`
@@ -80,7 +80,6 @@ type Food struct {
 	Variants       []Food  `json:"variants,omitempty" gorm:"-"`
 }
 
-func (f Food) GetID() uint       { return f.ID }
 func (f Food) TableName() string { return "foods" }
 
 var quickLogFoodNameSuffix = regexp.MustCompile(`\s*\[ql-\d+\]\s*$`)
@@ -107,17 +106,17 @@ type FoodWithVariants struct {
 // CompositeFood is a reusable recipe (multiple foods + amounts); logging expands to grouped meal items.
 type CompositeFood struct {
 	gorm.Model
-	Name  string              `json:"name" gorm:"not null;uniqueIndex"`
+	database.Owner
+	Name  string              `json:"name" gorm:"not null"`
 	Items []CompositeFoodItem `json:"items" gorm:"constraint:OnDelete:CASCADE;"`
 }
 
-func (c CompositeFood) GetID() uint        { return c.ID }
-func (c CompositeFood) TableName() string  { return "composite_foods" }
-func (c CompositeFood) Preloads() []string { return []string{"Items.Food"} }
+func (c CompositeFood) TableName() string { return "composite_foods" }
 
 // CompositeFoodItem is one ingredient line in a composite food.
 type CompositeFoodItem struct {
 	gorm.Model
+	database.Owner
 	CompositeFoodID uint          `json:"composite_food_id" gorm:"not null;index"`
 	FoodID          uint          `json:"food_id" gorm:"not null;index"`
 	Amount          float32       `json:"amount"`
@@ -125,6 +124,4 @@ type CompositeFoodItem struct {
 	Food            Food          `json:"food"`
 }
 
-func (c CompositeFoodItem) GetID() uint        { return c.ID }
-func (c CompositeFoodItem) TableName() string  { return "composite_food_items" }
-func (c CompositeFoodItem) Preloads() []string { return []string{"Food"} }
+func (c CompositeFoodItem) TableName() string { return "composite_food_items" }

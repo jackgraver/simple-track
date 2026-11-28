@@ -5,7 +5,6 @@ import (
 	"be-simpletracker/internal/core/diet/models"
 	dietrepo "be-simpletracker/internal/core/diet/repository"
 	"be-simpletracker/internal/core/diet/testutil"
-	"context"
 	"errors"
 	"fmt"
 	"strings"
@@ -17,8 +16,8 @@ import (
 )
 
 func TestDayMealPlanToday_createsDayWithDefaultPlan(t *testing.T) {
-	testutil.SetupTestDB(t)
-	day, err := dietrepo.DayMealPlanToday(0)
+	ctx := testutil.Ctx(testutil.SetupTestDB(t))
+	day, err := dietrepo.DayMealPlanToday(ctx, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -29,6 +28,7 @@ func TestDayMealPlanToday_createsDayWithDefaultPlan(t *testing.T) {
 
 func TestDayByID_andCalculateTotals(t *testing.T) {
 	db := testutil.SetupTestDB(t)
+	ctx := testutil.Ctx(db)
 	plan := testutil.SeedPlan(t, db, "Bulk")
 	day := testutil.SeedDay(t, db, testutil.Today(), plan.ID)
 	food := testutil.SeedFood(t, db, "Steak", models.Food{
@@ -38,14 +38,14 @@ func TestDayByID_andCalculateTotals(t *testing.T) {
 	meal := testutil.SeedMeal(t, db, "Dinner", food.ID, 2)
 	testutil.SeedDayLog(t, db, day.ID, meal.ID)
 
-	loaded, err := dietrepo.DayByID(int(day.ID))
+	loaded, err := dietrepo.DayByID(ctx, int(day.ID))
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(loaded.Logs) != 1 {
 		t.Fatalf("logs %+v", loaded.Logs)
 	}
-	tot := dietrepo.CalculateTotals(day.ID)
+	tot := dietrepo.CalculateTotals(ctx, day.ID)
 	if tot.Calories != 500 || tot.Protein != 52 {
 		t.Fatalf("totals %+v", tot)
 	}
@@ -53,9 +53,10 @@ func TestDayByID_andCalculateTotals(t *testing.T) {
 
 func TestGoalsToday_returnsPlanForToday(t *testing.T) {
 	db := testutil.SetupTestDB(t)
+	ctx := testutil.Ctx(db)
 	plan := testutil.SeedPlan(t, db, "Maintain")
 	testutil.SeedDay(t, db, testutil.Today(), plan.ID)
-	got, err := dietrepo.GoalsToday()
+	got, err := dietrepo.GoalsToday(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -65,8 +66,8 @@ func TestGoalsToday_returnsPlanForToday(t *testing.T) {
 }
 
 func TestFindDayByDate_createsIfMissing(t *testing.T) {
-	testutil.SetupTestDB(t)
-	day, err := dietrepo.FindDayByDate(testutil.Today())
+	ctx := testutil.Ctx(testutil.SetupTestDB(t))
+	day, err := dietrepo.FindDayByDate(ctx, testutil.Today())
 	if err != nil || day == nil || day.ID == 0 {
 		t.Fatalf("day %+v err %v", day, err)
 	}
@@ -74,11 +75,11 @@ func TestFindDayByDate_createsIfMissing(t *testing.T) {
 
 func TestDaysByDateRange_andDayByIDGeneric(t *testing.T) {
 	db := testutil.SetupTestDB(t)
+	ctx := testutil.Ctx(db)
 	plan := testutil.SeedPlan(t, db, "P")
 	today := testutil.Today()
 	testutil.SeedDay(t, db, today, plan.ID)
 	testutil.SeedDay(t, db, today.AddDate(0, 0, -1), plan.ID)
-	ctx := context.Background()
 	days, err := dietrepo.DaysByDateRange(ctx, today.AddDate(0, 0, -2), today)
 	if err != nil || len(days) < 2 {
 		t.Fatalf("days %+v err %v", days, err)
@@ -95,6 +96,7 @@ func TestDaysByDateRange_andDayByIDGeneric(t *testing.T) {
 
 func TestCountUnloggedPlannedMealsPerCalendarDay(t *testing.T) {
 	db := testutil.SetupTestDB(t)
+	ctx := testutil.Ctx(db)
 	plan := testutil.SeedPlan(t, db, "P")
 	today := testutil.Today()
 	day := testutil.SeedDay(t, db, today, plan.ID)
@@ -105,7 +107,7 @@ func TestCountUnloggedPlannedMealsPerCalendarDay(t *testing.T) {
 	testutil.SeedPlannedMeal(t, db, day.ID, m2.ID, 1, true)
 	start := time.Date(today.Year(), today.Month(), today.Day(), 0, 0, 0, 0, today.Location())
 	end := start
-	counts, err := dietrepo.CountUnloggedPlannedMealsPerCalendarDay(start, end)
+	counts, err := dietrepo.CountUnloggedPlannedMealsPerCalendarDay(ctx, start, end)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -116,9 +118,10 @@ func TestCountUnloggedPlannedMealsPerCalendarDay(t *testing.T) {
 
 func TestAllMealDays(t *testing.T) {
 	db := testutil.SetupTestDB(t)
+	ctx := testutil.Ctx(db)
 	plan := testutil.SeedPlan(t, db, "P")
 	testutil.SeedDay(t, db, testutil.Today(), plan.ID)
-	days, err := dietrepo.AllMealDays()
+	days, err := dietrepo.AllMealDays(ctx)
 	if err != nil || len(days) != 1 {
 		t.Fatalf("days %+v err %v", days, err)
 	}
@@ -126,14 +129,15 @@ func TestAllMealDays(t *testing.T) {
 
 func TestCreateDayMeal_andDayLogExists(t *testing.T) {
 	db := testutil.SetupTestDB(t)
+	ctx := testutil.Ctx(db)
 	plan := testutil.SeedPlan(t, db, "P")
 	day := testutil.SeedDay(t, db, testutil.Today(), plan.ID)
 	food := testutil.SeedFood(t, db, "Banana", testutil.DefaultMacros())
 	meal := testutil.SeedMeal(t, db, "B", food.ID, 1)
-	if err := dietrepo.CreateDayMeal(&models.DayLog{DayID: day.ID, MealID: meal.ID}); err != nil {
+	if err := dietrepo.CreateDayMeal(ctx, &models.DayLog{DayID: day.ID, MealID: meal.ID}); err != nil {
 		t.Fatal(err)
 	}
-	ok, err := dietrepo.DayLogExists(day.ID, meal.ID)
+	ok, err := dietrepo.DayLogExists(ctx, day.ID, meal.ID)
 	if err != nil || !ok {
 		t.Fatalf("exists %v err %v", ok, err)
 	}
@@ -141,23 +145,24 @@ func TestCreateDayMeal_andDayLogExists(t *testing.T) {
 
 func TestDeleteLoggedMeal_andUpdateDayLogMeal(t *testing.T) {
 	db := testutil.SetupTestDB(t)
+	ctx := testutil.Ctx(db)
 	plan := testutil.SeedPlan(t, db, "P")
 	day := testutil.SeedDay(t, db, testutil.Today(), plan.ID)
 	food := testutil.SeedFood(t, db, "Tofu", testutil.DefaultMacros())
 	oldMeal := testutil.SeedMeal(t, db, "Old", food.ID, 1)
 	newMeal := testutil.SeedMeal(t, db, "New", food.ID, 1)
 	testutil.SeedDayLog(t, db, day.ID, oldMeal.ID)
-	if err := dietrepo.UpdateDayLogMeal(day.ID, oldMeal.ID, newMeal.ID); err != nil {
+	if err := dietrepo.UpdateDayLogMeal(ctx, day.ID, oldMeal.ID, newMeal.ID); err != nil {
 		t.Fatal(err)
 	}
-	ok, _ := dietrepo.DayLogExists(day.ID, newMeal.ID)
+	ok, _ := dietrepo.DayLogExists(ctx, day.ID, newMeal.ID)
 	if !ok {
 		t.Fatal("expected new meal logged")
 	}
-	if err := dietrepo.DeleteLoggedMeal(day.ID, newMeal.ID); err != nil {
+	if err := dietrepo.DeleteLoggedMeal(ctx, day.ID, newMeal.ID); err != nil {
 		t.Fatal(err)
 	}
-	ok, _ = dietrepo.DayLogExists(day.ID, newMeal.ID)
+	ok, _ = dietrepo.DayLogExists(ctx, day.ID, newMeal.ID)
 	if ok {
 		t.Fatal("expected deleted")
 	}
@@ -165,12 +170,13 @@ func TestDeleteLoggedMeal_andUpdateDayLogMeal(t *testing.T) {
 
 func TestSetPlannedMealLogged(t *testing.T) {
 	db := testutil.SetupTestDB(t)
+	ctx := testutil.Ctx(db)
 	plan := testutil.SeedPlan(t, db, "P")
 	day := testutil.SeedDay(t, db, testutil.Today(), plan.ID)
 	food := testutil.SeedFood(t, db, "Pasta", testutil.DefaultMacros())
 	meal := testutil.SeedMeal(t, db, "Dinner", food.ID, 1)
 	pm := testutil.SeedPlannedMeal(t, db, day.ID, meal.ID, 0, false)
-	if err := dietrepo.SetPlannedMealLogged(day.ID, meal.ID); err != nil {
+	if err := dietrepo.SetPlannedMealLogged(ctx, day.ID, meal.ID); err != nil {
 		t.Fatal(err)
 	}
 	var reloaded models.PlannedMeal
@@ -180,8 +186,8 @@ func TestSetPlannedMealLogged(t *testing.T) {
 }
 
 func TestQuickLogMeal_createsLog(t *testing.T) {
-	testutil.SetupTestDB(t)
-	dayID, err := dietrepo.QuickLogMeal(dietrepo.QuickLogParams{
+	ctx := testutil.Ctx(testutil.SetupTestDB(t))
+	dayID, err := dietrepo.QuickLogMeal(ctx, dietrepo.QuickLogParams{
 		DisplayName: "Protein Shake",
 		FoodRowName: "Protein Shake [ql-99]",
 		Calories:    200,
@@ -190,7 +196,7 @@ func TestQuickLogMeal_createsLog(t *testing.T) {
 	if err != nil || dayID == 0 {
 		t.Fatalf("dayID %d err %v", dayID, err)
 	}
-	tot := dietrepo.CalculateTotals(dayID)
+	tot := dietrepo.CalculateTotals(ctx, dayID)
 	if tot.Calories != 200 {
 		t.Fatalf("totals %+v", tot)
 	}
@@ -198,12 +204,13 @@ func TestQuickLogMeal_createsLog(t *testing.T) {
 
 func TestQuickLogMeal_replaceExistingLog(t *testing.T) {
 	db := testutil.SetupTestDB(t)
+	ctx := testutil.Ctx(db)
 	plan := testutil.SeedPlan(t, db, "P")
 	day := testutil.SeedDay(t, db, testutil.Today(), plan.ID)
 	food := testutil.SeedFood(t, db, "Bar", testutil.DefaultMacros())
 	oldMeal := testutil.SeedMeal(t, db, "Old Bar", food.ID, 1)
 	testutil.SeedDayLog(t, db, day.ID, oldMeal.ID)
-	_, err := dietrepo.QuickLogMeal(dietrepo.QuickLogParams{
+	_, err := dietrepo.QuickLogMeal(ctx, dietrepo.QuickLogParams{
 		DisplayName:   "New Bar",
 		FoodRowName:   "New Bar [ql-1]",
 		Calories:      150,
@@ -213,7 +220,7 @@ func TestQuickLogMeal_replaceExistingLog(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	ok, _ := dietrepo.DayLogExists(day.ID, oldMeal.ID)
+	ok, _ := dietrepo.DayLogExists(ctx, day.ID, oldMeal.ID)
 	if ok {
 		t.Fatal("old meal should be replaced")
 	}
@@ -221,7 +228,8 @@ func TestQuickLogMeal_replaceExistingLog(t *testing.T) {
 
 func TestQuickLogMeal_replaceInvalid(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	_, err := dietrepo.QuickLogMeal(dietrepo.QuickLogParams{
+	ctx := testutil.Ctx(db)
+	_, err := dietrepo.QuickLogMeal(ctx, dietrepo.QuickLogParams{
 		DisplayName:   "X",
 		FoodRowName:   "X [ql-1]",
 		ReplaceMealID: 9999,
@@ -242,13 +250,14 @@ func TestQuickLogMeal_replaceInvalid(t *testing.T) {
 // A failed replace keeps the original log: the edit cannot lose the meal.
 func TestQuickLogMeal_replaceFailureKeepsOriginal(t *testing.T) {
 	db := testutil.SetupTestDB(t)
+	ctx := testutil.Ctx(db)
 	plan := testutil.SeedPlan(t, db, "P")
 	day := testutil.SeedDay(t, db, testutil.Today(), plan.ID)
 	food := testutil.SeedFood(t, db, "Bar", testutil.DefaultMacros())
 	oldMeal := testutil.SeedMeal(t, db, "Old Bar", food.ID, 1)
 	testutil.SeedDayLog(t, db, day.ID, oldMeal.ID)
 	// Wrong day (tomorrow): the replace target is not logged there, so the whole call rolls back.
-	if _, err := dietrepo.QuickLogMeal(dietrepo.QuickLogParams{
+	if _, err := dietrepo.QuickLogMeal(ctx, dietrepo.QuickLogParams{
 		DisplayName:   "New Bar",
 		FoodRowName:   "New Bar [ql-2]",
 		ReplaceMealID: oldMeal.ID,
@@ -256,7 +265,7 @@ func TestQuickLogMeal_replaceFailureKeepsOriginal(t *testing.T) {
 	}); err == nil {
 		t.Fatal("expected replace error")
 	}
-	if ok, _ := dietrepo.DayLogExists(day.ID, oldMeal.ID); !ok {
+	if ok, _ := dietrepo.DayLogExists(ctx, day.ID, oldMeal.ID); !ok {
 		t.Fatal("original log should survive a failed replace")
 	}
 	var meals int64
@@ -268,6 +277,7 @@ func TestQuickLogMeal_replaceFailureKeepsOriginal(t *testing.T) {
 
 func TestEditLoggedMeal(t *testing.T) {
 	db := testutil.SetupTestDB(t)
+	ctx := testutil.Ctx(db)
 	plan := testutil.SeedPlan(t, db, "P")
 	day := testutil.SeedDay(t, db, testutil.Today(), plan.ID)
 	food := testutil.SeedFood(t, db, "Fish", testutil.DefaultMacros())
@@ -280,10 +290,10 @@ func TestEditLoggedMeal(t *testing.T) {
 			Amount: 2,
 		}},
 	}
-	if err := dietrepo.EditLoggedMeal(day.ID, oldMeal.ID, newMeal); err != nil {
+	if err := dietrepo.EditLoggedMeal(ctx, day.ID, oldMeal.ID, newMeal); err != nil {
 		t.Fatal(err)
 	}
-	ok, _ := dietrepo.DayLogExists(day.ID, oldMeal.ID)
+	ok, _ := dietrepo.DayLogExists(ctx, day.ID, oldMeal.ID)
 	if ok {
 		t.Fatal("old meal should be unlinked")
 	}
@@ -291,9 +301,9 @@ func TestEditLoggedMeal(t *testing.T) {
 
 func TestPlansGetAll(t *testing.T) {
 	db := testutil.SetupTestDB(t)
+	ctx := testutil.Ctx(db)
 	testutil.SeedPlan(t, db, "A")
 	testutil.SeedPlan(t, db, "B")
-	ctx := context.Background()
 	all, err := dietrepo.PlansGetAll(ctx, utils.QueryParams{})
 	if err != nil || len(all.Data) != 2 {
 		t.Fatalf("all %+v err %v", all, err)
@@ -302,11 +312,19 @@ func TestPlansGetAll(t *testing.T) {
 	if err != nil || paged.Pagination == nil || len(paged.Data) != 1 {
 		t.Fatalf("paged %+v err %v", paged, err)
 	}
+	// Default order is newest first; the count ignores the page.
+	if paged.Data[0].Name != "B" || paged.Pagination.Total != 2 || paged.Pagination.TotalPages != 2 || !paged.Pagination.HasNext {
+		t.Fatalf("paged %+v pagination %+v", paged.Data, paged.Pagination)
+	}
+	filtered, err := dietrepo.PlansGetAll(ctx, utils.QueryParams{Filters: map[string]string{"name": "A"}})
+	if err != nil || len(filtered.Data) != 1 || filtered.Data[0].Name != "A" {
+		t.Fatalf("filtered %+v err %v", filtered, err)
+	}
 }
 
 func TestDayByIDGeneric_notFound(t *testing.T) {
-	testutil.SetupTestDB(t)
-	_, err := dietrepo.DayByIDGeneric(context.Background(), 9999)
+	ctx := testutil.Ctx(testutil.SetupTestDB(t))
+	_, err := dietrepo.DayByIDGeneric(ctx, 9999)
 	if err == nil {
 		t.Fatal("expected error")
 	}
@@ -314,6 +332,7 @@ func TestDayByIDGeneric_notFound(t *testing.T) {
 
 func TestCopyPlannedMeals_appendsInOrderWithOwnMeals(t *testing.T) {
 	db := testutil.SetupTestDB(t)
+	ctx := testutil.Ctx(db)
 	plan := testutil.SeedPlan(t, db, "P")
 	src := testutil.SeedDay(t, db, clock.ZerodTime(0), plan.ID)
 	dst := testutil.SeedDay(t, db, clock.ZerodTime(-1), plan.ID)
@@ -327,7 +346,7 @@ func TestCopyPlannedMeals_appendsInOrderWithOwnMeals(t *testing.T) {
 	existing := testutil.SeedMeal(t, db, "Existing", food.ID, 1)
 	testutil.SeedPlannedMeal(t, db, dst.ID, existing.ID, 0, false)
 
-	n, err := dietrepo.CopyPlannedMeals(0, []int{-1, 0, -1})
+	n, err := dietrepo.CopyPlannedMeals(ctx, 0, []int{-1, 0, -1})
 	if err != nil || n != 2 {
 		t.Fatalf("n %d err %v", n, err)
 	}
@@ -355,6 +374,7 @@ func TestCopyPlannedMeals_appendsInOrderWithOwnMeals(t *testing.T) {
 
 func TestLogPlannedMeal_pastDayIdempotent(t *testing.T) {
 	db := testutil.SetupTestDB(t)
+	ctx := testutil.Ctx(db)
 	plan := testutil.SeedPlan(t, db, "P")
 	yesterday := testutil.SeedDay(t, db, testutil.Today().AddDate(0, 0, -1), plan.ID)
 	food := testutil.SeedFood(t, db, "Rice", testutil.DefaultMacros())
@@ -362,7 +382,7 @@ func TestLogPlannedMeal_pastDayIdempotent(t *testing.T) {
 	testutil.SeedPlannedMeal(t, db, yesterday.ID, meal.ID, 0, false)
 
 	for i := 0; i < 2; i++ { // second call is a replay
-		if err := dietrepo.LogPlannedMeal(yesterday.ID, meal.ID); err != nil {
+		if err := dietrepo.LogPlannedMeal(ctx, yesterday.ID, meal.ID); err != nil {
 			t.Fatalf("call %d: %v", i, err)
 		}
 	}
@@ -376,20 +396,21 @@ func TestLogPlannedMeal_pastDayIdempotent(t *testing.T) {
 	if !pm.Logged {
 		t.Fatal("planned meal should be marked logged")
 	}
-	if err := dietrepo.LogPlannedMeal(yesterday.ID, meal.ID+999); !errors.Is(err, gorm.ErrRecordNotFound) {
+	if err := dietrepo.LogPlannedMeal(ctx, yesterday.ID, meal.ID+999); !errors.Is(err, gorm.ErrRecordNotFound) {
 		t.Fatalf("want ErrRecordNotFound, got %v", err)
 	}
 }
 
 func TestDeleteLoggedMeal_idempotent(t *testing.T) {
 	db := testutil.SetupTestDB(t)
+	ctx := testutil.Ctx(db)
 	plan := testutil.SeedPlan(t, db, "P")
 	day := testutil.SeedDay(t, db, testutil.Today(), plan.ID)
 	food := testutil.SeedFood(t, db, "Egg", testutil.DefaultMacros())
 	meal := testutil.SeedMeal(t, db, "Eggs", food.ID, 1)
 	testutil.SeedDayLog(t, db, day.ID, meal.ID)
 	for i := 0; i < 2; i++ {
-		if err := dietrepo.DeleteLoggedMeal(day.ID, meal.ID); err != nil {
+		if err := dietrepo.DeleteLoggedMeal(ctx, day.ID, meal.ID); err != nil {
 			t.Fatalf("call %d: %v", i, err)
 		}
 	}
@@ -397,11 +418,12 @@ func TestDeleteLoggedMeal_idempotent(t *testing.T) {
 
 func TestQuickLogMeal_clientIDIdempotent(t *testing.T) {
 	db := testutil.SetupTestDB(t)
+	ctx := testutil.Ctx(db)
 	plan := testutil.SeedPlan(t, db, "P")
 	testutil.SeedDay(t, db, testutil.Today(), plan.ID)
 	cid := "11111111-1111-4111-8111-111111111111"
 	for i := 0; i < 2; i++ {
-		if _, err := dietrepo.QuickLogMeal(dietrepo.QuickLogParams{
+		if _, err := dietrepo.QuickLogMeal(ctx, dietrepo.QuickLogParams{
 			DisplayName: "Bar", FoodRowName: fmt.Sprintf("Bar [ql-%d]", i), Calories: 200, ClientID: cid,
 		}); err != nil {
 			t.Fatal(err)
@@ -418,6 +440,7 @@ func TestQuickLogMeal_clientIDIdempotent(t *testing.T) {
 // on client_id covers soft-deleted rows).
 func TestAddPlannedMealFromSavedMeal_replayAfterDelete(t *testing.T) {
 	db := testutil.SetupTestDB(t)
+	ctx := testutil.Ctx(db)
 	plan := testutil.SeedPlan(t, db, "P")
 	testutil.SeedDay(t, db, testutil.Today(), plan.ID)
 	food := testutil.SeedFood(t, db, "Oats", testutil.DefaultMacros())
@@ -425,7 +448,7 @@ func TestAddPlannedMealFromSavedMeal_replayAfterDelete(t *testing.T) {
 	cid := "44444444-4444-4444-8444-444444444444"
 	add := func() error {
 		meal := models.Meal{Name: saved.Name, Items: []models.MealItem{{FoodID: food.ID, Amount: 1}}}
-		return dietrepo.AddPlannedMealFromSavedMeal(0, saved.ID, &meal, cid)
+		return dietrepo.AddPlannedMealFromSavedMeal(ctx, 0, saved.ID, &meal, cid)
 	}
 	if err := add(); err != nil {
 		t.Fatal(err)

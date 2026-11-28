@@ -80,7 +80,8 @@ test.describe('finances', { tag: ['@finances'] }, () => {
     await page.goto(`/finances/accounts/${acct.ID}`);
     await page.getByRole('textbox', { name: 'Amount' }).fill('40');
     await page.getByRole('button', { name: 'Add deposit' }).click();
-    await expect(page.getByText(/e2e fault: create account_balances/)).toBeVisible();
+    // The server answers a fixed message (the raw error is only in its log, BACKLOG #6).
+    await expect(page.getByText('Internal server error', { exact: true })).toBeVisible();
     const { rows } = await db.query(`SELECT count(*)::int AS n FROM investment_deposits WHERE account_id = $1`, [acct.ID]);
     expect(rows[0].n).toBe(0);
   });

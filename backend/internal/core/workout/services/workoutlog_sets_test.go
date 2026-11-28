@@ -2,7 +2,6 @@ package services_test
 
 import (
 	"be-simpletracker/internal/clock"
-	"context"
 	"errors"
 	"fmt"
 	"sync"
@@ -29,8 +28,8 @@ func clientID(n int) string { return fmt.Sprintf("00000000-0000-4000-8000-%012d"
 
 func TestLogSet_createsDayAndParent(t *testing.T) {
 	db := testutil.SetupTestDB(t)
+	ctx := testutil.Ctx(db)
 	ex := setsTestExercise(t, db, "Squat")
-	ctx := context.Background()
 
 	res, err := services.LogSet(ctx, services.LogSetInput{
 		ClientID: clientID(1), Day: clock.ZerodTime(0), ExerciseID: ex.ID, Reps: 5, Weight: 100,
@@ -67,9 +66,10 @@ func TestLogSet_createsDayAndParent(t *testing.T) {
 
 func TestLogSet_offTodayUsesThatDay(t *testing.T) {
 	db := testutil.SetupTestDB(t)
+	ctx := testutil.Ctx(db)
 	ex := setsTestExercise(t, db, "Row")
 	yesterday := clock.ZerodTime(1)
-	res, err := services.LogSet(context.Background(), services.LogSetInput{
+	res, err := services.LogSet(ctx, services.LogSetInput{
 		ClientID: clientID(1), Day: yesterday, ExerciseID: ex.ID, Reps: 8, Weight: 60,
 	})
 	if err != nil {
@@ -82,8 +82,8 @@ func TestLogSet_offTodayUsesThatDay(t *testing.T) {
 
 func TestLogSet_replayIsIdempotent(t *testing.T) {
 	db := testutil.SetupTestDB(t)
+	ctx := testutil.Ctx(db)
 	ex := setsTestExercise(t, db, "Bench")
-	ctx := context.Background()
 	in := services.LogSetInput{ClientID: clientID(7), Day: clock.ZerodTime(0), ExerciseID: ex.ID, Reps: 5, Weight: 80}
 
 	first, err := services.LogSet(ctx, in)
@@ -112,9 +112,9 @@ func TestLogSet_replayIsIdempotent(t *testing.T) {
 
 func TestLogSet_clientIDReusedForOtherExerciseConflicts(t *testing.T) {
 	db := testutil.SetupTestDB(t)
+	ctx := testutil.Ctx(db)
 	a := setsTestExercise(t, db, "Curl")
 	b := setsTestExercise(t, db, "Press")
-	ctx := context.Background()
 	if _, err := services.LogSet(ctx, services.LogSetInput{ClientID: clientID(3), Day: clock.ZerodTime(0), ExerciseID: a.ID, Reps: 10}); err != nil {
 		t.Fatal(err)
 	}
@@ -125,8 +125,8 @@ func TestLogSet_clientIDReusedForOtherExerciseConflicts(t *testing.T) {
 }
 
 func TestLogSet_unknownExercise(t *testing.T) {
-	testutil.SetupTestDB(t)
-	_, err := services.LogSet(context.Background(), services.LogSetInput{ClientID: clientID(1), Day: clock.ZerodTime(0), ExerciseID: 999})
+	ctx := testutil.Ctx(testutil.SetupTestDB(t))
+	_, err := services.LogSet(ctx, services.LogSetInput{ClientID: clientID(1), Day: clock.ZerodTime(0), ExerciseID: 999})
 	if !errors.Is(err, services.ErrExerciseNotFound) {
 		t.Fatalf("want ErrExerciseNotFound, got %v", err)
 	}
@@ -136,13 +136,14 @@ func TestLogSet_unknownExercise(t *testing.T) {
 // rather than real parallelism; pg_sets_test.go runs the same scenario on Postgres.
 func TestLogSet_concurrentFirstSets(t *testing.T) {
 	db := testutil.SetupTestDB(t)
+	ctx := testutil.Ctx(db)
 	sqlDB, err := db.DB()
 	if err != nil {
 		t.Fatal(err)
 	}
 	sqlDB.SetMaxOpenConns(1) // :memory: is per connection
 	ex := setsTestExercise(t, db, "Deadlift")
-	if _, err := services.GetOrCreateToday(context.Background(), 0); err != nil {
+	if _, err := services.GetOrCreateToday(ctx, 0); err != nil {
 		t.Fatal(err)
 	}
 
@@ -153,7 +154,7 @@ func TestLogSet_concurrentFirstSets(t *testing.T) {
 		go func(i int) {
 			defer wg.Done()
 			// 6 distinct sets, each sent twice (a double tap / retry of the same create).
-			_, err := services.LogSet(context.Background(), services.LogSetInput{
+			_, err := services.LogSet(ctx, services.LogSetInput{
 				ClientID: clientID(100 + i%6), Day: clock.ZerodTime(0), ExerciseID: ex.ID, Reps: 5, Weight: 140,
 			})
 			errs <- err
@@ -176,8 +177,8 @@ func TestLogSet_concurrentFirstSets(t *testing.T) {
 
 func TestUpdateSet_patchByIDAndClientID(t *testing.T) {
 	db := testutil.SetupTestDB(t)
+	ctx := testutil.Ctx(db)
 	ex := setsTestExercise(t, db, "Dip")
-	ctx := context.Background()
 	res, err := services.LogSet(ctx, services.LogSetInput{ClientID: clientID(5), Day: clock.ZerodTime(0), ExerciseID: ex.ID, Reps: 8, Weight: 20, WeightSetup: "belt"})
 	if err != nil {
 		t.Fatal(err)
@@ -205,8 +206,8 @@ func TestUpdateSet_patchByIDAndClientID(t *testing.T) {
 
 func TestDeleteSet_repeatIsSuccess(t *testing.T) {
 	db := testutil.SetupTestDB(t)
+	ctx := testutil.Ctx(db)
 	ex := setsTestExercise(t, db, "Lunge")
-	ctx := context.Background()
 	a, err := services.LogSet(ctx, services.LogSetInput{ClientID: clientID(1), Day: clock.ZerodTime(0), ExerciseID: ex.ID, Reps: 8})
 	if err != nil {
 		t.Fatal(err)
@@ -237,17 +238,18 @@ func TestDeleteSet_repeatIsSuccess(t *testing.T) {
 
 func TestLogExercise_secondCreateReportsExisting(t *testing.T) {
 	db := testutil.SetupTestDB(t)
+	ctx := testutil.Ctx(db)
 	ex := setsTestExercise(t, db, "Shrug")
-	wl, err := services.GetOrCreateToday(context.Background(), 0)
+	wl, err := services.GetOrCreateToday(ctx, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
 	first := models.LoggedExercise{WorkoutLogID: wl.ID, ExerciseID: ex.ID, Sets: []models.LoggedSet{{Reps: 5}}}
-	if err := services.LogExercise(&first); err != nil {
+	if err := services.LogExercise(ctx, &first); err != nil {
 		t.Fatal(err)
 	}
 	second := models.LoggedExercise{WorkoutLogID: wl.ID, ExerciseID: ex.ID, Sets: []models.LoggedSet{{Reps: 5}}}
-	err = services.LogExercise(&second)
+	err = services.LogExercise(ctx, &second)
 	if !errors.Is(err, workoutrepo.ErrLoggedExerciseExists) || second.ID != first.ID {
 		t.Fatalf("want ErrLoggedExerciseExists pointing at %d, got %v (id %d)", first.ID, err, second.ID)
 	}

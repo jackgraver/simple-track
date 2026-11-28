@@ -17,6 +17,17 @@ import (
 	_ "github.com/jackc/pgx/v5/stdlib"
 )
 
+// skipPG skips a test that needs Postgres, or fails it when TEST_DATABASE_REQUIRED is set (CI).
+// The same rule as internal/database/pgtest, which this package can't import (pgtest imports it).
+func skipPG(t *testing.T, format string, args ...any) {
+	t.Helper()
+	switch strings.ToLower(os.Getenv("TEST_DATABASE_REQUIRED")) {
+	case "1", "true", "yes":
+		t.Fatalf("TEST_DATABASE_REQUIRED is set: "+format, args...)
+	}
+	t.Skipf(format, args...)
+}
+
 // testDB creates a fresh, empty database for one test and drops it afterwards.
 // It needs TEST_DATABASE_URL pointing at a Postgres server where the user may
 // CREATE DATABASE (`dev test` sets it to the dev database); otherwise the
@@ -25,7 +36,7 @@ func testDB(t *testing.T) *sql.DB {
 	t.Helper()
 	admin := os.Getenv("TEST_DATABASE_URL")
 	if admin == "" {
-		t.Skip("TEST_DATABASE_URL not set")
+		skipPG(t, "TEST_DATABASE_URL not set")
 	}
 	adminDB, err := sql.Open("pgx", admin)
 	if err != nil {
@@ -33,7 +44,7 @@ func testDB(t *testing.T) *sql.DB {
 	}
 	t.Cleanup(func() { adminDB.Close() })
 	if err := adminDB.Ping(); err != nil {
-		t.Skipf("TEST_DATABASE_URL unreachable: %v", err)
+		skipPG(t, "TEST_DATABASE_URL unreachable: %v", err)
 	}
 
 	name := fmt.Sprintf("migrate_test_%d", rand.Uint32())
@@ -315,7 +326,9 @@ func TestEmbeddedMigrationsApply(t *testing.T) {
 	}
 	var active int
 	db.QueryRow(`SELECT count(*) FROM workout_programs WHERE is_active`).Scan(&active)
-	if active != 1 {
-		t.Errorf("active workout programs = %d, want 1", active)
+	// The baseline's placeholder "Default" program belongs to nobody on a fresh database, so
+	// migration 0017 removes it; a new user starts with none and creates one on the plans page.
+	if active != 0 {
+		t.Errorf("active workout programs = %d, want 0 on a fresh database", active)
 	}
 }

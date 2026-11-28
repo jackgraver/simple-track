@@ -5,13 +5,13 @@ import (
 	"be-simpletracker/internal/core/workout/models"
 	"be-simpletracker/internal/core/workout/services"
 	"be-simpletracker/internal/core/workout/testutil"
-	"context"
 	"errors"
 	"testing"
 )
 
 func TestGetWorkoutActivity_year_includesDayWithSet(t *testing.T) {
 	db := testutil.SetupTestDB(t)
+	ctx := testutil.Ctx(db)
 	today := clock.ZerodTime(0)
 	ex := models.Exercise{Name: "Bench"}
 	if err := db.Create(&ex).Error; err != nil {
@@ -28,7 +28,7 @@ func TestGetWorkoutActivity_year_includesDayWithSet(t *testing.T) {
 	if err := db.Create(&models.LoggedSet{LoggedExerciseID: le.ID, Reps: 5, Weight: 100}).Error; err != nil {
 		t.Fatal(err)
 	}
-	res, err := services.GetWorkoutActivity(context.Background(), "year", 52)
+	res, err := services.GetWorkoutActivity(ctx, "year", 52)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -50,6 +50,7 @@ func TestGetWorkoutActivity_year_includesDayWithSet(t *testing.T) {
 
 func TestGetWorkoutActivity_rolling_excludesOldDayOutsideWindow(t *testing.T) {
 	db := testutil.SetupTestDB(t)
+	ctx := testutil.Ctx(db)
 	ex := models.Exercise{Name: "Squat"}
 	if err := db.Create(&ex).Error; err != nil {
 		t.Fatal(err)
@@ -66,7 +67,7 @@ func TestGetWorkoutActivity_rolling_excludesOldDayOutsideWindow(t *testing.T) {
 	if err := db.Create(&models.LoggedSet{LoggedExerciseID: leOld.ID, Reps: 3, Weight: 50}).Error; err != nil {
 		t.Fatal(err)
 	}
-	res, err := services.GetWorkoutActivity(context.Background(), "rolling", 52)
+	res, err := services.GetWorkoutActivity(ctx, "rolling", 52)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -78,8 +79,8 @@ func TestGetWorkoutActivity_rolling_excludesOldDayOutsideWindow(t *testing.T) {
 }
 
 func TestGetWorkoutActivity_invalidMode(t *testing.T) {
-	testutil.SetupTestDB(t)
-	_, err := services.GetWorkoutActivity(context.Background(), "nope", 52)
+	ctx := testutil.Ctx(testutil.SetupTestDB(t))
+	_, err := services.GetWorkoutActivity(ctx, "nope", 52)
 	if !errors.Is(err, services.ErrInvalidActivityMode) {
 		t.Fatalf("expected ErrInvalidActivityMode, got %v", err)
 	}

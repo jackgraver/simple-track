@@ -68,8 +68,11 @@ export interface Exercise extends BaseModel {
     load_type?: ExerciseLoadType;
     /** Logged one side at a time (each set is a left + right pair). */
     unilateral?: boolean;
-    /** Machine positions (seat, pad, pulley). Not editable yet; null/absent means none. */
+    /** The signed-in user's own machine positions (seat, pad, pulley); null/absent means none. */
     machine_settings?: MachineSetting[] | null;
+    /** Exercises are shared: only their creator (or an admin) may change the shared fields. */
+    can_edit?: boolean;
+    created_by?: number;
 }
 
 export interface MachineSetting {

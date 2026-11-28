@@ -4,6 +4,7 @@ import (
 	"be-simpletracker/internal/clock"
 	"be-simpletracker/internal/core/diet/services"
 	"be-simpletracker/internal/utils"
+	"be-simpletracker/internal/utils/apierr"
 	"net/http"
 	"strconv"
 
@@ -14,7 +15,7 @@ func GetMealPlanToday(c *gin.Context) {
 	offset := utils.GetDayOffset(c)
 	day, tot, err := services.MealPlanToday(c.Request.Context(), offset)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		respondErr(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{
@@ -31,7 +32,7 @@ func GetMealPlanToday(c *gin.Context) {
 func GetMealPlanWeek(c *gin.Context) {
 	data, err := services.MealPlanWeek(c.Request.Context())
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		respondErr(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{
@@ -43,12 +44,12 @@ func GetMealPlanWeek(c *gin.Context) {
 func GetMonthPlannedSummary(c *gin.Context) {
 	offset, err := utils.ParseQueryInt(c, monthOffsetQuery)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		apierr.BadRequest(c, err.Error())
 		return
 	}
 	counts, err := services.MonthPlannedSummary(c.Request.Context(), offset)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		respondErr(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{
@@ -60,12 +61,12 @@ func GetMonthPlannedSummary(c *gin.Context) {
 func GetMealPlanMonth(c *gin.Context) {
 	offset, err := utils.ParseQueryInt(c, monthOffsetQuery)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		apierr.BadRequest(c, err.Error())
 		return
 	}
 	days, startOfMonth, endOfMonth, month, err := services.MealPlanMonth(c.Request.Context(), offset)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		respondErr(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{
@@ -84,12 +85,12 @@ func GetMealPlanDay(c *gin.Context) {
 	idStr := c.Param("id")
 	id64, err := strconv.ParseUint(idStr, 10, 32)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid ID"})
+		apierr.BadRequest(c, "Invalid ID")
 		return
 	}
 	day, tot, err := services.MealPlanDay(c.Request.Context(), uint(id64))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		respondErr(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{
@@ -103,9 +104,9 @@ func GetMealPlanDay(c *gin.Context) {
 }
 
 func GetGoalsToday(c *gin.Context) {
-	goals, err := services.GoalsToday()
+	goals, err := services.GoalsToday(c.Request.Context())
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		respondErr(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, goals)

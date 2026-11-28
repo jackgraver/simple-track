@@ -4,21 +4,33 @@ import { queryClient } from "~/api/queryClient";
 import { getApiErrorMessage } from "~/api/httpError";
 import {
     authStatus,
+    isAdmin,
     isAuthenticated,
     markAuthenticated,
     markUnauthorized,
     setEnvironment,
     username,
 } from "~/composables/auth/session";
+import { clearUserStorage } from "~/utils/userStorage";
 
-interface AuthResponse {
+export interface AuthResponse {
     username?: string;
     environment?: string;
     user?: {
         ID: number;
         username: string;
         email?: string;
+        is_admin?: boolean;
     };
+}
+
+/** Applies a successful /auth/me, /auth/login or /auth/setup response to the session. */
+export function applyAuthResponse(data: AuthResponse): boolean {
+    const name = data.username ?? data.user?.username;
+    if (!name) return false;
+    setEnvironment(data.environment);
+    markAuthenticated(name, data.user?.ID, data.user?.is_admin === true);
+    return true;
 }
 
 let resolveInFlight: Promise<void> | null = null;
@@ -31,13 +43,7 @@ export async function resolveAuthSession(): Promise<void> {
         resolveInFlight = (async () => {
             try {
                 const { data } = await apiClient.get<AuthResponse>("/auth/me");
-                setEnvironment(data.environment);
-                const name = data.username ?? data.user?.username;
-                if (name) {
-                    markAuthenticated(name);
-                } else {
-                    markUnauthorized();
-                }
+                if (!applyAuthResponse(data)) markUnauthorized();
             } catch {
                 markUnauthorized();
             }
@@ -56,13 +62,7 @@ export function useAuth() {
                 password,
             });
 
-            const name = response.data.username ?? response.data.user?.username;
-            if (name) {
-                setEnvironment(response.data.environment);
-                markAuthenticated(name);
-            } else {
-                throw new Error("No user in login response");
-            }
+            if (!applyAuthResponse(response.data)) throw new Error("No user in login response");
         } catch (error) {
             throw new Error(getApiErrorMessage(error, "Login failed"));
         }
@@ -76,13 +76,7 @@ export function useAuth() {
                 email,
             });
 
-            const name = response.data.username ?? response.data.user?.username;
-            if (name) {
-                setEnvironment(response.data.environment);
-                markAuthenticated(name);
-            } else {
-                throw new Error("No user in registration response");
-            }
+            if (!applyAuthResponse(response.data)) throw new Error("No user in registration response");
         } catch (error) {
             throw new Error(getApiErrorMessage(error, "Registration failed"));
         }
@@ -98,6 +92,7 @@ export function useAuth() {
             return false;
         } finally {
             queryClient.clear();
+            clearUserStorage();
             markUnauthorized();
             void router.push({ name: "signin" });
         }
@@ -109,6 +104,7 @@ export function useAuth() {
 
     return {
         username,
+        isAdmin,
         isAuthenticated,
         login,
         register,

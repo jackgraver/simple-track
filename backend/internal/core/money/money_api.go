@@ -4,17 +4,14 @@ import (
 	"be-simpletracker/internal/core/money/controller"
 
 	"github.com/gin-gonic/gin"
-	"gorm.io/gorm"
 )
 
-type Handler struct {
-	db *gorm.DB
-}
+type Handler struct{}
 
-func NewHandler(db *gorm.DB) *Handler {
-	return &Handler{db: db}
+func NewHandler() *Handler {
+	return &Handler{}
 }
 
 func (h *Handler) RegisterRoutes(router *gin.Engine, authMiddleware gin.HandlerFunc) {
-	controller.RegisterRoutes(router.Group("/money", authMiddleware), h.db)
+	controller.RegisterRoutes(router.Group("/money", authMiddleware))
 }

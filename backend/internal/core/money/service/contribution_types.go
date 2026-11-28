@@ -1,24 +1,47 @@
 package service
 
 import (
+	"be-simpletracker/internal/database"
+	"context"
 	"errors"
 	"strings"
 	"time"
 
 	"be-simpletracker/internal/core/money/models"
 
+	"github.com/jackc/pgx/v5/pgconn"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
+// Contribution types are a shared catalog (everyone reads, anyone adds, the creator or the admin
+// edits, only the admin deletes); each user's own room figures live in models.ContributionRoom.
+// docs/multi-user/DECISIONS.md, "C4 money".
+
+// ContributionTypeInput is the shared rules of a type. It is the request body for editing a type.
 type ContributionTypeInput struct {
 	Name                   string   `json:"name"`
-	StartYear              *int     `json:"start_year"`
 	EligibilityAge         *int     `json:"eligibility_age"`
 	CarryForwardCap        *float64 `json:"carry_forward_cap"`
 	LifetimeLimit          *float64 `json:"lifetime_limit"`
 	WithdrawalsRestoreRoom bool     `json:"withdrawals_restore_room"`
-	OpeningRoomYear        *int     `json:"opening_room_year"`
-	OpeningRoom            *float64 `json:"opening_room"`
+}
+
+// RoomInput is the caller's own figures for a type. All nil clears them.
+type RoomInput struct {
+	StartYear       *int     `json:"start_year"`
+	OpeningRoomYear *int     `json:"opening_room_year"`
+	OpeningRoom     *float64 `json:"opening_room"`
+}
+
+func (r RoomInput) empty() bool {
+	return r.StartYear == nil && r.OpeningRoomYear == nil && r.OpeningRoom == nil
+}
+
+// ContributionTypeCreateInput creates a type with the caller's own room figures in one go.
+type ContributionTypeCreateInput struct {
+	ContributionTypeInput
+	RoomInput
 }
 
 type AccountRef struct {
@@ -28,6 +51,12 @@ type AccountRef struct {
 
 type ContributionTypeSummary struct {
 	models.ContributionType
+	// The caller's own room figures for this type (null when they have none).
+	StartYear       *int     `json:"start_year"`
+	OpeningRoomYear *int     `json:"opening_room_year"`
+	OpeningRoom     *float64 `json:"opening_room"`
+	// CanEdit is true for the type's creator and the admin.
+	CanEdit  bool         `json:"can_edit"`
 	Accounts []AccountRef `json:"accounts"`
 	// Room is nil when there is not enough configuration to calculate it
 	// (no start year, eligibility or limits).
@@ -36,37 +65,62 @@ type ContributionTypeSummary struct {
 	RoomIssue string `json:"room_issue,omitempty"`
 }
 
-func ListContributionTypes(db *gorm.DB, birthYear *int, now time.Time) ([]ContributionTypeSummary, error) {
+func canEditType(id database.Identity, contributionType models.ContributionType) bool {
+	return id.IsAdmin || contributionType.CreatedBy == id.UserID
+}
+
+func ListContributionTypes(ctx context.Context, birthYear *int, now time.Time) ([]ContributionTypeSummary, error) {
+	id, err := caller(ctx)
+	if err != nil {
+		return nil, err
+	}
+	db := database.From(ctx)
 	var types []models.ContributionType
 	if err := db.Preload("Limits", func(tx *gorm.DB) *gorm.DB {
 		return tx.Order("year DESC")
 	}).Order("name ASC").Find(&types).Error; err != nil {
 		return nil, err
 	}
-	var accounts []models.Account
-	if err := db.Where("investment_account_type_id IS NOT NULL").Order("name ASC").Find(&accounts).Error; err != nil {
+	var rooms []models.ContributionRoom
+	if err := db.Scopes(database.Owned(ctx)).Find(&rooms).Error; err != nil {
 		return nil, err
 	}
-	flows, err := contributionFlows(db)
+	roomByType := make(map[uint]*models.ContributionRoom, len(rooms))
+	for i := range rooms {
+		roomByType[rooms[i].ContributionTypeID] = &rooms[i]
+	}
+	var accounts []models.Account
+	if err := db.Scopes(database.Owned(ctx)).Where("investment_account_type_id IS NOT NULL").Order("name ASC").Find(&accounts).Error; err != nil {
+		return nil, err
+	}
+	flows, err := contributionFlows(ctx, db)
 	if err != nil {
 		return nil, err
 	}
 	summaries := make([]ContributionTypeSummary, 0, len(types))
 	for _, contributionType := range types {
-		summary := ContributionTypeSummary{ContributionType: contributionType, Accounts: []AccountRef{}}
+		room := roomByType[contributionType.ID]
+		summary := ContributionTypeSummary{
+			ContributionType: contributionType,
+			CanEdit:          canEditType(id, contributionType),
+			Accounts:         []AccountRef{},
+		}
+		if room != nil {
+			summary.StartYear, summary.OpeningRoomYear, summary.OpeningRoom = room.StartYear, room.OpeningRoomYear, room.OpeningRoom
+		}
 		for _, account := range accounts {
 			if account.ContributionTypeID != nil && *account.ContributionTypeID == contributionType.ID {
 				summary.Accounts = append(summary.Accounts, AccountRef{ID: account.ID, Name: account.Name})
 			}
 		}
-		summary.Room, summary.RoomIssue = roomFor(contributionType, birthYear, flows[contributionType.ID], now.Year())
+		summary.Room, summary.RoomIssue = roomFor(contributionType, room, birthYear, flows[contributionType.ID], now.Year())
 		summaries = append(summaries, summary)
 	}
 	return summaries, nil
 }
 
-func GetContributionType(db *gorm.DB, id uint, birthYear *int, now time.Time) (*ContributionTypeSummary, error) {
-	summaries, err := ListContributionTypes(db, birthYear, now)
+func GetContributionType(ctx context.Context, id uint, birthYear *int, now time.Time) (*ContributionTypeSummary, error) {
+	summaries, err := ListContributionTypes(ctx, birthYear, now)
 	if err != nil {
 		return nil, err
 	}
@@ -75,11 +129,11 @@ func GetContributionType(db *gorm.DB, id uint, birthYear *int, now time.Time) (*
 			return &summaries[i], nil
 		}
 	}
-	return nil, gorm.ErrRecordNotFound
+	return nil, database.ErrNotFound
 }
 
-func roomFor(contributionType models.ContributionType, birthYear *int, flows map[int]YearFlow, currentYear int) (*RoomSummary, string) {
-	startYear, ok := ResolveStartYear(contributionType, birthYear)
+func roomFor(contributionType models.ContributionType, room *models.ContributionRoom, birthYear *int, flows map[int]YearFlow, currentYear int) (*RoomSummary, string) {
+	startYear, ok := ResolveStartYear(contributionType, room, birthYear)
 	if !ok {
 		if contributionType.EligibilityAge != nil && birthYear == nil {
 			return nil, "Set your birth year in settings, or a start year, to calculate room."
@@ -89,21 +143,24 @@ func roomFor(contributionType models.ContributionType, birthYear *int, flows map
 	if startYear > currentYear {
 		return nil, "Room starts accruing in a future year."
 	}
-	summary := CalculateRoom(RoomRules{
+	rules := RoomRules{
 		StartYear:              startYear,
 		Limits:                 contributionType.Limits,
 		CarryForwardCap:        contributionType.CarryForwardCap,
 		LifetimeLimit:          contributionType.LifetimeLimit,
 		WithdrawalsRestoreRoom: contributionType.WithdrawalsRestoreRoom,
-		OpeningRoomYear:        contributionType.OpeningRoomYear,
-		OpeningRoom:            contributionType.OpeningRoom,
-	}, flows, currentYear)
+	}
+	if room != nil {
+		rules.OpeningRoomYear, rules.OpeningRoom = room.OpeningRoomYear, room.OpeningRoom
+	}
+	summary := CalculateRoom(rules, flows, currentYear)
 	return &summary, ""
 }
 
-// contributionFlows totals deposits and withdrawals per contribution type and
-// year across every (non-deleted) account assigned to that type.
-func contributionFlows(db *gorm.DB) (map[uint]map[int]YearFlow, error) {
+// contributionFlows totals the caller's deposits and withdrawals per contribution type and year
+// across their own (non-deleted) accounts assigned to that type. Deposits are scoped to the
+// caller; the composite FK guarantees each deposit's account has the same owner.
+func contributionFlows(ctx context.Context, db *gorm.DB) (map[uint]map[int]YearFlow, error) {
 	type row struct {
 		TypeID uint
 		Kind   models.TransactionKind
@@ -111,7 +168,7 @@ func contributionFlows(db *gorm.DB) (map[uint]map[int]YearFlow, error) {
 		Date   time.Time
 	}
 	var rows []row
-	if err := db.Table("investment_deposits").
+	if err := db.Table("investment_deposits").Scopes(database.Owned(ctx)).
 		Select("investment_accounts.investment_account_type_id AS type_id, investment_deposits.kind, investment_deposits.amount, investment_deposits.date").
 		Joins("JOIN investment_accounts ON investment_accounts.id = investment_deposits.account_id").
 		Where("investment_deposits.deleted_at IS NULL AND investment_accounts.deleted_at IS NULL AND investment_accounts.investment_account_type_id IS NOT NULL").
@@ -137,31 +194,90 @@ func contributionFlows(db *gorm.DB) (map[uint]map[int]YearFlow, error) {
 	return flows, nil
 }
 
-func CreateContributionType(db *gorm.DB, input ContributionTypeInput) (*models.ContributionType, error) {
+func CreateContributionType(ctx context.Context, input ContributionTypeCreateInput) (*models.ContributionType, error) {
+	db := database.From(ctx)
 	contributionType := models.ContributionType{}
-	applyContributionTypeInput(&contributionType, input)
+	applyContributionTypeInput(&contributionType, input.ContributionTypeInput)
 	if err := validateContributionType(db, contributionType); err != nil {
 		return nil, err
 	}
-	if err := db.Create(&contributionType).Error; err != nil {
+	if err := validateRoom(input.RoomInput); err != nil {
+		return nil, err
+	}
+	err := db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Omit(clause.Associations).Create(&contributionType).Error; err != nil {
+			return err
+		}
+		return saveRoom(ctx, tx, contributionType.ID, input.RoomInput)
+	})
+	if err != nil {
 		return nil, err
 	}
 	return &contributionType, nil
 }
 
-func UpdateContributionType(db *gorm.DB, id uint, input ContributionTypeInput) (*models.ContributionType, error) {
+// UpdateContributionType edits the shared rules of a type: its creator or the admin only.
+func UpdateContributionType(ctx context.Context, id uint, input ContributionTypeInput) (*models.ContributionType, error) {
+	identity, err := caller(ctx)
+	if err != nil {
+		return nil, err
+	}
+	db := database.From(ctx)
 	var contributionType models.ContributionType
 	if err := db.First(&contributionType, id).Error; err != nil {
 		return nil, err
+	}
+	if !canEditType(identity, contributionType) {
+		return nil, ErrForbidden
 	}
 	applyContributionTypeInput(&contributionType, input)
 	if err := validateContributionType(db, contributionType); err != nil {
 		return nil, err
 	}
-	if err := db.Save(&contributionType).Error; err != nil {
+	if err := db.Omit(clause.Associations).Save(&contributionType).Error; err != nil {
 		return nil, err
 	}
 	return &contributionType, nil
+}
+
+// SetContributionRoom replaces the caller's own room figures for a type (all nil clears them).
+func SetContributionRoom(ctx context.Context, id uint, input RoomInput) error {
+	db := database.From(ctx)
+	if err := validateRoom(input); err != nil {
+		return err
+	}
+	return db.Transaction(func(tx *gorm.DB) error {
+		var contributionType models.ContributionType
+		if err := tx.Select("id").First(&contributionType, id).Error; err != nil {
+			return err
+		}
+		return saveRoom(ctx, tx, id, input)
+	})
+}
+
+// saveRoom upserts the caller's room row for a type; an empty input removes it.
+func saveRoom(ctx context.Context, tx *gorm.DB, typeID uint, input RoomInput) error {
+	var row models.ContributionRoom
+	err := tx.Scopes(database.Owned(ctx)).Where("investment_account_type_id = ?", typeID).First(&row).Error
+	switch {
+	case errors.Is(err, gorm.ErrRecordNotFound):
+		if input.empty() {
+			return nil
+		}
+		row = models.ContributionRoom{
+			ContributionTypeID: typeID,
+			StartYear:          input.StartYear,
+			OpeningRoomYear:    input.OpeningRoomYear,
+			OpeningRoom:        input.OpeningRoom,
+		}
+		return tx.Omit(clause.Associations).Create(&row).Error
+	case err != nil:
+		return err
+	case input.empty():
+		return tx.Scopes(database.Owned(ctx)).Delete(&row).Error
+	}
+	row.StartYear, row.OpeningRoomYear, row.OpeningRoom = input.StartYear, input.OpeningRoomYear, input.OpeningRoom
+	return tx.Omit(clause.Associations).Save(&row).Error
 }
 
 type PresetInput struct {
@@ -172,9 +288,12 @@ type PresetInput struct {
 	OpeningRoom     *float64 `json:"opening_room"`
 }
 
-// CreateContributionTypeFromPreset creates a contribution type with the
-// preset's rules and limit schedule in one go.
-func CreateContributionTypeFromPreset(db *gorm.DB, input PresetInput) (*models.ContributionType, error) {
+// CreateContributionTypeFromPreset creates a contribution type with the preset's rules and limit
+// schedule in one go, plus the caller's own room figures. The catalog is shared: when a type with
+// that name already exists (another user added their TFSA first) it is reused as is and only the
+// caller's room figures are saved.
+func CreateContributionTypeFromPreset(ctx context.Context, input PresetInput) (*models.ContributionType, error) {
+	db := database.From(ctx)
 	preset, ok := findContributionPreset(input.Key)
 	if !ok {
 		return nil, invalid("unknown preset %q", input.Key)
@@ -183,31 +302,43 @@ func CreateContributionTypeFromPreset(db *gorm.DB, input PresetInput) (*models.C
 	if name == "" {
 		name = preset.Name
 	}
+	room := RoomInput{StartYear: input.StartYear, OpeningRoomYear: input.OpeningRoomYear, OpeningRoom: input.OpeningRoom}
+	if err := validateRoom(room); err != nil {
+		return nil, err
+	}
+	var existing models.ContributionType
+	err := db.Where("LOWER(name) = LOWER(?)", name).First(&existing).Error
+	switch {
+	case err == nil:
+		if err := saveRoom(ctx, db, existing.ID, room); err != nil {
+			return nil, err
+		}
+		return &existing, nil
+	case !errors.Is(err, gorm.ErrRecordNotFound):
+		return nil, err
+	}
 	contributionType := models.ContributionType{}
 	applyContributionTypeInput(&contributionType, ContributionTypeInput{
 		Name:                   name,
-		StartYear:              input.StartYear,
 		EligibilityAge:         preset.EligibilityAge,
 		CarryForwardCap:        preset.CarryForwardCap,
 		LifetimeLimit:          preset.LifetimeLimit,
 		WithdrawalsRestoreRoom: preset.WithdrawalsRestoreRoom,
-		OpeningRoomYear:        input.OpeningRoomYear,
-		OpeningRoom:            input.OpeningRoom,
 	})
 	if err := validateContributionType(db, contributionType); err != nil {
 		return nil, err
 	}
-	err := db.Transaction(func(tx *gorm.DB) error {
-		if err := tx.Create(&contributionType).Error; err != nil {
+	err = db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Omit(clause.Associations).Create(&contributionType).Error; err != nil {
 			return err
 		}
 		for _, limit := range preset.Limits {
 			row := models.ContributionLimit{ContributionTypeID: contributionType.ID, Year: limit.Year, AnnualLimit: limit.AnnualLimit}
-			if err := tx.Create(&row).Error; err != nil {
+			if err := tx.Omit(clause.Associations).Create(&row).Error; err != nil {
 				return err
 			}
 		}
-		return nil
+		return saveRoom(ctx, tx, contributionType.ID, room)
 	})
 	if err != nil {
 		return nil, err
@@ -215,30 +346,45 @@ func CreateContributionTypeFromPreset(db *gorm.DB, input PresetInput) (*models.C
 	return &contributionType, nil
 }
 
-func DeleteContributionType(db *gorm.DB, id uint) error {
+// DeleteContributionType removes a type from the catalog: the admin only. It is refused while any
+// account still uses it (the admin only sees their own accounts, so the database's foreign key
+// answers for other users' accounts).
+func DeleteContributionType(ctx context.Context, id uint) error {
+	identity, err := caller(ctx)
+	if err != nil {
+		return err
+	}
+	if !identity.IsAdmin {
+		return ErrForbidden
+	}
+	db := database.From(ctx)
 	var count int64
-	if err := db.Model(&models.Account{}).Where("investment_account_type_id = ?", id).Count(&count).Error; err != nil {
+	if err := db.Scopes(database.Owned(ctx)).Model(&models.Account{}).Where("investment_account_type_id = ?", id).Count(&count).Error; err != nil {
 		return err
 	}
 	if count > 0 {
 		return invalid("this contribution type is assigned to %d account(s); reassign them first", count)
 	}
-	return db.Transaction(func(tx *gorm.DB) error {
+	err = db.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Unscoped().Where("investment_account_type_id = ?", id).Delete(&models.ContributionLimit{}).Error; err != nil {
 			return err
 		}
-		result := tx.Unscoped().Delete(&models.ContributionType{}, id)
-		if result.Error != nil {
-			return result.Error
-		}
-		if result.RowsAffected == 0 {
-			return gorm.ErrRecordNotFound
-		}
-		return nil
+		return database.Affected(tx.Unscoped().Delete(&models.ContributionType{}, id))
 	})
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) && pgErr.Code == "23503" {
+		return invalid("this contribution type is still assigned to other users' accounts")
+	}
+	return err
 }
 
-func UpsertContributionLimit(db *gorm.DB, contributionTypeID uint, year int, annualLimit float64) (*models.ContributionLimit, error) {
+// UpsertContributionLimit sets the limit for a year: the type's creator or the admin only.
+func UpsertContributionLimit(ctx context.Context, contributionTypeID uint, year int, annualLimit float64) (*models.ContributionLimit, error) {
+	identity, err := caller(ctx)
+	if err != nil {
+		return nil, err
+	}
+	db := database.From(ctx)
 	if !validYear(year) {
 		return nil, invalid("year must be between 1900 and 9999")
 	}
@@ -249,11 +395,14 @@ func UpsertContributionLimit(db *gorm.DB, contributionTypeID uint, year int, ann
 	if err := db.First(&contributionType, contributionTypeID).Error; err != nil {
 		return nil, err
 	}
+	if !canEditType(identity, contributionType) {
+		return nil, ErrForbidden
+	}
 	var limit models.ContributionLimit
-	err := db.Unscoped().Where("investment_account_type_id = ? AND year = ?", contributionTypeID, year).First(&limit).Error
+	err = db.Unscoped().Where("investment_account_type_id = ? AND year = ?", contributionTypeID, year).First(&limit).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		limit = models.ContributionLimit{ContributionTypeID: contributionTypeID, Year: year, AnnualLimit: annualLimit}
-		if err := db.Create(&limit).Error; err != nil {
+		if err := db.Omit(clause.Associations).Create(&limit).Error; err != nil {
 			return nil, err
 		}
 		return &limit, nil
@@ -264,32 +413,31 @@ func UpsertContributionLimit(db *gorm.DB, contributionTypeID uint, year int, ann
 	// Revive a soft-deleted row so the unique index stays satisfied.
 	limit.DeletedAt = gorm.DeletedAt{}
 	limit.AnnualLimit = annualLimit
-	if err := db.Unscoped().Save(&limit).Error; err != nil {
+	if err := db.Unscoped().Omit(clause.Associations).Save(&limit).Error; err != nil {
 		return nil, err
 	}
 	return &limit, nil
 }
 
-func DeleteContributionLimit(db *gorm.DB, contributionTypeID uint, year int) error {
-	result := db.Unscoped().Where("investment_account_type_id = ? AND year = ?", contributionTypeID, year).Delete(&models.ContributionLimit{})
-	if result.Error != nil {
-		return result.Error
+// DeleteContributionLimit removes a year's limit: the admin only.
+func DeleteContributionLimit(ctx context.Context, contributionTypeID uint, year int) error {
+	identity, err := caller(ctx)
+	if err != nil {
+		return err
 	}
-	if result.RowsAffected == 0 {
-		return gorm.ErrRecordNotFound
+	if !identity.IsAdmin {
+		return ErrForbidden
 	}
-	return nil
+	db := database.From(ctx)
+	return database.Affected(db.Unscoped().Where("investment_account_type_id = ? AND year = ?", contributionTypeID, year).Delete(&models.ContributionLimit{}))
 }
 
 func applyContributionTypeInput(contributionType *models.ContributionType, input ContributionTypeInput) {
 	contributionType.Name = strings.TrimSpace(input.Name)
-	contributionType.StartYear = input.StartYear
 	contributionType.EligibilityAge = input.EligibilityAge
 	contributionType.CarryForwardCap = input.CarryForwardCap
 	contributionType.LifetimeLimit = input.LifetimeLimit
 	contributionType.WithdrawalsRestoreRoom = input.WithdrawalsRestoreRoom
-	contributionType.OpeningRoomYear = input.OpeningRoomYear
-	contributionType.OpeningRoom = input.OpeningRoom
 }
 
 func validateContributionType(db *gorm.DB, contributionType models.ContributionType) error {
@@ -305,9 +453,6 @@ func validateContributionType(db *gorm.DB, contributionType models.ContributionT
 	if existing > 0 {
 		return invalid("a contribution type named %q already exists", contributionType.Name)
 	}
-	if contributionType.StartYear != nil && !validYear(*contributionType.StartYear) {
-		return invalid("start year must be between 1900 and 9999")
-	}
 	if contributionType.EligibilityAge != nil && (*contributionType.EligibilityAge < 0 || *contributionType.EligibilityAge > 120) {
 		return invalid("eligibility age must be between 0 and 120")
 	}
@@ -317,10 +462,17 @@ func validateContributionType(db *gorm.DB, contributionType models.ContributionT
 	if contributionType.LifetimeLimit != nil && *contributionType.LifetimeLimit < 0 {
 		return invalid("lifetime limit must not be negative")
 	}
-	if (contributionType.OpeningRoomYear == nil) != (contributionType.OpeningRoom == nil) {
+	return nil
+}
+
+func validateRoom(room RoomInput) error {
+	if room.StartYear != nil && !validYear(*room.StartYear) {
+		return invalid("start year must be between 1900 and 9999")
+	}
+	if (room.OpeningRoomYear == nil) != (room.OpeningRoom == nil) {
 		return invalid("opening room needs both a year and an amount")
 	}
-	if contributionType.OpeningRoomYear != nil && !validYear(*contributionType.OpeningRoomYear) {
+	if room.OpeningRoomYear != nil && !validYear(*room.OpeningRoomYear) {
 		return invalid("opening room year must be between 1900 and 9999")
 	}
 	return nil

@@ -2,15 +2,18 @@ package controller
 
 import (
 	"errors"
+	"log"
 	"net/http"
 	"strconv"
 	"time"
 
 	"be-simpletracker/internal/core/auth/models"
+	authrepo "be-simpletracker/internal/core/auth/repository"
 	"be-simpletracker/internal/core/auth/services"
 	"be-simpletracker/internal/env"
 
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
 type CookieConfig struct {
@@ -22,7 +25,7 @@ type CookieConfig struct {
 
 type RegisterRequest struct {
 	Username string `json:"username" binding:"required,max=128"`
-	Password string `json:"password" binding:"required,max=72"`
+	Password string `json:"password" binding:"required,max=256"`
 	Email    string `json:"email" binding:"max=254"`
 }
 
@@ -35,13 +38,15 @@ func Register(c *gin.Context, service *services.AuthService, cookie CookieConfig
 		return
 	}
 
-	result, err := service.Register(services.RegisterInput{
+	result, err := service.Register(c.Request.Context(), services.RegisterInput{
 		Username: req.Username,
 		Password: req.Password,
 		Email:    req.Email,
 	})
 	if err != nil {
 		switch {
+		case errors.Is(err, services.ErrInvalidUsername), errors.Is(err, services.ErrPasswordTooShort), errors.Is(err, services.ErrPasswordTooLong):
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		case errors.Is(err, services.ErrUsernameExists):
 			c.JSON(http.StatusConflict, gin.H{"error": "Username already exists"})
 		case errors.Is(err, services.ErrPasswordHash):
@@ -70,9 +75,11 @@ type AuthResponse struct {
 	Environment string      `json:"environment"`
 }
 
+// LoginRequest: max lengths only bound the body; a password over 72 bytes simply fails
+// (services.PasswordMaxBytes).
 type LoginRequest struct {
 	Username string `json:"username" binding:"required,max=128"`
-	Password string `json:"password" binding:"required,max=72"`
+	Password string `json:"password" binding:"required,max=256"`
 }
 
 func Login(c *gin.Context, service *services.AuthService, cookie CookieConfig, protection *LoginProtection) {
@@ -85,6 +92,12 @@ func Login(c *gin.Context, service *services.AuthService, cookie CookieConfig, p
 	}
 
 	clientIP := c.ClientIP()
+	// Whether the username exists is only looked up when something is logged, and only the
+	// existing names are logged verbatim.
+	logAttempt := func(outcome string) {
+		_, err := authrepo.FindUserByUsername(c.Request.Context(), req.Username)
+		protection.LogAttempt(c.Request.Context(), outcome, clientIP, req.Username, err == nil)
+	}
 	decision := protection.Allow(clientIP, req.Username)
 	if !decision.Allowed {
 		if decision.LogRejection {
@@ -92,42 +105,53 @@ func Login(c *gin.Context, service *services.AuthService, cookie CookieConfig, p
 			if decision.Reason == "credential_spray" {
 				outcome = "credential_spray_blocked"
 			}
-			protection.LogAttempt(c.Request.Context(), outcome, clientIP, req.Username)
+			logAttempt(outcome)
+			services.RecordRejection(c.Request.Context(), models.AuthEvent{Event: models.EventLoginRateLimited, ClientIP: clientIP, Detail: decision.Reason})
 		}
 		respondLoginRateLimited(c, decision.RetryAfter)
 		return
 	}
 
-	result, err := service.Login(services.LoginInput{
+	protection.Wait(c.Request.Context(), decision.Delay)
+	if c.Request.Context().Err() != nil {
+		// The client went away during the backoff: don't check the password or log a failure.
+		c.Abort()
+		return
+	}
+	result, err := service.Login(c.Request.Context(), services.LoginInput{
 		Username: req.Username,
 		Password: req.Password,
 	})
 	if err != nil {
 		switch {
 		case errors.Is(err, services.ErrInvalidCredentials):
+			recordLoginFailure(c, clientIP, err)
 			sprayDecision := protection.RecordFailure(clientIP, req.Username)
 			if !sprayDecision.Allowed {
 				if sprayDecision.LogRejection {
-					protection.LogAttempt(c.Request.Context(), "credential_spray_blocked", clientIP, req.Username)
+					logAttempt("credential_spray_blocked")
 				}
 				respondLoginRateLimited(c, sprayDecision.RetryAfter)
 				return
 			}
-			protection.LogAttempt(c.Request.Context(), "invalid_credentials", clientIP, req.Username)
+			logAttempt("invalid_credentials")
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid username or password"})
 		case errors.Is(err, services.ErrTokenGeneration):
-			protection.LogAttempt(c.Request.Context(), "server_error", clientIP, req.Username)
+			logAttempt("server_error")
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate token"})
 		default:
-			protection.LogAttempt(c.Request.Context(), "server_error", clientIP, req.Username)
+			logAttempt("server_error")
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Database error"})
 		}
 		return
 	}
 
+	if err := services.RecordEvent(c.Request.Context(), models.AuthEvent{Event: models.EventLoginOK, UserID: &result.User.ID, ClientIP: clientIP}); err != nil {
+		log.Printf("[auth] audit login_ok: %v", err)
+	}
 	setAuthCookie(c, cookie, result.Token)
 	protection.RecordSuccess(clientIP, result.User.Username)
-	protection.LogAttempt(c.Request.Context(), "success", clientIP, result.User.Username)
+	protection.LogAttempt(c.Request.Context(), "success", clientIP, result.User.Username, true)
 	c.JSON(http.StatusOK, AuthResponse{
 		User:        result.User,
 		Username:    result.User.Username,
@@ -135,22 +159,27 @@ func Login(c *gin.Context, service *services.AuthService, cookie CookieConfig, p
 	})
 }
 
-func GetCurrentUser(c *gin.Context, service *services.AuthService) {
-	setAuthResponseHeaders(c)
-	username, exists := c.Get("username")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Not authenticated"})
-		return
+// recordLoginFailure audits a failed login: the account if the username exists, never the
+// attempted name (BACKLOG #19).
+func recordLoginFailure(c *gin.Context, clientIP string, err error) {
+	ev := models.AuthEvent{Event: models.EventLoginFailed, ClientIP: clientIP, Detail: "wrong_password"}
+	var failure *services.LoginFailure
+	if errors.As(err, &failure) {
+		ev.Detail = failure.Reason
+		if failure.UserID != 0 {
+			id := failure.UserID
+			ev.UserID = &id
+		}
 	}
-	usernameStr, ok := username.(string)
-	if !ok {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Not authenticated"})
-		return
-	}
+	services.RecordRejection(c.Request.Context(), ev)
+}
 
-	user, err := service.CurrentUser(usernameStr)
+// GetCurrentUser answers /auth/me for userID (resolved by AuthMiddleware).
+func GetCurrentUser(c *gin.Context, service *services.AuthService, userID uint) {
+	setAuthResponseHeaders(c)
+	user, err := service.CurrentUser(c.Request.Context(), userID)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+		respondUserLookupError(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{
@@ -164,7 +193,7 @@ type updateProfileRequest struct {
 	BirthYear *int `json:"birth_year"`
 }
 
-func UpdateCurrentUser(c *gin.Context, service *services.AuthService) {
+func UpdateCurrentUser(c *gin.Context, service *services.AuthService, userID uint) {
 	var req updateProfileRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -174,12 +203,26 @@ func UpdateCurrentUser(c *gin.Context, service *services.AuthService) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "birth_year is required"})
 		return
 	}
-	user, err := service.UpdateBirthYear(c.GetString("username"), *req.BirthYear)
-	if err != nil {
+	user, err := service.UpdateBirthYear(c.Request.Context(), userID, *req.BirthYear)
+	if errors.Is(err, services.ErrInvalidBirthYear) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+	if err != nil {
+		respondUserLookupError(c, err)
+		return
+	}
 	c.JSON(http.StatusOK, gin.H{"user": user})
+}
+
+// respondUserLookupError: the user vanished after the middleware checked it (404), or the
+// database failed (503, so the client doesn't treat it as signed out).
+func respondUserLookupError(c *gin.Context, err error) {
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+		return
+	}
+	c.JSON(http.StatusServiceUnavailable, gin.H{"error": "Could not load user"})
 }
 
 func Logout(c *gin.Context, cookie CookieConfig) {

@@ -4,6 +4,7 @@ import (
 	"be-simpletracker/internal/clock"
 	"be-simpletracker/internal/core/workout/models"
 	workoutrepo "be-simpletracker/internal/core/workout/repository"
+	"be-simpletracker/internal/database"
 	"context"
 	"errors"
 	"fmt"
@@ -27,7 +28,7 @@ func GetOrCreateDay(ctx context.Context, day time.Time) (models.WorkoutLog, erro
 	if !errors.Is(err, gorm.ErrRecordNotFound) {
 		return models.WorkoutLog{}, err
 	}
-	plan, err := GetPlanByDay(int(day.Weekday()))
+	plan, err := GetPlanByDay(ctx, int(day.Weekday()))
 	if err != nil {
 		return models.WorkoutLog{}, err
 	}
@@ -57,7 +58,7 @@ func SwitchPlan(ctx context.Context, offset int, planID *uint) (PreviousWorkoutR
 			return PreviousWorkoutResponse{}, err
 		}
 		if !exists {
-			return PreviousWorkoutResponse{}, fmt.Errorf("workout plan not found")
+			return PreviousWorkoutResponse{}, fmt.Errorf("workout plan not found: %w", gorm.ErrRecordNotFound)
 		}
 	}
 	if err := workoutrepo.UpdateWorkoutPlanID(ctx, day.ID, planID); err != nil {
@@ -271,7 +272,7 @@ func UpsertCardio(ctx context.Context, offset int, minutes int, cardioType strin
 		ctype = strings.TrimSpace(t.WorkoutPlan.PlannedCardioType)
 	}
 	if ctype == "" {
-		return nil, fmt.Errorf("cardio type is required when the plan has no planned cardio")
+		return nil, workoutrepo.Invalid("cardio type is required when the plan has no planned cardio")
 	}
 	existing, err := workoutrepo.FirstCardioByWorkoutLogID(ctx, t.ID)
 	if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -325,14 +326,7 @@ func GetPreviousWorkoutView(ctx context.Context, offset int) (PreviousWorkoutRes
 			group.Logged = &log
 			delete(loggedMap, p.Name)
 		}
-		prev, err := workoutrepo.GetPreviousExerciseLog(ctx, today.Date, p.Name, 0)
-		if err == nil {
-			group.Previous = &prev
-		}
-		maxLog, err := workoutrepo.GetMaxExerciseLog(ctx, today.Date, p.Name)
-		if err == nil {
-			group.Max = &maxLog
-		}
+		group.Previous, group.Max = previousAndMax(ctx, today.Date, p.Name)
 		results = append(results, group)
 	}
 	for _, l := range loggedMap {
@@ -341,14 +335,7 @@ func GetPreviousWorkoutView(ctx context.Context, offset int) (PreviousWorkoutRes
 			continue
 		}
 		group := ExerciseGroup{Logged: &l}
-		prev, err := workoutrepo.GetPreviousExerciseLog(ctx, today.Date, l.Exercise.Name, 0)
-		if err == nil {
-			group.Previous = &prev
-		}
-		maxLog, err := workoutrepo.GetMaxExerciseLog(ctx, today.Date, l.Exercise.Name)
-		if err == nil {
-			group.Max = &maxLog
-		}
+		group.Previous, group.Max = previousAndMax(ctx, today.Date, l.Exercise.Name)
 		results = append(results, group)
 	}
 	return PreviousWorkoutResponse{
@@ -373,7 +360,7 @@ func UpsertMobilityPre(ctx context.Context, offset int, checked []string) (*Mobi
 		items = append([]string{}, t.WorkoutPlan.PreMobilityItems...)
 	}
 	if len(items) == 0 {
-		return nil, fmt.Errorf("no dynamic warmup planned for this day")
+		return nil, workoutrepo.Invalid("no dynamic warmup planned for this day")
 	}
 	filtered := filterCheckedToItems(items, checked)
 	if err := workoutrepo.UpdatePreMobilityChecked(ctx, t.ID, filtered); err != nil {
@@ -396,7 +383,7 @@ func UpsertMobilityPost(ctx context.Context, offset int, checked []string) (*Mob
 		items = append([]string{}, t.WorkoutPlan.PostMobilityItems...)
 	}
 	if len(items) == 0 {
-		return nil, fmt.Errorf("no static stretching planned for this day")
+		return nil, workoutrepo.Invalid("no static stretching planned for this day")
 	}
 	filtered := filterCheckedToItems(items, checked)
 	if err := workoutrepo.UpdatePostMobilityChecked(ctx, t.ID, filtered); err != nil {
@@ -409,12 +396,12 @@ func UpsertMobilityPost(ctx context.Context, offset int, checked []string) (*Mob
 	return loggedPostMobilityView(reloaded.WorkoutPlan, &reloaded), nil
 }
 
-func LogExercise(exercise *models.LoggedExercise) error {
-	return workoutrepo.CreateLoggedExercise(exercise)
+func LogExercise(ctx context.Context, exercise *models.LoggedExercise) error {
+	return workoutrepo.CreateLoggedExercise(ctx, exercise)
 }
 
-func UpdateLoggedExercise(exercise models.LoggedExercise) error {
-	return workoutrepo.UpdateLoggedExerciseWithSets(exercise)
+func UpdateLoggedExercise(ctx context.Context, exercise models.LoggedExercise) error {
+	return workoutrepo.UpdateLoggedExerciseWithSets(ctx, exercise)
 }
 
 func RemoveLoggedExerciseForDay(ctx context.Context, offset int, exerciseID uint) error {
@@ -469,7 +456,7 @@ func LogSet(ctx context.Context, in LogSetInput) (LogSetResult, error) {
 	if err != nil {
 		return LogSetResult{}, err
 	}
-	exercise, err := workoutrepo.LoadLoggedExercise(res.LoggedExerciseID)
+	exercise, err := workoutrepo.LoadLoggedExercise(ctx, res.LoggedExerciseID)
 	if err != nil {
 		return LogSetResult{}, err
 	}
@@ -482,7 +469,7 @@ func UpdateSet(ctx context.Context, ref workoutrepo.SetRef, patch workoutrepo.Se
 	if err != nil {
 		return models.LoggedSet{}, models.LoggedExercise{}, err
 	}
-	exercise, err := workoutrepo.LoadLoggedExercise(set.LoggedExerciseID)
+	exercise, err := workoutrepo.LoadLoggedExercise(ctx, set.LoggedExerciseID)
 	if err != nil {
 		return models.LoggedSet{}, models.LoggedExercise{}, err
 	}
@@ -494,79 +481,121 @@ func DeleteSet(ctx context.Context, ref workoutrepo.SetRef) (workoutrepo.DeleteS
 	return workoutrepo.DeleteSet(ctx, ref)
 }
 
-func DeleteLoggedSet(setID uint) error {
-	return workoutrepo.DeleteLoggedSet(setID)
+func DeleteLoggedSet(ctx context.Context, setID uint) error {
+	return workoutrepo.DeleteLoggedSet(ctx, setID)
 }
 
-func GetAllExercises(excludeIDs []uint) ([]models.Exercise, error) {
-	return workoutrepo.FindAllExercises(excludeIDs)
+// DeleteExercise soft-deletes a shared exercise (admin only).
+func DeleteExercise(ctx context.Context, id uint) error {
+	return workoutrepo.DeleteExercise(ctx, id)
 }
+
+// SaveMachineSettings stores the caller's own machine settings for a shared exercise. Blank rows
+// (no label and no value) are dropped; an empty result clears them.
+func SaveMachineSettings(ctx context.Context, exerciseID uint, settings []models.MachineSetting) (*models.Exercise, error) {
+	clean := make([]models.MachineSetting, 0, len(settings))
+	for _, m := range settings {
+		m.Label, m.Value = strings.TrimSpace(m.Label), strings.TrimSpace(m.Value)
+		if m.Label == "" && m.Value == "" {
+			continue
+		}
+		if m.Label == "" {
+			return nil, workoutrepo.Invalid("every machine setting needs a label")
+		}
+		if len(m.Label) > 60 || len(m.Value) > 60 {
+			return nil, workoutrepo.Invalid("machine setting labels and values are at most 60 characters")
+		}
+		clean = append(clean, m)
+	}
+	if len(clean) > 20 {
+		return nil, workoutrepo.Invalid("at most 20 machine settings per exercise")
+	}
+	return workoutrepo.SaveMachineSettings(ctx, exerciseID, clean)
+}
+
+func GetAllExercises(ctx context.Context, excludeIDs []uint) ([]models.Exercise, error) {
+	return workoutrepo.FindAllExercises(ctx, excludeIDs)
+}
+
+// ValidationError and ErrForbidden come from the repository; handlers map them to 400 and 403.
+type ValidationError = workoutrepo.ValidationError
+
+var (
+	ErrForbidden     = workoutrepo.ErrForbidden
+	ErrExerciseInUse = workoutrepo.ErrExerciseInUse
+)
 
 type ExerciseProgressionEntry = workoutrepo.ExerciseProgressionEntry
 
-func GetExerciseProgression(exerciseID uint) ([]ExerciseProgressionEntry, error) {
-	return workoutrepo.GetExerciseProgression(exerciseID)
+func GetExerciseProgression(ctx context.Context, exerciseID uint) ([]ExerciseProgressionEntry, error) {
+	return workoutrepo.GetExerciseProgression(ctx, exerciseID)
 }
 
-func LoadPlanWithOrderedExercises(planID uint) (*models.WorkoutPlan, error) {
-	return workoutrepo.LoadPlanWithOrderedExercises(planID)
+func LoadPlanWithOrderedExercises(ctx context.Context, planID uint) (*models.WorkoutPlan, error) {
+	return workoutrepo.LoadPlanWithOrderedExercises(ctx, planID)
 }
 
-func GetAllWorkoutPlans() ([]models.WorkoutPlan, error) {
-	return workoutrepo.FindAllWorkoutPlans()
+func GetAllWorkoutPlans(ctx context.Context) ([]models.WorkoutPlan, error) {
+	return workoutrepo.FindAllWorkoutPlans(ctx)
 }
 
-func GetAllWorkoutPrograms() ([]models.WorkoutProgram, error) {
-	return workoutrepo.FindAllWorkoutPrograms()
+// GetAllWorkoutPrograms lists the caller's programs. A new account has none: the plans page shows
+// its "No programs yet" state and the first program created becomes the active one.
+func GetAllWorkoutPrograms(ctx context.Context) ([]models.WorkoutProgram, error) {
+	return workoutrepo.FindAllWorkoutPrograms(ctx)
 }
 
-func CreateWorkoutProgram(name string) (*models.WorkoutProgram, error) {
+func CreateWorkoutProgram(ctx context.Context, name string) (*models.WorkoutProgram, error) {
 	name = strings.TrimSpace(name)
 	if name == "" {
-		return nil, fmt.Errorf("program name is required")
+		return nil, workoutrepo.Invalid("program name is required")
 	}
 	program := &models.WorkoutProgram{Name: name}
-	if _, err := workoutrepo.FindActiveWorkoutProgram(); err != nil && errors.Is(err, gorm.ErrRecordNotFound) {
+	// Any other lookup error is ignored, as before; Optional keeps it from aborting the request.
+	if err := database.Optional(ctx, func() error {
+		_, err := workoutrepo.FindActiveWorkoutProgram(ctx)
+		return err
+	}); err != nil && errors.Is(err, gorm.ErrRecordNotFound) {
 		program.IsActive = true
 	}
-	if err := workoutrepo.CreateWorkoutProgram(program); err != nil {
+	if err := workoutrepo.CreateWorkoutProgram(ctx, program); err != nil {
 		return nil, err
 	}
 	return program, nil
 }
 
-func CreateWorkoutPlan(programID uint, name string, dayOfWeek *int) (*models.WorkoutPlan, error) {
+func CreateWorkoutPlan(ctx context.Context, programID uint, name string, dayOfWeek *int) (*models.WorkoutPlan, error) {
 	name = strings.TrimSpace(name)
 	if name == "" {
-		return nil, fmt.Errorf("plan name is required")
+		return nil, workoutrepo.Invalid("plan name is required")
 	}
-	if _, err := workoutrepo.FindWorkoutProgramByID(programID); err != nil {
+	if _, err := workoutrepo.FindWorkoutProgramByID(ctx, programID); err != nil {
 		return nil, fmt.Errorf("program not found: %w", err)
 	}
 	if dayOfWeek != nil && (*dayOfWeek < 0 || *dayOfWeek > 6) {
-		return nil, fmt.Errorf("day_of_week must be between 0 and 6")
+		return nil, workoutrepo.Invalid("day_of_week must be between 0 and 6")
 	}
 	plan := &models.WorkoutPlan{Name: name, WorkoutProgramID: &programID}
-	if err := workoutrepo.CreateWorkoutPlan(plan); err != nil {
+	if err := workoutrepo.CreateWorkoutPlan(ctx, plan); err != nil {
 		return nil, err
 	}
 	if dayOfWeek != nil {
-		if _, err := AssignPlanToDay(plan.ID, *dayOfWeek); err != nil {
+		if _, err := AssignPlanToDay(ctx, plan.ID, *dayOfWeek); err != nil {
 			return nil, err
 		}
 	}
-	return workoutrepo.LoadPlanWithOrderedExercises(plan.ID)
+	return workoutrepo.LoadPlanWithOrderedExercises(ctx, plan.ID)
 }
 
-func RenameWorkoutProgram(id uint, name string) (*models.WorkoutProgram, error) {
+func RenameWorkoutProgram(ctx context.Context, id uint, name string) (*models.WorkoutProgram, error) {
 	name = strings.TrimSpace(name)
 	if name == "" {
-		return nil, fmt.Errorf("program name is required")
+		return nil, workoutrepo.Invalid("program name is required")
 	}
-	if err := workoutrepo.UpdateWorkoutProgramName(id, name); err != nil {
+	if err := workoutrepo.UpdateWorkoutProgramName(ctx, id, name); err != nil {
 		return nil, err
 	}
-	program, err := workoutrepo.FindWorkoutProgramByID(id)
+	program, err := workoutrepo.FindWorkoutProgramByID(ctx, id)
 	if err != nil {
 		return nil, err
 	}
@@ -574,35 +603,40 @@ func RenameWorkoutProgram(id uint, name string) (*models.WorkoutProgram, error) 
 }
 
 func ActivateWorkoutProgram(ctx context.Context, id uint) (*models.WorkoutProgram, error) {
-	if _, err := workoutrepo.FindWorkoutProgramByID(id); err != nil {
+	if _, err := workoutrepo.FindWorkoutProgramByID(ctx, id); err != nil {
 		return nil, fmt.Errorf("program not found: %w", err)
 	}
 	if _, err := GetOrCreateToday(ctx, 0); err != nil {
 		return nil, err
 	}
-	if err := workoutrepo.ActivateWorkoutProgram(id); err != nil {
+	if err := workoutrepo.ActivateWorkoutProgram(ctx, id); err != nil {
 		return nil, err
 	}
-	program, err := workoutrepo.FindWorkoutProgramByID(id)
+	program, err := workoutrepo.FindWorkoutProgramByID(ctx, id)
 	if err != nil {
 		return nil, err
 	}
 	return &program, nil
 }
 
-func AddExerciseToPlan(planID uint, exerciseID uint) error {
-	return workoutrepo.AddExerciseToPlan(planID, exerciseID)
+func AddExerciseToPlan(ctx context.Context, planID uint, exerciseID uint) error {
+	return workoutrepo.AddExerciseToPlan(ctx, planID, exerciseID)
 }
 
-func RemoveExerciseFromPlan(planID uint, exerciseID uint) error {
-	return workoutrepo.RemoveExerciseFromPlan(planID, exerciseID)
+func RemoveExerciseFromPlan(ctx context.Context, planID uint, exerciseID uint) error {
+	// The plan first, so someone else's plan answers like a missing one ("not found"), apart from
+	// "that exercise isn't in your plan".
+	if _, err := workoutrepo.FindWorkoutPlanByID(ctx, planID); err != nil {
+		return err
+	}
+	return workoutrepo.RemoveExerciseFromPlan(ctx, planID, exerciseID)
 }
 
-func ReorderPlanExercises(planID uint, exerciseIDs []uint) error {
-	return workoutrepo.ReorderPlanExercises(planID, exerciseIDs)
+func ReorderPlanExercises(ctx context.Context, planID uint, exerciseIDs []uint) error {
+	return workoutrepo.ReorderPlanExercises(ctx, planID, exerciseIDs)
 }
 
-func CreateExercise(name string, repRollover uint, cues string, loadTypes ...models.ExerciseLoadType) (*models.Exercise, error) {
+func CreateExercise(ctx context.Context, name string, repRollover uint, cues string, loadTypes ...models.ExerciseLoadType) (*models.Exercise, error) {
 	loadType := models.ExerciseLoadType("")
 	if len(loadTypes) > 0 {
 		loadType = loadTypes[0]
@@ -613,134 +647,134 @@ func CreateExercise(name string, repRollover uint, cues string, loadTypes ...mod
 		Cues:        cues,
 		LoadType:    models.NormalizeExerciseLoadType(loadType),
 	}
-	if err := workoutrepo.CreateExercise(&exercise); err != nil {
+	if err := workoutrepo.CreateExercise(ctx, &exercise); err != nil {
 		return nil, err
 	}
 	return &exercise, nil
 }
 
-func UpdateExercise(id uint, name string, repRollover uint, cues string, loadTypes ...models.ExerciseLoadType) (*models.Exercise, error) {
-	return workoutrepo.UpdateExercise(id, name, repRollover, cues, loadTypes...)
+func UpdateExercise(ctx context.Context, id uint, name string, repRollover uint, cues string, loadTypes ...models.ExerciseLoadType) (*models.Exercise, error) {
+	return workoutrepo.UpdateExercise(ctx, id, name, repRollover, cues, loadTypes...)
 }
 
 // UpdateExerciseWithUnilateral is UpdateExercise that can also turn one-side-at-a-time logging on
 // or off (nil keeps it) in the same write. Logged sets keep their sides.
-func UpdateExerciseWithUnilateral(id uint, name string, repRollover uint, cues string, unilateral *bool, loadTypes ...models.ExerciseLoadType) (*models.Exercise, error) {
-	return workoutrepo.UpdateExerciseWithUnilateral(id, name, repRollover, cues, unilateral, loadTypes...)
+func UpdateExerciseWithUnilateral(ctx context.Context, id uint, name string, repRollover uint, cues string, unilateral *bool, loadTypes ...models.ExerciseLoadType) (*models.Exercise, error) {
+	return workoutrepo.UpdateExerciseWithUnilateral(ctx, id, name, repRollover, cues, unilateral, loadTypes...)
 }
 
-func AssignPlanToDay(planID uint, dayOfWeek int) (*models.WorkoutPlan, error) {
+func AssignPlanToDay(ctx context.Context, planID uint, dayOfWeek int) (*models.WorkoutPlan, error) {
 	if dayOfWeek < 0 || dayOfWeek > 6 {
-		return nil, fmt.Errorf("day_of_week must be between 0 (Sunday) and 6 (Saturday)")
+		return nil, workoutrepo.Invalid("day_of_week must be between 0 (Sunday) and 6 (Saturday)")
 	}
-	plan, err := workoutrepo.FindWorkoutPlanByID(planID)
+	plan, err := workoutrepo.FindWorkoutPlanByID(ctx, planID)
 	if err != nil {
 		return nil, fmt.Errorf("plan not found: %w", err)
 	}
 	if plan.WorkoutProgramID == nil {
-		program, err := workoutrepo.FindActiveWorkoutProgram()
+		program, err := workoutrepo.FindActiveWorkoutProgram(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("active program not found: %w", err)
 		}
-		if err := workoutrepo.AssignWorkoutPlanToProgram(planID, program.ID); err != nil {
+		if err := workoutrepo.AssignWorkoutPlanToProgram(ctx, planID, program.ID); err != nil {
 			return nil, err
 		}
 		plan.WorkoutProgramID = &program.ID
 	}
-	if err := workoutrepo.UnassignOtherPlansFromProgramDay(*plan.WorkoutProgramID, dayOfWeek, planID); err != nil {
+	if err := workoutrepo.UnassignOtherPlansFromProgramDay(ctx, *plan.WorkoutProgramID, dayOfWeek, planID); err != nil {
 		return nil, fmt.Errorf("failed to unassign existing plan: %w", err)
 	}
-	if err := workoutrepo.AssignWorkoutPlanToDay(planID, dayOfWeek); err != nil {
+	if err := workoutrepo.AssignWorkoutPlanToDay(ctx, planID, dayOfWeek); err != nil {
 		return nil, fmt.Errorf("failed to assign plan to day: %w", err)
 	}
-	reloaded, err := workoutrepo.LoadPlanWithOrderedExercises(planID)
+	reloaded, err := workoutrepo.LoadPlanWithOrderedExercises(ctx, planID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to reload plan: %w", err)
 	}
 	return reloaded, nil
 }
 
-func UnassignPlanFromDay(planID uint) (*models.WorkoutPlan, error) {
-	return unassignPlanFromDay(planID, nil)
+func UnassignPlanFromDay(ctx context.Context, planID uint) (*models.WorkoutPlan, error) {
+	return unassignPlanFromDay(ctx, planID, nil)
 }
 
-func UnassignPlanFromSpecificDay(planID uint, dayOfWeek int) (*models.WorkoutPlan, error) {
+func UnassignPlanFromSpecificDay(ctx context.Context, planID uint, dayOfWeek int) (*models.WorkoutPlan, error) {
 	if dayOfWeek < 0 || dayOfWeek > 6 {
-		return nil, fmt.Errorf("day_of_week must be between 0 (Sunday) and 6 (Saturday)")
+		return nil, workoutrepo.Invalid("day_of_week must be between 0 (Sunday) and 6 (Saturday)")
 	}
-	return unassignPlanFromDay(planID, &dayOfWeek)
+	return unassignPlanFromDay(ctx, planID, &dayOfWeek)
 }
 
-func unassignPlanFromDay(planID uint, dayOfWeek *int) (*models.WorkoutPlan, error) {
-	if _, err := workoutrepo.FindWorkoutPlanByID(planID); err != nil {
+func unassignPlanFromDay(ctx context.Context, planID uint, dayOfWeek *int) (*models.WorkoutPlan, error) {
+	if _, err := workoutrepo.FindWorkoutPlanByID(ctx, planID); err != nil {
 		return nil, fmt.Errorf("plan not found: %w", err)
 	}
 	var err error
 	if dayOfWeek == nil {
-		err = workoutrepo.ClearWorkoutPlanDay(planID)
+		err = workoutrepo.ClearWorkoutPlanDay(ctx, planID)
 	} else {
-		err = workoutrepo.ClearWorkoutPlanDayOfWeek(planID, *dayOfWeek)
+		err = workoutrepo.ClearWorkoutPlanDayOfWeek(ctx, planID, *dayOfWeek)
 	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to unassign plan from day: %w", err)
 	}
-	reloaded, err := workoutrepo.LoadPlanWithOrderedExercises(planID)
+	reloaded, err := workoutrepo.LoadPlanWithOrderedExercises(ctx, planID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to reload plan: %w", err)
 	}
 	return reloaded, nil
 }
 
-func GetPlanByDay(dayOfWeek int) (*models.WorkoutPlan, error) {
+func GetPlanByDay(ctx context.Context, dayOfWeek int) (*models.WorkoutPlan, error) {
 	if dayOfWeek < 0 || dayOfWeek > 6 {
-		return nil, fmt.Errorf("day_of_week must be between 0 (Sunday) and 6 (Saturday)")
+		return nil, workoutrepo.Invalid("day_of_week must be between 0 (Sunday) and 6 (Saturday)")
 	}
-	program, err := workoutrepo.FindActiveWorkoutProgram()
+	program, err := workoutrepo.FindActiveWorkoutProgram(ctx)
 	if err != nil {
 		if err == gorm.ErrRecordNotFound {
 			return nil, nil
 		}
 		return nil, err
 	}
-	plan, err := workoutrepo.FindWorkoutPlanByProgramAndDay(program.ID, dayOfWeek)
+	plan, err := workoutrepo.FindWorkoutPlanByProgramAndDay(ctx, program.ID, dayOfWeek)
 	if err != nil {
 		if err == gorm.ErrRecordNotFound {
 			return nil, nil
 		}
 		return nil, err
 	}
-	return workoutrepo.LoadPlanWithOrderedExercises(plan.ID)
+	return workoutrepo.LoadPlanWithOrderedExercises(ctx, plan.ID)
 }
 
-func UpdateExerciseCues(exerciseID uint, cues string) (*models.Exercise, error) {
-	return workoutrepo.UpdateExerciseCues(exerciseID, cues)
+func UpdateExerciseCues(ctx context.Context, exerciseID uint, cues string) (*models.Exercise, error) {
+	return workoutrepo.UpdateExerciseCues(ctx, exerciseID, cues)
 }
 
 type ExerciseListResult = workoutrepo.ExerciseListResult
 
-func ListExercises(page, pageSize int, search string) (ExerciseListResult, error) {
-	return workoutrepo.ListExercises(page, pageSize, search)
+func ListExercises(ctx context.Context, page, pageSize int, search string) (ExerciseListResult, error) {
+	return workoutrepo.ListExercises(ctx, page, pageSize, search)
 }
 
-func LoadLoggedExercise(id uint) (models.LoggedExercise, error) {
-	return workoutrepo.LoadLoggedExercise(id)
+func LoadLoggedExercise(ctx context.Context, id uint) (models.LoggedExercise, error) {
+	return workoutrepo.LoadLoggedExercise(ctx, id)
 }
 
-func SetPlannedCardio(planID uint, cardioType string, minutes int) (*models.WorkoutPlan, error) {
+func SetPlannedCardio(ctx context.Context, planID uint, cardioType string, minutes int) (*models.WorkoutPlan, error) {
 	if minutes < 0 {
-		return nil, errors.New("planned cardio minutes cannot be negative")
+		return nil, workoutrepo.Invalid("planned cardio minutes cannot be negative")
 	}
 	cardioType = strings.TrimSpace(cardioType)
 	if cardioType == "" {
 		minutes = 0
 	}
-	if err := workoutrepo.UpdatePlannedCardio(planID, cardioType, minutes); err != nil {
+	if err := workoutrepo.UpdatePlannedCardio(ctx, planID, cardioType, minutes); err != nil {
 		return nil, err
 	}
-	return workoutrepo.LoadPlanWithOrderedExercises(planID)
+	return workoutrepo.LoadPlanWithOrderedExercises(ctx, planID)
 }
 
-func SetPlannedMobility(planID uint, preItems, postItems []string) (*models.WorkoutPlan, error) {
+func SetPlannedMobility(ctx context.Context, planID uint, preItems, postItems []string) (*models.WorkoutPlan, error) {
 	normalize := func(items []string) []string {
 		result := make([]string, 0, len(items))
 		seen := make(map[string]struct{}, len(items))
@@ -760,33 +794,54 @@ func SetPlannedMobility(planID uint, preItems, postItems []string) (*models.Work
 	}
 	preItems = normalize(preItems)
 	postItems = normalize(postItems)
-	if err := workoutrepo.UpdateMobilityItems(planID, preItems, postItems); err != nil {
+	if err := workoutrepo.UpdateMobilityItems(ctx, planID, preItems, postItems); err != nil {
 		return nil, err
 	}
-	return workoutrepo.LoadPlanWithOrderedExercises(planID)
+	return workoutrepo.LoadPlanWithOrderedExercises(ctx, planID)
 }
 
-func RenameWorkoutPlan(id uint, name string) (*models.WorkoutPlan, error) {
+func RenameWorkoutPlan(ctx context.Context, id uint, name string) (*models.WorkoutPlan, error) {
 	name = strings.TrimSpace(name)
 	if name == "" {
-		return nil, fmt.Errorf("routine name is required")
+		return nil, workoutrepo.Invalid("routine name is required")
 	}
-	if err := workoutrepo.UpdateWorkoutPlanName(id, name); err != nil {
+	if err := workoutrepo.UpdateWorkoutPlanName(ctx, id, name); err != nil {
 		return nil, err
 	}
-	return workoutrepo.LoadPlanWithOrderedExercises(id)
+	return workoutrepo.LoadPlanWithOrderedExercises(ctx, id)
 }
 
-func DeleteWorkoutPlan(id uint) error {
-	return workoutrepo.SoftDeleteWorkoutPlan(id)
+func DeleteWorkoutPlan(ctx context.Context, id uint) error {
+	return workoutrepo.SoftDeleteWorkoutPlan(ctx, id)
 }
 
-func RestoreWorkoutPlan(id uint) (*models.WorkoutPlan, error) {
-	if err := workoutrepo.RestoreWorkoutPlan(id); err != nil {
+func RestoreWorkoutPlan(ctx context.Context, id uint) (*models.WorkoutPlan, error) {
+	if err := workoutrepo.RestoreWorkoutPlan(ctx, id); err != nil {
 		return nil, err
 	}
-	if err := workoutrepo.RefreshLegacyDay(id); err != nil {
+	if err := workoutrepo.RefreshLegacyDay(ctx, id); err != nil {
 		return nil, err
 	}
-	return workoutrepo.LoadPlanWithOrderedExercises(id)
+	return workoutrepo.LoadPlanWithOrderedExercises(ctx, id)
+}
+
+// previousAndMax loads an exercise's previous and best logs before day. Both are best effort
+// (missing or failed lookups leave them nil); Optional keeps a failed one from aborting the
+// request transaction.
+func previousAndMax(ctx context.Context, day time.Time, exercise string) (previous, max *models.LoggedExercise) {
+	_ = database.Optional(ctx, func() error {
+		prev, err := workoutrepo.GetPreviousExerciseLog(ctx, day, exercise, 0)
+		if err == nil {
+			previous = &prev
+		}
+		return err
+	})
+	_ = database.Optional(ctx, func() error {
+		m, err := workoutrepo.GetMaxExerciseLog(ctx, day, exercise)
+		if err == nil {
+			max = &m
+		}
+		return err
+	})
+	return previous, max
 }

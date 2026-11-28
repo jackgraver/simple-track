@@ -3,12 +3,15 @@ package models
 import (
 	"time"
 
+	"be-simpletracker/internal/database"
+
 	"gorm.io/gorm"
 )
 
 // Plan represents a diet plan
 type Plan struct {
 	gorm.Model
+	database.Owner
 	Name          string     `json:"name"`
 	Calories      float32    `json:"calories"`
 	Protein       float32    `json:"protein"`
@@ -18,13 +21,12 @@ type Plan struct {
 	EffectiveFrom *time.Time `json:"effective_from,omitempty" gorm:"index"`
 }
 
-func (p Plan) GetID() uint        { return p.ID }
-func (p Plan) TableName() string  { return "plans" }
-func (p Plan) Preloads() []string { return []string{} }
+func (p Plan) TableName() string { return "plans" }
 
 // PlannedMeal represents a meal that is planned for a day
 type PlannedMeal struct {
 	gorm.Model
+	database.Owner
 	DayID        uint    `json:"day_id" gorm:"not null"`
 	DietDay      DietDay `gorm:"foreignKey:DayID" json:"day"`
 	MealID       uint    `json:"meal_id" gorm:"not null"`
@@ -36,6 +38,4 @@ type PlannedMeal struct {
 	ClientID *string `json:"client_id,omitempty" gorm:"type:uuid"`
 }
 
-func (p PlannedMeal) GetID() uint        { return p.ID }
-func (p PlannedMeal) TableName() string  { return "planned_meals" }
-func (p PlannedMeal) Preloads() []string { return []string{"Meal.Items.Food"} }
+func (p PlannedMeal) TableName() string { return "planned_meals" }

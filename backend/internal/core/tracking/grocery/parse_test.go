@@ -1,6 +1,7 @@
 package grocery
 
 import (
+	"be-simpletracker/internal/database"
 	"reflect"
 	"testing"
 	"time"
@@ -78,11 +79,11 @@ func TestParseTextListAndCreateItems(t *testing.T) {
 	db := testDB(t)
 	now := time.Now()
 	for _, n := range []string{"Eggs", "Eggs", "Bread"} {
-		db.Create(&GroceryItem{Name: n, CompletedAt: &now})
+		db.Create(&GroceryItem{Owner: database.Owner{UserID: 1}, Name: n, CompletedAt: &now})
 	}
-	db.Create(&GroceryItem{Name: "Bread"}) // active
+	db.Create(&GroceryItem{Owner: database.Owner{UserID: 1}, Name: "Bread"}) // active
 
-	lines, err := ParseTextList(db, "eggs\nbread\ncheese")
+	lines, err := ParseTextList(asUser(db, 1), "eggs\nbread\ncheese")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -95,7 +96,7 @@ func TestParseTextListAndCreateItems(t *testing.T) {
 		t.Fatalf("ParseTextList:\n got %+v\nwant %+v", lines, want)
 	}
 
-	created, skipped, err := CreateItems(db, []string{"Eggs", "bread", " cheese ", "Cheese", ""})
+	created, skipped, err := CreateItems(asUser(db, 1), []string{"Eggs", "bread", " cheese ", "Cheese", ""})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -105,7 +106,7 @@ func TestParseTextListAndCreateItems(t *testing.T) {
 	if !reflect.DeepEqual(skipped, []string{"bread", "Cheese"}) {
 		t.Fatalf("skipped = %q", skipped)
 	}
-	active, _ := ListActiveItems(db)
+	active, _ := ListActiveItems(asUser(db, 1))
 	if len(active) != 3 {
 		t.Fatalf("active = %d, want 3", len(active))
 	}

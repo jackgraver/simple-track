@@ -8,6 +8,7 @@ import type {
     LoggedSetWithStatus,
 } from "../../store/useWorkoutStore";
 import { toast } from "~/composables/toast/useToast";
+import { userKey } from "~/utils/userStorage";
 import { useGlobalRestTimer } from "~/composables/useGlobalRestTimer";
 import { useWebStorageJsonSync } from "~/composables/useWebStorageJsonSync";
 import { newClientId } from "~/api/ids";
@@ -220,7 +221,9 @@ export function useExerciseLoggingSession(options: {
 
     const draftStorageKey = computed(
         () =>
-            `gym-draft:v2:date:${date.value}:exercise:${exerciseIdentity.value}`,
+            userKey(
+                `gym-draft:v2:date:${date.value}:exercise:${exerciseIdentity.value}`,
+            ) ?? "",
     );
 
     const draftStorage = useWebStorageJsonSync<StoredDraft>({

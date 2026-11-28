@@ -23,7 +23,7 @@ the same time. **Never hardcode ports; ask `./bin/dev env`.**
 | frontend (vite, proxies `/api` -> backend) | 3000 | 3000+N*100 |
 | backend (`/health`) | 8080 | 8080+N*100 |
 | pgweb | 8081 | 8081+N*100 |
-| postgres (`simpletracker_dev`, postgres/postgres) | 5432 | 5432+N*100 |
+| postgres (`simpletracker_dev`, postgres/postgres; the backend logs in as `simpletrack_app`) | 5432 | 5432+N*100 |
 
 ### Verifying changes as an agent
 
@@ -85,6 +85,9 @@ UI overhaul, optimistic UI and performance work are tracked in `docs/projects/`.
 of them, read `docs/projects/README.md` (session protocol) and that project's README/TASKS. Update
 TASKS/DECISIONS in the same PR as the code.
 
+Multi-user and security hardening: `docs/multi-user/` on the `proj/multi-user` branch (base for
+all its lane PRs). Starter prompt for a lane session: `docs/multi-user/START.md`.
+
 ## UI / design system
 
 Any frontend UI change follows `docs/design/` (start with `docs/design/README.md`; the `ui` skill and
@@ -109,6 +112,9 @@ server, which refuses to start while any are pending, and into `cmd/migrate`, wh
 - `./bin/dev migrate new <name>` creates the next file. Fill in `-- migrate:up` and
   `-- migrate:down` (or `-- migrate:down irreversible`).
 - `./bin/dev migrate up | down [n] | redo | status | check`.
+- Migrations run as the schema owner; the server logs in as `simpletrack_app`, which gets DML on
+  new tables and sequences through default privileges (migration 0010), so don't add GRANTs.
+  A table the server must not write needs an explicit `REVOKE`.
 - Never edit a migration that has been applied anywhere but your dev DB. Write a new one instead.
   In dev, `migrate redo` re-runs the latest one after you've edited it.
 - Tests for `internal/migrate` need `TEST_DATABASE_URL` (`dev test` sets it). Module tests

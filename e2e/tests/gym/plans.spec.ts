@@ -300,6 +300,32 @@ test.describe('gym plans: routine exercises', { tag: ['@gym'] }, () => {
   });
 });
 
+test.describe('gym plans: machine settings', { tag: ['@gym'] }, () => {
+  test('edit an exercise: your own machine settings persist, and can be cleared', async ({ page }) => {
+    await openRoutine(page, LEGS, 'Legs');
+    await rowAction(page, 'Leg Press', 'Edit exercise');
+    let dialog = page.getByRole('dialog', { name: 'Edit Leg Press' });
+    await dialog.getByRole('button', { name: 'Add setting' }).click();
+    await dialog.getByLabel('Setting label').fill('Seat');
+    await dialog.getByLabel('Setting value').fill('4');
+    const saved = waitForApi(page, 'PUT /workout/exercises/:id/settings');
+    await dialog.getByRole('button', { name: 'Save' }).click();
+    await saved;
+    await expect(dialog).toHaveCount(0);
+    await page.reload();
+    await rowAction(page, 'Leg Press', 'Edit exercise');
+    dialog = page.getByRole('dialog', { name: 'Edit Leg Press' });
+    await expect(dialog.getByLabel('Setting label')).toHaveValue('Seat');
+    await expect(dialog.getByLabel('Setting value')).toHaveValue('4');
+    await dialog.getByRole('button', { name: 'Remove setting' }).click();
+    await dialog.getByRole('button', { name: 'Save' }).click();
+    await expect(dialog).toHaveCount(0);
+    await page.reload();
+    await rowAction(page, 'Leg Press', 'Edit exercise');
+    await expect(page.getByRole('dialog', { name: 'Edit Leg Press' }).getByLabel('Setting label')).toHaveCount(0);
+  });
+});
+
 test.describe('gym plans: scheduling', { tag: ['@gym'] }, () => {
   test('day picker: put a routine on a free day; the schedule and /gym show it', async ({ page, isMobile }) => {
     await openSchedule(page);

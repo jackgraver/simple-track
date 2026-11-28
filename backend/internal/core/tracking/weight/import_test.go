@@ -1,8 +1,13 @@
 package weight
 
 import (
+	"be-simpletracker/internal/database"
+	"context"
+	"encoding/json"
+	"fmt"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/glebarez/sqlite"
 	"gorm.io/gorm"
@@ -71,16 +76,51 @@ func TestImportBodyWeightsUpserts(t *testing.T) {
 		t.Fatal(err)
 	}
 	logs, _ := ParseRenphoCSV(renphoHeader + renphoRow)
-	if c, u, err := ImportBodyWeights(db, logs); err != nil || c != 1 || u != 0 {
+	if c, u, err := ImportBodyWeights(database.WithIdentity(database.WithDB(context.Background(), db), database.Identity{UserID: 1}), logs); err != nil || c != 1 || u != 0 {
 		t.Fatalf("first import: %d %d %v", c, u, err)
 	}
 	// Re-import with a later weight and without body fat: row is replaced, not duplicated.
 	logs2, _ := ParseRenphoCSV("Date,Weight(lb)\n2026.11.19,163.0\n")
-	if c, u, err := ImportBodyWeights(db, logs2); err != nil || c != 0 || u != 1 {
+	if c, u, err := ImportBodyWeights(database.WithIdentity(database.WithDB(context.Background(), db), database.Identity{UserID: 1}), logs2); err != nil || c != 0 || u != 1 {
 		t.Fatalf("second import: %d %d %v", c, u, err)
 	}
-	rows, _ := ListBodyWeights(db, 0)
+	rows, _ := ListBodyWeights(database.WithIdentity(database.WithDB(context.Background(), db), database.Identity{UserID: 1}), 0)
 	if len(rows) != 1 || rows[0].WeightLbs != 163.0 || rows[0].BodyFatPct != nil {
 		t.Fatalf("unexpected rows: %+v", rows)
+	}
+}
+
+func TestParseRenphoCSVDayCap(t *testing.T) {
+	days := func(n, perDay int) string {
+		var b strings.Builder
+		b.WriteString("Date,Time,Weight(lb)\n")
+		start := time.Date(1990, 1, 1, 0, 0, 0, 0, time.Local)
+		for d := 0; d < n; d++ {
+			for k := 0; k < perDay; k++ {
+				fmt.Fprintf(&b, "%s,0%d:00:00,164.2\n", start.AddDate(0, 0, d).Format("2006.01.02"), k)
+			}
+		}
+		return b.String()
+	}
+	// Several weigh-ins a day collapse first, so only days count.
+	if logs, err := ParseRenphoCSV(days(MaxImportRows, 3)); err != nil || len(logs) != MaxImportRows {
+		t.Fatalf("%d days x 3: %d logs, err %v", MaxImportRows, len(logs), err)
+	}
+	_, err := ParseRenphoCSV(days(MaxImportRows+1, 1))
+	if err == nil || !strings.Contains(err.Error(), "too many days") {
+		t.Fatalf("%d days: err = %v, want too many days", MaxImportRows+1, err)
+	}
+}
+
+// A full Renpho export at the cap, pasted tab-separated (each tab is 2 bytes in JSON), fits the
+// route's 5 MiB body limit (cmd/server bodyLimits).
+func TestRenphoExportAtCapFitsBodyLimit(t *testing.T) {
+	tsv := strings.ReplaceAll(renphoHeader+strings.Repeat(renphoRow, MaxImportRows), ",", "\t")
+	body, err := json.Marshal(importWeightsBody{CSV: tsv})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(body) > 5<<20 {
+		t.Fatalf("request body for %d rows is %d bytes, over 5 MiB", MaxImportRows, len(body))
 	}
 }

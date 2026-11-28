@@ -1,4 +1,5 @@
-import { computed, ref } from "vue";
+import { computed, ref, watch } from "vue";
+import { currentUserId, userKey } from "~/utils/userStorage";
 import type { SetSide } from "~/types/workout";
 
 type StoredGlobalTimer = {
@@ -8,7 +9,7 @@ type StoredGlobalTimer = {
     switchTo?: SetSide | null;
 };
 
-const STORAGE_KEY = "gym-rest-timer:global";
+const STORAGE_NAME = "gym-rest-timer:global";
 const TICK_MS = 250;
 const MAX_REST_MS = 5 * 60 * 1000;
 
@@ -19,9 +20,14 @@ const elapsedMs = ref(0);
 
 let intervalId: number | null = null;
 
+/** Null until the signed-in user is known: nothing is read or written then. */
+const storageKey = () => userKey(STORAGE_NAME);
+
 function persist() {
+    const key = storageKey();
+    if (key === null) return;
     if (startedAt.value === null) {
-        window.localStorage.removeItem(STORAGE_KEY);
+        window.localStorage.removeItem(key);
         return;
     }
     const payload: StoredGlobalTimer = {
@@ -29,7 +35,7 @@ function persist() {
         exerciseName: timerExerciseName.value,
         switchTo: switchTo.value,
     };
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+    window.localStorage.setItem(key, JSON.stringify(payload));
 }
 
 function clearTick() {
@@ -98,7 +104,9 @@ function clear() {
 }
 
 function restore() {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
+    const key = storageKey();
+    if (key === null) return;
+    const raw = window.localStorage.getItem(key);
     if (!raw) return;
     try {
         const parsed = JSON.parse(raw) as Partial<StoredGlobalTimer>;
@@ -106,11 +114,11 @@ function restore() {
             typeof parsed.startedAt !== "number" ||
             !Number.isFinite(parsed.startedAt)
         ) {
-            window.localStorage.removeItem(STORAGE_KEY);
+            window.localStorage.removeItem(key);
             return;
         }
         if (parsed.startedAt > Date.now()) {
-            window.localStorage.removeItem(STORAGE_KEY);
+            window.localStorage.removeItem(key);
             return;
         }
         startedAt.value = parsed.startedAt;
@@ -119,11 +127,24 @@ function restore() {
         tick();
         ensureTick();
     } catch {
-        window.localStorage.removeItem(STORAGE_KEY);
+        window.localStorage.removeItem(key);
     }
 }
 
-restore();
+// The stored timer belongs to a user: drop the in-memory one when the user changes or signs out,
+// and restore theirs once their ID is known (it isn't at import time).
+watch(
+    currentUserId,
+    () => {
+        startedAt.value = null;
+        timerExerciseName.value = "";
+        switchTo.value = null;
+        elapsedMs.value = 0;
+        clearTick();
+        restore();
+    },
+    { immediate: true },
+);
 
 const isActive = computed(() => startedAt.value !== null);
 

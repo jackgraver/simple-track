@@ -80,7 +80,7 @@ func (s *Service) aniListQuery(ctx context.Context, query string, vars map[strin
 		if resp.Errors[0].Status == http.StatusNotFound {
 			return ErrNotFound
 		}
-		return fmt.Errorf("%w: anilist: %s", ErrUpstream, resp.Errors[0].Message)
+		return newLookupError(ErrUpstream, "anilist: %s", resp.Errors[0].Message)
 	}
 	return json.Unmarshal(resp.Data, out)
 }

@@ -25,6 +25,9 @@ const item = (ID: number, over: Partial<MediaItem> = {}): MediaItem => ({
     times_consumed: 0,
     source: "",
     external_id: "",
+    media_item_id: ID,
+    created_by: 1,
+    can_edit_catalog: true,
     ...over,
 });
 

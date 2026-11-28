@@ -2,6 +2,7 @@ package controller
 
 import (
 	"bytes"
+	"context"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
@@ -27,15 +28,11 @@ func setupLoginRouteTest(t *testing.T, config LoginProtectionConfig) (*gin.Engin
 	if err := db.AutoMigrate(&models.User{}); err != nil {
 		t.Fatal(err)
 	}
-	database.SetDB(db)
-	t.Cleanup(func() {
-		database.SetDB(nil)
-	})
 
-	service := services.NewAuthService(func(string) (string, error) {
+	service := services.NewAuthService(func(models.User) (string, error) {
 		return "server-only-token", nil
 	})
-	if _, err := service.Register(services.RegisterInput{
+	if _, err := service.Register(database.WithDB(context.Background(), db), services.RegisterInput{
 		Username: "alice",
 		Password: "correct-password",
 	}); err != nil {
@@ -52,6 +49,7 @@ func setupLoginRouteTest(t *testing.T, config LoginProtectionConfig) (*gin.Engin
 	}
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
+	router.Use(database.Middleware(db))
 	router.POST("/login", func(c *gin.Context) {
 		Login(c, service, cookie, protection)
 	})
@@ -113,5 +111,46 @@ func TestLoginRateLimitLogsFailureAndReturnsRetryAfter(t *testing.T) {
 	}
 	if strings.Contains(logged, "wrong-password") {
 		t.Fatalf("password appeared in login audit log: %s", logged)
+	}
+}
+
+func TestLoginDoesNotLogUnknownUsernames(t *testing.T) {
+	router, logs := setupLoginRouteTest(t, LoginProtectionConfig{Window: time.Minute, MaxPerIP: 10, MaxPerUsername: 10})
+	if recorder := performLogin(router, "not-a-user-hunter2", "wrong-password"); recorder.Code != http.StatusUnauthorized {
+		t.Fatalf("status %d", recorder.Code)
+	}
+	if strings.Contains(logs.String(), "hunter2") || !strings.Contains(logs.String(), `"username":"unknown"`) {
+		t.Fatalf("unknown username logged: %s", logs.String())
+	}
+	performLogin(router, "alice", "wrong-password")
+	if !strings.Contains(logs.String(), `"username":"alice"`) {
+		t.Fatalf("existing username not logged: %s", logs.String())
+	}
+}
+
+func TestLoginStopsWhenClientLeavesDuringBackoff(t *testing.T) {
+	router, logs := setupLoginRouteTest(t, LoginProtectionConfig{
+		Window:         time.Hour,
+		MaxPerIP:       100,
+		MaxPerUsername: 1,
+	})
+	// Two attempts from other sources use up the free username-wide budget (2*MaxPerUsername).
+	for _, ip := range []string{"192.0.2.10", "192.0.2.11"} {
+		req := httptest.NewRequest(http.MethodPost, "/login", strings.NewReader(`{"username":"alice","password":"wrong-password"}`))
+		req.Header.Set("Content-Type", "application/json")
+		req.RemoteAddr = ip + ":1234"
+		router.ServeHTTP(httptest.NewRecorder(), req)
+	}
+	logs.Reset()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	req := httptest.NewRequest(http.MethodPost, "/login", strings.NewReader(`{"username":"alice","password":"wrong-password"}`)).WithContext(ctx)
+	req.Header.Set("Content-Type", "application/json")
+	req.RemoteAddr = "192.0.2.12:1234"
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+	if rec.Body.Len() != 0 || strings.Contains(logs.String(), "server_error") || strings.Contains(logs.String(), "invalid_credentials") {
+		t.Fatalf("cancelled request was processed: body=%q logs=%s", rec.Body.String(), logs.String())
 	}
 }

@@ -37,7 +37,7 @@ func run() error {
 	if env.IsProduction() {
 		return errors.New("refusing to run with APP_ENV=production")
 	}
-	db, err := database.ConnectToPostgres()
+	db, err := database.ConnectOwner()
 	if err != nil {
 		return err
 	}

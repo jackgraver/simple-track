@@ -1,26 +1,24 @@
 package utils
 
 import (
-	"be-simpletracker/internal/database/repository"
-	"context"
 	"fmt"
 	"strconv"
 	"strings"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 // QueryParams represents parsed query parameters from HTTP requests
 type QueryParams struct {
-	Page               int
-	PageSize           int
-	OrderBy            string
-	OrderDesc          bool
-	Filters            map[string]string // Field -> value mappings
-	ExcludeIDs         []uint
-	Preloads           []string // Custom preloads (empty means use defaults, nil means no preloads)
-	UseDefaultPreloads bool
+	Page       int
+	PageSize   int
+	OrderBy    string
+	OrderDesc  bool
+	Filters    map[string]string // Field -> value mappings
+	ExcludeIDs []uint
+	Preloads   []string // Relations to preload, from QueryPolicy.AllowedPreloads
 }
 
 type QueryPolicy struct {
@@ -31,8 +29,7 @@ type QueryPolicy struct {
 
 func ParseQueryParams(c *gin.Context, policy QueryPolicy) (QueryParams, error) {
 	params := QueryParams{
-		Filters:            make(map[string]string),
-		UseDefaultPreloads: true,
+		Filters: make(map[string]string),
 	}
 
 	// Parse pagination
@@ -84,100 +81,71 @@ func ParseQueryParams(c *gin.Context, policy QueryPolicy) (QueryParams, error) {
 			}
 			params.Preloads = append(params.Preloads, preload)
 		}
-		params.UseDefaultPreloads = false
-	}
-
-	if c.Query("useDefaultPreloads") == "false" {
-		params.UseDefaultPreloads = false
 	}
 
 	return params, nil
 }
 
-// BuildQueryOptions converts QueryParams to repository.QueryOption slice
-func BuildQueryOptions(params QueryParams, defaultOrderBy string, defaultOrderDesc bool) []repository.QueryOption {
-	var opts []repository.QueryOption
-
-	// Add pagination
-	if params.Page > 0 && params.PageSize > 0 {
-		opts = append(opts, repository.WithPagination(params.Page, params.PageSize))
-	}
-
-	// Add sorting
-	if params.OrderBy != "" {
-		opts = append(opts, repository.WithOrderBy(params.OrderBy, params.OrderDesc))
-	} else if defaultOrderBy != "" {
-		opts = append(opts, repository.WithOrderBy(defaultOrderBy, defaultOrderDesc))
-	}
-
-	// Add filters
-	for field, value := range params.Filters {
-		opts = append(opts, repository.WithFilter(field, value))
-	}
-
-	// Add exclude IDs
-	if len(params.ExcludeIDs) > 0 {
-		opts = append(opts, repository.WithExcludeIDs(params.ExcludeIDs...))
-	}
-
-	// Add preloads
-	if params.UseDefaultPreloads {
-		opts = append(opts, repository.WithDefaultPreloads())
-	} else if len(params.Preloads) > 0 {
-		opts = append(opts, repository.WithPreloads(params.Preloads...))
-	} else {
-		opts = append(opts, repository.WithNoPreloads())
-	}
-
-	return opts
+// Pagination describes one page of a list query.
+type Pagination struct {
+	Total      int64
+	Page       int
+	PageSize   int
+	TotalPages int
+	HasNext    bool
+	HasPrev    bool
 }
 
-// GetAllResult represents the result of a GetAll query (either paginated or not)
-type GetAllResult[T repository.Entity] struct {
+// ListResult is the rows of a list query, with Pagination set when a page was requested.
+type ListResult[T any] struct {
 	Data       []T
-	Pagination *repository.PaginatedResult[T]
+	Pagination *Pagination
 }
 
-// GetAllWithOptions is a convenience function that handles the full flow:
-// 1. Parse query params from gin.Context
-// 2. Build query options
-// 3. Execute query (paginated or not)
-// 4. Return results
-func GetAllWithOptions[T repository.Entity](
-	ctx context.Context,
-	db *gorm.DB,
-	c *gin.Context,
-	defaultOrderBy string,
-	defaultOrderDesc bool,
-	policy QueryPolicy,
-) (*GetAllResult[T], error) {
-	repo := repository.NewGormRepository[T](db)
-
-	params, err := ParseQueryParams(c, policy)
-	if err != nil {
-		return nil, err
+// List queries T with params' filters, excluded IDs, preloads and ordering (defaultOrderBy
+// when params has none). It returns one page when params.Page and params.PageSize are both set,
+// otherwise every matching row. Field names in params come from a QueryPolicy allowlist.
+func List[T any](db *gorm.DB, params QueryParams, defaultOrderBy string, defaultOrderDesc bool) (*ListResult[T], error) {
+	q := db.Model(new(T))
+	for field, value := range params.Filters {
+		q = q.Where(clause.Eq{Column: clause.Column{Name: field}, Value: value})
 	}
-	opts := BuildQueryOptions(params, defaultOrderBy, defaultOrderDesc)
+	if len(params.ExcludeIDs) > 0 {
+		q = q.Where("id NOT IN ?", params.ExcludeIDs)
+	}
 
-	// Use paginated query if pagination params are provided
+	var page *Pagination
 	if params.Page > 0 && params.PageSize > 0 {
-		result, err := repo.GetAllPaginated(ctx, params.Page, params.PageSize, opts...)
-		if err != nil {
+		var total int64
+		if err := q.Session(&gorm.Session{}).Count(&total).Error; err != nil {
 			return nil, err
 		}
-		return &GetAllResult[T]{
-			Data:       result.Data,
-			Pagination: result,
-		}, nil
+		totalPages := int((total + int64(params.PageSize) - 1) / int64(params.PageSize))
+		page = &Pagination{
+			Total:      total,
+			Page:       params.Page,
+			PageSize:   params.PageSize,
+			TotalPages: totalPages,
+			HasNext:    params.Page < totalPages,
+			HasPrev:    params.Page > 1,
+		}
+		q = q.Limit(params.PageSize).Offset((params.Page - 1) * params.PageSize)
 	}
 
-	// Use non-paginated query
-	entities, err := repo.GetAll(ctx, opts...)
-	if err != nil {
+	for _, preload := range params.Preloads {
+		q = q.Preload(preload)
+	}
+	orderBy, orderDesc := params.OrderBy, params.OrderDesc
+	if orderBy == "" {
+		orderBy, orderDesc = defaultOrderBy, defaultOrderDesc
+	}
+	if orderBy != "" {
+		q = q.Order(clause.OrderByColumn{Column: clause.Column{Name: orderBy}, Desc: orderDesc})
+	}
+
+	var rows []T
+	if err := q.Find(&rows).Error; err != nil {
 		return nil, err
 	}
-	return &GetAllResult[T]{
-		Data:       entities,
-		Pagination: nil,
-	}, nil
+	return &ListResult[T]{Data: rows, Pagination: page}, nil
 }

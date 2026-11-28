@@ -1,6 +1,8 @@
 package weight
 
 import (
+	"be-simpletracker/internal/database"
+	"context"
 	"encoding/csv"
 	"errors"
 	"fmt"
@@ -52,6 +54,12 @@ func isBlank(s string) bool {
 	s = strings.TrimSpace(s)
 	return s == "" || s == "--"
 }
+
+// MaxImportRows caps the days in one import (BACKLOG #8), so one request can't hold a
+// transaction open for an unbounded number of upserts: about 27 years of history. Rows on the
+// same day collapse first, so frequent weigh-ins don't count against it; the route's body limit
+// (cmd/server bodyLimits) bounds the raw rows.
+const MaxImportRows = 10000
 
 // ParseRenphoCSV parses a Renpho CSV export (comma or tab separated, as copied to
 // the clipboard). Rows sharing a date collapse to the latest measurement.
@@ -146,6 +154,9 @@ func ParseRenphoCSV(text string) ([]BodyWeightLog, error) {
 	if len(order) == 0 {
 		return nil, errors.New("no data rows found")
 	}
+	if len(order) > MaxImportRows {
+		return nil, fmt.Errorf("too many days (%d); import at most %d at a time", len(order), MaxImportRows)
+	}
 	out := make([]BodyWeightLog, 0, len(order))
 	for _, k := range order {
 		out = append(out, byDate[k])
@@ -153,17 +164,19 @@ func ParseRenphoCSV(text string) ([]BodyWeightLog, error) {
 	return out, nil
 }
 
-// ImportBodyWeights upserts every log by date in one transaction, replacing all
-// metric columns for matching days. It returns how many rows were created/updated.
-func ImportBodyWeights(db *gorm.DB, logs []BodyWeightLog) (created, updated int, err error) {
+// ImportBodyWeights upserts every log by date for the current user (the importing user owns every
+// row it writes) in one transaction, replacing all metric columns for matching days. It returns
+// how many rows were created/updated.
+func ImportBodyWeights(ctx context.Context, logs []BodyWeightLog) (created, updated int, err error) {
+	db := database.From(ctx)
 	err = db.Transaction(func(tx *gorm.DB) error {
 		for i := range logs {
 			l := logs[i]
 			var existing BodyWeightLog
-			e := tx.Where("date = ?", l.Date).First(&existing).Error
+			e := tx.Scopes(database.Owned(ctx)).Where("date = ?", l.Date).First(&existing).Error
 			switch {
 			case errors.Is(e, gorm.ErrRecordNotFound):
-				if e := tx.Create(&l).Error; e != nil {
+				if e := tx.Omit(clause.Associations).Create(&l).Error; e != nil {
 					return e
 				}
 				created++
@@ -171,7 +184,8 @@ func ImportBodyWeights(db *gorm.DB, logs []BodyWeightLog) (created, updated int,
 				return e
 			default:
 				l.ID, l.CreatedAt = existing.ID, existing.CreatedAt
-				if e := tx.Select("*").Omit(clause.Associations).Save(&l).Error; e != nil {
+				// user_id is never rewritten; the row is the caller's (Owned above).
+				if e := tx.Select("*").Omit(clause.Associations, "user_id").Save(&l).Error; e != nil {
 					return e
 				}
 				updated++

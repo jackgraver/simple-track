@@ -6,7 +6,7 @@ import { startBackend, type Backend } from '../infra/backend';
 import { BACKEND_COOKIE } from '../infra/frontdoor';
 import { workerDb } from '../infra/paths';
 import { mapStack } from '../infra/sourcemap';
-import { changedRows, cloneTemplate, dropDatabase, dumpData, maxIds, pgUrl, tablesWithId, type TableInfo } from '../infra/postgres';
+import { appPgUrl, changedRows, cloneTemplate, dropDatabase, dumpData, maxIds, pgUrl, tablesWithId, type TableInfo } from '../infra/postgres';
 import { Api } from './api';
 import { E2E } from './e2e';
 
@@ -72,7 +72,7 @@ export const test = base.extend<Fixtures & Options, { stack: WorkerStack }>({
       await cloneTemplate(PG_PORT(), db);
       const dbUrl = pgUrl(PG_PORT(), db);
       const upstream = await startUpstream();
-      const backend = await startBackend(`w${workerInfo.parallelIndex}`, dbUrl, {
+      const backend = await startBackend(`w${workerInfo.parallelIndex}`, appPgUrl(PG_PORT(), db), dbUrl, {
         LOOKUP_ANILIST_URL: `${upstream.url}/anilist`,
       });
       const sql = new Client({ connectionString: dbUrl });

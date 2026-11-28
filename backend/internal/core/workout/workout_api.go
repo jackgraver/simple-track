@@ -40,6 +40,8 @@ func RegisterRoutes(router *gin.Engine, authMiddleware gin.HandlerFunc) {
 			exercises.POST("", controller.CreateExercise)
 			exercises.PUT("/:id", controller.UpdateExercise)
 			exercises.PUT("/:id/cues", controller.UpdateExerciseCues)
+			exercises.PUT("/:id/settings", controller.SaveExerciseSettings)
+			exercises.DELETE("/:id", controller.DeleteExercise)
 			exercises.POST("/log", controller.LogExercise)
 			exercises.POST("/add", dayOffsetMiddleware, controller.AddExerciseToWorkout)
 			exercises.DELETE("/remove", dayOffsetMiddleware, controller.RemoveExerciseFromWorkout)

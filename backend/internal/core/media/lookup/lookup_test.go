@@ -189,10 +189,49 @@ func TestUnsupportedAndUpstreamErrors(t *testing.T) {
 	}))
 	defer srv.Close()
 	s = testService("", srv.URL)
-	if _, err := s.Search(context.Background(), models.MediaTypeBook, "x"); !errors.Is(err, ErrUpstream) || !strings.Contains(err.Error(), "500") {
+	if _, err := s.Search(context.Background(), models.MediaTypeBook, "x"); !errors.Is(err, ErrUpstream) || !strings.Contains(Detail(err), "500") {
 		t.Fatalf("expected ErrUpstream with status, got %v", err)
 	}
 	if res, err := s.Search(context.Background(), models.MediaTypeBook, "   "); err != nil || len(res) != 0 {
 		t.Fatalf("blank query should return no results, got %v %v", res, err)
+	}
+}
+
+func TestTransportErrorHasNoAPIKey(t *testing.T) {
+	srv, _ := fakeAPI(t, nil)
+	base := srv.URL
+	srv.Close() // connection refused
+	svc := testService("secretkey123", base)
+	_, err := svc.Search(context.Background(), models.MediaTypeMovie, "heat")
+	if !errors.Is(err, ErrUpstream) {
+		t.Fatalf("want ErrUpstream, got %v", err)
+	}
+	for _, s := range []string{err.Error(), Detail(err)} {
+		if strings.Contains(s, "secretkey123") || strings.Contains(s, "api_key") || strings.Contains(s, "query=") {
+			t.Errorf("leaks request URL query: %s", s)
+		}
+	}
+}
+
+func TestUpstreamBodyNotEchoed(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+		io.WriteString(w, "internal secret upstream body")
+	}))
+	defer srv.Close()
+	_, err := testService("k", srv.URL).Search(context.Background(), models.MediaTypeBook, "dune")
+	if !errors.Is(err, ErrUpstream) {
+		t.Fatalf("want ErrUpstream, got %v", err)
+	}
+	if strings.Contains(err.Error(), "secret") || strings.Contains(Detail(err), "secret") {
+		t.Errorf("body echoed: %v / %s", err, Detail(err))
+	}
+}
+
+func TestRedact(t *testing.T) {
+	in := `Get "https://x/3/search?api_key=abc&query=q&token=t2": boom`
+	out := redact(in)
+	if strings.Contains(out, "abc") || strings.Contains(out, "t2") || !strings.Contains(out, "query=q") {
+		t.Errorf("bad redaction: %s", out)
 	}
 }

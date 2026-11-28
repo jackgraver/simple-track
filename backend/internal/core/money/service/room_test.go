@@ -168,22 +168,23 @@ func TestResolveStartYear(t *testing.T) {
 	cases := []struct {
 		name      string
 		input     models.ContributionType
+		room      *models.ContributionRoom
 		birthYear *int
 		want      int
 		ok        bool
 	}{
-		{"eligibility from birth year", models.ContributionType{EligibilityAge: &age, Limits: tfsaLimits}, &birth, 2018, true},
-		{"eligibility age needs birth year", models.ContributionType{EligibilityAge: &age, Limits: tfsaLimits}, nil, 0, false},
-		{"explicit start without birth year", models.ContributionType{StartYear: &start, EligibilityAge: &age, Limits: tfsaLimits}, nil, 2020, true},
-		{"no eligibility uses first limit", models.ContributionType{Limits: tfsaLimits}, nil, 2009, true},
-		{"explicit start later than eligibility", models.ContributionType{StartYear: &start, EligibilityAge: &age, Limits: tfsaLimits}, &birth, 2020, true},
-		{"cannot start before first limit", models.ContributionType{EligibilityAge: &age, Limits: tfsaLimits}, intPtr(1980), 2009, true},
-		{"opening room wins", models.ContributionType{StartYear: &start, OpeningRoomYear: &openingYear, OpeningRoom: &openingRoom}, nil, 2025, true},
-		{"nothing configured", models.ContributionType{}, nil, 0, false},
+		{"eligibility from birth year", models.ContributionType{EligibilityAge: &age, Limits: tfsaLimits}, nil, &birth, 2018, true},
+		{"eligibility age needs birth year", models.ContributionType{EligibilityAge: &age, Limits: tfsaLimits}, nil, nil, 0, false},
+		{"explicit start without birth year", models.ContributionType{EligibilityAge: &age, Limits: tfsaLimits}, &models.ContributionRoom{StartYear: &start}, nil, 2020, true},
+		{"no eligibility uses first limit", models.ContributionType{Limits: tfsaLimits}, nil, nil, 2009, true},
+		{"explicit start later than eligibility", models.ContributionType{EligibilityAge: &age, Limits: tfsaLimits}, &models.ContributionRoom{StartYear: &start}, &birth, 2020, true},
+		{"cannot start before first limit", models.ContributionType{EligibilityAge: &age, Limits: tfsaLimits}, nil, intPtr(1980), 2009, true},
+		{"opening room wins", models.ContributionType{}, &models.ContributionRoom{StartYear: &start, OpeningRoomYear: &openingYear, OpeningRoom: &openingRoom}, nil, 2025, true},
+		{"nothing configured", models.ContributionType{}, nil, nil, 0, false},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			got, ok := ResolveStartYear(tc.input, tc.birthYear)
+			got, ok := ResolveStartYear(tc.input, tc.room, tc.birthYear)
 			if got != tc.want || ok != tc.ok {
 				t.Fatalf("got (%d, %v), want (%d, %v)", got, ok, tc.want, tc.ok)
 			}

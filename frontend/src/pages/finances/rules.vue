@@ -9,6 +9,7 @@ import {
 } from "~/api/money/api";
 import { useContributionTypes, useMoneyMutation } from "~/api/money/queries";
 import type { ContributionType } from "~/api/money/types";
+import { isAdmin } from "~/composables/auth/session";
 import { dialogManager } from "~/composables/dialog/useDialog";
 import { toast } from "~/composables/toast/useToast";
 import ModuleTitleBar, { type ModuleTitleLink } from "~/shared/ModuleTitleBar.vue";
@@ -146,7 +147,7 @@ async function removeType(type: ContributionType) {
 
 function editType(type: ContributionType) {
     void dialogManager.custom<boolean>({
-        title: `${type.name} rules`,
+        title: type.can_edit ? `${type.name} rules` : `${type.name}: your room`,
         component: ContributionTypeDialog,
         componentProps: { contributionType: type },
     });
@@ -236,9 +237,9 @@ const navLinks: ModuleTitleLink[] = [
                         <div class="flex shrink-0 items-center gap-1">
                             <Button size="sm" @click="editType(type)">
                                 <template #icon-left><Pencil aria-hidden="true" class="size-4" /></template>
-                                Rules
+                                {{ type.can_edit ? "Rules" : "My room" }}
                             </Button>
-                            <IconButton label="Delete type" variant="danger" size="sm" @click="removeType(type)">
+                            <IconButton v-if="isAdmin" label="Delete type" variant="danger" size="sm" @click="removeType(type)">
                                 <Trash2 />
                             </IconButton>
                         </div>
@@ -269,6 +270,7 @@ const navLinks: ModuleTitleLink[] = [
                                 <template #trailing>
                                     <span class="text-fg">{{ formatMoney(limit.annual_limit) }} / yr</span>
                                     <IconButton
+                                        v-if="isAdmin"
                                         :label="`Remove ${limit.year} limit`"
                                         size="sm"
                                         variant="danger"
@@ -279,7 +281,7 @@ const navLinks: ModuleTitleLink[] = [
                                 </template>
                             </ListRow>
                         </List>
-                        <form class="grid grid-cols-[6rem_minmax(0,1fr)_auto] items-end gap-2" @submit.prevent="saveLimit(type)">
+                        <form v-if="type.can_edit" class="grid grid-cols-[6rem_minmax(0,1fr)_auto] items-end gap-2" @submit.prevent="saveLimit(type)">
                             <Field label="Year" required>
                                 <Input v-model="limitInput(type.ID).year" inputmode="numeric" required />
                             </Field>

@@ -1,6 +1,7 @@
 package workoutrepo
 
 import (
+	"be-simpletracker/internal/database"
 	"context"
 	"errors"
 	"time"
@@ -12,18 +13,22 @@ import (
 )
 
 func DatesWithLoggedSets(ctx context.Context, start, end time.Time) ([]time.Time, error) {
+	uid, err := callerID(ctx)
+	if err != nil {
+		return nil, err
+	}
 	var rows []struct {
 		D time.Time `gorm:"column:d"`
 	}
-	err := conn().WithContext(ctx).Raw(`
+	err = database.From(ctx).WithContext(ctx).Raw(`
 		SELECT workout_logs.date AS d
 		FROM logged_sets
-		JOIN logged_exercises ON logged_exercises.id = logged_sets.logged_exercise_id
-		JOIN workout_logs ON workout_logs.id = logged_exercises.workout_log_id
-		WHERE workout_logs.date >= ? AND workout_logs.date <= ?
+		JOIN logged_exercises ON logged_exercises.id = logged_sets.logged_exercise_id AND logged_exercises.user_id = ?
+		JOIN workout_logs ON workout_logs.id = logged_exercises.workout_log_id AND workout_logs.user_id = ?
+		WHERE logged_sets.user_id = ? AND workout_logs.date >= ? AND workout_logs.date <= ?
 		GROUP BY workout_logs.date
 		ORDER BY workout_logs.date ASC
-		`, start, end).Scan(&rows).Error
+		`, uid, uid, uid, start, end).Scan(&rows).Error
 	if err != nil {
 		return nil, err
 	}
@@ -34,8 +39,8 @@ func DatesWithLoggedSets(ctx context.Context, start, end time.Time) ([]time.Time
 	return out, nil
 }
 
-func DeleteLoggedSet(setID uint) error {
-	res, err := DeleteSet(context.Background(), SetRef{ID: setID})
+func DeleteLoggedSet(ctx context.Context, setID uint) error {
+	res, err := DeleteSet(ctx, SetRef{ID: setID})
 	if err != nil {
 		return err
 	}
@@ -55,7 +60,8 @@ type SetRef struct {
 	ClientID string
 }
 
-func (r SetRef) where(tx *gorm.DB) *gorm.DB {
+func (r SetRef) where(ctx context.Context, tx *gorm.DB) *gorm.DB {
+	tx = tx.Scopes(database.Owned(ctx))
 	if r.ClientID != "" {
 		return tx.Where("client_id = ?", r.ClientID)
 	}
@@ -88,13 +94,18 @@ type CreateSetResult struct {
 // the same client_id returns the stored set unchanged (first write wins).
 func CreateSet(ctx context.Context, in CreateSetInput) (CreateSetResult, error) {
 	var out CreateSetResult
-	err := conn().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		if existing, ok, err := findReplay(tx, in); err != nil || ok {
+	err := database.From(ctx).WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		// The log must be the caller's and the exercise must exist: 404 for anything else, before
+		// any write (and before a replay lookup could answer for another log).
+		if err := requireOwnLogAndExercise(ctx, tx, in.WorkoutLogID, in.ExerciseID); err != nil {
+			return err
+		}
+		if existing, ok, err := findReplay(ctx, tx, in); err != nil || ok {
 			out = existing
 			return err
 		}
 
-		parentID, err := upsertAndLockParent(tx, in.WorkoutLogID, in.ExerciseID)
+		parentID, err := upsertAndLockParent(ctx, tx, in.WorkoutLogID, in.ExerciseID)
 		if err != nil {
 			return err
 		}
@@ -108,13 +119,16 @@ func CreateSet(ctx context.Context, in CreateSetInput) (CreateSetResult, error) 
 			Side:             in.Side,
 			PairID:           in.PairID,
 		}
-		res := tx.Clauses(clause.OnConflict{Columns: []clause.Column{{Name: "client_id"}}, DoNothing: true}).Create(&set)
+		res := tx.Omit(clause.Associations).Clauses(clause.OnConflict{
+			Columns:   []clause.Column{{Name: "user_id"}, {Name: "client_id"}},
+			DoNothing: true,
+		}).Create(&set)
 		if res.Error != nil {
 			return res.Error
 		}
 		if res.RowsAffected == 0 || set.ID == 0 {
 			// A concurrent replay committed first.
-			existing, ok, err := findReplay(tx, in)
+			existing, ok, err := findReplay(ctx, tx, in)
 			if err != nil {
 				return err
 			}
@@ -126,7 +140,7 @@ func CreateSet(ctx context.Context, in CreateSetInput) (CreateSetResult, error) 
 		}
 
 		var daySets int64
-		if err := tx.Model(&models.LoggedSet{}).
+		if err := tx.Model(&models.LoggedSet{}).Scopes(database.Owned(ctx)).
 			Joins("JOIN logged_exercises ON logged_exercises.id = logged_sets.logged_exercise_id").
 			Where("logged_exercises.workout_log_id = ? AND logged_exercises.deleted_at IS NULL", in.WorkoutLogID).
 			Count(&daySets).Error; err != nil {
@@ -144,14 +158,14 @@ func CreateSet(ctx context.Context, in CreateSetInput) (CreateSetResult, error) 
 // this transaction's set and keeps the parent, or it deletes the parent first and the lock here
 // finds no row, in which case the upsert runs again and creates a fresh parent. Without the lock
 // a racing delete of the last set would cascade away a set this transaction already committed.
-func upsertAndLockParent(tx *gorm.DB, workoutLogID, exerciseID uint) (uint, error) {
+func upsertAndLockParent(ctx context.Context, tx *gorm.DB, workoutLogID, exerciseID uint) (uint, error) {
 	for attempt := 0; attempt < 5; attempt++ {
-		parentID, _, err := upsertLoggedExercise(tx, workoutLogID, exerciseID, "")
+		parentID, _, err := upsertLoggedExercise(ctx, tx, workoutLogID, exerciseID, "")
 		if err != nil {
 			return 0, err
 		}
 		var locked []uint
-		if err := tx.Model(&models.LoggedExercise{}).
+		if err := tx.Model(&models.LoggedExercise{}).Scopes(database.Owned(ctx)).
 			Clauses(clause.Locking{Strength: "KEY SHARE"}).
 			Where("id = ?", parentID).
 			Pluck("id", &locked).Error; err != nil {
@@ -166,16 +180,16 @@ func upsertAndLockParent(tx *gorm.DB, workoutLogID, exerciseID uint) (uint, erro
 
 // findReplay returns the set already stored under in.ClientID, if any. It fails with
 // ErrClientIDConflict when that set belongs to another workout log or exercise.
-func findReplay(tx *gorm.DB, in CreateSetInput) (CreateSetResult, bool, error) {
+func findReplay(ctx context.Context, tx *gorm.DB, in CreateSetInput) (CreateSetResult, bool, error) {
 	var set models.LoggedSet
-	if err := tx.Where("client_id = ?", in.ClientID).Limit(1).Find(&set).Error; err != nil {
+	if err := tx.Scopes(database.Owned(ctx)).Where("client_id = ?", in.ClientID).Limit(1).Find(&set).Error; err != nil {
 		return CreateSetResult{}, false, err
 	}
 	if set.ID == 0 {
 		return CreateSetResult{}, false, nil
 	}
 	var parent models.LoggedExercise
-	if err := tx.Unscoped().Select("id", "workout_log_id", "exercise_id").
+	if err := tx.Unscoped().Scopes(database.Owned(ctx)).Select("id", "workout_log_id", "exercise_id").
 		First(&parent, set.LoggedExerciseID).Error; err != nil {
 		return CreateSetResult{}, false, err
 	}
@@ -199,8 +213,8 @@ type SetPatch struct {
 // UpdateSet applies patch to one set and returns it. gorm.ErrRecordNotFound if it doesn't exist.
 func UpdateSet(ctx context.Context, ref SetRef, patch SetPatch) (models.LoggedSet, error) {
 	var set models.LoggedSet
-	err := conn().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		if err := ref.where(tx).First(&set).Error; err != nil {
+	err := database.From(ctx).WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := ref.where(ctx, tx).First(&set).Error; err != nil {
 			return err
 		}
 		updates := map[string]any{}
@@ -227,10 +241,10 @@ func UpdateSet(ctx context.Context, ref SetRef, patch SetPatch) (models.LoggedSe
 		if len(updates) == 0 {
 			return nil
 		}
-		if err := tx.Model(&models.LoggedSet{}).Where("id = ?", set.ID).Updates(updates).Error; err != nil {
+		if err := database.Affected(tx.Model(&models.LoggedSet{}).Scopes(database.Owned(ctx)).Where("id = ?", set.ID).Updates(updates)); err != nil {
 			return err
 		}
-		return tx.First(&set, set.ID).Error
+		return tx.Scopes(database.Owned(ctx)).First(&set, set.ID).Error
 	})
 	return set, err
 }
@@ -248,9 +262,9 @@ type DeleteSetResult struct {
 // not an error: Deleted is false.
 func DeleteSet(ctx context.Context, ref SetRef) (DeleteSetResult, error) {
 	var out DeleteSetResult
-	err := conn().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+	err := database.From(ctx).WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var set models.LoggedSet
-		if err := ref.where(tx).Limit(1).Find(&set).Error; err != nil {
+		if err := ref.where(ctx, tx).Limit(1).Find(&set).Error; err != nil {
 			return err
 		}
 		if set.ID == 0 {
@@ -260,25 +274,25 @@ func DeleteSet(ctx context.Context, ref SetRef) (DeleteSetResult, error) {
 		// exercise either commits its set first (and the count sees it) or waits for this
 		// delete and then creates a new parent (see upsertAndLockParent).
 		var parentIDs []uint
-		if err := tx.Unscoped().Model(&models.LoggedExercise{}).
+		if err := tx.Unscoped().Model(&models.LoggedExercise{}).Scopes(database.Owned(ctx)).
 			Clauses(clause.Locking{Strength: "UPDATE"}).
 			Where("id = ?", set.LoggedExerciseID).
 			Pluck("id", &parentIDs).Error; err != nil {
 			return err
 		}
-		if err := tx.Unscoped().Delete(&models.LoggedSet{}, set.ID).Error; err != nil {
+		if err := tx.Unscoped().Scopes(database.Owned(ctx)).Delete(&models.LoggedSet{}, set.ID).Error; err != nil {
 			return err
 		}
 		out = DeleteSetResult{Deleted: true, LoggedExerciseID: set.LoggedExerciseID}
 
 		var remainingSetCount int64
-		if err := tx.Model(&models.LoggedSet{}).
+		if err := tx.Model(&models.LoggedSet{}).Scopes(database.Owned(ctx)).
 			Where("logged_exercise_id = ?", set.LoggedExerciseID).
 			Count(&remainingSetCount).Error; err != nil {
 			return err
 		}
 		if remainingSetCount == 0 {
-			if err := tx.Unscoped().
+			if err := tx.Unscoped().Scopes(database.Owned(ctx)).
 				Delete(&models.LoggedExercise{}, set.LoggedExerciseID).Error; err != nil {
 				return err
 			}

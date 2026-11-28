@@ -2,6 +2,8 @@ package service
 
 import (
 	"be-simpletracker/internal/clock"
+	"be-simpletracker/internal/database"
+	"context"
 	"errors"
 	"strings"
 	"time"
@@ -38,8 +40,9 @@ type AccountSummary struct {
 	Gain float64 `json:"gain"`
 }
 
-func ListAccounts(db *gorm.DB, includeArchived bool) ([]AccountSummary, error) {
-	query := db.Preload("ContributionType").Order("name ASC")
+func ListAccounts(ctx context.Context, includeArchived bool) ([]AccountSummary, error) {
+	db := database.From(ctx)
+	query := db.Scopes(database.Owned(ctx)).Preload("ContributionType").Order("name ASC")
 	if !includeArchived {
 		query = query.Where("archived_at IS NULL")
 	}
@@ -47,22 +50,23 @@ func ListAccounts(db *gorm.DB, includeArchived bool) ([]AccountSummary, error) {
 	if err := query.Find(&accounts).Error; err != nil {
 		return nil, err
 	}
-	return summarizeAccounts(db, accounts)
+	return summarizeAccounts(ctx, db, accounts)
 }
 
-func GetAccount(db *gorm.DB, id uint) (*AccountSummary, error) {
+func GetAccount(ctx context.Context, id uint) (*AccountSummary, error) {
+	db := database.From(ctx)
 	var account models.Account
-	if err := db.Preload("ContributionType").First(&account, id).Error; err != nil {
+	if err := db.Scopes(database.Owned(ctx)).Preload("ContributionType").First(&account, id).Error; err != nil {
 		return nil, err
 	}
-	summaries, err := summarizeAccounts(db, []models.Account{account})
+	summaries, err := summarizeAccounts(ctx, db, []models.Account{account})
 	if err != nil {
 		return nil, err
 	}
 	return &summaries[0], nil
 }
 
-func summarizeAccounts(db *gorm.DB, accounts []models.Account) ([]AccountSummary, error) {
+func summarizeAccounts(ctx context.Context, db *gorm.DB, accounts []models.Account) ([]AccountSummary, error) {
 	summaries := make([]AccountSummary, 0, len(accounts))
 	if len(accounts) == 0 {
 		return summaries, nil
@@ -79,7 +83,7 @@ func summarizeAccounts(db *gorm.DB, accounts []models.Account) ([]AccountSummary
 		Count     int64
 	}
 	var totals []totalRow
-	if err := db.Model(&models.AccountTransaction{}).
+	if err := db.Scopes(database.Owned(ctx)).Model(&models.AccountTransaction{}).
 		Select("account_id, kind, COALESCE(SUM(amount), 0) AS total, COUNT(*) AS count").
 		Where("account_id IN ?", ids).
 		Group("account_id, kind").
@@ -88,7 +92,7 @@ func summarizeAccounts(db *gorm.DB, accounts []models.Account) ([]AccountSummary
 	}
 
 	var balances []models.AccountBalance
-	if err := db.Where("account_id IN ?", ids).Order("account_id ASC, date DESC").Find(&balances).Error; err != nil {
+	if err := db.Scopes(database.Owned(ctx)).Where("account_id IN ?", ids).Order("account_id ASC, date DESC").Find(&balances).Error; err != nil {
 		return nil, err
 	}
 	latest := map[uint][]models.AccountBalance{}
@@ -132,18 +136,19 @@ func summarizeAccounts(db *gorm.DB, accounts []models.Account) ([]AccountSummary
 
 // CreateAccount creates an account and, when given, records its opening
 // balance as the first snapshot.
-func CreateAccount(db *gorm.DB, input AccountInput, openingBalance *float64, balanceDate time.Time) (*models.Account, error) {
+func CreateAccount(ctx context.Context, input AccountInput, openingBalance *float64, balanceDate time.Time) (*models.Account, error) {
+	db := database.From(ctx)
 	account := models.Account{}
 	applyAccountInput(&account, input, clock.Now())
 	if err := validateAccount(db, account); err != nil {
 		return nil, err
 	}
 	err := db.Transaction(func(tx *gorm.DB) error {
-		if err := tx.Create(&account).Error; err != nil {
+		if err := tx.Omit(clause.Associations).Create(&account).Error; err != nil {
 			return err
 		}
 		if openingBalance != nil {
-			return setBalance(tx, account.ID, balanceDate, *openingBalance)
+			return setBalance(ctx, tx, account.ID, balanceDate, *openingBalance)
 		}
 		return nil
 	})
@@ -153,9 +158,10 @@ func CreateAccount(db *gorm.DB, input AccountInput, openingBalance *float64, bal
 	return &account, nil
 }
 
-func UpdateAccount(db *gorm.DB, id uint, input AccountInput) (*models.Account, error) {
+func UpdateAccount(ctx context.Context, id uint, input AccountInput) (*models.Account, error) {
+	db := database.From(ctx)
 	var account models.Account
-	if err := db.First(&account, id).Error; err != nil {
+	if err := db.Scopes(database.Owned(ctx)).First(&account, id).Error; err != nil {
 		return nil, err
 	}
 	applyAccountInput(&account, input, clock.Now())
@@ -163,7 +169,7 @@ func UpdateAccount(db *gorm.DB, id uint, input AccountInput) (*models.Account, e
 		return nil, err
 	}
 	// Omit the association so a stale preloaded type is never written back.
-	if err := db.Omit("ContributionType").Save(&account).Error; err != nil {
+	if err := db.Omit(clause.Associations).Save(&account).Error; err != nil {
 		return nil, err
 	}
 	return &account, nil
@@ -171,22 +177,16 @@ func UpdateAccount(db *gorm.DB, id uint, input AccountInput) (*models.Account, e
 
 // DeleteAccount permanently removes an account with its balances and
 // transactions. Archive it instead to keep its history.
-func DeleteAccount(db *gorm.DB, id uint) error {
+func DeleteAccount(ctx context.Context, id uint) error {
+	db := database.From(ctx)
 	return db.Transaction(func(tx *gorm.DB) error {
-		if err := tx.Unscoped().Where("account_id = ?", id).Delete(&models.AccountBalance{}).Error; err != nil {
+		if err := tx.Unscoped().Scopes(database.Owned(ctx)).Where("account_id = ?", id).Delete(&models.AccountBalance{}).Error; err != nil {
 			return err
 		}
-		if err := tx.Unscoped().Where("account_id = ?", id).Delete(&models.AccountTransaction{}).Error; err != nil {
+		if err := tx.Unscoped().Scopes(database.Owned(ctx)).Where("account_id = ?", id).Delete(&models.AccountTransaction{}).Error; err != nil {
 			return err
 		}
-		result := tx.Unscoped().Delete(&models.Account{}, id)
-		if result.Error != nil {
-			return result.Error
-		}
-		if result.RowsAffected == 0 {
-			return gorm.ErrRecordNotFound
-		}
-		return nil
+		return database.Affected(tx.Unscoped().Scopes(database.Owned(ctx)).Delete(&models.Account{}, id))
 	})
 }
 
@@ -230,19 +230,22 @@ func validateAccount(db *gorm.DB, account models.Account) error {
 	return nil
 }
 
-func accountExists(db *gorm.DB, id uint) error {
+// accountExists is the "not found or not yours" check every balance and transaction call starts
+// with: someone else's account answers like a missing one.
+func accountExists(ctx context.Context, db *gorm.DB, id uint) error {
 	var account models.Account
-	return db.Select("id").First(&account, id).Error
+	return db.Scopes(database.Owned(ctx)).Select("id").First(&account, id).Error
 }
 
 // ---- Balances ----
 
-func ListBalances(db *gorm.DB, accountID uint) ([]models.AccountBalance, error) {
-	if err := accountExists(db, accountID); err != nil {
+func ListBalances(ctx context.Context, accountID uint) ([]models.AccountBalance, error) {
+	db := database.From(ctx)
+	if err := accountExists(ctx, db, accountID); err != nil {
 		return nil, err
 	}
 	var balances []models.AccountBalance
-	if err := db.Where("account_id = ?", accountID).Order("date DESC").Find(&balances).Error; err != nil {
+	if err := db.Scopes(database.Owned(ctx)).Where("account_id = ?", accountID).Order("date DESC").Find(&balances).Error; err != nil {
 		return nil, err
 	}
 	return balances, nil
@@ -250,12 +253,13 @@ func ListBalances(db *gorm.DB, accountID uint) ([]models.AccountBalance, error) 
 
 // SetBalance records the balance of an account on a day, replacing any
 // existing snapshot for that day.
-func SetBalance(db *gorm.DB, accountID uint, date time.Time, balance float64) error {
-	if err := accountExists(db, accountID); err != nil {
+func SetBalance(ctx context.Context, accountID uint, date time.Time, balance float64) error {
+	db := database.From(ctx)
+	if err := accountExists(ctx, db, accountID); err != nil {
 		return err
 	}
 	return db.Transaction(func(tx *gorm.DB) error {
-		return setBalance(tx, accountID, date, balance)
+		return setBalance(ctx, tx, accountID, date, balance)
 	})
 }
 
@@ -266,19 +270,20 @@ type BalanceEntry struct {
 
 // SetBalances records several balances for the same day at once, e.g. a
 // monthly check-in of every account.
-func SetBalances(db *gorm.DB, date time.Time, entries []BalanceEntry) error {
+func SetBalances(ctx context.Context, date time.Time, entries []BalanceEntry) error {
+	db := database.From(ctx)
 	if len(entries) == 0 {
 		return invalid("no balances given")
 	}
 	return db.Transaction(func(tx *gorm.DB) error {
 		for _, entry := range entries {
-			if err := accountExists(tx, entry.AccountID); err != nil {
+			if err := accountExists(ctx, tx, entry.AccountID); err != nil {
 				if errors.Is(err, gorm.ErrRecordNotFound) {
 					return invalid("account %d not found", entry.AccountID)
 				}
 				return err
 			}
-			if err := setBalance(tx, entry.AccountID, date, entry.Balance); err != nil {
+			if err := setBalance(ctx, tx, entry.AccountID, date, entry.Balance); err != nil {
 				return err
 			}
 		}
@@ -286,50 +291,49 @@ func SetBalances(db *gorm.DB, date time.Time, entries []BalanceEntry) error {
 	})
 }
 
-func setBalance(tx *gorm.DB, accountID uint, date time.Time, balance float64) error {
+func setBalance(ctx context.Context, tx *gorm.DB, accountID uint, date time.Time, balance float64) error {
 	snapshot := models.AccountBalance{AccountID: accountID, Date: date, Balance: roundCents(balance)}
 	if err := tx.Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "account_id"}, {Name: "date"}},
 		DoUpdates: clause.AssignmentColumns([]string{"balance", "updated_at"}),
-	}).Create(&snapshot).Error; err != nil {
+	}).Omit(clause.Associations).Create(&snapshot).Error; err != nil {
 		return err
 	}
-	return refreshCachedBalance(tx, accountID)
+	return refreshCachedBalance(ctx, tx, accountID)
 }
 
-func DeleteBalance(db *gorm.DB, accountID, balanceID uint) error {
+func DeleteBalance(ctx context.Context, accountID, balanceID uint) error {
+	db := database.From(ctx)
 	return db.Transaction(func(tx *gorm.DB) error {
-		result := tx.Unscoped().Where("account_id = ?", accountID).Delete(&models.AccountBalance{}, balanceID)
-		if result.Error != nil {
-			return result.Error
+		res := tx.Unscoped().Scopes(database.Owned(ctx)).Where("account_id = ?", accountID).Delete(&models.AccountBalance{}, balanceID)
+		if err := database.Affected(res); err != nil {
+			return err
 		}
-		if result.RowsAffected == 0 {
-			return gorm.ErrRecordNotFound
-		}
-		return refreshCachedBalance(tx, accountID)
+		return refreshCachedBalance(ctx, tx, accountID)
 	})
 }
 
-func refreshCachedBalance(tx *gorm.DB, accountID uint) error {
+func refreshCachedBalance(ctx context.Context, tx *gorm.DB, accountID uint) error {
 	var latest models.AccountBalance
 	balance := 0.0
-	err := tx.Where("account_id = ?", accountID).Order("date DESC").First(&latest).Error
+	err := tx.Scopes(database.Owned(ctx)).Where("account_id = ?", accountID).Order("date DESC").First(&latest).Error
 	if err == nil {
 		balance = latest.Balance
 	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
 		return err
 	}
-	return tx.Model(&models.Account{}).Where("id = ?", accountID).Update("current_balance", balance).Error
+	return tx.Scopes(database.Owned(ctx)).Model(&models.Account{}).Where("id = ?", accountID).Update("current_balance", balance).Error
 }
 
 // ---- Transactions ----
 
-func ListTransactions(db *gorm.DB, accountID uint) ([]models.AccountTransaction, error) {
-	if err := accountExists(db, accountID); err != nil {
+func ListTransactions(ctx context.Context, accountID uint) ([]models.AccountTransaction, error) {
+	db := database.From(ctx)
+	if err := accountExists(ctx, db, accountID); err != nil {
 		return nil, err
 	}
 	var transactions []models.AccountTransaction
-	if err := db.Where("account_id = ?", accountID).Order("date DESC, id DESC").Find(&transactions).Error; err != nil {
+	if err := db.Scopes(database.Owned(ctx)).Where("account_id = ?", accountID).Order("date DESC, id DESC").Find(&transactions).Error; err != nil {
 		return nil, err
 	}
 	return transactions, nil
@@ -346,7 +350,8 @@ type TransactionInput struct {
 	UpdateBalance bool `json:"update_balance"`
 }
 
-func CreateTransaction(db *gorm.DB, accountID uint, input TransactionInput) (*models.AccountTransaction, error) {
+func CreateTransaction(ctx context.Context, accountID uint, input TransactionInput) (*models.AccountTransaction, error) {
+	db := database.From(ctx)
 	if input.Kind == "" {
 		input.Kind = models.TransactionDeposit
 	}
@@ -364,16 +369,16 @@ func CreateTransaction(db *gorm.DB, accountID uint, input TransactionInput) (*mo
 		Note:      strings.TrimSpace(input.Note),
 	}
 	err := db.Transaction(func(tx *gorm.DB) error {
-		if err := accountExists(tx, accountID); err != nil {
+		if err := accountExists(ctx, tx, accountID); err != nil {
 			return err
 		}
-		if err := tx.Create(&transaction).Error; err != nil {
+		if err := tx.Omit(clause.Associations).Create(&transaction).Error; err != nil {
 			return err
 		}
 		if !input.UpdateBalance {
 			return nil
 		}
-		return applyTransactionToBalance(tx, accountID, transaction)
+		return applyTransactionToBalance(ctx, tx, accountID, transaction)
 	})
 	if err != nil {
 		return nil, err
@@ -384,10 +389,10 @@ func CreateTransaction(db *gorm.DB, accountID uint, input TransactionInput) (*mo
 // applyTransactionToBalance records latest balance +/- the transaction amount
 // as a snapshot on the transaction's date. Only allowed on or after the latest
 // snapshot: a back-dated adjustment would be overwritten by the later one.
-func applyTransactionToBalance(tx *gorm.DB, accountID uint, transaction models.AccountTransaction) error {
+func applyTransactionToBalance(ctx context.Context, tx *gorm.DB, accountID uint, transaction models.AccountTransaction) error {
 	var latest models.AccountBalance
 	current := 0.0
-	err := tx.Where("account_id = ?", accountID).Order("date DESC").First(&latest).Error
+	err := tx.Scopes(database.Owned(ctx)).Where("account_id = ?", accountID).Order("date DESC").First(&latest).Error
 	switch {
 	case err == nil:
 		if transaction.Date.Format(time.DateOnly) < latest.Date.Format(time.DateOnly) {
@@ -401,16 +406,10 @@ func applyTransactionToBalance(tx *gorm.DB, accountID uint, transaction models.A
 	if transaction.Kind == models.TransactionWithdrawal {
 		delta = -delta
 	}
-	return setBalance(tx, accountID, transaction.Date, current+delta)
+	return setBalance(ctx, tx, accountID, transaction.Date, current+delta)
 }
 
-func DeleteTransaction(db *gorm.DB, accountID, transactionID uint) error {
-	result := db.Where("account_id = ?", accountID).Delete(&models.AccountTransaction{}, transactionID)
-	if result.Error != nil {
-		return result.Error
-	}
-	if result.RowsAffected == 0 {
-		return gorm.ErrRecordNotFound
-	}
-	return nil
+func DeleteTransaction(ctx context.Context, accountID, transactionID uint) error {
+	db := database.From(ctx)
+	return database.Affected(db.Scopes(database.Owned(ctx)).Where("account_id = ?", accountID).Delete(&models.AccountTransaction{}, transactionID))
 }

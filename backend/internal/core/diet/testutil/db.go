@@ -4,12 +4,28 @@ import (
 	"be-simpletracker/internal/clock"
 	"be-simpletracker/internal/core/diet/models"
 	"be-simpletracker/internal/database"
+	"context"
 	"testing"
 	"time"
 
 	"github.com/glebarez/sqlite"
 	"gorm.io/gorm"
 )
+
+// UserID is the account every seed row here belongs to, and the one Ctx acts as.
+const UserID uint = 1
+
+var owner = database.Owner{UserID: UserID}
+
+// Ctx is a request-shaped context for the test user on db (SQLite module tests).
+func Ctx(db *gorm.DB) context.Context {
+	return database.WithIdentity(database.WithDB(context.Background(), db), database.Identity{UserID: UserID})
+}
+
+// CtxAs is Ctx for another user.
+func CtxAs(db *gorm.DB, uid uint) context.Context {
+	return database.WithIdentity(database.WithDB(context.Background(), db), database.Identity{UserID: uid})
+}
 
 func SetupTestDB(t *testing.T) *gorm.DB {
 	t.Helper()
@@ -32,13 +48,13 @@ func SetupTestDB(t *testing.T) *gorm.DB {
 	); err != nil {
 		t.Fatal(err)
 	}
-	database.SetDB(db)
 	return db
 }
 
 func SeedPlan(t *testing.T, db *gorm.DB, name string) models.Plan {
 	t.Helper()
 	p := models.Plan{
+		Owner:    owner,
 		Name:     name,
 		Calories: 2000,
 		Protein:  150,
@@ -55,6 +71,7 @@ func SeedPlan(t *testing.T, db *gorm.DB, name string) models.Plan {
 func SeedFood(t *testing.T, db *gorm.DB, name string, macros models.Food) models.Food {
 	t.Helper()
 	f := macros
+	f.CreatedBy = UserID
 	f.Name = name
 	f.ServingType = "g"
 	f.ServingAmount = 100
@@ -67,6 +84,7 @@ func SeedFood(t *testing.T, db *gorm.DB, name string, macros models.Food) models
 func SeedDay(t *testing.T, db *gorm.DB, date time.Time, planID uint) models.DietDay {
 	t.Helper()
 	d := models.DietDay{
+		Owner:  owner,
 		Date:   date,
 		PlanID: planID,
 	}
@@ -79,8 +97,10 @@ func SeedDay(t *testing.T, db *gorm.DB, date time.Time, planID uint) models.Diet
 func SeedMeal(t *testing.T, db *gorm.DB, name string, foodID uint, amount float32) models.Meal {
 	t.Helper()
 	m := models.Meal{
-		Name: name,
+		Owner: owner,
+		Name:  name,
 		Items: []models.MealItem{{
+			Owner:  owner,
 			FoodID: foodID,
 			Amount: amount,
 		}},
@@ -94,8 +114,10 @@ func SeedMeal(t *testing.T, db *gorm.DB, name string, foodID uint, amount float3
 func SeedSavedMeal(t *testing.T, db *gorm.DB, name string, foodID uint) models.SavedMeal {
 	t.Helper()
 	sm := models.SavedMeal{
-		Name: name,
+		Owner: owner,
+		Name:  name,
 		Items: []models.SavedMealItem{{
+			Owner:  owner,
 			FoodID: foodID,
 			Amount: 1,
 		}},
@@ -108,7 +130,7 @@ func SeedSavedMeal(t *testing.T, db *gorm.DB, name string, foodID uint) models.S
 
 func SeedDayLog(t *testing.T, db *gorm.DB, dayID, mealID uint) models.DayLog {
 	t.Helper()
-	dl := models.DayLog{DayID: dayID, MealID: mealID}
+	dl := models.DayLog{Owner: owner, DayID: dayID, MealID: mealID}
 	if err := db.Create(&dl).Error; err != nil {
 		t.Fatal(err)
 	}
@@ -118,6 +140,7 @@ func SeedDayLog(t *testing.T, db *gorm.DB, dayID, mealID uint) models.DayLog {
 func SeedPlannedMeal(t *testing.T, db *gorm.DB, dayID, mealID uint, order int, logged bool) models.PlannedMeal {
 	t.Helper()
 	pm := models.PlannedMeal{
+		Owner:        owner,
 		DayID:        dayID,
 		MealID:       mealID,
 		Logged:       logged,
@@ -141,4 +164,14 @@ func DefaultMacros() models.Food {
 		Carbs:    12,
 		Fat:      3,
 	}
+}
+
+// SeedPlannedFromSaved is an unlogged planned meal that came from a saved meal.
+func SeedPlannedFromSaved(t *testing.T, db *gorm.DB, dayID, mealID, savedMealID uint) models.PlannedMeal {
+	t.Helper()
+	pm := models.PlannedMeal{Owner: owner, DayID: dayID, MealID: mealID, SavedMealID: &savedMealID}
+	if err := db.Create(&pm).Error; err != nil {
+		t.Fatal(err)
+	}
+	return pm
 }

@@ -1,7 +1,7 @@
 package models
 
 import (
-	"be-simpletracker/internal/database/repository"
+	"be-simpletracker/internal/database"
 
 	"gorm.io/gorm"
 )
@@ -10,6 +10,7 @@ import (
 // that can be assigned to workout logs for tracking training sessions
 type WorkoutPlan struct {
 	gorm.Model
+	database.Owner
 	Name                 string          `json:"name"`
 	WorkoutProgramID     *uint           `json:"workout_program_id"`
 	WorkoutProgram       *WorkoutProgram `json:"workout_program,omitempty" gorm:"foreignKey:WorkoutProgramID"`
@@ -22,23 +23,7 @@ type WorkoutPlan struct {
 	AssignedDays         []int           `json:"assigned_days" gorm:"-"`
 }
 
-// GetID implements repository.Entity interface
-func (w WorkoutPlan) GetID() uint {
-	return w.ID
-}
-
-// TableName implements repository.Entity interface
+// TableName sets the gorm table name.
 func (w WorkoutPlan) TableName() string {
 	return "workout_plans"
 }
-
-// Preloads implements repository.Preloadable interface
-func (w WorkoutPlan) Preloads() []string {
-	return []string{"Exercises"}
-}
-
-// Verify interface implementations at compile time
-var (
-	_ repository.Entity      = (*WorkoutPlan)(nil)
-	_ repository.Preloadable = (*WorkoutPlan)(nil)
-)

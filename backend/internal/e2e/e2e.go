@@ -25,6 +25,7 @@ import (
 	"gorm.io/gorm"
 
 	"be-simpletracker/internal/clock"
+	"be-simpletracker/internal/database"
 	"be-simpletracker/internal/e2e/seed"
 	"be-simpletracker/internal/env"
 )
@@ -40,6 +41,19 @@ func Install(router *gin.Engine, db *gorm.DB) {
 	}
 	log.Print("e2e: test-only endpoints enabled under /__e2e")
 	s := newState(router, db)
+	// Reset and seed profiles truncate and reseed as the schema owner, like cmd/e2eseed. The
+	// server's own pool is the app role, which may not TRUNCATE or restart sequences.
+	owner, err := database.OwnerDSN()
+	if err != nil {
+		log.Fatalf("e2e: owner database: %v", err)
+	}
+	if s.seedDB, err = database.Open(owner, database.Pool{MaxOpen: 2, MaxIdle: 1, MaxLifetime: time.Hour, MaxIdleTime: time.Hour}); err != nil {
+		log.Fatalf("e2e: owner database: %v", err)
+	}
+	var user string
+	if err := s.seedDB.Raw("SELECT current_user").Scan(&user).Error; err != nil || user == database.AppRole {
+		log.Fatalf("e2e: /__e2e reset needs the schema owner, but DATABASE_OWNER_URL is unset or names %s (%v)", database.AppRole, err)
+	}
 	if err := s.registerFaultHooks(db); err != nil {
 		log.Fatalf("e2e: %v", err)
 	}
@@ -51,7 +65,7 @@ func (s *state) routes(g *gin.RouterGroup) {
 	g.POST("/reset", func(c *gin.Context) {
 		s.clear()
 		clock.Reset()
-		if err := seed.Reset(s.db); err != nil {
+		if err := seed.Reset(s.seedDB); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
@@ -64,7 +78,7 @@ func (s *state) routes(g *gin.RouterGroup) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "unknown seed profile " + c.Param("profile")})
 			return
 		}
-		if err := apply(s.db); err != nil {
+		if err := apply(s.seedDB); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}

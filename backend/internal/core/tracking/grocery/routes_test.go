@@ -1,6 +1,7 @@
 package grocery
 
 import (
+	"be-simpletracker/internal/database"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -9,12 +10,18 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// signedIn stands in for AuthMiddleware: every request is user 1.
+func signedIn(c *gin.Context) {
+	_ = database.SetIdentity(c, database.Identity{UserID: 1})
+}
+
 func groceryRouter(t *testing.T) (*gin.Engine, func(string) *httptest.ResponseRecorder) {
 	t.Helper()
 	gin.SetMode(gin.TestMode)
 	db := groceryTestDB(t)
 	r := gin.New()
-	RegisterGroceryRoutes(r.Group("/grocery"), db)
+	r.Use(database.Middleware(db), signedIn)
+	RegisterGroceryRoutes(r.Group("/grocery"))
 	post := func(body string) *httptest.ResponseRecorder {
 		req := httptest.NewRequest(http.MethodPost, "/grocery/items", strings.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
@@ -49,7 +56,8 @@ func TestPostItem_dbErrorIs500WithoutDetails(t *testing.T) {
 	db := groceryTestDB(t)
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
-	RegisterGroceryRoutes(r.Group("/grocery"), db)
+	r.Use(database.Middleware(db), signedIn)
+	RegisterGroceryRoutes(r.Group("/grocery"))
 	if err := db.Exec("DROP TABLE grocery_items").Error; err != nil {
 		t.Fatal(err)
 	}

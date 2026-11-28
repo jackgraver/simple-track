@@ -14,12 +14,12 @@ import (
 	"be-simpletracker/internal/utils"
 	"be-simpletracker/migrations"
 	"context"
-	"fmt"
 	"log"
-	"strings"
+	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
-	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
@@ -35,24 +35,21 @@ func main() {
 		log.Fatalf("config: %v", err)
 	}
 	gin.SetMode(gin.ReleaseMode)
-	router := gin.Default()
+	router := gin.New()
+	// gin.Default's logger and recovery, but the log names the route, not the raw URL.
+	router.Use(requestLogger()...)
+	router.Use(gin.Recovery())
+	// Contexts derived from a *gin.Context (context.WithTimeout(c, ...)) still reach the
+	// request context, so auth.UserID works on them.
+	router.ContextWithFallback = true
+
+	// First, so every response (including CORS preflights and 404s) gets it.
+	router.Use(hardening(defaultBodyLimit, bodyLimits))
+	router.Use(corsMiddleware(env.SliceOr("CORS_ORIGINS", ",", nil)))
 
 	if !env.IsProduction() {
 		router.Use(utils.BenchmarkMiddleware(router))
 	}
-
-	defaultCORS := "http://localhost:5173,http://localhost:3000,http://192.168.4.78:3000,http://192.168.4.64:3000"
-	corsOrigins := env.StringOr("CORS_ORIGINS", defaultCORS)
-	origins := splitString(corsOrigins, ",")
-
-	router.Use(cors.New(cors.Config{
-		AllowOrigins:     origins,
-		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE"},
-		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization"},
-		AllowCredentials: true,
-		ExposeHeaders:    []string{"Set-Cookie"},
-		MaxAge:           12 * time.Hour,
-	}))
 
 	trustedProxies := env.SliceOr("TRUSTED_PROXIES", ",", nil)
 	if err := router.SetTrustedProxies(trustedProxies); err != nil {
@@ -61,34 +58,48 @@ func main() {
 	if env.IsProduction() && len(trustedProxies) == 0 {
 		log.Printf("config: TRUSTED_PROXIES is empty; login protection will use the direct peer IP")
 	}
-	db, err := database.ConnectToPostgres()
+	db, err := database.ConnectApp()
 	if err != nil {
 		log.Fatalf("database: %v", err)
 	}
 	if err := checkSchema(db); err != nil {
 		log.Fatalf("database schema: %v", err)
 	}
+	if err := checkRole(db); err != nil {
+		if env.IsProduction() {
+			log.Fatalf("database role: %v", err)
+		}
+		log.Printf("database role: warning: %v", err)
+	}
 
 	// Test-only /__e2e endpoints; a no-op unless built with -tags e2e (e2e/README.md).
 	e2e.Install(router, db)
+	// After e2e.Install (its holds must not sit in an open transaction), before every route that
+	// reaches the database (docs/multi-user/DECISIONS.md, "B2").
+	router.Use(database.Middleware(db))
 	CreateFeatures(db, router)
 	// Last, after the schema check: see healthHandler.
 	router.GET("/health", healthHandler(db))
 
 	addr := env.StringOr("LISTEN_ADDR", "0.0.0.0:8080")
-	fmt.Println("Server is running on port", addr)
-	router.Run(addr)
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	// After the first signal, restore default handling so a second Ctrl-C/SIGTERM kills at once.
+	go func() { <-ctx.Done(); stop() }()
+	if err := serve(ctx, newHTTPServer(addr, router), db); err != nil {
+		log.Fatal(err)
+	}
 }
 
-func splitString(s, sep string) []string {
-	var result []string
-	for _, part := range strings.Split(s, sep) {
-		trimmed := strings.TrimSpace(part)
-		if trimmed != "" {
-			result = append(result, trimmed)
-		}
+// checkRole: the server must not connect as a role that row-level security doesn't apply to.
+func checkRole(db *gorm.DB) error {
+	sqlDB, err := db.DB()
+	if err != nil {
+		return err
 	}
-	return result
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	return database.CheckAppRole(ctx, sqlDB)
 }
 
 // checkSchema refuses to start against a database that is missing migrations
@@ -109,20 +120,20 @@ func checkSchema(db *gorm.DB) error {
 }
 
 func CreateFeatures(db *gorm.DB, router *gin.Engine) {
-	auth.RegisterRoutes(router)
+	auth.RegisterRoutes(router, db)
 
-	authMW := auth.AuthMiddleware()
+	authMW := auth.AuthMiddleware(db)
 
 	diet.RegisterRoutes(router, authMW)
 
 	workout.RegisterRoutes(router, authMW)
 
-	trackingHandler := tracking.NewHandler(db)
+	trackingHandler := tracking.NewHandler()
 	trackingHandler.RegisterRoutes(router, authMW)
 
-	moneyHandler := money.NewHandler(db)
+	moneyHandler := money.NewHandler()
 	moneyHandler.RegisterRoutes(router, authMW)
 
-	mediaHandler := media.NewHandler(db)
+	mediaHandler := media.NewHandler()
 	mediaHandler.RegisterRoutes(router, authMW)
 }

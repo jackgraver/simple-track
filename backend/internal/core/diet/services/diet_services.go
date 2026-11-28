@@ -20,11 +20,11 @@ type DayWithTotals struct {
 }
 
 func MealPlanToday(ctx context.Context, offset int) (models.DietDay, dietrepo.MealDayTotals, error) {
-	day, err := dietrepo.DayMealPlanToday(offset)
+	day, err := dietrepo.DayMealPlanToday(ctx, offset)
 	if err != nil {
 		return models.DietDay{}, dietrepo.MealDayTotals{}, err
 	}
-	tot := dietrepo.CalculateTotals(day.ID)
+	tot := dietrepo.CalculateTotals(ctx, day.ID)
 	return day, tot, nil
 }
 
@@ -47,14 +47,14 @@ func MealPlanMonth(ctx context.Context, offset int) (days []models.DietDay, star
 	return days, startOfMonth, endOfMonth, target.Month(), nil
 }
 
-func MonthPlannedSummary(_ context.Context, monthOffset int) ([]int, error) {
+func MonthPlannedSummary(ctx context.Context, monthOffset int) ([]int, error) {
 	today := clock.Now()
 	target := today.AddDate(0, monthOffset, 0)
 	loc := target.Location()
 	startOfMonth := time.Date(target.Year(), target.Month(), 1, 0, 0, 0, 0, loc)
 	endOfMonth := startOfMonth.AddDate(0, 1, -1)
 	dim := endOfMonth.Day()
-	byDate, err := dietrepo.CountUnloggedPlannedMealsPerCalendarDay(startOfMonth, endOfMonth)
+	byDate, err := dietrepo.CountUnloggedPlannedMealsPerCalendarDay(ctx, startOfMonth, endOfMonth)
 	if err != nil {
 		return nil, err
 	}
@@ -71,103 +71,116 @@ func MealPlanDay(ctx context.Context, id uint) (models.DietDay, dietrepo.MealDay
 	if err != nil {
 		return models.DietDay{}, dietrepo.MealDayTotals{}, err
 	}
-	tot := dietrepo.CalculateTotals(day.ID)
+	tot := dietrepo.CalculateTotals(ctx, day.ID)
 	return day, tot, nil
 }
 
-func GoalsToday() (*models.Plan, error) {
-	return dietrepo.GoalsToday()
+func GoalsToday(ctx context.Context) (*models.Plan, error) {
+	return dietrepo.GoalsToday(ctx)
 }
 
-func MealPlanDayByID(id int) (*models.DietDay, error) {
-	return dietrepo.DayByID(id)
+func MealPlanDayByID(ctx context.Context, id int) (*models.DietDay, error) {
+	return dietrepo.DayByID(ctx, id)
 }
 
-func CalculateTotals(dayID uint) dietrepo.MealDayTotals {
-	return dietrepo.CalculateTotals(dayID)
+func CalculateTotals(ctx context.Context, dayID uint) dietrepo.MealDayTotals {
+	return dietrepo.CalculateTotals(ctx, dayID)
 }
 
-func DayWithTotalsByID(id int) (DayWithTotals, error) {
-	day, err := dietrepo.DayByID(id)
+func DayWithTotalsByID(ctx context.Context, id int) (DayWithTotals, error) {
+	day, err := dietrepo.DayByID(ctx, id)
 	if err != nil {
 		return DayWithTotals{}, err
 	}
-	return DayWithTotals{Day: day, Totals: dietrepo.CalculateTotals(day.ID)}, nil
+	return DayWithTotals{Day: day, Totals: dietrepo.CalculateTotals(ctx, day.ID)}, nil
 }
 
-func AllMealDays() ([]models.DietDay, error) {
-	return dietrepo.AllMealDays()
+func AllMealDays(ctx context.Context) ([]models.DietDay, error) {
+	return dietrepo.AllMealDays(ctx)
 }
 
-func AllFoods(excludeIDs []uint) ([]models.Food, error) {
-	return dietrepo.FoodsAll(excludeIDs)
+func AllFoods(ctx context.Context, excludeIDs []uint) ([]models.Food, error) {
+	return dietrepo.FoodsAll(ctx, excludeIDs)
 }
 
-func AllFoodsForPicker(excludeIDs []uint) ([]models.FoodWithVariants, error) {
-	return dietrepo.FoodsAllWithVariantSiblings(excludeIDs)
+func AllFoodsForPicker(ctx context.Context, excludeIDs []uint) ([]models.FoodWithVariants, error) {
+	return dietrepo.FoodsAllWithVariantSiblings(ctx, excludeIDs)
 }
 
-func CreateFood(food *models.Food, relatedFoodID *uint) (*models.Food, error) {
+func CreateFood(ctx context.Context, food *models.Food, relatedFoodID *uint) (*models.Food, error) {
 	food.ID = 0
 	food.VariantGroupID = nil
-	if err := dietrepo.FoodCreateWithOptionalRelated(food, relatedFoodID); err != nil {
+	if err := dietrepo.FoodCreateWithOptionalRelated(ctx, food, relatedFoodID); err != nil {
 		return nil, err
 	}
-	dietrepo.EnrichFoodVariants(food)
+	dietrepo.EnrichFoodVariants(ctx, food)
 	return food, nil
 }
 
-func AllCompositeFoods() ([]models.CompositeFood, error) {
-	return dietrepo.CompositeFoodsAll()
+func UpdateFood(ctx context.Context, id uint, in dietrepo.FoodFields) (*models.Food, error) {
+	food, err := dietrepo.FoodUpdate(ctx, id, in)
+	if err != nil {
+		return nil, err
+	}
+	dietrepo.EnrichFoodVariants(ctx, food)
+	return food, nil
 }
 
-func CreateCompositeFood(cf *models.CompositeFood) (uint, error) {
-	return dietrepo.CompositeFoodCreate(cf)
+func DeleteFood(ctx context.Context, id uint) error {
+	return dietrepo.FoodDelete(ctx, id)
 }
 
-func CompositeFoodByID(id uint) (*models.CompositeFood, error) {
-	return dietrepo.CompositeFoodByID(id)
+func AllCompositeFoods(ctx context.Context) ([]models.CompositeFood, error) {
+	return dietrepo.CompositeFoodsAll(ctx)
 }
 
-func AllMeals(excludeIDs []uint) ([]models.Meal, error) {
-	return dietrepo.MealsAll(excludeIDs)
+func CreateCompositeFood(ctx context.Context, cf *models.CompositeFood) (uint, error) {
+	return dietrepo.CompositeFoodCreate(ctx, cf)
 }
 
-func MealByID(id uint) (*models.Meal, error) {
-	return dietrepo.MealByID(id)
+func CompositeFoodByID(ctx context.Context, id uint) (*models.CompositeFood, error) {
+	return dietrepo.CompositeFoodByID(ctx, id)
 }
 
-func FindMealPlanDay(date time.Time) (*models.DietDay, error) {
-	return dietrepo.FindDayByDate(date)
+func AllMeals(ctx context.Context, excludeIDs []uint) ([]models.Meal, error) {
+	return dietrepo.MealsAll(ctx, excludeIDs)
 }
 
-func CreateDayMeal(dayMeal *models.DayLog) error {
-	return dietrepo.CreateDayMeal(dayMeal)
+func MealByID(ctx context.Context, id uint) (*models.Meal, error) {
+	return dietrepo.MealByID(ctx, id)
 }
 
-func DayLogExistsForMeal(dayID uint, mealID uint) (bool, error) {
-	return dietrepo.DayLogExists(dayID, mealID)
+func FindMealPlanDay(ctx context.Context, date time.Time) (*models.DietDay, error) {
+	return dietrepo.FindDayByDate(ctx, date)
 }
 
-func CreateMeal(meal *models.Meal) (uint, error) {
-	return dietrepo.MealCreate(meal)
+func CreateDayMeal(ctx context.Context, dayMeal *models.DayLog) error {
+	return dietrepo.CreateDayMeal(ctx, dayMeal)
 }
 
-func AllSavedMeals(excludeIDs []uint) ([]models.SavedMeal, error) {
-	return dietrepo.SavedMealsAll(excludeIDs)
+func DayLogExistsForMeal(ctx context.Context, dayID uint, mealID uint) (bool, error) {
+	return dietrepo.DayLogExists(ctx, dayID, mealID)
 }
 
-func CreateSavedMeal(sm *models.SavedMeal) (uint, error) {
-	return dietrepo.SavedMealCreate(sm)
+func CreateMeal(ctx context.Context, meal *models.Meal) (uint, error) {
+	return dietrepo.MealCreate(ctx, meal)
 }
 
-func SavedMealByID(id uint) (*models.SavedMeal, error) {
-	return dietrepo.SavedMealByID(id)
+func AllSavedMeals(ctx context.Context, excludeIDs []uint) ([]models.SavedMeal, error) {
+	return dietrepo.SavedMealsAll(ctx, excludeIDs)
 }
 
-func SavedMealPlannedUsageInfo(savedMealID uint) (SavedMealPlannedUsage, error) {
+func CreateSavedMeal(ctx context.Context, sm *models.SavedMeal) (uint, error) {
+	return dietrepo.SavedMealCreate(ctx, sm)
+}
+
+func SavedMealByID(ctx context.Context, id uint) (*models.SavedMeal, error) {
+	return dietrepo.SavedMealByID(ctx, id)
+}
+
+func SavedMealPlannedUsageInfo(ctx context.Context, savedMealID uint) (SavedMealPlannedUsage, error) {
 	var out SavedMealPlannedUsage
-	count, err := dietrepo.CountUnloggedPlannedBySavedMealID(savedMealID)
+	count, err := dietrepo.CountUnloggedPlannedBySavedMealID(ctx, savedMealID)
 	if err != nil {
 		return out, err
 	}
@@ -175,16 +188,16 @@ func SavedMealPlannedUsageInfo(savedMealID uint) (SavedMealPlannedUsage, error) 
 	return out, nil
 }
 
-func DeleteSavedMeal(id uint) error {
-	return dietrepo.DeleteSavedMeal(id)
+func DeleteSavedMeal(ctx context.Context, id uint) error {
+	return dietrepo.DeleteSavedMeal(ctx, id)
 }
 
-func ReplaceSavedMeal(id uint, incoming *models.SavedMeal) error {
-	return dietrepo.SavedMealReplace(id, incoming)
+func ReplaceSavedMeal(ctx context.Context, id uint, incoming *models.SavedMeal) error {
+	return dietrepo.SavedMealReplace(ctx, id, incoming)
 }
 
-func SetPlannedMealLogged(dayID uint, mealID uint) error {
-	return dietrepo.SetPlannedMealLogged(dayID, mealID)
+func SetPlannedMealLogged(ctx context.Context, dayID uint, mealID uint) error {
+	return dietrepo.SetPlannedMealLogged(ctx, dayID, mealID)
 }
 
 func mealFromSaved(sm *models.SavedMeal) *models.Meal {
@@ -201,79 +214,79 @@ func mealFromSaved(sm *models.SavedMeal) *models.Meal {
 	return m
 }
 
-func AddPlannedMealFromSavedMeal(offset int, savedMealID uint, clientID string) error {
-	sm, err := dietrepo.SavedMealByID(savedMealID)
+func AddPlannedMealFromSavedMeal(ctx context.Context, offset int, savedMealID uint, clientID string) error {
+	sm, err := dietrepo.SavedMealByID(ctx, savedMealID)
 	if err != nil {
 		return err
 	}
-	return dietrepo.AddPlannedMealFromSavedMeal(offset, savedMealID, mealFromSaved(sm), clientID)
+	return dietrepo.AddPlannedMealFromSavedMeal(ctx, offset, savedMealID, mealFromSaved(sm), clientID)
 }
 
 // CopyPlannedMeals copies one day's planned meals onto other days. See dietrepo.CopyPlannedMeals.
-func CopyPlannedMeals(fromOffset int, toOffsets []int) (int, error) {
-	return dietrepo.CopyPlannedMeals(fromOffset, toOffsets)
+func CopyPlannedMeals(ctx context.Context, fromOffset int, toOffsets []int) (int, error) {
+	return dietrepo.CopyPlannedMeals(ctx, fromOffset, toOffsets)
 }
 
-func ReorderPlannedMeals(offset int, orderedIDs []uint) error {
-	day, err := dietrepo.FindDayByDate(clock.ZerodTime(offset))
+func ReorderPlannedMeals(ctx context.Context, offset int, orderedIDs []uint) error {
+	day, err := dietrepo.FindDayByDate(ctx, clock.ZerodTime(offset))
 	if err != nil {
 		return err
 	}
-	return dietrepo.PlannedMealReorder(day.ID, orderedIDs)
+	return dietrepo.PlannedMealReorder(ctx, day.ID, orderedIDs)
 }
 
-func DeletePlannedMeal(offset int, plannedMealID uint) error {
-	day, err := dietrepo.FindDayByDate(clock.ZerodTime(offset))
+func DeletePlannedMeal(ctx context.Context, offset int, plannedMealID uint) error {
+	day, err := dietrepo.FindDayByDate(ctx, clock.ZerodTime(offset))
 	if err != nil {
 		return err
 	}
-	return dietrepo.PlannedMealDelete(plannedMealID, day.ID)
+	return dietrepo.PlannedMealDelete(ctx, plannedMealID, day.ID)
 }
 
 // LogPlannedMeal logs a planned meal on the given day (idempotent). See dietrepo.LogPlannedMeal.
-func LogPlannedMeal(dayID uint, mealID uint) error {
-	return dietrepo.LogPlannedMeal(dayID, mealID)
+func LogPlannedMeal(ctx context.Context, dayID uint, mealID uint) error {
+	return dietrepo.LogPlannedMeal(ctx, dayID, mealID)
 }
 
-func DeleteLoggedMeal(dayID uint, mealID uint) error {
-	return dietrepo.DeleteLoggedMeal(dayID, mealID)
+func DeleteLoggedMeal(ctx context.Context, dayID uint, mealID uint) error {
+	return dietrepo.DeleteLoggedMeal(ctx, dayID, mealID)
 }
 
-func UpdateDayLogMeal(dayID uint, oldMealID uint, newMealID uint) error {
-	return dietrepo.UpdateDayLogMeal(dayID, oldMealID, newMealID)
+func UpdateDayLogMeal(ctx context.Context, dayID uint, oldMealID uint, newMealID uint) error {
+	return dietrepo.UpdateDayLogMeal(ctx, dayID, oldMealID, newMealID)
 }
 
-func EditLoggedMeal(dayID uint, oldMealID uint, meal *models.Meal) error {
-	return dietrepo.EditLoggedMeal(dayID, oldMealID, meal)
+func EditLoggedMeal(ctx context.Context, dayID uint, oldMealID uint, meal *models.Meal) error {
+	return dietrepo.EditLoggedMeal(ctx, dayID, oldMealID, meal)
 }
 
-func QuickLogMeal(params dietrepo.QuickLogParams) (DayWithTotals, error) {
-	dayID, err := dietrepo.QuickLogMeal(params)
+func QuickLogMeal(ctx context.Context, params dietrepo.QuickLogParams) (DayWithTotals, error) {
+	dayID, err := dietrepo.QuickLogMeal(ctx, params)
 	if err != nil {
 		return DayWithTotals{}, err
 	}
-	return DayWithTotalsByID(int(dayID))
+	return DayWithTotalsByID(ctx, int(dayID))
 }
 
-func GetAllPlans(ctx context.Context, params utils.QueryParams) (*utils.GetAllResult[models.Plan], error) {
+func GetAllPlans(ctx context.Context, params utils.QueryParams) (*utils.ListResult[models.Plan], error) {
 	return dietrepo.PlansGetAll(ctx, params)
 }
 
-func UpdatePlanMacros(id uint, calories, protein, fiber, carbs, fat float32) (*models.Plan, error) {
-	return dietrepo.UpdatePlanMacros(id, calories, protein, fiber, carbs, fat)
+func UpdatePlanMacros(ctx context.Context, id uint, calories, protein, fiber, carbs, fat float32) (*models.Plan, error) {
+	return dietrepo.UpdatePlanMacros(ctx, id, calories, protein, fiber, carbs, fat)
 }
 
-func FindMealPlanDayByRowIDOrToday(dayID uint) (*models.DietDay, error) {
+func FindMealPlanDayByRowIDOrToday(ctx context.Context, dayID uint) (*models.DietDay, error) {
 	if dayID != 0 {
-		return MealPlanDayByID(int(dayID))
+		return MealPlanDayByID(ctx, int(dayID))
 	}
-	return FindMealPlanDay(clock.ZerodTime(0))
+	return FindMealPlanDay(ctx, clock.ZerodTime(0))
 }
 
-func DayWithTotalsForDay(day *models.DietDay) DayWithTotals {
-	return DayWithTotals{Day: day, Totals: CalculateTotals(day.ID)}
+func DayWithTotalsForDay(ctx context.Context, day *models.DietDay) DayWithTotals {
+	return DayWithTotals{Day: day, Totals: CalculateTotals(ctx, day.ID)}
 }
 
-func ReloadDayWithTotals(day *models.DietDay) (DayWithTotals, error) {
-	return DayWithTotalsByID(int(day.ID))
+func ReloadDayWithTotals(ctx context.Context, day *models.DietDay) (DayWithTotals, error) {
+	return DayWithTotalsByID(ctx, int(day.ID))
 }

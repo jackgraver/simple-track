@@ -152,7 +152,7 @@ func UpdateSet(c *gin.Context) {
 	})
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			apierr.NotFound(c, "Set not found")
+			apierr.NotFound(c, "not found")
 			return
 		}
 		apierr.Internal(c, err)

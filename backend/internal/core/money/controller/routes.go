@@ -2,6 +2,7 @@ package controller
 
 import (
 	"be-simpletracker/internal/clock"
+	"be-simpletracker/internal/database"
 	"errors"
 	"net/http"
 	"strconv"
@@ -11,17 +12,16 @@ import (
 	"be-simpletracker/internal/core/money/models"
 	"be-simpletracker/internal/core/money/service"
 	"be-simpletracker/internal/core/tracking/common"
+	"be-simpletracker/internal/utils/apierr"
 
 	"github.com/gin-gonic/gin"
-	"gorm.io/gorm"
+	"github.com/jackc/pgx/v5/pgconn"
 )
 
-type Handler struct {
-	db *gorm.DB
-}
+type Handler struct{}
 
-func RegisterRoutes(group *gin.RouterGroup, db *gorm.DB) {
-	h := Handler{db: db}
+func RegisterRoutes(group *gin.RouterGroup) {
+	h := Handler{}
 
 	accounts := group.Group("/accounts")
 	accounts.GET("", h.listAccounts)
@@ -46,6 +46,7 @@ func RegisterRoutes(group *gin.RouterGroup, db *gorm.DB) {
 	types.POST("/presets", h.createFromPreset)
 	types.GET("/:id", h.getContributionType)
 	types.PUT("/:id", h.updateContributionType)
+	types.PUT("/:id/room", h.setContributionRoom)
 	types.DELETE("/:id", h.deleteContributionType)
 	types.PUT("/:id/limits/:year", h.upsertLimit)
 	types.DELETE("/:id/limits/:year", h.deleteLimit)
@@ -54,7 +55,7 @@ func RegisterRoutes(group *gin.RouterGroup, db *gorm.DB) {
 // ---- Accounts ----
 
 func (h *Handler) listAccounts(c *gin.Context) {
-	accounts, err := service.ListAccounts(h.db, c.Query("archived") == "true")
+	accounts, err := service.ListAccounts(c.Request.Context(), c.Query("archived") == "true")
 	if err != nil {
 		respondError(c, err)
 		return
@@ -67,7 +68,7 @@ func (h *Handler) getAccount(c *gin.Context) {
 	if !ok {
 		return
 	}
-	account, err := service.GetAccount(h.db, id)
+	account, err := service.GetAccount(c.Request.Context(), id)
 	if err != nil {
 		respondError(c, err)
 		return
@@ -84,14 +85,14 @@ type createAccountBody struct {
 func (h *Handler) createAccount(c *gin.Context) {
 	var body createAccountBody
 	if err := c.ShouldBindJSON(&body); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		apierr.BadRequest(c, err.Error())
 		return
 	}
 	date, ok := parseDate(c, body.BalanceDate)
 	if !ok {
 		return
 	}
-	account, err := service.CreateAccount(h.db, body.AccountInput, body.OpeningBalance, date)
+	account, err := service.CreateAccount(c.Request.Context(), body.AccountInput, body.OpeningBalance, date)
 	if err != nil {
 		respondError(c, err)
 		return
@@ -106,10 +107,10 @@ func (h *Handler) updateAccount(c *gin.Context) {
 	}
 	var body service.AccountInput
 	if err := c.ShouldBindJSON(&body); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		apierr.BadRequest(c, err.Error())
 		return
 	}
-	account, err := service.UpdateAccount(h.db, id, body)
+	account, err := service.UpdateAccount(c.Request.Context(), id, body)
 	if err != nil {
 		respondError(c, err)
 		return
@@ -122,7 +123,7 @@ func (h *Handler) deleteAccount(c *gin.Context) {
 	if !ok {
 		return
 	}
-	if err := service.DeleteAccount(h.db, id); err != nil {
+	if err := service.DeleteAccount(c.Request.Context(), id); err != nil {
 		respondError(c, err)
 		return
 	}
@@ -136,7 +137,7 @@ func (h *Handler) listBalances(c *gin.Context) {
 	if !ok {
 		return
 	}
-	balances, err := service.ListBalances(h.db, id)
+	balances, err := service.ListBalances(c.Request.Context(), id)
 	if err != nil {
 		respondError(c, err)
 		return
@@ -156,18 +157,18 @@ func (h *Handler) setBalance(c *gin.Context) {
 	}
 	var body balanceBody
 	if err := c.ShouldBindJSON(&body); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		apierr.BadRequest(c, err.Error())
 		return
 	}
 	if body.Balance == nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "balance is required"})
+		apierr.BadRequest(c, "balance is required")
 		return
 	}
 	date, ok := parseDate(c, body.Date)
 	if !ok {
 		return
 	}
-	if err := service.SetBalance(h.db, id, date, *body.Balance); err != nil {
+	if err := service.SetBalance(c.Request.Context(), id, date, *body.Balance); err != nil {
 		respondError(c, err)
 		return
 	}
@@ -182,14 +183,14 @@ type balancesBody struct {
 func (h *Handler) setBalances(c *gin.Context) {
 	var body balancesBody
 	if err := c.ShouldBindJSON(&body); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		apierr.BadRequest(c, err.Error())
 		return
 	}
 	date, ok := parseDate(c, body.Date)
 	if !ok {
 		return
 	}
-	if err := service.SetBalances(h.db, date, body.Balances); err != nil {
+	if err := service.SetBalances(c.Request.Context(), date, body.Balances); err != nil {
 		respondError(c, err)
 		return
 	}
@@ -205,7 +206,7 @@ func (h *Handler) deleteBalance(c *gin.Context) {
 	if !ok {
 		return
 	}
-	if err := service.DeleteBalance(h.db, id, balanceID); err != nil {
+	if err := service.DeleteBalance(c.Request.Context(), id, balanceID); err != nil {
 		respondError(c, err)
 		return
 	}
@@ -213,7 +214,7 @@ func (h *Handler) deleteBalance(c *gin.Context) {
 }
 
 func (h *Handler) netWorthHistory(c *gin.Context) {
-	points, err := service.NetWorthHistory(h.db)
+	points, err := service.NetWorthHistory(c.Request.Context())
 	if err != nil {
 		respondError(c, err)
 		return
@@ -228,7 +229,7 @@ func (h *Handler) listTransactions(c *gin.Context) {
 	if !ok {
 		return
 	}
-	transactions, err := service.ListTransactions(h.db, id)
+	transactions, err := service.ListTransactions(c.Request.Context(), id)
 	if err != nil {
 		respondError(c, err)
 		return
@@ -248,7 +249,7 @@ func (h *Handler) createTransaction(c *gin.Context) {
 	}
 	var body transactionBody
 	if err := c.ShouldBindJSON(&body); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		apierr.BadRequest(c, err.Error())
 		return
 	}
 	date, ok := parseDate(c, body.Date)
@@ -257,7 +258,7 @@ func (h *Handler) createTransaction(c *gin.Context) {
 	}
 	input := body.TransactionInput
 	input.Date = date
-	transaction, err := service.CreateTransaction(h.db, id, input)
+	transaction, err := service.CreateTransaction(c.Request.Context(), id, input)
 	if err != nil {
 		respondError(c, err)
 		return
@@ -274,7 +275,7 @@ func (h *Handler) deleteTransaction(c *gin.Context) {
 	if !ok {
 		return
 	}
-	if err := service.DeleteTransaction(h.db, id, transactionID); err != nil {
+	if err := service.DeleteTransaction(c.Request.Context(), id, transactionID); err != nil {
 		respondError(c, err)
 		return
 	}
@@ -288,7 +289,7 @@ func (h *Handler) listContributionTypes(c *gin.Context) {
 	if !ok {
 		return
 	}
-	types, err := service.ListContributionTypes(h.db, birthYear, clock.Now())
+	types, err := service.ListContributionTypes(c.Request.Context(), birthYear, clock.Now())
 	if err != nil {
 		respondError(c, err)
 		return
@@ -305,7 +306,7 @@ func (h *Handler) getContributionType(c *gin.Context) {
 	if !ok {
 		return
 	}
-	contributionType, err := service.GetContributionType(h.db, id, birthYear, clock.Now())
+	contributionType, err := service.GetContributionType(c.Request.Context(), id, birthYear, clock.Now())
 	if err != nil {
 		respondError(c, err)
 		return
@@ -320,10 +321,10 @@ func (h *Handler) listPresets(c *gin.Context) {
 func (h *Handler) createFromPreset(c *gin.Context) {
 	var body service.PresetInput
 	if err := c.ShouldBindJSON(&body); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		apierr.BadRequest(c, err.Error())
 		return
 	}
-	contributionType, err := service.CreateContributionTypeFromPreset(h.db, body)
+	contributionType, err := service.CreateContributionTypeFromPreset(c.Request.Context(), body)
 	if err != nil {
 		respondError(c, err)
 		return
@@ -332,12 +333,12 @@ func (h *Handler) createFromPreset(c *gin.Context) {
 }
 
 func (h *Handler) createContributionType(c *gin.Context) {
-	var body service.ContributionTypeInput
+	var body service.ContributionTypeCreateInput
 	if err := c.ShouldBindJSON(&body); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		apierr.BadRequest(c, err.Error())
 		return
 	}
-	contributionType, err := service.CreateContributionType(h.db, body)
+	contributionType, err := service.CreateContributionType(c.Request.Context(), body)
 	if err != nil {
 		respondError(c, err)
 		return
@@ -352,10 +353,38 @@ func (h *Handler) updateContributionType(c *gin.Context) {
 	}
 	var body service.ContributionTypeInput
 	if err := c.ShouldBindJSON(&body); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		apierr.BadRequest(c, err.Error())
 		return
 	}
-	contributionType, err := service.UpdateContributionType(h.db, id, body)
+	contributionType, err := service.UpdateContributionType(c.Request.Context(), id, body)
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"contribution_type": contributionType})
+}
+
+// setContributionRoom saves the caller's own room figures (start year, opening room) for a type.
+// They are per user, so anyone signed in may set theirs on a shared type.
+func (h *Handler) setContributionRoom(c *gin.Context) {
+	id, ok := parseUintParam(c, "id")
+	if !ok {
+		return
+	}
+	var body service.RoomInput
+	if err := c.ShouldBindJSON(&body); err != nil {
+		apierr.BadRequest(c, err.Error())
+		return
+	}
+	if err := service.SetContributionRoom(c.Request.Context(), id, body); err != nil {
+		respondError(c, err)
+		return
+	}
+	birthYear, ok := h.currentUserBirthYear(c)
+	if !ok {
+		return
+	}
+	contributionType, err := service.GetContributionType(c.Request.Context(), id, birthYear, clock.Now())
 	if err != nil {
 		respondError(c, err)
 		return
@@ -368,7 +397,7 @@ func (h *Handler) deleteContributionType(c *gin.Context) {
 	if !ok {
 		return
 	}
-	if err := service.DeleteContributionType(h.db, id); err != nil {
+	if err := service.DeleteContributionType(c.Request.Context(), id); err != nil {
 		respondError(c, err)
 		return
 	}
@@ -390,14 +419,14 @@ func (h *Handler) upsertLimit(c *gin.Context) {
 	}
 	var body limitBody
 	if err := c.ShouldBindJSON(&body); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		apierr.BadRequest(c, err.Error())
 		return
 	}
 	if body.AnnualLimit == nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "annual_limit is required"})
+		apierr.BadRequest(c, "annual_limit is required")
 		return
 	}
-	limit, err := service.UpsertContributionLimit(h.db, id, year, *body.AnnualLimit)
+	limit, err := service.UpsertContributionLimit(c.Request.Context(), id, year, *body.AnnualLimit)
 	if err != nil {
 		respondError(c, err)
 		return
@@ -414,7 +443,7 @@ func (h *Handler) deleteLimit(c *gin.Context) {
 	if !ok {
 		return
 	}
-	if err := service.DeleteContributionLimit(h.db, id, year); err != nil {
+	if err := service.DeleteContributionLimit(c.Request.Context(), id, year); err != nil {
 		respondError(c, err)
 		return
 	}
@@ -426,7 +455,7 @@ func (h *Handler) deleteLimit(c *gin.Context) {
 func parseUintParam(c *gin.Context, name string) (uint, bool) {
 	value, err := strconv.ParseUint(c.Param(name), 10, 32)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid " + name})
+		apierr.BadRequest(c, "invalid "+name)
 		return 0, false
 	}
 	return uint(value), true
@@ -435,7 +464,7 @@ func parseUintParam(c *gin.Context, name string) (uint, bool) {
 func parseYearParam(c *gin.Context) (int, bool) {
 	year, err := strconv.Atoi(c.Param("year"))
 	if err != nil || year < 1900 || year > 9999 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid year"})
+		apierr.BadRequest(c, "invalid year")
 		return 0, false
 	}
 	return year, true
@@ -445,36 +474,46 @@ func parseYearParam(c *gin.Context) (int, bool) {
 func parseDate(c *gin.Context, value string) (time.Time, bool) {
 	date, err := common.ParseDateString(value)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid date, expected YYYY-MM-DD"})
+		apierr.BadRequest(c, "invalid date, expected YYYY-MM-DD")
 		return time.Time{}, false
 	}
 	return date, true
 }
 
+// respondError maps a service error to a response: 400 for bad input, 403 for a shared row the
+// caller can see but may not change, 404 for a missing or someone else's row, else a logged 500.
 func respondError(c *gin.Context, err error) {
 	var validation service.ValidationError
 	switch {
-	case errors.Is(err, gorm.ErrRecordNotFound):
-		c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
 	case errors.As(err, &validation):
-		c.JSON(http.StatusBadRequest, gin.H{"error": validation.Message})
+		apierr.BadRequest(c, validation.Message)
+	case errors.Is(err, service.ErrForbidden):
+		apierr.Forbidden(c, "not allowed")
+	case isUniqueViolation(err):
+		// Two requests adding the same shared type (or first room row) at once: the loser retries.
+		apierr.Conflict(c, "already exists, reload and try again")
 	default:
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		apierr.NotFoundOrInternal(c, err)
 	}
 }
 
+func isUniqueViolation(err error) bool {
+	var pgErr *pgconn.PgError
+	return errors.As(err, &pgErr) && pgErr.Code == "23505"
+}
+
 func (h *Handler) currentUserBirthYear(c *gin.Context) (*int, bool) {
-	username := c.GetString("username")
-	if username == "" {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Not authenticated"})
+	id, ok := database.CurrentIdentity(c.Request.Context())
+	if !ok {
+		apierr.Unauthorized(c, "Not authenticated")
 		return nil, false
 	}
 	var user authmodels.User
-	if err := h.db.Select("birth_year").Where("username = ?", username).First(&user).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
+	if err := database.From(c.Request.Context()).Select("birth_year").First(&user, id.UserID).Error; err != nil {
+		if database.IsNotFound(err) {
 			return nil, true
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		apierr.Internal(c, err)
 		return nil, false
 	}
 	return user.BirthYear, true

@@ -44,19 +44,29 @@ export type RoomSummary = {
     years: RoomYear[];
 };
 
-export type ContributionTypeSettings = {
+/** The shared rules of a type: editable by its creator and the admin. */
+export type ContributionTypeRules = {
     name: string;
-    start_year: number | null;
     eligibility_age: number | null;
     carry_forward_cap: number | null;
     lifetime_limit: number | null;
     withdrawals_restore_room: boolean;
+};
+
+/** The signed-in user's own figures for a type. */
+export type ContributionRoomSettings = {
+    start_year: number | null;
     opening_room_year: number | null;
     opening_room: number | null;
 };
 
+export type ContributionTypeSettings = ContributionTypeRules & ContributionRoomSettings;
+
 export type ContributionType = ContributionTypeSettings & {
     ID: number;
+    created_by: number;
+    /** True for the type's creator and the admin (the rules and limits are shared). */
+    can_edit: boolean;
     limits: ContributionLimit[];
     accounts: { id: number; name: string }[];
     room: RoomSummary | null;

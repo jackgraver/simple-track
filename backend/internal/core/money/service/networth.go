@@ -1,12 +1,12 @@
 package service
 
 import (
+	"be-simpletracker/internal/database"
+	"context"
 	"sort"
 	"time"
 
 	"be-simpletracker/internal/core/money/models"
-
-	"gorm.io/gorm"
 )
 
 type NetWorthPoint struct {
@@ -19,13 +19,14 @@ type NetWorthPoint struct {
 // NetWorthHistory returns net worth on every day any balance was recorded.
 // Each account contributes its most recent balance on or before that day,
 // and stops counting once it is archived.
-func NetWorthHistory(db *gorm.DB) ([]NetWorthPoint, error) {
+func NetWorthHistory(ctx context.Context) ([]NetWorthPoint, error) {
+	db := database.From(ctx)
 	var accounts []models.Account
-	if err := db.Find(&accounts).Error; err != nil {
+	if err := db.Scopes(database.Owned(ctx)).Find(&accounts).Error; err != nil {
 		return nil, err
 	}
 	var balances []models.AccountBalance
-	if err := db.Order("date ASC").Find(&balances).Error; err != nil {
+	if err := db.Scopes(database.Owned(ctx)).Order("date ASC").Find(&balances).Error; err != nil {
 		return nil, err
 	}
 	return buildNetWorthHistory(accounts, balances), nil
