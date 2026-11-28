@@ -2,6 +2,7 @@ package services_test
 
 import (
 	"be-simpletracker/internal/clock"
+	"be-simpletracker/internal/core/workout/testutil"
 	"context"
 	"database/sql"
 	"fmt"
@@ -82,6 +83,8 @@ func TestPostgres_setsMigrationAndConcurrency(t *testing.T) {
 	}
 
 	// The pre-0004 duplicate from the audit: two parents for one (log, exercise).
+	// The one account (user 1) becomes the admin in migration 0009 and then owns all of this.
+	mustExec(t, sqlDB, `INSERT INTO users (username, password, email) VALUES ('owner', 'x', 'owner@example.test')`)
 	mustExec(t, sqlDB, `INSERT INTO exercises (id, name) VALUES (1, 'Squat'), (2, 'Bench')`)
 	mustExec(t, sqlDB, `INSERT INTO workout_logs (id, date) VALUES (1, '2026-01-05')`)
 	mustExec(t, sqlDB, `INSERT INTO logged_exercises (id, workout_log_id, exercise_id, notes) VALUES
@@ -108,7 +111,7 @@ func TestPostgres_setsMigrationAndConcurrency(t *testing.T) {
 	if n := count(t, sqlDB, `SELECT count(*) FROM logged_exercises WHERE id = 13 AND notes = 'solo'`); n != 1 {
 		t.Fatalf("non-duplicate parent changed")
 	}
-	if _, err := sqlDB.Exec(`INSERT INTO logged_exercises (workout_log_id, exercise_id) VALUES (1, 1)`); err == nil {
+	if _, err := sqlDB.Exec(`INSERT INTO logged_exercises (workout_log_id, exercise_id, user_id) VALUES (1, 1, 1)`); err == nil {
 		t.Fatalf("unique (workout_log_id, exercise_id) not enforced")
 	}
 	if _, err := m.Down(ctx, 1); err != nil {
@@ -128,7 +131,7 @@ func TestPostgres_setsMigrationAndConcurrency(t *testing.T) {
 	if d, err := gdb.DB(); err == nil {
 		d.SetMaxOpenConns(40) // below Postgres' default max_connections (100)
 	}
-	ctx = database.WithDB(ctx, gdb)
+	ctx = testutil.Ctx(gdb)
 	t.Cleanup(func() {
 		if d, err := gdb.DB(); err == nil {
 			d.Close()
@@ -231,6 +234,10 @@ func TestPostgres_setsMigrationAndConcurrency(t *testing.T) {
 // request ends, not until the repository's own transaction, which is a savepoint there).
 func inRequest[T any](db *gorm.DB, fn func(context.Context) (T, error)) (T, error) {
 	ctx, req := database.WithTx(context.Background(), db)
+	if err := database.SetIdentity(ctx, testutil.Identity); err != nil {
+		var zero T
+		return zero, err
+	}
 	v, err := fn(ctx)
 	if err != nil {
 		req.Rollback()
@@ -259,6 +266,8 @@ func pgMigratedGorm(t *testing.T) (*gorm.DB, *sql.DB) {
 			d.Close()
 		}
 	})
+	// User 1, the admin the tests act as (testutil.Identity). These tests run on the owner role.
+	mustExec(t, sqlDB, `INSERT INTO users (username, password, email, is_admin, token_version) VALUES ('owner', 'x', 'owner@example.test', true, 1)`)
 	return gdb, sqlDB
 }
 
@@ -280,8 +289,8 @@ func waitForLockWait(t *testing.T, db *sql.DB) {
 // being created must not cascade the new (committed) set away.
 func TestPostgres_deleteLastSetDoesNotEatConcurrentCreate(t *testing.T) {
 	gdb, sqlDB := pgMigratedGorm(t)
-	ctx := database.WithDB(context.Background(), gdb)
-	mustExec(t, sqlDB, `INSERT INTO exercises (id, name) VALUES (1, 'Squat')`)
+	ctx := testutil.Ctx(gdb)
+	mustExec(t, sqlDB, `INSERT INTO exercises (id, name, created_by) VALUES (1, 'Squat', 1)`)
 	day := clock.ZerodTime(0)
 
 	first, err := services.LogSet(ctx, services.LogSetInput{ClientID: clientID(1), Day: day, ExerciseID: 1, Reps: 5})
@@ -299,7 +308,7 @@ func TestPostgres_deleteLastSetDoesNotEatConcurrentCreate(t *testing.T) {
 	if _, err := b.Exec(`SELECT id FROM logged_exercises WHERE id = $1 FOR KEY SHARE`, parentID); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := b.Exec(`INSERT INTO logged_sets (logged_exercise_id, client_id, reps, weight) VALUES ($1, $2, 3, 0)`,
+	if _, err := b.Exec(`INSERT INTO logged_sets (logged_exercise_id, client_id, reps, weight, user_id) VALUES ($1, $2, 3, 0, 1)`,
 		parentID, clientID(2)); err != nil {
 		t.Fatal(err)
 	}
@@ -333,7 +342,7 @@ func TestPostgres_deleteLastSetDoesNotEatConcurrentCreate(t *testing.T) {
 	// new one is logged. Every successful create must still exist afterwards.
 	for i := 0; i < 150; i++ {
 		ex := uint(100 + i)
-		mustExec(t, sqlDB, `INSERT INTO exercises (id, name) VALUES ($1, $2)`, ex, fmt.Sprintf("Ex %d", ex))
+		mustExec(t, sqlDB, `INSERT INTO exercises (id, name, created_by) VALUES ($1, $2, 1)`, ex, fmt.Sprintf("Ex %d", ex))
 		old, newID := clientID(1000+2*i), clientID(1001+2*i)
 		if _, err := services.LogSet(ctx, services.LogSetInput{ClientID: old, Day: day, ExerciseID: ex, Reps: 1}); err != nil {
 			t.Fatal(err)

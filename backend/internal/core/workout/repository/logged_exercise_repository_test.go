@@ -5,8 +5,6 @@ import (
 	"be-simpletracker/internal/core/workout/models"
 	workoutrepo "be-simpletracker/internal/core/workout/repository"
 	"be-simpletracker/internal/core/workout/testutil"
-	"be-simpletracker/internal/database"
-	"context"
 	"testing"
 
 	"gorm.io/gorm"
@@ -14,7 +12,7 @@ import (
 
 func TestUpdateLoggedExerciseWithSets_addUpdateDelete(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	ctx := database.WithDB(context.Background(), db)
+	ctx := testutil.Ctx(db)
 	today := clock.ZerodTime(0)
 	ex := models.Exercise{Name: "Press"}
 	if err := db.Create(&ex).Error; err != nil {
@@ -57,7 +55,7 @@ func TestUpdateLoggedExerciseWithSets_addUpdateDelete(t *testing.T) {
 }
 
 func TestRemoveLoggedExerciseForDay_notFound(t *testing.T) {
-	ctx := database.WithDB(context.Background(), testutil.SetupTestDB(t))
+	ctx := testutil.Ctx(testutil.SetupTestDB(t))
 	err := workoutrepo.RemoveLoggedExerciseForDay(ctx, clock.ZerodTime(0), 1)
 	if err != gorm.ErrRecordNotFound {
 		t.Fatalf("expected not found, got %v", err)
@@ -65,7 +63,7 @@ func TestRemoveLoggedExerciseForDay_notFound(t *testing.T) {
 }
 
 func TestGetPreviousExerciseLog_noMatch(t *testing.T) {
-	ctx := database.WithDB(context.Background(), testutil.SetupTestDB(t))
+	ctx := testutil.Ctx(testutil.SetupTestDB(t))
 	_, err := workoutrepo.GetPreviousExerciseLog(ctx, clock.ZerodTime(0), "Missing", 0)
 	if err != nil {
 		t.Fatalf("expected nil error with empty result, got %v", err)
@@ -74,7 +72,7 @@ func TestGetPreviousExerciseLog_noMatch(t *testing.T) {
 
 func TestGetMaxExerciseLog_usesHighestWeightThenReps(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	ctx := database.WithDB(context.Background(), db)
+	ctx := testutil.Ctx(db)
 	today := clock.ZerodTime(0)
 	ex := models.Exercise{Name: "Bench"}
 	if err := db.Create(&ex).Error; err != nil {

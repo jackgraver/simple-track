@@ -5,8 +5,6 @@ import (
 	"be-simpletracker/internal/core/workout/models"
 	"be-simpletracker/internal/core/workout/services"
 	"be-simpletracker/internal/core/workout/testutil"
-	"be-simpletracker/internal/database"
-	"context"
 	"slices"
 	"strings"
 	"testing"
@@ -14,7 +12,7 @@ import (
 
 func TestAddExerciseToPlan_RemoveExerciseFromPlan_Reorder(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	ctx := database.WithDB(context.Background(), db)
+	ctx := testutil.Ctx(db)
 	ex1, err := services.CreateExercise(ctx, "A", 10, "")
 	if err != nil {
 		t.Fatal(err)
@@ -60,7 +58,7 @@ func TestAddExerciseToPlan_RemoveExerciseFromPlan_Reorder(t *testing.T) {
 
 func TestAssignPlanToDay_andUnassign(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	ctx := database.WithDB(context.Background(), db)
+	ctx := testutil.Ctx(db)
 	plan := models.WorkoutPlan{Name: "Upper"}
 	if err := db.Create(&plan).Error; err != nil {
 		t.Fatal(err)
@@ -88,7 +86,7 @@ func TestAssignPlanToDay_andUnassign(t *testing.T) {
 }
 
 func TestAssignPlanToDay_rejectsInvalidDay(t *testing.T) {
-	ctx := database.WithDB(context.Background(), testutil.SetupTestDB(t))
+	ctx := testutil.Ctx(testutil.SetupTestDB(t))
 	_, err := services.AssignPlanToDay(ctx, 1, 9)
 	if err == nil || !strings.Contains(err.Error(), "day_of_week") {
 		t.Fatalf("expected day_of_week error, got %v", err)
@@ -97,7 +95,7 @@ func TestAssignPlanToDay_rejectsInvalidDay(t *testing.T) {
 
 func TestSetPlannedCardio(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	ctx := database.WithDB(context.Background(), db)
+	ctx := testutil.Ctx(db)
 	plan := models.WorkoutPlan{Name: "Cardio Day"}
 	if err := db.Create(&plan).Error; err != nil {
 		t.Fatal(err)
@@ -113,7 +111,7 @@ func TestSetPlannedCardio(t *testing.T) {
 
 func TestSetPlannedMobility(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	ctx := database.WithDB(context.Background(), db)
+	ctx := testutil.Ctx(db)
 	plan := models.WorkoutPlan{Name: "Recovery Day"}
 	if err := db.Create(&plan).Error; err != nil {
 		t.Fatal(err)
@@ -143,7 +141,7 @@ func TestSetPlannedMobility(t *testing.T) {
 
 func TestGetAllWorkoutPlans(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	ctx := database.WithDB(context.Background(), db)
+	ctx := testutil.Ctx(db)
 	if err := db.Create(&models.WorkoutPlan{Name: "One"}).Error; err != nil {
 		t.Fatal(err)
 	}

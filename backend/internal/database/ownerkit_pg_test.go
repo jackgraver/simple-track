@@ -32,9 +32,7 @@ var nullableOwnerColumn = map[string]bool{
 // its entries in the PR that adds the policies; D1 requires this to be empty. An entry whose
 // table already has RLS (or no longer exists) only logs a reminder, so lanes can merge in any order.
 var rlsPending = map[string]string{
-	"exercises": "C3", "workout_programs": "C3", "workout_plans": "C3", "workout_plan_days": "C3",
-	"workout_plan_exercises": "C3", "workout_logs": "C3", "logged_exercises": "C3",
-	"logged_sets": "C3", "cardios": "C3",
+	// (empty: every lane has its policies)
 }
 
 // Every table has row-level security with at least one policy, and every user_id / created_by

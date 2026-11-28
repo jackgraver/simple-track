@@ -23,19 +23,11 @@ import (
 // chain: gorm would also write whatever nested structs the value carries (a food inside a saved
 // meal item, BACKLOG #1). Sites that predate the rule; each module's C lane converts its own.
 var createWithAssociationsAllowed = map[string]int{
-	"internal/core/auth/repository/user_repository.go":               1, // C6 (users: no associations)
-	"internal/core/workout/repository/cardio_repository.go":          2,
-	"internal/core/workout/repository/exercise_repository.go":        1,
-	"internal/core/workout/repository/logged_exercise_repository.go": 3,
-	"internal/core/workout/repository/logged_set_repository.go":      1,
-	"internal/core/workout/repository/workoutlog_repository.go":      3,
-	"internal/core/workout/repository/workoutplan_repository.go":     4,
+	"internal/core/auth/repository/user_repository.go": 1, // C6 (users: no associations)
 }
 
 // Advisory locks taken without LockKey (BACKLOG #2): C2 and C3 move them to database.XactLock.
-var rawAdvisoryLockAllowed = map[string]int{
-	"internal/core/workout/repository/workoutlog_repository.go": 1, // C3: CreateMinimalIfMissing
-}
+var rawAdvisoryLockAllowed = map[string]int{}
 
 // Code that sets user_id / created_by (or a field named UserID / CreatedBy) other than the
 // Owner / Creator create hooks. Each entry needs a reason.

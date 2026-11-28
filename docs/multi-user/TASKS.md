@@ -184,11 +184,12 @@ Depends on: B3
 
 ### C3 Workout
 Depends on: B3
-- [ ] Catalog: exercises. Move machine settings (0003) to a per-user table.
-- [ ] Owned: workout_programs, workout_plans, plan days/exercises, workout_logs, logged_exercises,
+- [x] Catalog: exercises. Move machine settings (0003) to a per-user table.
+- [x] Owned: workout_programs, workout_plans, plan days/exercises, workout_logs, logged_exercises,
       logged_sets, cardios.
-- [ ] BACKLOG #2 (High): `CreateMinimalIfMissing` lock key and date check per user; two-user
+- [x] BACKLOG #2 (High): `CreateMinimalIfMissing` lock key and date check per user; two-user
       test where Alice and Bob both start a workout on the same date. #6.
+- Result: migration 0017, DECISIONS "C3 workout", ROLLOUT 1.11 and 3.3a (row counts for D1).
 
 ### C4 Money
 Depends on: B3

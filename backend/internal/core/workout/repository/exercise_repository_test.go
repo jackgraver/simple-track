@@ -4,8 +4,6 @@ import (
 	"be-simpletracker/internal/core/workout/models"
 	workoutrepo "be-simpletracker/internal/core/workout/repository"
 	"be-simpletracker/internal/core/workout/testutil"
-	"be-simpletracker/internal/database"
-	"context"
 	"testing"
 
 	"gorm.io/gorm"
@@ -13,7 +11,7 @@ import (
 
 func TestExerciseExists(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	ctx := database.WithDB(context.Background(), db)
+	ctx := testutil.Ctx(db)
 	ex := models.Exercise{Name: "Pull-up"}
 	if err := db.Create(&ex).Error; err != nil {
 		t.Fatal(err)
@@ -27,7 +25,7 @@ func TestExerciseExists(t *testing.T) {
 }
 
 func TestUpdateExercise_notFound(t *testing.T) {
-	ctx := database.WithDB(context.Background(), testutil.SetupTestDB(t))
+	ctx := testutil.Ctx(testutil.SetupTestDB(t))
 	_, err := workoutrepo.UpdateExercise(ctx, 9999, "Missing", 10, "")
 	if err != gorm.ErrRecordNotFound {
 		t.Fatalf("expected not found, got %v", err)
@@ -35,7 +33,7 @@ func TestUpdateExercise_notFound(t *testing.T) {
 }
 
 func TestUpdateExerciseCues_notFound(t *testing.T) {
-	ctx := database.WithDB(context.Background(), testutil.SetupTestDB(t))
+	ctx := testutil.Ctx(testutil.SetupTestDB(t))
 	_, err := workoutrepo.UpdateExerciseCues(ctx, 9999, "cue")
 	if err != gorm.ErrRecordNotFound {
 		t.Fatalf("expected not found, got %v", err)
@@ -44,7 +42,7 @@ func TestUpdateExerciseCues_notFound(t *testing.T) {
 
 func TestFindAllExercises_withExclude(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	ctx := database.WithDB(context.Background(), db)
+	ctx := testutil.Ctx(db)
 	for _, name := range []string{"One", "Two"} {
 		if err := db.Create(&models.Exercise{Name: name}).Error; err != nil {
 			t.Fatal(err)

@@ -97,8 +97,9 @@ func seed(tx *gorm.DB, owner uint) error {
 	tracking := func(tx *gorm.DB) error { return seedTracking(tx, owner) }
 	media := func(tx *gorm.DB) error { return seedMedia(tx, owner) }
 	money := func(tx *gorm.DB) error { return seedMoney(tx, owner) }
+	gym := func(tx *gorm.DB) error { return seedGym(tx, owner) }
 	diet := func(tx *gorm.DB) error { return seedDiet(tx, owner) }
-	for _, f := range []func(*gorm.DB) error{seedGym, diet, tracking, media, money} {
+	for _, f := range []func(*gorm.DB) error{gym, diet, tracking, media, money} {
 		if err := f(tx); err != nil {
 			return err
 		}
@@ -106,7 +107,7 @@ func seed(tx *gorm.DB, owner uint) error {
 	return nil
 }
 
-func seedGym(tx *gorm.DB) error {
+func seedGym(tx *gorm.DB, owner uint) error {
 	type ex struct {
 		name string
 		lt   workm.ExerciseLoadType
@@ -127,13 +128,19 @@ func seedGym(tx *gorm.DB) error {
 	}
 	exs := make([]workm.Exercise, len(defs))
 	for i, d := range defs {
-		exs[i] = workm.Exercise{Name: d.name, LoadType: d.lt, RepRollover: 12, Cues: "Controlled tempo, full range of motion."}
+		exs[i] = workm.Exercise{Creator: database.Creator{CreatedBy: owner}, Name: d.name, LoadType: d.lt, RepRollover: 12, Cues: "Controlled tempo, full range of motion."}
 	}
 	if err := tx.Create(&exs).Error; err != nil {
 		return err
 	}
 
-	prog := workm.WorkoutProgram{Name: "Push Pull Legs", IsActive: true}
+	// The dev login's own machine settings on one shared exercise (exercise_settings).
+	if err := tx.Create(&workm.ExerciseSetting{Owner: database.Owner{UserID: owner}, ExerciseID: exs[5].ID,
+		MachineSettings: []workm.MachineSetting{{Label: "Seat", Value: "4"}, {Label: "Pad", Value: "2"}}}).Error; err != nil {
+		return err
+	}
+
+	prog := workm.WorkoutProgram{Owner: database.Owner{UserID: owner}, Name: "Push Pull Legs", IsActive: true}
 	if err := tx.Create(&prog).Error; err != nil {
 		return err
 	}
@@ -158,7 +165,8 @@ func seedGym(tx *gorm.DB) error {
 	for i, p := range plans {
 		day := p.day
 		wp := workm.WorkoutPlan{
-			Name: p.name, WorkoutProgramID: &prog.ID, DayOfWeek: &day,
+			Owner: database.Owner{UserID: owner},
+			Name:  p.name, WorkoutProgramID: &prog.ID, DayOfWeek: &day,
 			PlannedCardioType: p.cardio, PlannedCardioMinutes: p.minutes,
 			PreMobilityItems:  []string{"Arm circles", "Cat-cow"},
 			PostMobilityItems: []string{"Hamstring stretch", "Doorway chest stretch"},
@@ -167,11 +175,11 @@ func seedGym(tx *gorm.DB) error {
 			return err
 		}
 		created[i] = wp
-		if err := tx.Create(&workm.WorkoutPlanDay{WorkoutPlanID: wp.ID, DayOfWeek: p.day}).Error; err != nil {
+		if err := tx.Create(&workm.WorkoutPlanDay{Owner: database.Owner{UserID: owner}, WorkoutPlanID: wp.ID, DayOfWeek: p.day}).Error; err != nil {
 			return err
 		}
 		for order, ei := range p.idx {
-			if err := tx.Create(&workm.WorkoutPlanExercise{WorkoutPlanID: wp.ID, ExerciseID: exs[ei].ID, DisplayOrder: order}).Error; err != nil {
+			if err := tx.Create(&workm.WorkoutPlanExercise{Owner: database.Owner{UserID: owner}, WorkoutPlanID: wp.ID, ExerciseID: exs[ei].ID, DisplayOrder: order}).Error; err != nil {
 				return err
 			}
 		}
@@ -199,25 +207,25 @@ func seedGym(tx *gorm.DB) error {
 		session++
 		p := plans[pi]
 		wp := created[pi]
-		log := workm.WorkoutLog{Date: date, WorkoutPlanID: &wp.ID}
+		log := workm.WorkoutLog{Owner: database.Owner{UserID: owner}, Date: date, WorkoutPlanID: &wp.ID}
 		if err := tx.Create(&log).Error; err != nil {
 			return err
 		}
 		for _, ei := range p.idx {
-			le := workm.LoggedExercise{WorkoutLogID: log.ID, ExerciseID: exs[ei].ID}
+			le := workm.LoggedExercise{Owner: database.Owner{UserID: owner}, WorkoutLogID: log.ID, ExerciseID: exs[ei].ID}
 			if err := tx.Create(&le).Error; err != nil {
 				return err
 			}
 			base := float32(45 + ei*10 + session*2)
 			for s := 0; s < 3; s++ {
-				set := workm.LoggedSet{LoggedExerciseID: le.ID, Reps: uint(10 - s), Weight: base, WeightSetup: ""}
+				set := workm.LoggedSet{Owner: database.Owner{UserID: owner}, LoggedExerciseID: le.ID, Reps: uint(10 - s), Weight: base, WeightSetup: ""}
 				if err := tx.Create(&set).Error; err != nil {
 					return err
 				}
 			}
 		}
 		if p.cardio != "" {
-			c := workm.Cardio{WorkoutLogID: log.ID, Minutes: p.minutes, Type: p.cardio}
+			c := workm.Cardio{Owner: database.Owner{UserID: owner}, WorkoutLogID: log.ID, Minutes: p.minutes, Type: p.cardio}
 			if err := tx.Create(&c).Error; err != nil {
 				return err
 			}

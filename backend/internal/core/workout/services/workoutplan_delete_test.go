@@ -5,14 +5,12 @@ import (
 	"be-simpletracker/internal/core/workout/models"
 	"be-simpletracker/internal/core/workout/services"
 	"be-simpletracker/internal/core/workout/testutil"
-	"be-simpletracker/internal/database"
-	"context"
 	"testing"
 )
 
 func TestRenameWorkoutPlan(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	ctx := database.WithDB(context.Background(), db)
+	ctx := testutil.Ctx(db)
 	var program models.WorkoutProgram
 	if err := db.Where("is_active = ?", true).First(&program).Error; err != nil {
 		t.Fatal(err)
@@ -38,7 +36,7 @@ func TestRenameWorkoutPlan(t *testing.T) {
 
 func TestDeleteAndRestoreWorkoutPlanKeepsExercisesAndFreeDays(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	ctx := database.WithDB(context.Background(), db)
+	ctx := testutil.Ctx(db)
 	var program models.WorkoutProgram
 	if err := db.Where("is_active = ?", true).First(&program).Error; err != nil {
 		t.Fatal(err)
@@ -97,7 +95,7 @@ func TestDeleteAndRestoreWorkoutPlanKeepsExercisesAndFreeDays(t *testing.T) {
 
 func TestLogKeepsRoutineAfterDelete(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	ctx := database.WithDB(context.Background(), db)
+	ctx := testutil.Ctx(db)
 	plan := models.WorkoutPlan{Name: "Legs"}
 	squat := models.Exercise{Name: "Squat"}
 	for _, v := range []any{&plan, &squat} {

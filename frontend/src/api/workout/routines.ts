@@ -17,7 +17,7 @@ import {
     type ProgramsData,
 } from "~/api/workout/routinePatches";
 import { searchListKeys } from "~/shared/searchListKeys";
-import type { Exercise, ExerciseLoadType, WorkoutPlan } from "~/types/workout";
+import type { Exercise, ExerciseLoadType, MachineSetting, WorkoutPlan } from "~/types/workout";
 
 /**
  * Mutations for routines (a `WorkoutPlan` inside a program) and the exercises they hold.
@@ -235,6 +235,17 @@ export function useCreateExercise() {
         mutationKey: ["workout", "mutations", "createExercise"],
         mutationFn: async (input: ExerciseInput) =>
             (await apiPOST<{ exercise: Exercise }>("/workout/exercises", input)).exercise,
+        invalidate: exerciseKeys,
+        errorMessage: false,
+    });
+}
+
+/** Saves the caller's own machine settings for a shared exercise (an empty list clears them). */
+export function useSaveMachineSettings() {
+    return useServerMutation({
+        mutationKey: ["workout", "mutations", "saveMachineSettings"],
+        mutationFn: async ({ id, machine_settings }: { id: number; machine_settings: MachineSetting[] }) =>
+            (await apiPUT<{ exercise: Exercise }>(`/workout/exercises/${id}/settings`, { machine_settings })).exercise,
         invalidate: exerciseKeys,
         errorMessage: false,
     });

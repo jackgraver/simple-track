@@ -1,7 +1,10 @@
 package models
 
+import "be-simpletracker/internal/database"
+
 // WorkoutPlanExercise is the join row for plan ↔ exercise with display order.
 type WorkoutPlanExercise struct {
+	database.Owner
 	WorkoutPlanID uint `gorm:"primaryKey" json:"workout_plan_id"`
 	ExerciseID    uint `gorm:"primaryKey" json:"exercise_id"`
 	DisplayOrder  int  `gorm:"not null;default:0" json:"display_order"`

@@ -4,8 +4,7 @@ import (
 	"be-simpletracker/internal/core/workout/models"
 	workoutrepo "be-simpletracker/internal/core/workout/repository"
 	"be-simpletracker/internal/core/workout/testutil"
-	"be-simpletracker/internal/database"
-	"context"
+	"errors"
 	"strings"
 	"testing"
 
@@ -14,7 +13,7 @@ import (
 
 func TestReorderPlanExercises_rejectsPartialList(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	ctx := database.WithDB(context.Background(), db)
+	ctx := testutil.Ctx(db)
 	plan := models.WorkoutPlan{Name: "Split"}
 	if err := db.Create(&plan).Error; err != nil {
 		t.Fatal(err)
@@ -48,19 +47,19 @@ func TestReorderPlanExercises_rejectsPartialList(t *testing.T) {
 
 func TestRemoveExerciseFromPlan_notFound(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	ctx := database.WithDB(context.Background(), db)
+	ctx := testutil.Ctx(db)
 	plan := models.WorkoutPlan{Name: "Empty"}
 	if err := db.Create(&plan).Error; err != nil {
 		t.Fatal(err)
 	}
 	err := workoutrepo.RemoveExerciseFromPlan(ctx, plan.ID, 1)
-	if err != gorm.ErrRecordNotFound {
-		t.Fatalf("expected not found, got %v", err)
+	if !errors.Is(err, workoutrepo.ErrNotInPlan) {
+		t.Fatalf("expected ErrNotInPlan, got %v", err)
 	}
 }
 
 func TestAddExerciseToPlan_rejectsMissingPlan(t *testing.T) {
-	ctx := database.WithDB(context.Background(), testutil.SetupTestDB(t))
+	ctx := testutil.Ctx(testutil.SetupTestDB(t))
 	err := workoutrepo.AddExerciseToPlan(ctx, 9999, 1)
 	if err != gorm.ErrRecordNotFound {
 		t.Fatalf("expected not found, got %v", err)
@@ -68,7 +67,7 @@ func TestAddExerciseToPlan_rejectsMissingPlan(t *testing.T) {
 }
 
 func TestLoadPlanWithOrderedExercises_notFound(t *testing.T) {
-	ctx := database.WithDB(context.Background(), testutil.SetupTestDB(t))
+	ctx := testutil.Ctx(testutil.SetupTestDB(t))
 	_, err := workoutrepo.LoadPlanWithOrderedExercises(ctx, 9999)
 	if err != gorm.ErrRecordNotFound {
 		t.Fatalf("expected not found, got %v", err)
@@ -77,7 +76,7 @@ func TestLoadPlanWithOrderedExercises_notFound(t *testing.T) {
 
 func TestRenumberPlanExerciseDisplayOrder_onRemove(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	ctx := database.WithDB(context.Background(), db)
+	ctx := testutil.Ctx(db)
 	plan := models.WorkoutPlan{Name: "Three"}
 	if err := db.Create(&plan).Error; err != nil {
 		t.Fatal(err)

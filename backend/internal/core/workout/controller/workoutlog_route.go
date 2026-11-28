@@ -3,6 +3,7 @@ package controller
 import (
 	"be-simpletracker/internal/core/workout/services"
 	"be-simpletracker/internal/utils"
+	"be-simpletracker/internal/utils/apierr"
 	"errors"
 	"net/http"
 	"strings"
@@ -13,7 +14,7 @@ import (
 func GetWorkoutToday(c *gin.Context) {
 	day, err := services.GetOrCreateToday(c.Request.Context(), utils.GetDayOffset(c))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		respondError(c, err)
 		return
 	}
 
@@ -27,13 +28,13 @@ func GetWorkoutMonth(c *gin.Context) {
 		ErrInvalid: "monthoffset must be an integer",
 	})
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		respondError(c, err)
 		return
 	}
 
 	data, err := services.GetMonthWorkoutLogs(c.Request.Context(), offset)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		respondError(c, err)
 		return
 	}
 
@@ -50,13 +51,13 @@ func UpsertCardio(c *gin.Context) {
 	offset := utils.GetDayOffset(c)
 	var req upsertCardioRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		apierr.BadRequest(c, "Invalid request body")
 		return
 	}
 
 	cardio, err := services.UpsertCardio(c.Request.Context(), offset, req.Minutes, req.Type, req.Notes)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		respondError(c, err)
 		return
 	}
 
@@ -67,7 +68,7 @@ func GetPreviousWorkout(c *gin.Context) {
 	offset := utils.GetDayOffset(c)
 	payload, err := services.GetPreviousWorkoutView(c.Request.Context(), offset)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		respondError(c, err)
 		return
 	}
 
@@ -82,12 +83,12 @@ func SwitchPlan(c *gin.Context) {
 	offset := utils.GetDayOffset(c)
 	var req switchPlanRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		apierr.BadRequest(c, "Invalid request body")
 		return
 	}
 	payload, err := services.SwitchPlan(c.Request.Context(), offset, req.PlanID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		respondError(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, payload)
@@ -105,16 +106,16 @@ func GetWorkoutActivity(c *gin.Context) {
 		ErrInvalid: "weeks must be an integer",
 	})
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		respondError(c, err)
 		return
 	}
 	data, err := services.GetWorkoutActivity(c.Request.Context(), mode, weeks)
 	if err != nil {
 		if errors.Is(err, services.ErrInvalidActivityMode) {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "mode must be year or rolling"})
+			apierr.BadRequest(c, "mode must be year or rolling")
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		respondError(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, data)
@@ -128,12 +129,12 @@ func UpsertMobilityPre(c *gin.Context) {
 	offset := utils.GetDayOffset(c)
 	var req upsertMobilityRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		apierr.BadRequest(c, "Invalid request body")
 		return
 	}
 	view, err := services.UpsertMobilityPre(c.Request.Context(), offset, req.Checked)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		respondError(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"mobility": view})
@@ -143,12 +144,12 @@ func UpsertMobilityPost(c *gin.Context) {
 	offset := utils.GetDayOffset(c)
 	var req upsertMobilityRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		apierr.BadRequest(c, "Invalid request body")
 		return
 	}
 	view, err := services.UpsertMobilityPost(c.Request.Context(), offset, req.Checked)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		respondError(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"mobility": view})

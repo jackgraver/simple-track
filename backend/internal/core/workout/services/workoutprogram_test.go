@@ -4,15 +4,13 @@ import (
 	"be-simpletracker/internal/core/workout/models"
 	"be-simpletracker/internal/core/workout/services"
 	"be-simpletracker/internal/core/workout/testutil"
-	"be-simpletracker/internal/database"
-	"context"
 	"testing"
 	"time"
 )
 
 func TestActiveWorkoutProgramResolvesItsOwnWeek(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	ctx := database.WithDB(context.Background(), db)
+	ctx := testutil.Ctx(db)
 	var current models.WorkoutProgram
 	if err := db.Where("is_active = ?", true).First(&current).Error; err != nil {
 		t.Fatal(err)
@@ -41,7 +39,7 @@ func TestActiveWorkoutProgramResolvesItsOwnWeek(t *testing.T) {
 
 func TestActivatingWorkoutProgramPreservesExistingDayLog(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	ctx := database.WithDB(context.Background(), db)
+	ctx := testutil.Ctx(db)
 	var current models.WorkoutProgram
 	if err := db.Where("is_active = ?", true).First(&current).Error; err != nil {
 		t.Fatal(err)
@@ -76,7 +74,7 @@ func TestActivatingWorkoutProgramPreservesExistingDayLog(t *testing.T) {
 
 func TestWorkoutPlanCanBeAssignedToMultipleWeekdays(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	ctx := database.WithDB(context.Background(), db)
+	ctx := testutil.Ctx(db)
 	var program models.WorkoutProgram
 	if err := db.Where("is_active = ?", true).First(&program).Error; err != nil {
 		t.Fatal(err)
@@ -102,7 +100,7 @@ func TestWorkoutPlanCanBeAssignedToMultipleWeekdays(t *testing.T) {
 
 func TestUnassignWorkoutPlanFromSpecificWeekdayKeepsOtherAssignments(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	ctx := database.WithDB(context.Background(), db)
+	ctx := testutil.Ctx(db)
 	var program models.WorkoutProgram
 	if err := db.Where("is_active = ?", true).First(&program).Error; err != nil {
 		t.Fatal(err)
@@ -127,7 +125,7 @@ func TestUnassignWorkoutPlanFromSpecificWeekdayKeepsOtherAssignments(t *testing.
 }
 
 func TestCreateWorkoutPlanWithoutDayCreatesUnassignedRoutine(t *testing.T) {
-	ctx := database.WithDB(context.Background(), testutil.SetupTestDB(t))
+	ctx := testutil.Ctx(testutil.SetupTestDB(t))
 	program, err := services.CreateWorkoutProgram(ctx, "New Split")
 	if err != nil {
 		t.Fatal(err)
@@ -145,7 +143,7 @@ func TestCreateWorkoutPlanWithoutDayCreatesUnassignedRoutine(t *testing.T) {
 // must take their plan from the one with plans (what the week strip shows), not the first by id.
 func TestGetPlanByDayPrefersActiveProgramWithPlans(t *testing.T) {
 	db := testutil.SetupTestDB(t) // creates an active, empty "Test Program" first
-	ctx := database.WithDB(context.Background(), db)
+	ctx := testutil.Ctx(db)
 	ppl := models.WorkoutProgram{Name: "PPL", IsActive: true}
 	if err := db.Create(&ppl).Error; err != nil {
 		t.Fatal(err)

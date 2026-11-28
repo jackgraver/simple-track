@@ -2,8 +2,6 @@ package services_test
 
 import (
 	"be-simpletracker/internal/clock"
-	"be-simpletracker/internal/database"
-	"context"
 	"errors"
 	"fmt"
 	"sync"
@@ -30,7 +28,7 @@ func clientID(n int) string { return fmt.Sprintf("00000000-0000-4000-8000-%012d"
 
 func TestLogSet_createsDayAndParent(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	ctx := database.WithDB(context.Background(), db)
+	ctx := testutil.Ctx(db)
 	ex := setsTestExercise(t, db, "Squat")
 
 	res, err := services.LogSet(ctx, services.LogSetInput{
@@ -68,7 +66,7 @@ func TestLogSet_createsDayAndParent(t *testing.T) {
 
 func TestLogSet_offTodayUsesThatDay(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	ctx := database.WithDB(context.Background(), db)
+	ctx := testutil.Ctx(db)
 	ex := setsTestExercise(t, db, "Row")
 	yesterday := clock.ZerodTime(1)
 	res, err := services.LogSet(ctx, services.LogSetInput{
@@ -84,7 +82,7 @@ func TestLogSet_offTodayUsesThatDay(t *testing.T) {
 
 func TestLogSet_replayIsIdempotent(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	ctx := database.WithDB(context.Background(), db)
+	ctx := testutil.Ctx(db)
 	ex := setsTestExercise(t, db, "Bench")
 	in := services.LogSetInput{ClientID: clientID(7), Day: clock.ZerodTime(0), ExerciseID: ex.ID, Reps: 5, Weight: 80}
 
@@ -114,7 +112,7 @@ func TestLogSet_replayIsIdempotent(t *testing.T) {
 
 func TestLogSet_clientIDReusedForOtherExerciseConflicts(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	ctx := database.WithDB(context.Background(), db)
+	ctx := testutil.Ctx(db)
 	a := setsTestExercise(t, db, "Curl")
 	b := setsTestExercise(t, db, "Press")
 	if _, err := services.LogSet(ctx, services.LogSetInput{ClientID: clientID(3), Day: clock.ZerodTime(0), ExerciseID: a.ID, Reps: 10}); err != nil {
@@ -127,7 +125,7 @@ func TestLogSet_clientIDReusedForOtherExerciseConflicts(t *testing.T) {
 }
 
 func TestLogSet_unknownExercise(t *testing.T) {
-	ctx := database.WithDB(context.Background(), testutil.SetupTestDB(t))
+	ctx := testutil.Ctx(testutil.SetupTestDB(t))
 	_, err := services.LogSet(ctx, services.LogSetInput{ClientID: clientID(1), Day: clock.ZerodTime(0), ExerciseID: 999})
 	if !errors.Is(err, services.ErrExerciseNotFound) {
 		t.Fatalf("want ErrExerciseNotFound, got %v", err)
@@ -138,7 +136,7 @@ func TestLogSet_unknownExercise(t *testing.T) {
 // rather than real parallelism; pg_sets_test.go runs the same scenario on Postgres.
 func TestLogSet_concurrentFirstSets(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	ctx := database.WithDB(context.Background(), db)
+	ctx := testutil.Ctx(db)
 	sqlDB, err := db.DB()
 	if err != nil {
 		t.Fatal(err)
@@ -179,7 +177,7 @@ func TestLogSet_concurrentFirstSets(t *testing.T) {
 
 func TestUpdateSet_patchByIDAndClientID(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	ctx := database.WithDB(context.Background(), db)
+	ctx := testutil.Ctx(db)
 	ex := setsTestExercise(t, db, "Dip")
 	res, err := services.LogSet(ctx, services.LogSetInput{ClientID: clientID(5), Day: clock.ZerodTime(0), ExerciseID: ex.ID, Reps: 8, Weight: 20, WeightSetup: "belt"})
 	if err != nil {
@@ -208,7 +206,7 @@ func TestUpdateSet_patchByIDAndClientID(t *testing.T) {
 
 func TestDeleteSet_repeatIsSuccess(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	ctx := database.WithDB(context.Background(), db)
+	ctx := testutil.Ctx(db)
 	ex := setsTestExercise(t, db, "Lunge")
 	a, err := services.LogSet(ctx, services.LogSetInput{ClientID: clientID(1), Day: clock.ZerodTime(0), ExerciseID: ex.ID, Reps: 8})
 	if err != nil {
@@ -240,7 +238,7 @@ func TestDeleteSet_repeatIsSuccess(t *testing.T) {
 
 func TestLogExercise_secondCreateReportsExisting(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	ctx := database.WithDB(context.Background(), db)
+	ctx := testutil.Ctx(db)
 	ex := setsTestExercise(t, db, "Shrug")
 	wl, err := services.GetOrCreateToday(ctx, 0)
 	if err != nil {

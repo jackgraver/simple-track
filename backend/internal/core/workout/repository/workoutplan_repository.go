@@ -3,25 +3,32 @@ package workoutrepo
 import (
 	"be-simpletracker/internal/database"
 	"context"
-	"fmt"
 
 	"be-simpletracker/internal/core/workout/models"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 func LoadExercisesOrderedForPlan(ctx context.Context, planID uint) ([]models.Exercise, error) {
+	uid, err := callerID(ctx)
+	if err != nil {
+		return nil, err
+	}
 	var exercises []models.Exercise
-	err := database.From(ctx).Model(&models.Exercise{}).
-		Joins("INNER JOIN workout_plan_exercises AS wpe ON wpe.exercise_id = exercises.id AND wpe.workout_plan_id = ?", planID).
+	err = database.From(ctx).Model(&models.Exercise{}).
+		Joins("INNER JOIN workout_plan_exercises AS wpe ON wpe.exercise_id = exercises.id AND wpe.workout_plan_id = ? AND wpe.user_id = ?", planID, uid).
 		Order("wpe.display_order ASC").
 		Find(&exercises).Error
-	return exercises, err
+	if err != nil {
+		return nil, err
+	}
+	return exercises, decorateAll(ctx, exercises)
 }
 
 func FindWorkoutPlanByID(ctx context.Context, planID uint) (models.WorkoutPlan, error) {
 	var plan models.WorkoutPlan
-	err := database.From(ctx).First(&plan, planID).Error
+	err := database.From(ctx).Scopes(database.Owned(ctx)).First(&plan, planID).Error
 	return plan, err
 }
 
@@ -43,7 +50,7 @@ func LoadPlanWithOrderedExercises(ctx context.Context, planID uint) (*models.Wor
 
 func loadAssignedDays(ctx context.Context, plan *models.WorkoutPlan) error {
 	var rows []models.WorkoutPlanDay
-	if err := database.From(ctx).Where("workout_plan_id = ?", plan.ID).Order("day_of_week ASC").Find(&rows).Error; err != nil {
+	if err := database.From(ctx).Scopes(database.Owned(ctx)).Where("workout_plan_id = ?", plan.ID).Order("day_of_week ASC").Find(&rows).Error; err != nil {
 		return err
 	}
 	plan.AssignedDays = make([]int, 0, len(rows))
@@ -61,7 +68,7 @@ func loadAssignedDays(ctx context.Context, plan *models.WorkoutPlan) error {
 
 func FindAllWorkoutPlans(ctx context.Context) ([]models.WorkoutPlan, error) {
 	var workoutPlans []models.WorkoutPlan
-	err := database.From(ctx).Find(&workoutPlans).Error
+	err := database.From(ctx).Scopes(database.Owned(ctx)).Find(&workoutPlans).Error
 	if err != nil {
 		return []models.WorkoutPlan{}, err
 	}
@@ -77,7 +84,7 @@ func FindAllWorkoutPlans(ctx context.Context) ([]models.WorkoutPlan, error) {
 
 func FindAllWorkoutPrograms(ctx context.Context) ([]models.WorkoutProgram, error) {
 	var programs []models.WorkoutProgram
-	if err := database.From(ctx).Order("id ASC").Find(&programs).Error; err != nil {
+	if err := database.From(ctx).Scopes(database.Owned(ctx)).Order("id ASC").Find(&programs).Error; err != nil {
 		return nil, err
 	}
 	for i := range programs {
@@ -92,7 +99,7 @@ func FindAllWorkoutPrograms(ctx context.Context) ([]models.WorkoutProgram, error
 
 func FindWorkoutPlansByProgram(ctx context.Context, programID uint) ([]models.WorkoutPlan, error) {
 	var plans []models.WorkoutPlan
-	if err := database.From(ctx).Where("workout_program_id = ?", programID).Order("id ASC").Find(&plans).Error; err != nil {
+	if err := database.From(ctx).Scopes(database.Owned(ctx)).Where("workout_program_id = ?", programID).Order("id ASC").Find(&plans).Error; err != nil {
 		return nil, err
 	}
 	for i := range plans {
@@ -106,16 +113,16 @@ func FindWorkoutPlansByProgram(ctx context.Context, programID uint) ([]models.Wo
 }
 
 func CreateWorkoutProgram(ctx context.Context, program *models.WorkoutProgram) error {
-	return database.From(ctx).Create(program).Error
+	return database.From(ctx).Omit(clause.Associations).Create(program).Error
 }
 
 func CreateWorkoutPlan(ctx context.Context, plan *models.WorkoutPlan) error {
-	return database.From(ctx).Create(plan).Error
+	return database.From(ctx).Omit(clause.Associations).Create(plan).Error
 }
 
 func FindWorkoutProgramByID(ctx context.Context, id uint) (models.WorkoutProgram, error) {
 	var program models.WorkoutProgram
-	return program, database.From(ctx).First(&program, id).Error
+	return program, database.From(ctx).Scopes(database.Owned(ctx)).First(&program, id).Error
 }
 
 // FindActiveWorkoutProgram returns the active program. Older data can have several flagged active
@@ -124,93 +131,94 @@ func FindWorkoutProgramByID(ctx context.Context, id uint) (models.WorkoutProgram
 // plan the UI shows for it.
 func FindActiveWorkoutProgram(ctx context.Context) (models.WorkoutProgram, error) {
 	var program models.WorkoutProgram
-	err := database.From(ctx).Where("is_active = ?", true).
-		Where("EXISTS (SELECT 1 FROM workout_plans wp WHERE wp.workout_program_id = workout_programs.id AND wp.deleted_at IS NULL)").
+	err := database.From(ctx).Scopes(database.Owned(ctx)).Where("is_active = ?", true).
+		Where("EXISTS (SELECT 1 FROM workout_plans wp WHERE wp.workout_program_id = workout_programs.id AND wp.user_id = workout_programs.user_id AND wp.deleted_at IS NULL)").
 		Order("id ASC").First(&program).Error
 	if err == gorm.ErrRecordNotFound {
-		err = database.From(ctx).Where("is_active = ?", true).Order("id ASC").First(&program).Error
+		err = database.From(ctx).Scopes(database.Owned(ctx)).Where("is_active = ?", true).Order("id ASC").First(&program).Error
 	}
 	return program, err
 }
 
 func UpdateWorkoutProgramName(ctx context.Context, id uint, name string) error {
-	return database.From(ctx).Model(&models.WorkoutProgram{}).Where("id = ?", id).Update("name", name).Error
+	return database.Affected(database.From(ctx).Scopes(database.Owned(ctx)).Model(&models.WorkoutProgram{}).Where("id = ?", id).Update("name", name))
 }
 
 func ActivateWorkoutProgram(ctx context.Context, id uint) error {
-	return database.From(ctx).Transaction(func(tx *gorm.DB) error {
-		if err := tx.Model(&models.WorkoutProgram{}).Where("id = ?", id).Update("is_active", true).Error; err != nil {
+	return database.From(ctx).Scopes(database.Owned(ctx)).Transaction(func(tx *gorm.DB) error {
+		own := database.Owned(ctx)
+		if err := database.Affected(tx.Model(&models.WorkoutProgram{}).Scopes(own).Where("id = ?", id).Update("is_active", true)); err != nil {
 			return err
 		}
-		return tx.Model(&models.WorkoutProgram{}).Where("id != ?", id).Update("is_active", false).Error
+		return tx.Model(&models.WorkoutProgram{}).Scopes(own).Where("id != ?", id).Update("is_active", false).Error
 	})
 }
 
 func WorkoutPlanExists(ctx context.Context, planID uint) (bool, error) {
 	var n int64
-	err := database.From(ctx).WithContext(ctx).Model(&models.WorkoutPlan{}).Where("id = ?", planID).Count(&n).Error
+	err := database.From(ctx).Scopes(database.Owned(ctx)).WithContext(ctx).Model(&models.WorkoutPlan{}).Where("id = ?", planID).Count(&n).Error
 	return n > 0, err
 }
 
 func FindWorkoutPlanByDayOfWeek(ctx context.Context, dayOfWeek int) (models.WorkoutPlan, error) {
 	var plan models.WorkoutPlan
-	err := database.From(ctx).Joins("INNER JOIN workout_plan_days AS wpd ON wpd.workout_plan_id = workout_plans.id").
+	err := database.From(ctx).Scopes(database.Owned(ctx)).Joins("INNER JOIN workout_plan_days AS wpd ON wpd.workout_plan_id = workout_plans.id").
 		Where("wpd.day_of_week = ?", dayOfWeek).First(&plan).Error
 	if err == gorm.ErrRecordNotFound {
-		err = database.From(ctx).Where("day_of_week = ?", dayOfWeek).First(&plan).Error
+		err = database.From(ctx).Scopes(database.Owned(ctx)).Where("day_of_week = ?", dayOfWeek).First(&plan).Error
 	}
 	return plan, err
 }
 
 func FindWorkoutPlanByProgramAndDay(ctx context.Context, programID uint, dayOfWeek int) (models.WorkoutPlan, error) {
 	var plan models.WorkoutPlan
-	err := database.From(ctx).Joins("INNER JOIN workout_plan_days AS wpd ON wpd.workout_plan_id = workout_plans.id").
+	err := database.From(ctx).Scopes(database.Owned(ctx)).Joins("INNER JOIN workout_plan_days AS wpd ON wpd.workout_plan_id = workout_plans.id").
 		Where("workout_plans.workout_program_id = ? AND wpd.day_of_week = ?", programID, dayOfWeek).
 		First(&plan).Error
 	if err == gorm.ErrRecordNotFound {
-		err = database.From(ctx).Where("workout_program_id = ? AND day_of_week = ?", programID, dayOfWeek).First(&plan).Error
+		err = database.From(ctx).Scopes(database.Owned(ctx)).Where("workout_program_id = ? AND day_of_week = ?", programID, dayOfWeek).First(&plan).Error
 	}
 	return plan, err
 }
 
 func UpdatePlannedCardio(ctx context.Context, planID uint, cardioType string, minutes int) error {
-	return database.From(ctx).Model(&models.WorkoutPlan{}).
+	return database.Affected(database.From(ctx).Scopes(database.Owned(ctx)).Model(&models.WorkoutPlan{}).
 		Where("id = ?", planID).
 		Updates(map[string]any{
 			"planned_cardio_type":    cardioType,
 			"planned_cardio_minutes": minutes,
-		}).Error
+		}))
 }
 
 func UpdateMobilityItems(ctx context.Context, planID uint, preItems, postItems []string) error {
 	var plan models.WorkoutPlan
-	if err := database.From(ctx).First(&plan, planID).Error; err != nil {
+	if err := database.From(ctx).Scopes(database.Owned(ctx)).First(&plan, planID).Error; err != nil {
 		return err
 	}
 	plan.PreMobilityItems = preItems
 	plan.PostMobilityItems = postItems
-	return database.From(ctx).Model(&plan).
+	return database.From(ctx).Scopes(database.Owned(ctx)).Model(&plan).
 		Select("PreMobilityItems", "PostMobilityItems").
 		Updates(&plan).Error
 }
 
 func AssignWorkoutPlanToProgram(ctx context.Context, planID uint, programID uint) error {
-	return database.From(ctx).Model(&models.WorkoutPlan{}).Where("id = ?", planID).Update("workout_program_id", programID).Error
+	return database.Affected(database.From(ctx).Scopes(database.Owned(ctx)).Model(&models.WorkoutPlan{}).Where("id = ?", planID).Update("workout_program_id", programID))
 }
 
 func UnassignOtherPlansFromDay(ctx context.Context, dayOfWeek int, planID uint) error {
-	return database.From(ctx).Model(&models.WorkoutPlan{}).
+	return database.From(ctx).Scopes(database.Owned(ctx)).Model(&models.WorkoutPlan{}).
 		Where("day_of_week = ? AND id != ?", dayOfWeek, planID).
 		Update("day_of_week", nil).Error
 }
 
 func UnassignOtherPlansFromProgramDay(ctx context.Context, programID uint, dayOfWeek int, planID uint) error {
 	var plans []models.WorkoutPlan
-	if err := database.From(ctx).Where("workout_program_id = ? AND id != ?", programID, planID).Find(&plans).Error; err != nil {
+	if err := database.From(ctx).Scopes(database.Owned(ctx)).Where("workout_program_id = ? AND id != ?", programID, planID).Find(&plans).Error; err != nil {
 		return err
 	}
 	for _, plan := range plans {
-		if err := database.From(ctx).Where("workout_plan_id = ? AND day_of_week = ?", plan.ID, dayOfWeek).
+		if err := database.From(ctx).Scopes(database.Owned(ctx)).Where("workout_plan_id = ? AND day_of_week = ?", plan.ID, dayOfWeek).
 			Delete(&models.WorkoutPlanDay{}).Error; err != nil {
 			return err
 		}
@@ -222,7 +230,7 @@ func UnassignOtherPlansFromProgramDay(ctx context.Context, programID uint, dayOf
 }
 
 func AssignWorkoutPlanToDay(ctx context.Context, planID uint, dayOfWeek int) error {
-	if err := database.From(ctx).Where("workout_plan_id = ? AND day_of_week = ?", planID, dayOfWeek).
+	if err := database.From(ctx).Scopes(database.Owned(ctx)).Omit(clause.Associations).Where("workout_plan_id = ? AND day_of_week = ?", planID, dayOfWeek).
 		FirstOrCreate(&models.WorkoutPlanDay{WorkoutPlanID: planID, DayOfWeek: dayOfWeek}).Error; err != nil {
 		return err
 	}
@@ -230,14 +238,14 @@ func AssignWorkoutPlanToDay(ctx context.Context, planID uint, dayOfWeek int) err
 }
 
 func ClearWorkoutPlanDay(ctx context.Context, planID uint) error {
-	if err := database.From(ctx).Where("workout_plan_id = ?", planID).Delete(&models.WorkoutPlanDay{}).Error; err != nil {
+	if err := database.From(ctx).Scopes(database.Owned(ctx)).Where("workout_plan_id = ?", planID).Delete(&models.WorkoutPlanDay{}).Error; err != nil {
 		return err
 	}
 	return refreshLegacyDay(ctx, planID)
 }
 
 func ClearWorkoutPlanDayOfWeek(ctx context.Context, planID uint, dayOfWeek int) error {
-	if err := database.From(ctx).Where("workout_plan_id = ? AND day_of_week = ?", planID, dayOfWeek).
+	if err := database.From(ctx).Scopes(database.Owned(ctx)).Where("workout_plan_id = ? AND day_of_week = ?", planID, dayOfWeek).
 		Delete(&models.WorkoutPlanDay{}).Error; err != nil {
 		return err
 	}
@@ -246,35 +254,35 @@ func ClearWorkoutPlanDayOfWeek(ctx context.Context, planID uint, dayOfWeek int) 
 
 func refreshLegacyDay(ctx context.Context, planID uint) error {
 	var row models.WorkoutPlanDay
-	err := database.From(ctx).Where("workout_plan_id = ?", planID).Order("day_of_week ASC").First(&row).Error
+	err := database.From(ctx).Scopes(database.Owned(ctx)).Where("workout_plan_id = ?", planID).Order("day_of_week ASC").First(&row).Error
 	if err == gorm.ErrRecordNotFound {
-		return database.From(ctx).Model(&models.WorkoutPlan{}).Where("id = ?", planID).Update("day_of_week", nil).Error
+		return database.From(ctx).Scopes(database.Owned(ctx)).Model(&models.WorkoutPlan{}).Where("id = ?", planID).Update("day_of_week", nil).Error
 	}
 	if err != nil {
 		return err
 	}
-	return database.From(ctx).Model(&models.WorkoutPlan{}).Where("id = ?", planID).Update("day_of_week", row.DayOfWeek).Error
+	return database.From(ctx).Scopes(database.Owned(ctx)).Model(&models.WorkoutPlan{}).Where("id = ?", planID).Update("day_of_week", row.DayOfWeek).Error
 }
 
 func AddExerciseToPlan(ctx context.Context, planID uint, exerciseID uint) error {
-	if err := database.From(ctx).First(&models.WorkoutPlan{}, planID).Error; err != nil {
+	if err := database.From(ctx).Scopes(database.Owned(ctx)).First(&models.WorkoutPlan{}, planID).Error; err != nil {
 		return err
 	}
 	if err := database.From(ctx).First(&models.Exercise{}, exerciseID).Error; err != nil {
 		return err
 	}
 	var n int64
-	if err := database.From(ctx).Model(&models.WorkoutPlanExercise{}).Where("workout_plan_id = ? AND exercise_id = ?", planID, exerciseID).Count(&n).Error; err != nil {
+	if err := database.From(ctx).Scopes(database.Owned(ctx)).Model(&models.WorkoutPlanExercise{}).Where("workout_plan_id = ? AND exercise_id = ?", planID, exerciseID).Count(&n).Error; err != nil {
 		return err
 	}
 	if n > 0 {
-		return fmt.Errorf("exercise already in plan")
+		return Invalid("exercise already in plan")
 	}
 	var count int64
-	if err := database.From(ctx).Model(&models.WorkoutPlanExercise{}).Where("workout_plan_id = ?", planID).Count(&count).Error; err != nil {
+	if err := database.From(ctx).Scopes(database.Owned(ctx)).Model(&models.WorkoutPlanExercise{}).Where("workout_plan_id = ?", planID).Count(&count).Error; err != nil {
 		return err
 	}
-	return database.From(ctx).Create(&models.WorkoutPlanExercise{
+	return database.From(ctx).Omit(clause.Associations).Create(&models.WorkoutPlanExercise{
 		WorkoutPlanID: planID,
 		ExerciseID:    exerciseID,
 		DisplayOrder:  int(count),
@@ -283,12 +291,12 @@ func AddExerciseToPlan(ctx context.Context, planID uint, exerciseID uint) error 
 
 func renumberPlanExerciseDisplayOrder(ctx context.Context, planID uint) error {
 	var rows []models.WorkoutPlanExercise
-	if err := database.From(ctx).Where("workout_plan_id = ?", planID).Order("display_order ASC").Find(&rows).Error; err != nil {
+	if err := database.From(ctx).Scopes(database.Owned(ctx)).Where("workout_plan_id = ?", planID).Order("display_order ASC").Find(&rows).Error; err != nil {
 		return err
 	}
 	for i := range rows {
 		if rows[i].DisplayOrder != i {
-			if err := database.From(ctx).Model(&models.WorkoutPlanExercise{}).
+			if err := database.From(ctx).Scopes(database.Owned(ctx)).Model(&models.WorkoutPlanExercise{}).
 				Where("workout_plan_id = ? AND exercise_id = ?", planID, rows[i].ExerciseID).
 				Update("display_order", i).Error; err != nil {
 				return err
@@ -299,23 +307,23 @@ func renumberPlanExerciseDisplayOrder(ctx context.Context, planID uint) error {
 }
 
 func RemoveExerciseFromPlan(ctx context.Context, planID uint, exerciseID uint) error {
-	res := database.From(ctx).Where("workout_plan_id = ? AND exercise_id = ?", planID, exerciseID).Delete(&models.WorkoutPlanExercise{})
+	res := database.From(ctx).Scopes(database.Owned(ctx)).Where("workout_plan_id = ? AND exercise_id = ?", planID, exerciseID).Delete(&models.WorkoutPlanExercise{})
 	if res.Error != nil {
 		return res.Error
 	}
 	if res.RowsAffected == 0 {
-		return gorm.ErrRecordNotFound
+		return ErrNotInPlan
 	}
 	return renumberPlanExerciseDisplayOrder(ctx, planID)
 }
 
 func ReorderPlanExercises(ctx context.Context, planID uint, exerciseIDs []uint) error {
 	var existing []models.WorkoutPlanExercise
-	if err := database.From(ctx).Where("workout_plan_id = ?", planID).Find(&existing).Error; err != nil {
+	if err := database.From(ctx).Scopes(database.Owned(ctx)).Where("workout_plan_id = ?", planID).Find(&existing).Error; err != nil {
 		return err
 	}
 	if len(exerciseIDs) != len(existing) {
-		return fmt.Errorf("exercise list must include all plan exercises")
+		return Invalid("exercise list must include all plan exercises")
 	}
 	existingSet := make(map[uint]struct{}, len(existing))
 	for _, e := range existing {
@@ -323,16 +331,16 @@ func ReorderPlanExercises(ctx context.Context, planID uint, exerciseIDs []uint) 
 	}
 	for _, id := range exerciseIDs {
 		if _, ok := existingSet[id]; !ok {
-			return fmt.Errorf("invalid exercise id for plan")
+			return Invalid("invalid exercise id for plan")
 		}
 		delete(existingSet, id)
 	}
 	if len(existingSet) != 0 {
-		return fmt.Errorf("exercise list must include all plan exercises")
+		return Invalid("exercise list must include all plan exercises")
 	}
-	return database.From(ctx).Transaction(func(tx *gorm.DB) error {
+	return database.From(ctx).Scopes(database.Owned(ctx)).Transaction(func(tx *gorm.DB) error {
 		for i, eid := range exerciseIDs {
-			if err := tx.Model(&models.WorkoutPlanExercise{}).
+			if err := tx.Model(&models.WorkoutPlanExercise{}).Scopes(database.Owned(ctx)).
 				Where("workout_plan_id = ? AND exercise_id = ?", planID, eid).
 				Update("display_order", i).Error; err != nil {
 				return err
@@ -343,7 +351,7 @@ func ReorderPlanExercises(ctx context.Context, planID uint, exerciseIDs []uint) 
 }
 
 func UpdateWorkoutPlanName(ctx context.Context, id uint, name string) error {
-	res := database.From(ctx).Model(&models.WorkoutPlan{}).Where("id = ?", id).Update("name", name)
+	res := database.From(ctx).Scopes(database.Owned(ctx)).Model(&models.WorkoutPlan{}).Where("id = ?", id).Update("name", name)
 	if res.Error != nil {
 		return res.Error
 	}
@@ -356,7 +364,7 @@ func UpdateWorkoutPlanName(ctx context.Context, id uint, name string) error {
 // SoftDeleteWorkoutPlan hides a routine but keeps its exercises and day rows, so
 // RestoreWorkoutPlan can bring it back unchanged. Past logs keep their plan id.
 func SoftDeleteWorkoutPlan(ctx context.Context, id uint) error {
-	res := database.From(ctx).Delete(&models.WorkoutPlan{}, id)
+	res := database.From(ctx).Scopes(database.Owned(ctx)).Delete(&models.WorkoutPlan{}, id)
 	if res.Error != nil {
 		return res.Error
 	}
@@ -369,21 +377,22 @@ func SoftDeleteWorkoutPlan(ctx context.Context, id uint) error {
 // RestoreWorkoutPlan undoes SoftDeleteWorkoutPlan. Days that another live routine of the same
 // program took in the meantime stay with that routine: this one drops them.
 func RestoreWorkoutPlan(ctx context.Context, id uint) error {
-	return database.From(ctx).Transaction(func(tx *gorm.DB) error {
+	return database.From(ctx).Scopes(database.Owned(ctx)).Transaction(func(tx *gorm.DB) error {
+		own := database.Owned(ctx)
 		var plan models.WorkoutPlan
-		if err := tx.Unscoped().Where("id = ? AND deleted_at IS NOT NULL", id).First(&plan).Error; err != nil {
+		if err := tx.Unscoped().Scopes(own).Where("id = ? AND deleted_at IS NOT NULL", id).First(&plan).Error; err != nil {
 			return err
 		}
-		if err := tx.Unscoped().Model(&models.WorkoutPlan{}).Where("id = ?", id).Update("deleted_at", nil).Error; err != nil {
+		if err := tx.Unscoped().Model(&models.WorkoutPlan{}).Scopes(own).Where("id = ?", id).Update("deleted_at", nil).Error; err != nil {
 			return err
 		}
 		if plan.WorkoutProgramID == nil {
 			return nil
 		}
-		taken := tx.Model(&models.WorkoutPlanDay{}).Select("workout_plan_days.day_of_week").
+		taken := tx.Model(&models.WorkoutPlanDay{}).Scopes(own).Select("workout_plan_days.day_of_week").
 			Joins("INNER JOIN workout_plans AS wp ON wp.id = workout_plan_days.workout_plan_id").
 			Where("wp.workout_program_id = ? AND wp.id != ? AND wp.deleted_at IS NULL", *plan.WorkoutProgramID, id)
-		if err := tx.Where("workout_plan_id = ? AND day_of_week IN (?)", id, taken).
+		if err := tx.Scopes(own).Where("workout_plan_id = ? AND day_of_week IN (?)", id, taken).
 			Delete(&models.WorkoutPlanDay{}).Error; err != nil {
 			return err
 		}

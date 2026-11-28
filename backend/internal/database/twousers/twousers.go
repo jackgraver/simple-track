@@ -133,6 +133,16 @@ func (h *Harness) Router(register func(g *gin.RouterGroup)) *API {
 	return &API{t: h.t, engine: r}
 }
 
+// Engine is Router for modules that register on the engine itself and take the auth middleware
+// as an argument (workout.RegisterRoutes): same stack, the routes keep their own paths.
+func (h *Harness) Engine(register func(r *gin.Engine, authMiddleware gin.HandlerFunc)) *API {
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	r.Use(gin.Recovery(), database.Middleware(h.App))
+	register(r, auth.AuthMiddleware(h.App))
+	return &API{t: h.t, engine: r}
+}
+
 // API sends requests to a Router.
 type API struct {
 	t      testing.TB
