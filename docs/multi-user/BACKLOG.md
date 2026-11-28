@@ -26,7 +26,7 @@ Nothing Critical was found. Prod today has one account, so most multi-user findi
 | 3 | Medium | Anyone can lock the owner out of login, from one IP, indefinitely | S1: **done**; C6: lockouts in `auth_events` (`login_rate_limited`) **done** |
 | 4 | Medium | IPv6 address rotation defeats per-IP limits and can fill the limiter (global lockout) | S1: **done** |
 | 5 | Medium | TMDB API key can leak to users in lookup error messages | S3: **done** |
-| 6 | Medium | Raw internal errors (SQL, constraint names) returned to clients at ~160 sites | C1–C5 (C1, C2, C4, C5 **done**); B3 test **done** (`TestNoRawErrorsIn500s`) |
+| 6 | Medium | Raw internal errors (SQL, constraint names) returned to clients at ~160 sites | C1–C5 (**all done**); B3 test **done** (`TestNoRawErrorsIn500s`) |
 | 7 | Medium | No security headers (CSP, frame-ancestors, nosniff, Referrer-Policy); API has none at all | H1: **done** (Caddy; deploys at D1, ROLLOUT 3.5) |
 | 8 | Medium | No request body size limit outside `/auth` (imports, JSON) | H1: **done** (1 MiB default, 5 MiB + 10k rows on import; Caddy 6MB) |
 | 9 | Medium | Frontend local storage isn't scoped to the user; logout leaves drafts, timers, last route | S2: **done** |
