@@ -74,6 +74,23 @@ the compose file and `.env.vps` must be updated before the deploy, not after.
    migration keeps the oldest live row and soft-deletes the rest (nothing is dropped), so note
    which one you expect to survive.
 
+10. (C2) Diet links the old schema never enforced. Migration 0016 adds foreign keys on
+   `meal_items.composite_food_id`, `saved_meal_items.composite_food_id` and
+   `planned_meals.saved_meal_id`; a row pointing at a row that doesn't exist (deleted by hand)
+   would fail validation, so those keys are added `NOT VALID` first and validated only if the data
+   is clean (it logs a notice and moves on otherwise, nothing is changed or dropped). List them to
+   know in advance:
+   ```sql
+   SELECT 'meal_items' AS tbl, count(*) FROM meal_items m WHERE composite_food_id IS NOT NULL
+     AND NOT EXISTS (SELECT 1 FROM composite_foods c WHERE c.id = m.composite_food_id)
+   UNION ALL SELECT 'saved_meal_items', count(*) FROM saved_meal_items m WHERE composite_food_id IS NOT NULL
+     AND NOT EXISTS (SELECT 1 FROM composite_foods c WHERE c.id = m.composite_food_id)
+   UNION ALL SELECT 'planned_meals', count(*) FROM planned_meals p WHERE saved_meal_id IS NOT NULL
+     AND NOT EXISTS (SELECT 1 FROM saved_meals s WHERE s.id = p.saved_meal_id);
+   ```
+   Expect 0 on every line (otherwise a rehearsal run shows which key stayed `NOT VALID`:
+   `SELECT conname FROM pg_constraint WHERE NOT convalidated;`).
+
 ## 2. Rehearsal (D1, locally, before touching the VPS)
 
 On a copy of the latest prod backup, with the D1 build of the backend image:
@@ -245,6 +262,50 @@ Each lane adds what its changes need here (README: "Prod changes go in ROLLOUT.m
     old backend can't read the new schema. Use the pre-deploy backup if 0013 must be undone.
   - In 3.4, `/media` shows the owner's items as before; the add page lists matching shared
     catalog entries.
+
+- **C2 (diet)**: migration 0016 runs in pre_swap with the rest. `foods` becomes the shared catalog
+  (`created_by` = the admin for every existing food); days, plans, meals, saved meals, recipes
+  (`composite_foods`), planned meals and everything under them become the admin's, with RLS on and
+  composite foreign keys. Nothing to configure; relies on pre-check 1.6 and it **stops** if rows
+  exist and there isn't exactly one live admin. See pre-check 1.10 for legacy dangling links.
+  **Row counts for the D1 rehearsal**: run before and after `migrate up`, the numbers must match,
+  and after it `owned` must equal `total` on every line:
+  ```sql
+  -- psql_owner (bypasses RLS, so it counts soft-deleted rows too)
+  SELECT 'foods' AS tbl, count(*) AS total FROM foods
+  UNION ALL SELECT 'composite_foods', count(*) FROM composite_foods
+  UNION ALL SELECT 'composite_food_items', count(*) FROM composite_food_items
+  UNION ALL SELECT 'plans', count(*) FROM plans
+  UNION ALL SELECT 'days', count(*) FROM days
+  UNION ALL SELECT 'meals', count(*) FROM meals
+  UNION ALL SELECT 'meal_items', count(*) FROM meal_items
+  UNION ALL SELECT 'saved_meals', count(*) FROM saved_meals
+  UNION ALL SELECT 'saved_meal_items', count(*) FROM saved_meal_items
+  UNION ALL SELECT 'planned_meals', count(*) FROM planned_meals
+  UNION ALL SELECT 'day_logs', count(*) FROM day_logs;
+  -- after the migration, rows given to the admin (foods: created_by) (expect owned = total on every line):
+  SELECT 'foods' AS tbl, count(*) AS owned FROM foods WHERE created_by = (SELECT id FROM users WHERE is_admin AND deleted_at IS NULL)
+  UNION ALL SELECT 'composite_foods', count(*) FROM composite_foods WHERE user_id = (SELECT id FROM users WHERE is_admin AND deleted_at IS NULL)
+  UNION ALL SELECT 'composite_food_items', count(*) FROM composite_food_items WHERE user_id = (SELECT id FROM users WHERE is_admin AND deleted_at IS NULL)
+  UNION ALL SELECT 'plans', count(*) FROM plans WHERE user_id = (SELECT id FROM users WHERE is_admin AND deleted_at IS NULL)
+  UNION ALL SELECT 'days', count(*) FROM days WHERE user_id = (SELECT id FROM users WHERE is_admin AND deleted_at IS NULL)
+  UNION ALL SELECT 'meals', count(*) FROM meals WHERE user_id = (SELECT id FROM users WHERE is_admin AND deleted_at IS NULL)
+  UNION ALL SELECT 'meal_items', count(*) FROM meal_items WHERE user_id = (SELECT id FROM users WHERE is_admin AND deleted_at IS NULL)
+  UNION ALL SELECT 'saved_meals', count(*) FROM saved_meals WHERE user_id = (SELECT id FROM users WHERE is_admin AND deleted_at IS NULL)
+  UNION ALL SELECT 'saved_meal_items', count(*) FROM saved_meal_items WHERE user_id = (SELECT id FROM users WHERE is_admin AND deleted_at IS NULL)
+  UNION ALL SELECT 'planned_meals', count(*) FROM planned_meals WHERE user_id = (SELECT id FROM users WHERE is_admin AND deleted_at IS NULL)
+  UNION ALL SELECT 'day_logs', count(*) FROM day_logs WHERE user_id = (SELECT id FROM users WHERE is_admin AND deleted_at IS NULL);
+  ```
+  Effects to know:
+  - The days, meals, plans and saved meals pages show the owner's data as before. A new account
+    starts with an empty week and gets its own default plan (2000 kcal) on first use.
+  - Foods and their picker stay shared. A quick-logged meal's hidden food row is only visible to
+    whoever logged it. New: `PUT /diet/foods/:id` (creator or admin, else 403) and
+    `DELETE /diet/foods/:id` (admin only, else 403, soft delete; meals that used the food keep it).
+  - A request body can't carry a nested food any more; the diet endpoints take plain IDs. The
+    frontend already sent that shape, so nothing changes for it.
+  - Diet error responses are fixed messages; database errors are only in the backend log.
+  - Rolling back the image does not undo the migration (use the pre-deploy backup).
 
 <!-- Later lanes: add anything else that must happen in this deploy here. -->
 

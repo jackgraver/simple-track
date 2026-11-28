@@ -125,11 +125,16 @@ func largeGym(tx *gorm.DB) error {
 }
 
 func largeDiet(tx *gorm.DB) error {
+	owner, err := devUser(tx)
+	if err != nil {
+		return err
+	}
+	added := database.Creator{CreatedBy: owner.UserID}
 	odd := []dietm.Food{
-		{Name: "Crème fraîche 🥛", ServingType: "g", ServingAmount: 30, Calories: 101, Protein: 0.6, Fat: 10.8},
-		{Name: "Extra-long food name that keeps going to check wrapping and truncation in every list", ServingType: "each", ServingAmount: 1, Calories: 250, Protein: 12},
-		{Name: "Water (zero calories)", ServingType: "ml", ServingAmount: 250, Calories: 0},
-		{Name: "Bulk shake", ServingType: "scoop", ServingAmount: 1, Calories: 1850, Protein: 110, Carbs: 250, Fat: 40},
+		{Creator: added, Name: "Crème fraîche 🥛", ServingType: "g", ServingAmount: 30, Calories: 101, Protein: 0.6, Fat: 10.8},
+		{Creator: added, Name: "Extra-long food name that keeps going to check wrapping and truncation in every list", ServingType: "each", ServingAmount: 1, Calories: 250, Protein: 12},
+		{Creator: added, Name: "Water (zero calories)", ServingType: "ml", ServingAmount: 250, Calories: 0},
+		{Creator: added, Name: "Bulk shake", ServingType: "scoop", ServingAmount: 1, Calories: 1850, Protein: 110, Carbs: 250, Fat: 40},
 	}
 	if err := tx.Create(&odd).Error; err != nil {
 		return err
@@ -145,7 +150,7 @@ func largeDiet(tx *gorm.DB) error {
 
 	days := make([]dietm.DietDay, 0, LargeDays)
 	for back := LargeDays; back >= 1; back-- {
-		days = append(days, dietm.DietDay{Date: day(back), PlanID: plan.ID})
+		days = append(days, dietm.DietDay{Owner: owner, Date: day(back), PlanID: plan.ID})
 	}
 	if err := tx.CreateInBatches(&days, batch).Error; err != nil {
 		return fmt.Errorf("diet days: %w", err)
@@ -153,8 +158,8 @@ func largeDiet(tx *gorm.DB) error {
 	meals := make([]dietm.Meal, 0, len(days))
 	for i := range days {
 		a, b := foods[i%len(foods)], foods[(i+3)%len(foods)]
-		meals = append(meals, dietm.Meal{Name: "Lunch", Items: []dietm.MealItem{
-			{FoodID: a.ID, Amount: 1 + float32(i%3)}, {FoodID: b.ID, Amount: 1.5},
+		meals = append(meals, dietm.Meal{Owner: owner, Name: "Lunch", Items: []dietm.MealItem{
+			{Owner: owner, FoodID: a.ID, Amount: 1 + float32(i%3)}, {Owner: owner, FoodID: b.ID, Amount: 1.5},
 		}})
 	}
 	if err := tx.CreateInBatches(&meals, batch).Error; err != nil {
@@ -162,7 +167,7 @@ func largeDiet(tx *gorm.DB) error {
 	}
 	logs := make([]dietm.DayLog, len(days))
 	for i := range days {
-		logs[i] = dietm.DayLog{DayID: days[i].ID, MealID: meals[i].ID}
+		logs[i] = dietm.DayLog{Owner: owner, DayID: days[i].ID, MealID: meals[i].ID}
 	}
 	return tx.CreateInBatches(&logs, batch).Error
 }

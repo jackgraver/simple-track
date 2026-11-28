@@ -172,12 +172,15 @@ Depends on: B3
 
 ### C2 Diet
 Depends on: B3
-- [ ] Catalog: foods, composite_foods, composite_food_items (`created_by`, catalog policies).
-- [ ] Owned: days, day_logs, plans, meals, meal_items, planned_meals, saved_meals, saved_meal_items.
-- [ ] client_id idempotency lookups scoped by user.
-- [ ] BACKLOG #1 (High): request DTOs instead of binding models in meal_route.go; no nested
+- [x] Catalog: `foods` only (`created_by`, catalog policies). Recipes (composite_foods and items)
+      are owned, by the owner's decision.
+- [x] Owned: days, day_logs, plans, meals, meal_items, planned_meals, saved_meals, saved_meal_items,
+      composite_foods, composite_food_items.
+- [x] client_id idempotency lookups scoped by user.
+- [x] BACKLOG #1 (High): request DTOs instead of binding models in meal_route.go; no nested
       association writes. #2 (High): advisory-lock keys and existence checks per user,
       including `Unscoped()` counts. #6.
+- Result: migration 0016, DECISIONS "C2 diet", ROLLOUT 1.10 and 3.3a (row counts for D1).
 
 ### C3 Workout
 Depends on: B3

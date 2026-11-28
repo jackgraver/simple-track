@@ -4,15 +4,13 @@ import (
 	"be-simpletracker/internal/core/diet/models"
 	dietrepo "be-simpletracker/internal/core/diet/repository"
 	"be-simpletracker/internal/core/diet/testutil"
-	"be-simpletracker/internal/database"
-	"context"
 	"strings"
 	"testing"
 )
 
 func TestMealCreateAndMealByID(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	ctx := database.WithDB(context.Background(), db)
+	ctx := testutil.Ctx(db)
 	food := testutil.SeedFood(t, db, "Yogurt", testutil.DefaultMacros())
 	id, err := dietrepo.MealCreate(ctx, &models.Meal{
 		Name:  "Breakfast",
@@ -29,7 +27,7 @@ func TestMealCreateAndMealByID(t *testing.T) {
 
 func TestMealsAll_excludesIDs(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	ctx := database.WithDB(context.Background(), db)
+	ctx := testutil.Ctx(db)
 	food := testutil.SeedFood(t, db, "Milk", testutil.DefaultMacros())
 	a := testutil.SeedMeal(t, db, "A", food.ID, 1)
 	testutil.SeedMeal(t, db, "B", food.ID, 1)
@@ -41,7 +39,7 @@ func TestMealsAll_excludesIDs(t *testing.T) {
 
 func TestSavedMealCRUD(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	ctx := database.WithDB(context.Background(), db)
+	ctx := testutil.Ctx(db)
 	food := testutil.SeedFood(t, db, "Cheese", testutil.DefaultMacros())
 	id, err := dietrepo.SavedMealCreate(ctx, &models.SavedMeal{
 		Name:  "Snack Plate",
@@ -75,19 +73,13 @@ func TestSavedMealCRUD(t *testing.T) {
 
 func TestDeleteSavedMeal_clearsUnloggedPlanned(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	ctx := database.WithDB(context.Background(), db)
+	ctx := testutil.Ctx(db)
 	plan := testutil.SeedPlan(t, db, "P")
 	day := testutil.SeedDay(t, db, testutil.Today(), plan.ID)
 	food := testutil.SeedFood(t, db, "Ham", testutil.DefaultMacros())
 	sm := testutil.SeedSavedMeal(t, db, "Ham Wrap", food.ID)
 	meal := testutil.SeedMeal(t, db, "Wrap", food.ID, 1)
-	sid := sm.ID
-	pm := models.PlannedMeal{
-		DayID: day.ID, MealID: meal.ID, SavedMealID: &sid, Logged: false, DisplayOrder: 0,
-	}
-	if err := db.Create(&pm).Error; err != nil {
-		t.Fatal(err)
-	}
+	testutil.SeedPlannedFromSaved(t, db, day.ID, meal.ID, sm.ID)
 	if err := dietrepo.DeleteSavedMeal(ctx, sm.ID); err != nil {
 		t.Fatal(err)
 	}
@@ -103,7 +95,7 @@ func TestDeleteSavedMeal_clearsUnloggedPlanned(t *testing.T) {
 
 func TestPlannedMealLifecycle(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	ctx := database.WithDB(context.Background(), db)
+	ctx := testutil.Ctx(db)
 	plan := testutil.SeedPlan(t, db, "P")
 	day := testutil.SeedDay(t, db, testutil.Today(), plan.ID)
 	food := testutil.SeedFood(t, db, "Salad", testutil.DefaultMacros())
@@ -125,7 +117,7 @@ func TestPlannedMealLifecycle(t *testing.T) {
 
 func TestPlannedMealReorder_mismatch(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	ctx := database.WithDB(context.Background(), db)
+	ctx := testutil.Ctx(db)
 	plan := testutil.SeedPlan(t, db, "P")
 	day := testutil.SeedDay(t, db, testutil.Today(), plan.ID)
 	food := testutil.SeedFood(t, db, "Soup", testutil.DefaultMacros())
@@ -145,7 +137,7 @@ func TestPlannedMealReorder_mismatch(t *testing.T) {
 
 func TestAddPlannedMealFromSavedMeal(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	ctx := database.WithDB(context.Background(), db)
+	ctx := testutil.Ctx(db)
 	plan := testutil.SeedPlan(t, db, "P")
 	testutil.SeedDay(t, db, testutil.Today(), plan.ID)
 	food := testutil.SeedFood(t, db, "Turkey", testutil.DefaultMacros())
@@ -168,18 +160,13 @@ func TestAddPlannedMealFromSavedMeal(t *testing.T) {
 
 func TestDeleteUnloggedPlannedBySavedMealID(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	ctx := database.WithDB(context.Background(), db)
+	ctx := testutil.Ctx(db)
 	plan := testutil.SeedPlan(t, db, "P")
 	day := testutil.SeedDay(t, db, testutil.Today(), plan.ID)
 	food := testutil.SeedFood(t, db, "Bean", testutil.DefaultMacros())
 	sm := testutil.SeedSavedMeal(t, db, "Bean Bowl", food.ID)
 	meal := testutil.SeedMeal(t, db, "Beans", food.ID, 1)
-	sid := sm.ID
-	if err := db.Create(&models.PlannedMeal{
-		DayID: day.ID, MealID: meal.ID, SavedMealID: &sid, Logged: false,
-	}).Error; err != nil {
-		t.Fatal(err)
-	}
+	testutil.SeedPlannedFromSaved(t, db, day.ID, meal.ID, sm.ID)
 	if err := dietrepo.DeleteUnloggedPlannedBySavedMealID(ctx, sm.ID); err != nil {
 		t.Fatal(err)
 	}
@@ -190,7 +177,7 @@ func TestDeleteUnloggedPlannedBySavedMealID(t *testing.T) {
 }
 
 func TestFoodCreate(t *testing.T) {
-	ctx := database.WithDB(context.Background(), testutil.SetupTestDB(t))
+	ctx := testutil.Ctx(testutil.SetupTestDB(t))
 	f := &models.Food{
 		Name: "Direct", ServingType: "g", ServingAmount: 1, Calories: 1,
 	}

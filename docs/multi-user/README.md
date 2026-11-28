@@ -252,3 +252,8 @@ a nullable `group_id` on tables that should be shareable, and the rule becomes
 - **`Save` with `Select("*")` writes `user_id` too** (C1). Updating a row you built by hand (the
   Renpho import's replace-all-columns) would set a zero `user_id`; add `Omit("user_id")`.
   `CreateInSavepoint` omits associations now.
+- **Parent plus children, no nested writes** (C2). `Create(&meal)` with `Items` filled writes the
+  items through the association, which the rules test forbids (a nested food would be written
+  too). Create the parent with `Omit(clause.Associations)`, then the items as their own batch with
+  the parent's ID (`createMealTx`). Check any ID in the body that points at another table (a
+  food, a recipe) is one the caller may use: FK checks bypass RLS.
