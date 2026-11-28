@@ -36,7 +36,7 @@ Nothing Critical was found. Prod today has one account, so most multi-user findi
 | 13 | Low | CSRF relies on SameSite=Lax only; JSON endpoints accept `text/plain` bodies | B1: **done** (Sec-Fetch-Site) |
 | 14 | Low | Usernames are case-sensitive unique (`Jack` vs `jack`); no password policy; `max=72` counts runes, bcrypt limit is bytes | C6: **done** (lower(username) unique, charset, 10 chars min, 72 bytes max) |
 | 15 | Low | Shared-catalog cover URLs are arbitrary image URLs shown to every user (tracking pixel) | C5: **done** (https + lookup image hosts only; legacy covers not served) |
-| 16 | Low | `TRUSTED_PROXIES` depends on an unpinned Docker gateway IP; drift merges all clients into one IP | A2/D1: **pinned in `docker-compose.vps.yml`** (172.18.0.0/16, gateway 172.18.0.1); network recreate on deploy day, ROLLOUT 3.2 |
+| 16 | Low | `TRUSTED_PROXIES` depends on an unpinned Docker gateway IP; drift merges all clients into one IP | A2/D1: **done** (pinned in `docker-compose.vps.yml` and applied on prod 2026-11-28, by hand: ROLLOUT 3.2) |
 | 17 | Low | API responses carry no `Cache-Control`; personal data may sit in browser/bfcache on shared devices | H1: **done** |
 | 18 | Low | Default CORS list (used when `CORS_ORIGINS` is unset) hard-codes home LAN IPs | H1: **done** |
 | 19 | Low | Request logs include full query strings; login logs record attempted usernames | S1: login part **done**; C6: request logs **done** (route patterns) |
