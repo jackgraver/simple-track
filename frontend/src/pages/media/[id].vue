@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, reactive, ref, watch } from "vue";
+import { computed, onBeforeUnmount, reactive, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import {
     LOOKUP_SOURCE_LABELS,
@@ -11,12 +11,23 @@ import {
     MEDIA_TYPE_LABELS,
     MEDIA_TYPES,
     type LookupResult,
-    type MediaInput,
+    type CatalogEntry,
+    type MediaCatalogInput,
     type MediaItem,
+    type MediaPersonalInput,
     type MediaStatus,
     type MediaType,
 } from "~/api/media/api";
-import { useCreateMedia, useDeleteMedia, useMediaItem, useQuickUpdateMedia, useUpdateMedia } from "~/api/media/queries";
+import {
+    useCatalogSearch,
+    useCreateMedia,
+    useDeleteMedia,
+    useMediaItem,
+    useQuickUpdateMedia,
+    useSaveCatalogItem,
+    useUpdateCatalogItem,
+    useUpdateMedia,
+} from "~/api/media/queries";
 import { getApiErrorMessage } from "~/api/httpError";
 import { useDialog } from "~/composables/dialog/useDialog";
 import { toast } from "~/composables/toast/useToast";
@@ -53,11 +64,16 @@ const createMut = useCreateMedia();
 const updateMut = useUpdateMedia();
 const quickMut = useQuickUpdateMedia();
 const deleteMut = useDeleteMedia();
+const saveCatalogMut = useSaveCatalogItem();
+const updateCatalogMut = useUpdateCatalogItem();
+
+// The catalog is shared: a new entry is yours to edit; an existing one only if you added it (or are an admin).
+const canEditCatalog = computed(() => isNew.value || itemQuery.data.value?.can_edit_catalog === true);
 
 const isLoading = computed(() => !isNew.value && itemQuery.data.value === undefined && !itemQuery.isError.value);
 const hasError = computed(() => !isNew.value && itemQuery.isError.value && itemQuery.data.value === undefined);
 const loadError = computed(() => itemQuery.error.value);
-const isSaving = computed(() => createMut.isPending.value || updateMut.isPending.value);
+const isSaving = computed(() => createMut.isPending.value || updateMut.isPending.value || updateCatalogMut.isPending.value);
 const isDeleting = computed(() => deleteMut.isPending.value);
 const showSkeleton = useDelayedFlag(isLoading);
 
@@ -102,6 +118,42 @@ const statusOptions = MEDIA_STATUSES.map((s) => ({ label: MEDIA_STATUS_LABELS[s]
 
 const unit = computed(() => LENGTH_UNITS[form.type]);
 const coverOk = ref(true);
+
+// --- Shared catalog: when adding, show what is already there so you can save it instead of re-entering it ---
+const catalogTitle = ref("");
+let catalogTimer: ReturnType<typeof setTimeout> | undefined;
+watch(
+    () => form.title,
+    (value) => {
+        clearTimeout(catalogTimer);
+        catalogTimer = setTimeout(() => (catalogTitle.value = value), 300);
+    },
+);
+onBeforeUnmount(() => clearTimeout(catalogTimer));
+const catalogQuery = useCatalogSearch(
+    () => (isNew.value ? catalogTitle.value : ""),
+    () => form.type,
+);
+const catalogMatches = computed<CatalogEntry[]>(() => (isNew.value ? (catalogQuery.data.value ?? []) : []));
+const savingCatalogId = ref<number | null>(null);
+
+async function pickCatalog(entry: CatalogEntry) {
+    if (savingCatalogId.value !== null) return;
+    if (entry.saved_id !== null) {
+        await router.push({ name: "media-detail", params: { id: entry.saved_id } });
+        return;
+    }
+    savingCatalogId.value = entry.ID;
+    try {
+        const item = await saveCatalogMut.mutateAsync(entry.ID);
+        toast.push("Added to your list", "success");
+        await router.replace({ name: "media-detail", params: { id: item.ID } });
+    } catch {
+        // Toasted by the mutation helper.
+    } finally {
+        savingCatalogId.value = null;
+    }
+}
 
 // --- Online lookup: search the title box, pick a match, fill the form ---
 const canLookup = computed(() => LOOKUP_TYPES.has(form.type));
@@ -190,7 +242,7 @@ function intOrNull(v: NumberField) {
     return v.trim() === "" ? null : Number(v);
 }
 
-function toPayload(): MediaInput {
+function catalogPayload(): MediaCatalogInput {
     return {
         type: form.type,
         title: form.title.trim(),
@@ -199,19 +251,24 @@ function toPayload(): MediaInput {
         genres: form.genres,
         cover_url: form.cover_url.trim(),
         synopsis: form.synopsis,
+        length: intOrNull(form.length),
+        source: form.source,
+        external_id: form.external_id,
+    };
+}
+
+function personalPayload(): MediaPersonalInput {
+    return {
         status: form.status,
         rating: form.rating,
         review: form.review,
         favorite: form.favorite,
         progress: intOrNull(form.progress),
-        length: intOrNull(form.length),
         // Leave dates out when blank on create so the backend can fill them
         // in from the status; on edit, blank means clear.
         started_at: form.started_at || (isNew.value ? undefined : null),
         finished_at: form.finished_at || (isNew.value ? undefined : null),
         times_consumed: intOrNull(form.times_consumed) ?? 0,
-        source: form.source,
-        external_id: form.external_id,
     };
 }
 
@@ -235,13 +292,17 @@ async function save() {
     if (!form.title.trim() || isSaving.value) return;
     try {
         if (isNew.value) {
-            const item = await createMut.mutateAsync(toPayload());
+            const item = await createMut.mutateAsync({ ...catalogPayload(), ...personalPayload() });
             toast.push("Added", "success");
             filledId = item.ID;
             await router.replace({ name: "media-detail", params: { id: item.ID } });
             toForm(item);
         } else {
-            await updateMut.mutateAsync({ id: itemId.value, payload: toPayload() });
+            const current = itemQuery.data.value;
+            if (canEditCatalog.value && current) {
+                await updateCatalogMut.mutateAsync({ id: current.media_item_id, payload: catalogPayload() });
+            }
+            await updateMut.mutateAsync({ id: itemId.value, payload: personalPayload() });
             toast.push("Saved", "success");
             await router.push({ name: "media" });
         }
@@ -275,15 +336,15 @@ function quickStatus(status: MediaStatus) {
 
 async function remove() {
     const ok = await confirm({
-        title: "Delete this item?",
+        title: "Remove from your list?",
         tone: "danger",
-        message: `"${form.title}" and your review will be removed.`,
-        confirmText: "Delete",
+        message: `"${form.title}" and your rating and review will be removed from your list. It stays in the shared catalog.`,
+        confirmText: "Remove",
     });
     if (!ok) return;
     try {
         await deleteMut.mutateAsync(itemId.value);
-        toast.push("Deleted", "success");
+        toast.push("Removed", "success");
         await router.push({ name: "media" });
     } catch {
         // Toasted by the mutation helper.
@@ -321,19 +382,19 @@ async function remove() {
                         {{ form.cover_url ? "Couldn't load cover" : "No cover" }}
                     </div>
                 </div>
-                <Input v-model="form.cover_url" type="url" inputmode="url" placeholder="Cover image URL" aria-label="Cover image URL" @input="coverOk = true" />
+                <Input v-if="canEditCatalog" v-model="form.cover_url" type="url" inputmode="url" placeholder="Cover image URL" aria-label="Cover image URL" @input="coverOk = true" />
                 <Checkbox v-model="form.favorite" label="Favourite" />
             </aside>
 
             <div class="flex min-w-0 flex-col gap-6">
                 <div class="grid grid-cols-1 gap-3 lg:grid-cols-[1fr_auto_auto]">
                     <Field label="Title" required>
-                        <Input v-model="form.title" required placeholder="Title" />
+                        <Input v-model="form.title" required placeholder="Title" :disabled="!canEditCatalog" />
                     </Field>
                     <Field label="Type">
-                        <Select v-model="form.type" :options="typeOptions" @update:model-value="closeLookup" />
+                        <Select v-model="form.type" :options="typeOptions" :disabled="!canEditCatalog" @update:model-value="closeLookup" />
                     </Field>
-                    <div class="flex items-end">
+                    <div v-if="canEditCatalog" class="flex items-end">
                         <Button
                             block
                             :loading="isLookingUp"
@@ -345,6 +406,32 @@ async function remove() {
                         </Button>
                     </div>
                 </div>
+
+                <Card v-if="catalogMatches.length" padding="none">
+                    <div class="px-3 py-2 lg:px-4">
+                        <h2 class="m-0 text-sm font-medium text-fg-muted">Already in the shared catalog</h2>
+                    </div>
+                    <List>
+                        <ListRow
+                            v-for="entry in catalogMatches"
+                            :key="entry.ID"
+                            :disabled="savingCatalogId !== null"
+                            :pending="savingCatalogId === entry.ID"
+                            @click="pickCatalog(entry)"
+                        >
+                            <template #leading>
+                                <span class="block aspect-[2/3] w-10 overflow-hidden rounded-control bg-surface-3">
+                                    <img v-if="entry.cover_url" :src="entry.cover_url" alt="" loading="lazy" referrerpolicy="no-referrer" class="h-full w-full object-cover" />
+                                </span>
+                            </template>
+                            {{ entry.title }}
+                            <template #subtitle>{{ [entry.release_year, entry.creator].filter(Boolean).join(" · ") || "\u00a0" }}</template>
+                            <template #trailing>
+                                <span class="text-sm text-fg-muted">{{ entry.saved_id !== null ? "On your list" : "Add to my list" }}</span>
+                            </template>
+                        </ListRow>
+                    </List>
+                </Card>
 
                 <Card v-if="lookupResults" padding="none">
                     <div class="flex items-center justify-between gap-2 px-3 py-2 lg:px-4">
@@ -376,9 +463,9 @@ async function remove() {
                 </Card>
 
                 <div class="grid grid-cols-1 gap-3 lg:grid-cols-[1fr_7rem_1fr]">
-                    <Field label="Creator"><Input v-model="form.creator" placeholder="Director, author…" /></Field>
-                    <Field label="Year"><Input v-model="form.release_year" type="number" inputmode="numeric" placeholder="Year" /></Field>
-                    <Field label="Genres"><Input v-model="form.genres" placeholder="Comma separated" /></Field>
+                    <Field label="Creator"><Input v-model="form.creator" placeholder="Director, author…" :disabled="!canEditCatalog" /></Field>
+                    <Field label="Year"><Input v-model="form.release_year" type="number" inputmode="numeric" placeholder="Year" :disabled="!canEditCatalog" /></Field>
+                    <Field label="Genres"><Input v-model="form.genres" placeholder="Comma separated" :disabled="!canEditCatalog" /></Field>
                 </div>
 
                 <Field label="Status">
@@ -407,7 +494,7 @@ async function remove() {
                         <div class="flex items-center gap-2">
                             <div class="min-w-0 flex-1"><Input v-model="form.progress" type="number" inputmode="numeric" aria-label="Progress" /></div>
                             <span class="text-fg-muted">/</span>
-                            <div class="min-w-0 flex-1"><Input v-model="form.length" type="number" inputmode="numeric" placeholder="total" aria-label="Total" /></div>
+                            <div class="min-w-0 flex-1"><Input v-model="form.length" type="number" inputmode="numeric" placeholder="total" aria-label="Total" :disabled="!canEditCatalog" /></div>
                         </div>
                     </Field>
                     <Field label="Times finished"><Input v-model="form.times_consumed" type="number" inputmode="numeric" /></Field>
@@ -415,12 +502,16 @@ async function remove() {
                     <Field label="Finished"><Input v-model="form.finished_at" type="date" /></Field>
                 </div>
 
+                <p v-if="!isNew && !canEditCatalog" class="m-0 text-sm text-fg-muted">
+                    Title, details and cover are shared with everyone, and only the person who added this entry (or an admin) can change them.
+                </p>
+
                 <Field label="Synopsis">
-                    <Textarea v-model="form.synopsis" :rows="3" placeholder="What's it about?" />
+                    <Textarea v-model="form.synopsis" :rows="3" placeholder="What's it about?" :disabled="!canEditCatalog" />
                 </Field>
 
                 <div class="flex flex-col-reverse gap-2 lg:flex-row lg:justify-between">
-                    <Button v-if="!isNew" variant="danger" :loading="isDeleting" @click="remove">Delete</Button>
+                    <Button v-if="!isNew" variant="danger" :loading="isDeleting" @click="remove">Remove from my list</Button>
                     <span v-else />
                     <div class="flex flex-col gap-2 lg:flex-row">
                         <Button :to="{ name: 'media' }">Back</Button>

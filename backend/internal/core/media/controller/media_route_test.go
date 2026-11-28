@@ -26,7 +26,7 @@ func TestLookupHoldsNoDatabaseConnection(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := db.AutoMigrate(&models.MediaItem{}); err != nil {
+	if err := db.AutoMigrate(&models.MediaItem{}, &models.UserMedia{}); err != nil {
 		t.Fatal(err)
 	}
 	sqlDB, err := db.DB()

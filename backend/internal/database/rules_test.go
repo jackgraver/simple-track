@@ -25,7 +25,6 @@ import (
 var createWithAssociationsAllowed = map[string]int{
 	"internal/core/auth/repository/user_repository.go":               1, // C6 (users: no associations)
 	"internal/core/diet/repository/repository.go":                    23,
-	"internal/core/media/service/media_service.go":                   2,
 	"internal/core/money/service/accounts.go":                        4,
 	"internal/core/money/service/contribution_types.go":              6,
 	"internal/core/tracking/grocery/service.go":                      3,

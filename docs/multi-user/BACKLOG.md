@@ -26,7 +26,7 @@ Nothing Critical was found. Prod today has one account, so most multi-user findi
 | 3 | Medium | Anyone can lock the owner out of login, from one IP, indefinitely | S1: **done**; C6: lockouts in `auth_events` (`login_rate_limited`) **done** |
 | 4 | Medium | IPv6 address rotation defeats per-IP limits and can fill the limiter (global lockout) | S1: **done** |
 | 5 | Medium | TMDB API key can leak to users in lookup error messages | S3: **done** |
-| 6 | Medium | Raw internal errors (SQL, constraint names) returned to clients at ~160 sites | C1–C5; B3 test **done** (`TestNoRawErrorsIn500s`) |
+| 6 | Medium | Raw internal errors (SQL, constraint names) returned to clients at ~160 sites | C1–C5 (C5 **done**); B3 test **done** (`TestNoRawErrorsIn500s`) |
 | 7 | Medium | No security headers (CSP, frame-ancestors, nosniff, Referrer-Policy); API has none at all | H1: **done** (Caddy; deploys at D1, ROLLOUT 3.5) |
 | 8 | Medium | No request body size limit outside `/auth` (imports, JSON) | H1: **done** (1 MiB default, 5 MiB + 10k rows on import; Caddy 6MB) |
 | 9 | Medium | Frontend local storage isn't scoped to the user; logout leaves drafts, timers, last route | S2: **done** |
@@ -35,7 +35,7 @@ Nothing Critical was found. Prod today has one account, so most multi-user findi
 | 12 | Low | `"Invalid token: " + err` echoes verification details | B1: **done** |
 | 13 | Low | CSRF relies on SameSite=Lax only; JSON endpoints accept `text/plain` bodies | B1: **done** (Sec-Fetch-Site) |
 | 14 | Low | Usernames are case-sensitive unique (`Jack` vs `jack`); no password policy; `max=72` counts runes, bcrypt limit is bytes | C6: **done** (lower(username) unique, charset, 10 chars min, 72 bytes max) |
-| 15 | Low | Shared-catalog cover URLs are arbitrary image URLs shown to every user (tracking pixel) | C5 |
+| 15 | Low | Shared-catalog cover URLs are arbitrary image URLs shown to every user (tracking pixel) | C5: **done** (https + lookup image hosts only; legacy covers not served) |
 | 16 | Low | `TRUSTED_PROXIES` depends on an unpinned Docker gateway IP; drift merges all clients into one IP | A2: deferred to D1 (needs a network recreate on the VPS) |
 | 17 | Low | API responses carry no `Cache-Control`; personal data may sit in browser/bfcache on shared devices | H1: **done** |
 | 18 | Low | Default CORS list (used when `CORS_ORIGINS` is unset) hard-codes home LAN IPs | H1: **done** |
@@ -320,6 +320,12 @@ Nothing Critical was found. Prod today has one account, so most multi-user findi
   source's image host (TMDB, Open Library, AniList, iTunes); a free-form URL stays on the user's
   own `user_media` row. A CSP `img-src` list (finding 7) enforces the same thing in the browser.
 - **Lane**: C5.
+- **Done (C5)**: `lookup.Service.CoverAllowed` accepts empty or https on image.tmdb.org,
+  covers.openlibrary.org, `*.anilist.co`, `*.mzstatic.com` (plus the configured image bases, which
+  is how e2e's http fake upstream works; production's are the https defaults). Checked on catalog
+  create and edit (400). Stored covers that fail it are blanked in every response, so rows from
+  before the rule are never handed to another browser. No free-form per-user cover (no second
+  column): a user who wants an odd cover can't have one. CSP `img-src` (finding 7) still applies.
 
 ### 16. Low: `TRUSTED_PROXIES` relies on an unpinned gateway IP
 

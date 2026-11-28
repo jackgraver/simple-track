@@ -10,10 +10,16 @@ import {
     getMedia,
     getMediaStats,
     listMedia,
+    saveCatalogItem,
+    searchCatalog,
+    updateCatalogItem,
     updateMedia,
+    type MediaCatalogInput,
     type MediaInput,
     type MediaItem,
     type MediaListParams,
+    type MediaPersonalInput,
+    type MediaType,
 } from "./api";
 import { patchItem, patchList, replaceInList, revertItem, revertList, type MediaQuickFields } from "./cache";
 import { mediaKeys } from "./keys";
@@ -137,7 +143,7 @@ export function useCreateMedia() {
 }
 
 export function useUpdateMedia() {
-    return useServerMutation<{ id: number; payload: MediaInput }, MediaItem>({
+    return useServerMutation<{ id: number; payload: MediaPersonalInput }, MediaItem>({
         mutationKey: mediaMutationKeys.update,
         mutationFn: ({ id, payload }) => updateMedia(id, payload),
         scope: ({ id }) => ({ id: `media:${id}` }),
@@ -154,5 +160,37 @@ export function useDeleteMedia() {
         reconcile: (_d, id, qc) => qc.removeQueries({ queryKey: mediaKeys.detail(id), exact: true }),
         invalidate: () => [mediaKeys.lists, mediaKeys.stats],
         errorMessage: (err) => getApiErrorMessage(err, "Failed to delete"),
+    });
+}
+
+/** Search the shared catalog (what everyone has added). Off until there is something to search for. */
+export function useCatalogSearch(q: MaybeRefOrGetter<string>, type: MaybeRefOrGetter<MediaType | undefined>) {
+    return useQuery({
+        queryKey: computed(() => mediaKeys.catalog(toValue(q).trim(), toValue(type))),
+        queryFn: () => searchCatalog(toValue(q).trim(), toValue(type)),
+        enabled: computed(() => toValue(q).trim().length >= 2),
+        staleTime: STALE.default,
+        placeholderData: (previous) => previous,
+    });
+}
+
+/** Add a shared catalog entry to your own list. */
+export function useSaveCatalogItem() {
+    return useServerMutation<number, MediaItem>({
+        mutationKey: ["media", "mutation", "save-catalog"] as const,
+        mutationFn: saveCatalogItem,
+        reconcile: (item, _v, qc) => qc.setQueryData(mediaKeys.detail(item.ID), item),
+        invalidate: () => [mediaKeys.lists, mediaKeys.stats, mediaKeys.catalogs],
+        errorMessage: (err) => getApiErrorMessage(err, "Failed to add"),
+    });
+}
+
+/** Edit a catalog entry (its creator or an admin). Your list and the picker refresh. */
+export function useUpdateCatalogItem() {
+    return useServerMutation<{ id: number; payload: MediaCatalogInput }, unknown>({
+        mutationKey: ["media", "mutation", "update-catalog"] as const,
+        mutationFn: ({ id, payload }) => updateCatalogItem(id, payload),
+        invalidate: () => [mediaKeys.lists, mediaKeys.details, mediaKeys.catalogs],
+        errorMessage: (err) => getApiErrorMessage(err, "Failed to save"),
     });
 }

@@ -45,8 +45,6 @@ var rlsPending = map[string]string{
 
 	"investment_account_types": "C4", "investment_contribution_rules": "C4",
 	"investment_accounts": "C4", "account_balances": "C4", "investment_deposits": "C4",
-
-	"media_items": "C5",
 }
 
 // Every table has row-level security with at least one policy, and every user_id / created_by
