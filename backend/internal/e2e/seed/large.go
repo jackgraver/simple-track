@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 
 	authm "be-simpletracker/internal/core/auth/models"
 	dietm "be-simpletracker/internal/core/diet/models"
@@ -195,24 +196,38 @@ func largeTracking(tx *gorm.DB) error {
 }
 
 func largeMedia(tx *gorm.DB) error {
+	// The catalog and the saves belong to the login the specs use.
+	var user authm.User
+	if err := tx.Where("username = ?", Username).First(&user).Error; err != nil {
+		return err
+	}
 	types := []mediam.MediaType{mediam.MediaTypeMovie, mediam.MediaTypeTV, mediam.MediaTypeBook, mediam.MediaTypeGame, mediam.MediaTypeAnime, mediam.MediaTypeAlbum}
 	statuses := []mediam.MediaStatus{mediam.MediaStatusPlanned, mediam.MediaStatusInProgress, mediam.MediaStatusCompleted, mediam.MediaStatusOnHold, mediam.MediaStatusDropped}
 	items := make([]mediam.MediaItem, 0, 300)
+	saves := make([]mediam.UserMedia, 0, 300)
 	for i := 0; i < 300; i++ {
 		year := 1950 + i%75
-		it := mediam.MediaItem{
-			Type: types[i%len(types)], Title: fmt.Sprintf("Title %03d", i), Creator: fmt.Sprintf("Creator %d", i%40),
-			ReleaseYear: &year, Genres: "Drama", Status: statuses[i%len(statuses)], Favorite: i%17 == 0,
-		}
-		if it.Status == mediam.MediaStatusCompleted {
+		items = append(items, mediam.MediaItem{
+			Creator: database.Creator{CreatedBy: user.ID},
+			Type:    types[i%len(types)], Title: fmt.Sprintf("Title %03d", i), Author: fmt.Sprintf("Creator %d", i%40),
+			ReleaseYear: &year, Genres: "Drama",
+		})
+		save := mediam.UserMedia{Owner: database.Owner{UserID: user.ID}, Status: statuses[i%len(statuses)], Favorite: i%17 == 0}
+		if save.Status == mediam.MediaStatusCompleted {
 			r := float64(1+i%10) / 2
-			it.Rating = &r
+			save.Rating = &r
 		}
-		items = append(items, it)
+		saves = append(saves, save)
 	}
 	items[0].Title = "Amélie: Le Fabuleux Destin d’Amélie Poulain 🎬"
 	items[1].Title = "A very long title that goes on and on to check how cards and rows cope with overflow"
-	return tx.CreateInBatches(&items, batch).Error
+	if err := tx.Omit(clause.Associations).CreateInBatches(&items, batch).Error; err != nil {
+		return err
+	}
+	for i := range saves {
+		saves[i].MediaItemID = items[i].ID
+	}
+	return tx.Omit(clause.Associations).CreateInBatches(&saves, batch).Error
 }
 
 // seedOwner is the seeded login's ID: the owner of every owned row the profiles add. The seed

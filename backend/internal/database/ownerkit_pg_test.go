@@ -39,8 +39,6 @@ var rlsPending = map[string]string{
 	"exercises": "C3", "workout_programs": "C3", "workout_plans": "C3", "workout_plan_days": "C3",
 	"workout_plan_exercises": "C3", "workout_logs": "C3", "logged_exercises": "C3",
 	"logged_sets": "C3", "cardios": "C3",
-
-	"media_items": "C5",
 }
 
 // Every table has row-level security with at least one policy, and every user_id / created_by

@@ -196,9 +196,10 @@ Depends on: B3
 
 ### C5 Media
 Depends on: B3
-- [ ] Split media_items into a shared catalog and per-user `user_media` (status, rating, notes, dates).
-- [ ] Frontend follows the API change.
-- [ ] BACKLOG #5 (TMDB key in error messages), #6, #15 (catalog cover URLs). Skip #5 if S3 ticked it.
+- [x] Split media_items into a shared catalog and per-user `user_media` (status, rating, notes, dates).
+- [x] Frontend follows the API change.
+- [x] BACKLOG #5 (TMDB key in error messages: S3), #6, #15 (catalog cover URLs).
+- Result: DECISIONS "C5 media". Migration 0013; PR `mu/c5-media`.
 
 ### C6 Accounts and setup links
 Depends on: B1, B2, H1 (all merged). Runs alongside B3 and the S lanes.

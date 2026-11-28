@@ -64,14 +64,63 @@ export type MediaItem = {
     times_consumed: number;
     source: string;
     external_id: string;
+    /** The shared catalog entry behind this save (several people can save the same one). */
+    media_item_id: number;
+    /** Who added the catalog entry. */
+    created_by: number;
+    /** True for the entry's creator and for admins: only they can change the catalog fields. */
+    can_edit_catalog: boolean;
 };
 
-/** Fields accepted on create/update. Omit to leave unchanged; null clears. Dates are YYYY-MM-DD. */
-export type MediaInput = Partial<
-    Omit<MediaItem, "ID" | "CreatedAt" | "UpdatedAt" | "started_at" | "finished_at">
+/** Catalog fields (shared by everyone): only the entry's creator or an admin may change them. */
+export type MediaCatalogInput = Partial<
+    Pick<
+        MediaItem,
+        | "type"
+        | "title"
+        | "creator"
+        | "release_year"
+        | "genres"
+        | "cover_url"
+        | "synopsis"
+        | "length"
+        | "source"
+        | "external_id"
+    >
+>;
+
+/** Your own fields of a save. Omit to leave unchanged; null clears. Dates are YYYY-MM-DD. */
+export type MediaPersonalInput = Partial<
+    Pick<MediaItem, "status" | "rating" | "review" | "favorite" | "progress" | "times_consumed">
 > & {
     started_at?: string | null;
     finished_at?: string | null;
+};
+
+/** Create: a catalog entry (reused when source + external_id already exist) plus your save of it. */
+export type MediaInput = MediaCatalogInput & MediaPersonalInput;
+
+/** A shared catalog entry as the add picker lists it. */
+export type CatalogEntry = Pick<
+    MediaItem,
+    | "type"
+    | "title"
+    | "creator"
+    | "release_year"
+    | "genres"
+    | "cover_url"
+    | "synopsis"
+    | "length"
+    | "source"
+    | "external_id"
+    | "created_by"
+    | "can_edit_catalog"
+    | "CreatedAt"
+    | "UpdatedAt"
+> & {
+    ID: number;
+    /** Your save of it (media id), or null if you haven't saved it. */
+    saved_id: number | null;
 };
 
 export type MediaListParams = {
@@ -107,7 +156,7 @@ export async function createMedia(payload: MediaInput) {
     return response.data.item;
 }
 
-export async function updateMedia(id: number, payload: MediaInput) {
+export async function updateMedia(id: number, payload: MediaPersonalInput) {
     const response = await apiClient.patch<{ item: MediaItem }>(
         `/media/${id}`,
         payload,
@@ -117,6 +166,24 @@ export async function updateMedia(id: number, payload: MediaInput) {
 
 export async function deleteMedia(id: number) {
     await apiClient.delete(`/media/${id}`);
+}
+
+export async function searchCatalog(q: string, type?: MediaType) {
+    const response = await apiClient.get<{ items: CatalogEntry[] }>("/media/catalog", {
+        params: { q, type },
+    });
+    return response.data.items;
+}
+
+/** Save an existing catalog entry to your list (status "planned"). Returns your save. */
+export async function saveCatalogItem(catalogId: number) {
+    const response = await apiClient.post<{ item: MediaItem }>(`/media/catalog/${catalogId}/save`);
+    return response.data.item;
+}
+
+export async function updateCatalogItem(catalogId: number, payload: MediaCatalogInput) {
+    const response = await apiClient.patch<{ item: CatalogEntry }>(`/media/catalog/${catalogId}`, payload);
+    return response.data.item;
 }
 
 export async function getMediaStats() {

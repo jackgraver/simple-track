@@ -654,7 +654,7 @@ reference (`drink_size_presets`); tests in each package (`*_pg_test.go`) and
   row is created on the first `PUT /tracking/profile`; `GET` still answers `{"profile": null}`
   until then, so a new account sees the onboarding state. The old table was meant to hold one
   row (the app read and updated the oldest). If prod somehow has several live rows, the
-  migration soft-deletes all but the oldest rather than failing or dropping data (ROLLOUT 1.8
+  migration soft-deletes all but the oldest rather than failing or dropping data (ROLLOUT 1.9
   checks the count first). The first-save race (two requests for a user with no row) is
   handled: the loser's insert fails in a savepoint and it updates the winner's row.
 - **Upserts** (weight, steps) do the same: find the user's row for the date, else create in a
@@ -743,3 +743,73 @@ away other users' room rows (the admin can't count them through RLS); (3) the di
 then room as two requests, so a room validation error after rules saved shows "Failed to save"
 though the rules persisted; (4) `created_by` (a user ID) is visible on catalog types, as the kit
 specifies; (5) migration 0013's down is lossy with several users.
+
+## 2026-11-27: C5 media (agent, lane C5)
+
+`media_items` is the shared catalog; `user_media` holds everything personal. Migration
+`0015_media_catalog.sql` (renumbered from 0013 when merged after C1 and C4), owner-approved column split ahead of the code.
+
+- **Catalog (`media_items`)**: `type`, `title`, `creator` (director/author/...), `release_year`,
+  `genres`, `cover_url`, `synopsis`, `length` (total pages/episodes/hours: a fact about the item),
+  `source` + `external_id`, `created_by`. Catalog policies and `catalog_guard` as in B3. A partial
+  unique index on `(source, external_id)` (live rows, both non-empty) means adding something that
+  already exists reuses the row instead of duplicating it; hand-entered items have no external ID
+  and are never deduplicated. NULL `source`/`external_id` were normalised to `''`.
+- **Owned (`user_media`)**: `user_id`, `media_item_id`, `status`, `rating`, `review`, `favorite`,
+  `progress`, `started_at`, `finished_at`, `times_consumed`. Unique `(user_id, media_item_id)`
+  **where `deleted_at IS NULL`**, so a removed save can be saved again (gorm soft delete).
+  `media_item_id` is a **plain FK** to the catalog: everyone may read the catalog, so the
+  composite-FK reason (FK checks bypass RLS) doesn't apply. A soft-deleted catalog entry leaves
+  people's saves in place but unlisted (the list joins live catalog rows).
+- **Backfill**: every `media_items` row (soft-deleted too) gets `created_by` = the one live admin
+  and a `user_media` row for them with `id = media_items.id`, so `/media/:id` URLs and the frontend
+  cache keep working; the sequence is advanced. Live duplicates of a (source, external_id) pair
+  would break the new index: all but the oldest lose the pair (they stay as hand-entered rows,
+  nothing is deleted). Down is lossy with several users (an item takes the lowest user's fields).
+- **API** (`/media`): the flat item shape stays (catalog + personal fields side by side, `ID` is the
+  `user_media` id) plus `media_item_id`, `created_by`, `can_edit_catalog`. `GET /media` and
+  `/stats` are the caller's saves only. `POST /media` finds-or-creates the catalog row then saves it
+  (201 new save, 200 if they already had it, which is returned untouched; an existing catalog row's
+  fields are never overwritten by a later POST). `PATCH /media/:id` takes **personal fields only**;
+  `DELETE /media/:id` removes the save, not the catalog entry. New: `GET /media/catalog?q=&type=`
+  (with the caller's `saved_id`), `POST /media/catalog/:id/save`, `PATCH /media/catalog/:id`
+  (creator or admin, else **403**; catalog rows are visible to all so 403 leaks nothing),
+  `DELETE /media/catalog/:id` (admin only, else 403; soft delete). A save of someone else's, or a
+  missing ID, is the shared 404 (`apierr.NotFoundOrInternal`).
+- **Request DTOs**: `CatalogInput`, `PersonalInput` and `MediaInput` (both) have no `user_id` or
+  `created_by`, so forged values are never read. `Omit(clause.Associations)` on every create/save;
+  find-or-create and save run in a savepoint (`db.Transaction`) so losing a race to a unique index
+  doesn't poison the request transaction, then re-read.
+- **Name clash**: `database.Creator` is embedded in `MediaItem`, so the director/author column's Go
+  field is `Author` (`json:"creator" gorm:"column:creator"`). Response DTOs name the creator's ID
+  `AddedBy` (json `created_by`) so the rules test's "writes `CreatedBy`" grep sees no false positive.
+- **Reads of `user_media`** all go through `saves(ctx)` (`database.Owned` + a join to live catalog
+  rows); the catalog search reads `user_media` for its `saved_id`s with `Owned` too, not a join.
+- **#15 covers**: `lookup.Service.CoverAllowed` (https + TMDB / Open Library / AniList / Apple
+  image hosts, plus the service's configured image bases for e2e's fake upstream) is checked on
+  catalog create and edit (400), and stored covers failing it are blanked in responses. No per-user
+  cover column: BACKLOG #15 suggested one, but nothing needs it yet.
+- **Frontend**: the add page lists matching shared catalog entries ("Add to my list", or "On your
+  list"); the detail page edits catalog fields (disabled otherwise, with a note) through
+  `PATCH /media/catalog/:id` and personal ones through `PATCH /media/:id`; "Delete" became "Remove
+  from my list". No UI for the admin's catalog delete yet (API only).
+- **Tests**: `controller/media_pg_test.go` (twousers: lists/stats/get/patch/delete per endpoint,
+  same catalog item saved independently, catalog permissions, forged `user_id`/`created_by`, cover
+  validation, RLS backstop as Bob incl. `catalog_guard`); SQLite service tests rewritten for the
+  split; e2e specs for the catalog save flow and the cover rule. `media_items` left `rlsPending`;
+  the media files' allowlist entries are gone from the rules tests.
+- **Seeds**: devseed creates the catalog entries and the dev login's saves; the e2e `large` seed
+  does the same for the `dev` user (the base e2e seed has no media).
+- **Known limits (from the C5 review)**:
+  - *First writer wins on an external ID.* A signed-in user can add a catalog row for a
+    `(source, external_id)` with wrong metadata; later people adding that title reuse it and only
+    its creator or an admin can fix it. Family-only accounts make this acceptable for now. If it
+    bites: fill the metadata server-side from `lookup.Details` when a source is given, and add an
+    admin UI for the catalog delete (API only today).
+  - *Legacy covers are hidden, not cleaned.* A stored cover outside the allowlist stays in the
+    database but is blanked in responses (ROLLOUT pre-check 1.8 lists them). The edit form only
+    sends catalog fields the user changed, so rating an item never wipes the hidden cover.
+  - Updates use explicit column lists (`Select(...).Updates` + `database.Affected`), not `Save`,
+    because gorm's `Save` falls back to an upsert when a concurrent soft delete leaves 0 rows.
+  - A legacy row with half a `(source, external_id)` pair stays editable; the "go together" rule
+    only applies when an edit sets one of them.

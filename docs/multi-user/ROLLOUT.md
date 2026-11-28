@@ -57,8 +57,19 @@ the compose file and `.env.vps` must be updated before the deploy, not after.
 7. (B3) Every owned-table migration backfills existing rows to the one admin and **fails** if
    there isn't exactly one live admin (0011 `drink_size_presets` first; C lanes copy it). After
    0009 that's the account from check 6, so nothing to do beyond it; the rehearsal proves it.
+8. (C5) Record the media counts, and look at what migration 0015 will change:
+   ```sql
+   SELECT count(*) AS media_items, count(*) FILTER (WHERE deleted_at IS NULL) AS live FROM media_items;
+   -- live items sharing a (source, external_id): all but the oldest lose source/external_id
+   -- (they stay as hand-entered rows; nothing is deleted)
+   SELECT source, external_id, count(*), array_agg(id ORDER BY id) FROM media_items
+     WHERE deleted_at IS NULL AND source <> '' AND external_id <> '' GROUP BY 1, 2 HAVING count(*) > 1;
+   -- covers the new rule would not accept (the API stops serving them; fix or accept)
+   SELECT id, title, cover_url FROM media_items WHERE deleted_at IS NULL AND cover_url <> ''
+     AND cover_url !~ '^https://(image\.tmdb\.org|covers\.openlibrary\.org|[^/]*\.anilist\.co|[^/]*\.mzstatic\.com)/';
+   ```
 
-8. (C1) `user_profiles` should hold at most one live row (the app only ever kept one):
+9. (C1) `user_profiles` should hold at most one live row (the app only ever kept one):
    `SELECT count(*) FROM user_profiles WHERE deleted_at IS NULL;` expect 0 or 1. With more, the
    migration keeps the oldest live row and soft-deletes the rest (nothing is dropped), so note
    which one you expect to survive.
@@ -78,6 +89,11 @@ On a copy of the latest prod backup, with the D1 build of the backend image:
 4. `SELECT usename, count(*) FROM pg_stat_activity GROUP BY 1;` shows the server as
    `simpletrack_app`. As that role: `SHOW statement_timeout;` gives `15s`.
 5. Click through every module as the owner (other lanes' checks: backfill row counts etc.).
+   For media (C5), compare with pre-check 1.8: `SELECT (SELECT count(*) FROM media_items) AS catalog,
+   (SELECT count(*) FROM user_media) AS saves;` must show catalog = saves = the old `media_items`
+   count (one save per old row, soft-deleted ones included, `user_media.id` = the old id), and
+   `SELECT count(*) FROM user_media WHERE user_id <> (SELECT id FROM users WHERE is_admin AND deleted_at IS NULL);`
+   must be 0. Open `/media` as the owner: same items, ratings, statuses and dates as before.
 6. Send the server SIGTERM during a request and confirm `shutting down: draining requests` then
    `shutdown complete` in its log.
 
@@ -218,6 +234,17 @@ Each lane adds what its changes need here (README: "Prod changes go in ROLLOUT.m
   Effects to know: other family accounts see the owner's contribution types (TFSA, ...) and their
   limits, but never the owner's accounts, balances or room figures. They can't edit the owner's
   types; only the admin deletes types or limits.
+- **C5 (media)**: migration 0015 runs in pre_swap with the rest. `media_items` becomes the shared
+  catalog and every existing row gets a `user_media` row for the admin (same id, so `/media/:id`
+  links keep working); the personal columns leave `media_items`. Nothing to configure. Effects:
+  - Items sharing a (source, external_id) lose that pair on all but the oldest (pre-check 1.8
+    lists them), because the catalog allows one row per external ID.
+  - A stored cover URL outside TMDB, Open Library, AniList or Apple's image hosts is no longer
+    served (the API returns an empty cover), and new covers are validated. Pre-check 1.8 lists them.
+  - Rolling back the image does not undo the migration (rollback never reverts the database): the
+    old backend can't read the new schema. Use the pre-deploy backup if 0013 must be undone.
+  - In 3.4, `/media` shows the owner's items as before; the add page lists matching shared
+    catalog entries.
 
 <!-- Later lanes: add anything else that must happen in this deploy here. -->
 

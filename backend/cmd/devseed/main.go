@@ -26,6 +26,7 @@ import (
 	"be-simpletracker/internal/env"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 func main() {
@@ -94,8 +95,9 @@ func devOwner(db *gorm.DB) (uint, error) {
 // converting a table pass it to that module's seed function).
 func seed(tx *gorm.DB, owner uint) error {
 	tracking := func(tx *gorm.DB) error { return seedTracking(tx, owner) }
+	media := func(tx *gorm.DB) error { return seedMedia(tx, owner) }
 	money := func(tx *gorm.DB) error { return seedMoney(tx, owner) }
-	for _, f := range []func(*gorm.DB) error{seedGym, seedDiet, tracking, seedMedia, money} {
+	for _, f := range []func(*gorm.DB) error{seedGym, seedDiet, tracking, media, money} {
 		if err := f(tx); err != nil {
 			return err
 		}
@@ -320,18 +322,33 @@ func seedTracking(tx *gorm.DB, owner uint) error {
 	return nil
 }
 
-func seedMedia(tx *gorm.DB) error {
+// seedMedia adds the shared catalog entries and the dev login's saves of them (both created by owner).
+func seedMedia(tx *gorm.DB, owner uint) error {
 	year := func(y int) *int { return &y }
 	rating := func(r float64) *float64 { return &r }
-	items := []mediam.MediaItem{
-		{Type: mediam.MediaTypeMovie, Title: "Blade Runner 2049", Creator: "Denis Villeneuve", ReleaseYear: year(2017), Genres: "Sci-Fi", Status: mediam.MediaStatusCompleted, Rating: rating(4.5), Favorite: true, TimesConsumed: 2},
-		{Type: mediam.MediaTypeTV, Title: "Severance", Creator: "Dan Erickson", ReleaseYear: year(2022), Genres: "Thriller", Status: mediam.MediaStatusInProgress},
-		{Type: mediam.MediaTypeBook, Title: "Project Hail Mary", Creator: "Andy Weir", ReleaseYear: year(2021), Genres: "Sci-Fi", Status: mediam.MediaStatusCompleted, Rating: rating(5)},
-		{Type: mediam.MediaTypeGame, Title: "Hades", Creator: "Supergiant Games", ReleaseYear: year(2020), Genres: "Roguelike", Status: mediam.MediaStatusOnHold},
-		{Type: mediam.MediaTypeAnime, Title: "Frieren", Creator: "Madhouse", ReleaseYear: year(2023), Genres: "Fantasy", Status: mediam.MediaStatusPlanned},
-		{Type: mediam.MediaTypeAlbum, Title: "In Rainbows", Creator: "Radiohead", ReleaseYear: year(2007), Genres: "Rock", Status: mediam.MediaStatusDropped},
+	type seeded struct {
+		item mediam.MediaItem
+		save mediam.UserMedia
 	}
-	return tx.Create(&items).Error
+	rows := []seeded{
+		{mediam.MediaItem{Type: mediam.MediaTypeMovie, Title: "Blade Runner 2049", Author: "Denis Villeneuve", ReleaseYear: year(2017), Genres: "Sci-Fi"}, mediam.UserMedia{Status: mediam.MediaStatusCompleted, Rating: rating(4.5), Favorite: true, TimesConsumed: 2}},
+		{mediam.MediaItem{Type: mediam.MediaTypeTV, Title: "Severance", Author: "Dan Erickson", ReleaseYear: year(2022), Genres: "Thriller"}, mediam.UserMedia{Status: mediam.MediaStatusInProgress}},
+		{mediam.MediaItem{Type: mediam.MediaTypeBook, Title: "Project Hail Mary", Author: "Andy Weir", ReleaseYear: year(2021), Genres: "Sci-Fi"}, mediam.UserMedia{Status: mediam.MediaStatusCompleted, Rating: rating(5)}},
+		{mediam.MediaItem{Type: mediam.MediaTypeGame, Title: "Hades", Author: "Supergiant Games", ReleaseYear: year(2020), Genres: "Roguelike"}, mediam.UserMedia{Status: mediam.MediaStatusOnHold}},
+		{mediam.MediaItem{Type: mediam.MediaTypeAnime, Title: "Frieren", Author: "Madhouse", ReleaseYear: year(2023), Genres: "Fantasy"}, mediam.UserMedia{Status: mediam.MediaStatusPlanned}},
+		{mediam.MediaItem{Type: mediam.MediaTypeAlbum, Title: "In Rainbows", Author: "Radiohead", ReleaseYear: year(2007), Genres: "Rock"}, mediam.UserMedia{Status: mediam.MediaStatusDropped}},
+	}
+	for _, r := range rows {
+		r.item.CreatedBy = owner
+		if err := tx.Omit(clause.Associations).Create(&r.item).Error; err != nil {
+			return err
+		}
+		r.save.UserID, r.save.MediaItemID = owner, r.item.ID
+		if err := tx.Omit(clause.Associations).Create(&r.save).Error; err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func seedMoney(tx *gorm.DB, owner uint) error {
