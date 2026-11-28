@@ -2,10 +2,12 @@ package authrepo
 
 import (
 	"context"
+	"errors"
 
 	"be-simpletracker/internal/core/auth/models"
 	"be-simpletracker/internal/database"
 
+	"github.com/jackc/pgx/v5/pgconn"
 	"gorm.io/gorm"
 )
 
@@ -28,6 +30,10 @@ func FindUserByID(ctx context.Context, id uint) (models.User, error) {
 	return user, nil
 }
 
+// ErrUsernameTaken: the insert hit the case-insensitive username index (a soft-deleted user with
+// that name, or a concurrent create).
+var ErrUsernameTaken = errors.New("username already taken")
+
 func CreateUser(ctx context.Context, user *models.User) error {
 	if user.TokenVersion == 0 {
 		user.TokenVersion = models.InitialTokenVersion
@@ -37,7 +43,13 @@ func CreateUser(ctx context.Context, user *models.User) error {
 		// NULL, not '': accounts without an email don't collide on the email unique index.
 		db = db.Omit("Email")
 	}
-	return db.Create(user).Error
+	// In a savepoint: the request can still answer after the unique violation (B2 gotcha).
+	err := database.CreateInSavepoint(db, user)
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) && pgErr.Code == "23505" && pgErr.ConstraintName == "idx_users_username_lower" {
+		return ErrUsernameTaken
+	}
+	return err
 }
 
 func UpdateUserBirthYear(ctx context.Context, id uint, birthYear *int) (models.User, error) {

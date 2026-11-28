@@ -138,9 +138,10 @@ type completeSetupRequest struct {
 	Password string `json:"password" binding:"required,max=256"`
 }
 
-// setupProtectionKey: setup attempts are limited per client IP (login protection's username
-// counter, keyed by IP), so failed attempts never count against a real username.
-func setupProtectionKey(clientIP string) string { return "setup-link:" + clientIP }
+// setupProtectionKey is the "username" setup attempts count against, on the account limiter
+// (not the sign-in one): per source it allows MaxPerUsername attempts per window, and all
+// sources together go through the username-wide backoff.
+const setupProtectionKey = "setup-link"
 
 // CompleteSetup sets the password through a setup link and signs the user in.
 func CompleteSetup(c *gin.Context, service *services.AuthService, cookie CookieConfig, protection *LoginProtection) {
@@ -156,12 +157,16 @@ func CompleteSetup(c *gin.Context, service *services.AuthService, cookie CookieC
 		return
 	}
 	clientIP := c.ClientIP()
-	key := setupProtectionKey(clientIP)
-	if decision := protection.Allow(clientIP, key); !decision.Allowed {
+	key := setupProtectionKey
+	decision := protection.Allow(clientIP, key)
+	if !decision.Allowed {
 		if decision.LogRejection {
 			services.RecordRejection(c.Request.Context(), models.AuthEvent{Event: models.EventLoginRateLimited, ClientIP: clientIP, Detail: "setup_link:" + decision.Reason})
 		}
 		respondLoginRateLimited(c, decision.RetryAfter)
+		return
+	}
+	if !waitBackoff(c, protection, decision) {
 		return
 	}
 	result, err := service.CompleteSetup(c.Request.Context(), services.Actor{ClientIP: clientIP}, req.Token, req.Password)
@@ -172,6 +177,17 @@ func CompleteSetup(c *gin.Context, service *services.AuthService, cookie CookieC
 	protection.RecordSuccess(clientIP, key)
 	setAuthCookie(c, cookie, result.Token)
 	c.JSON(http.StatusOK, AuthResponse{User: result.User, Username: result.User.Username, Environment: currentEnvironment()})
+}
+
+// waitBackoff applies the limiter's username-wide backoff (S1) before a password is checked. It
+// returns false if the client went away meanwhile (nothing checked, nothing logged).
+func waitBackoff(c *gin.Context, protection *LoginProtection, decision LoginDecision) bool {
+	protection.Wait(c.Request.Context(), decision.Delay)
+	if c.Request.Context().Err() != nil {
+		c.Abort()
+		return false
+	}
+	return true
 }
 
 type changePasswordRequest struct {
@@ -193,8 +209,15 @@ func ChangePassword(c *gin.Context, service *services.AuthService, cookie Cookie
 		return
 	}
 	key := "password-change:" + strconv.FormatUint(uint64(actor.UserID), 10)
-	if decision := protection.Allow(actor.ClientIP, key); !decision.Allowed {
+	decision := protection.Allow(actor.ClientIP, key)
+	if !decision.Allowed {
+		if decision.LogRejection {
+			services.RecordRejection(c.Request.Context(), models.AuthEvent{Event: models.EventLoginRateLimited, UserID: &actor.UserID, ClientIP: actor.ClientIP, Detail: "password_change:" + decision.Reason})
+		}
 		respondLoginRateLimited(c, decision.RetryAfter)
+		return
+	}
+	if !waitBackoff(c, protection, decision) {
 		return
 	}
 	result, err := service.ChangePassword(c.Request.Context(), actor, req.CurrentPassword, req.NewPassword)

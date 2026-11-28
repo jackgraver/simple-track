@@ -180,7 +180,8 @@ can be rolled back alone.
    `caddy.service` (connections drop for a second or two) and checks the site; on a failed
    check it restores the previous Caddyfile by itself.
 2. Headers: `curl -sI https://st.jackgraver.ca/ | grep -iE 'content-security|x-frame|nosniff|referrer|permissions|^server'`
-   shows the five headers and no `server:` line. `curl -sI https://st.jackgraver.ca/api/health`
+   shows the five headers and no `server:` line. `curl -sI https://st.jackgraver.ca/setup/x | grep -i referrer`
+   shows exactly one line, `no-referrer` (C6). `curl -sI https://st.jackgraver.ca/api/health`
    (404 for HEAD is fine) carries them too, plus `cache-control: no-store`.
 3. Body limit: `head -c 7000000 /dev/zero | curl -s -w ' %{http_code}\n' -X POST --data-binary @- https://st.jackgraver.ca/api/health`
    prints just ` 413` with an empty body: that's Caddy. A JSON body

@@ -17,9 +17,11 @@ import (
 // must outlive that outcome, above all audit rows for rejected attempts ("setup link expired").
 // Always is the one way to say so, and every use is visible with grep -rn 'database.Always'.
 
-// alwaysTimeout bounds the transaction Always functions run in. It runs after the response, on a
-// context the client can't cancel, so it needs its own limit (the app role's statement_timeout
-// bounds each statement, not the whole transaction).
+// alwaysTimeout bounds the transaction Always functions run in. It runs on a context the client
+// can't cancel, so it needs its own limit (the app role's statement_timeout bounds each
+// statement, not the whole transaction). It also bounds how long the response can be held: the
+// middleware runs Always before the handler chain returns, so net/http finishes sending the
+// response only after it (it takes a free pool connection; normally a few ms).
 const alwaysTimeout = 5 * time.Second
 
 // Always registers fn to run once the request transaction has committed or rolled back (also

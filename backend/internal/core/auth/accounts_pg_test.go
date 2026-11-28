@@ -486,3 +486,48 @@ func TestAccounts_rowLevelSecurity(t *testing.T) {
 		t.Fatalf("bob inserting a setup token: %v, want an RLS violation", err)
 	}
 }
+
+// A name held by a soft-deleted user is still taken (the index covers every row): 409, not 500.
+func TestAccounts_softDeletedUsernameIsAConflict(t *testing.T) {
+	e := newAccountsEnv(t)
+	e.seedUser("owner", "owner-password", true)
+	anna := e.seedUser("anna", "anna-password", false)
+	e.owner.Delete(&anna)
+	adminCookie := e.expect(e.login("owner", "owner-password"), http.StatusOK, "admin login").Cookie
+	e.expect(e.do(http.MethodPost, "/admin/users", adminCookie, map[string]string{"username": "Anna"}), http.StatusConflict, "soft-deleted name")
+	// The request is still usable after the unique violation: the next create works.
+	e.expect(e.do(http.MethodPost, "/admin/users", adminCookie, map[string]string{"username": "anna2"}), http.StatusCreated, "next create")
+}
+
+// Repeating enable or disable changes nothing: no sign-out, no event.
+func TestAccounts_disableEnableAreIdempotent(t *testing.T) {
+	e := newAccountsEnv(t)
+	e.seedUser("owner", "owner-password", true)
+	bob := e.seedUser("bob", "bob-password-1", false)
+	adminCookie := e.expect(e.login("owner", "owner-password"), http.StatusOK, "admin login").Cookie
+	bobCookie := e.expect(e.login("bob", "bob-password-1"), http.StatusOK, "bob login").Cookie
+	e.expect(e.do(http.MethodPost, fmt.Sprintf("/admin/users/%d/enable", bob.ID), adminCookie, nil), http.StatusOK, "enable an enabled user")
+	e.expect(e.do(http.MethodGet, "/auth/me", bobCookie, nil), http.StatusOK, "bob still signed in")
+	e.expect(e.do(http.MethodPost, fmt.Sprintf("/admin/users/%d/disable", bob.ID), adminCookie, nil), http.StatusOK, "disable")
+	e.expect(e.do(http.MethodPost, fmt.Sprintf("/admin/users/%d/disable", bob.ID), adminCookie, nil), http.StatusOK, "disable again")
+	var ver int64
+	e.owner.Model(&models.User{}).Where("id = ?", bob.ID).Pluck("token_version", &ver)
+	if ver != 2 {
+		t.Fatalf("token_version %d, want 2 (one real change)", ver)
+	}
+	if got := strings.Join(e.events(bob.ID), " "); got != "login_ok: user_disabled:" {
+		t.Fatalf("events %s", got)
+	}
+}
+
+// Setup and password-change attempts have their own limiter: they never use up the sign-in
+// budget of a shared home IP.
+func TestAccounts_setupAttemptsDontSpendTheLoginBudget(t *testing.T) {
+	t.Setenv("LOGIN_RATE_LIMIT_MAX_IP", "3")
+	e := newAccountsEnv(t)
+	e.seedUser("owner", "owner-password", true)
+	for i := 0; i < 5; i++ {
+		e.do(http.MethodPost, "/auth/setup", "", map[string]string{"token": fmt.Sprintf("bad-%d", i), "password": "some-password-1"})
+	}
+	e.expect(e.login("owner", "owner-password"), http.StatusOK, "login after setup attempts")
+}

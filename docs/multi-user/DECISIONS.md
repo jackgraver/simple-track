@@ -391,7 +391,10 @@ individually. C5 and C6 skip BACKLOG entries an S lane has ticked.
 
 **`database.Always` as built** (`internal/database/always.go`), per the entry above, plus:
 - The middleware runs the queued functions in its deferred cleanup, after `Rollback` (a no-op once
-  settled), so the request's connection is already back in the pool. `Request.RunAlways()` is the
+  settled), so the request's connection is already back in the pool. That is still inside the
+  handler chain: net/http finishes the response only after it, so a rejection reaches the client
+  a few ms later (at most the 5 s limit, if the pool is exhausted). A goroutine would answer
+  sooner but escape graceful shutdown and make tests racy; not worth it for a handful of rows. `Request.RunAlways()` is the
   hook; other `WithTx` owners call it after `Commit`/`Rollback`.
 - The context is `context.WithoutCancel(request ctx)` with a 5 s limit: a client that hangs up
   doesn't lose the audit row, and a stuck database doesn't hold the handler goroutine forever.
@@ -441,17 +444,30 @@ This narrows "auth_events written through database.Always" to the writes that ne
 `GET /admin/auth-events?before=&limit=` (AuthMiddleware + `auth.RequireAdmin`, 403 otherwise);
 public `POST /auth/setup/inspect` and `POST /auth/setup`; signed in `POST /auth/password`.
 - Tokens travel in request **bodies**, never in API URLs. The page URL `/setup/<token>` is the
-  only place it appears: nginx serves that location with `access_log off` (via `rewrite ... break`,
-  since a `try_files` fallback would finish in `location = /index.html` and log the request line
-  there), Caddy keeps no access log, and the backend logs route patterns only. Referrer-Policy
-  `same-origin` (H1) keeps it from other sites.
+  only place it appears, and it is logged nowhere:
+  - nginx serves that location with `access_log off` (via `rewrite ... break`: a `try_files`
+    fallback would finish in `location = /index.html` and log the request line there);
+  - the page's own asset requests would carry the URL as `Referer`, so Caddy sends
+    `Referrer-Policy: no-referrer` under `/setup/*` (H1's `same-origin` everywhere else, as two
+    exclusive matchers) **and** nginx's log format drops `$http_referer` (covers the time before
+    the Caddy deploy, and any later Caddy change). Found in /code-review.
+  - Caddy keeps no access log; the backend logs route patterns only.
 - The setup endpoint validates the password and runs bcrypt **before** its first query, so the
   request transaction (and the token's `FOR UPDATE` lock) is held only for the short write. It
   bumps `token_version` (a reset signs out everywhere) and sets a fresh cookie.
-- Setup attempts are rate-limited with the existing `LoginProtection` (not edited: S1 owns it),
-  keyed on `setup-link:<ip>` as the "username", so failures never count against a real
-  username. Password changes use `password-change:<user id>`. `inspect` isn't limited (256-bit
-  tokens can't be guessed, and reloading the page shouldn't burn attempts).
+- Setup attempts and password changes are rate-limited with S1's `LoginProtection`, but a
+  **separate instance** from sign-in, so they never spend a shared home IP's sign-in budget.
+  Setup counts against the "username" `setup-link` (per source: `MAX_USERNAME` per window; all
+  sources: S1's username-wide backoff, which the handler waits out like login does), password
+  changes against `password-change:<user id>`. Rejections are audited as `login_rate_limited`
+  with detail `setup_link:<reason>` / `password_change:<reason>`. `inspect` isn't limited
+  (256-bit tokens can't be guessed, and reloading the page shouldn't burn attempts).
+- A username taken by a soft-deleted user (the unique index covers every row) or by a
+  concurrent create is a 409, not a 500: the insert runs in a savepoint and the unique
+  violation on `idx_users_username_lower` maps to `ErrUsernameExists`.
+- Disable/enable are no-ops when the account is already in that state (no sign-out, no event).
+- Password change hashes the new password before its first query, so the request transaction
+  holds its connection for one bcrypt (checking the current one), not two.
 - Wrong current password answers **400**, not 401 (the client treats 401 as signed out).
 - Disabling yourself is refused (400) so the admin can't lock the only admin out.
 - Disabled user: login fails as before, a link can't be created (409) and a live one stops
@@ -461,9 +477,9 @@ public `POST /auth/setup/inspect` and `POST /auth/setup`; signed in `POST /auth/
 match `^[a-z0-9][a-z0-9._-]{1,31}$`. Uniqueness is on `lower(username)` (unique index replaces
 the case-sensitive one), and login matches case-insensitively, so an existing mixed-case name
 (the owner's, maybe) keeps working and can't be duplicated in another case. Existing names aren't
-rewritten. Passwords being set: at least 10 characters, at most 72 bytes (bcrypt's limit). Login
-doesn't apply the minimum (existing passwords) but treats anything over 72 bytes as wrong
-(bcrypt would compare only the prefix). An account without a password can't sign in; it answers
+rewritten. Passwords being set: at least 10 characters, at most 72 bytes (bcrypt's limit). Login applies
+neither: an existing password may be shorter, or longer than 72 bytes if it was set when the
+binding counted characters (bcrypt compares the first 72 bytes, as it hashed them). An account without a password can't sign in; it answers
 like a wrong password, in the same time (dummy bcrypt compare).
 - `users.email` unique index now ignores NULL/empty (accounts are username-only; two `''` emails
   used to collide). `authrepo.CreateUser` stores NULL for an empty email.
@@ -473,7 +489,10 @@ like a wrong password, in the same time (dummy bcrypt compare).
 query string; unmatched paths log as `(no route)`. The login-log part of #19 is S1's
 (`login_protection.go`), and auth_events already follows it.
 
-**Not done here (other lanes own them)**: #3, #4 and the login-log part of #19 (S1,
-`login_protection.go`), #9 (S2, frontend storage cleared on logout). The setup page clears the
-query cache when it signs someone in; S2's helper should be called there too once it exists.
+**S lanes** (merged before this PR; C6 rebased on them): #3, #4 and the login-log part of #19 are
+S1's, #9 is S2's. C6 adds #3's audit part: lockouts and backoff rejections are
+`login_rate_limited` rows (once per window per key, like S1's log line). The setup page signs a
+possibly different user in on a shared device: `markAuthenticated(name, id, admin)` passes the
+id to S2's `setUserStorageOwner`, which clears the previous user's storage, and the page clears
+the query cache.
 

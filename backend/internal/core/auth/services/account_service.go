@@ -82,7 +82,9 @@ func (s *AuthService) CreateUser(ctx context.Context, actor Actor, username stri
 		return models.User{}, SetupLink{}, err
 	}
 	user := models.User{Username: username}
-	if err := authrepo.CreateUser(ctx, &user); err != nil {
+	if err := authrepo.CreateUser(ctx, &user); errors.Is(err, authrepo.ErrUsernameTaken) {
+		return models.User{}, SetupLink{}, ErrUsernameExists
+	} else if err != nil {
 		return models.User{}, SetupLink{}, fmt.Errorf("%w: %v", ErrUserCreation, err)
 	}
 	if err := RecordEvent(ctx, models.AuthEvent{Event: models.EventUserCreated, UserID: uintPtr(user.ID), ActorID: actor.id(), ClientIP: actor.ClientIP}); err != nil {
@@ -149,6 +151,15 @@ func (s *AuthService) ListUsers(ctx context.Context) ([]authrepo.UserSummary, er
 func (s *AuthService) SetDisabled(ctx context.Context, actor Actor, userID uint, disabled bool) (models.User, error) {
 	if disabled && userID == actor.UserID {
 		return models.User{}, ErrSelfDisable
+	}
+	current, err := authrepo.FindUserByID(ctx, userID)
+	if err != nil {
+		return models.User{}, err
+	}
+	if (current.DisabledAt != nil) == disabled {
+		// Already in that state (double click, stale tab): no sign-out, no event.
+		current.Password = ""
+		return current, nil
 	}
 	var at *time.Time
 	event := models.EventUserEnabled
@@ -284,17 +295,19 @@ func (s *AuthService) ChangePassword(ctx context.Context, actor Actor, current, 
 	if current == next {
 		return AuthResult{}, ErrSamePassword
 	}
+	// Hash the new password before the first query, so the request transaction holds its
+	// connection for one bcrypt (checking the current password), not two.
+	hash, err := bcrypt.GenerateFromPassword([]byte(next), bcrypt.DefaultCost)
+	if err != nil {
+		return AuthResult{}, fmt.Errorf("%w: %v", ErrPasswordHash, err)
+	}
 	user, err := authrepo.FindUserByID(ctx, actor.UserID)
 	if err != nil {
 		return AuthResult{}, err
 	}
-	if len(current) > PasswordMaxBytes || bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(current)) != nil {
+	if bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(current)) != nil {
 		RecordRejection(ctx, models.AuthEvent{Event: models.EventPasswordChangeFailed, UserID: uintPtr(user.ID), ActorID: actor.id(), ClientIP: actor.ClientIP, Detail: "wrong_password"})
 		return AuthResult{}, ErrWrongPassword
-	}
-	hash, err := bcrypt.GenerateFromPassword([]byte(next), bcrypt.DefaultCost)
-	if err != nil {
-		return AuthResult{}, fmt.Errorf("%w: %v", ErrPasswordHash, err)
 	}
 	user, err = authrepo.SetUserPassword(ctx, user.ID, string(hash))
 	if err != nil {

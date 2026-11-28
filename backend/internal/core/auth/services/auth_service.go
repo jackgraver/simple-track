@@ -84,7 +84,9 @@ func (s *AuthService) Register(ctx context.Context, input RegisterInput) (AuthRe
 		Password: string(hashedPassword),
 		Email:    input.Email,
 	}
-	if err := authrepo.CreateUser(ctx, &user); err != nil {
+	if err := authrepo.CreateUser(ctx, &user); errors.Is(err, authrepo.ErrUsernameTaken) {
+		return AuthResult{}, ErrUsernameExists
+	} else if err != nil {
 		return AuthResult{}, fmt.Errorf("%w: %v", ErrUserCreation, err)
 	}
 
@@ -122,12 +124,8 @@ func (s *AuthService) Login(ctx context.Context, input LoginInput) (AuthResult, 
 		_ = bcrypt.CompareHashAndPassword(dummyPasswordHash, []byte(input.Password))
 		return AuthResult{}, &LoginFailure{UserID: user.ID, Reason: "no_password"}
 	}
-	// bcrypt only reads the first 72 bytes, so a longer input could match on its prefix. No
-	// stored password is longer (they're validated, and bcrypt refuses to hash more).
-	if len(input.Password) > PasswordMaxBytes {
-		_ = bcrypt.CompareHashAndPassword(dummyPasswordHash, []byte(input.Password[:PasswordMaxBytes]))
-		return AuthResult{}, &LoginFailure{UserID: user.ID, Reason: "wrong_password"}
-	}
+	// No byte limit here: a password set before the 72-byte rule may be longer (bcrypt compares
+	// its first 72 bytes, as it did when hashing). The 72-byte rule applies to new passwords.
 	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(input.Password)); err != nil {
 		return AuthResult{}, &LoginFailure{UserID: user.ID, Reason: "wrong_password"}
 	}

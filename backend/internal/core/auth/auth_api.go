@@ -16,6 +16,9 @@ func RegisterRoutes(router *gin.Engine, db *gorm.DB) {
 	registerEnabled := !env.IsProduction() && env.StringOr("REGISTER_ENABLED", "false") == "true"
 	service := services.NewAuthService(GenerateToken)
 	loginProtection := controller.NewLoginProtection(controller.LoginProtectionConfigFromEnv(), nil)
+	// Setup links and password changes have their own limiter, so their attempts never use up a
+	// source's sign-in budget (family members share one home IP).
+	accountProtection := controller.NewLoginProtection(controller.LoginProtectionConfigFromEnv(), nil)
 	cookie := controller.CookieConfig{
 		Name:     AuthTokenCookieName,
 		MaxAge:   CookieMaxAgeSeconds(),
@@ -43,7 +46,7 @@ func RegisterRoutes(router *gin.Engine, db *gorm.DB) {
 			controller.UpdateCurrentUser(c, service, MustUser(c).ID)
 		})
 		auth.POST("/password", AuthMiddleware(db), func(c *gin.Context) {
-			controller.ChangePassword(c, service, cookie, loginProtection, actor(c))
+			controller.ChangePassword(c, service, cookie, accountProtection, actor(c))
 		})
 		// Setup links: no session yet. They run in the request transaction (the token's row is
 		// visible only through app.setup_token_hash) and hash the new password before it begins.
@@ -51,7 +54,7 @@ func RegisterRoutes(router *gin.Engine, db *gorm.DB) {
 			controller.InspectSetupLink(c, service)
 		})
 		auth.POST("/setup", func(c *gin.Context) {
-			controller.CompleteSetup(c, service, cookie, loginProtection)
+			controller.CompleteSetup(c, service, cookie, accountProtection)
 		})
 	}
 
