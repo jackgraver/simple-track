@@ -25,13 +25,6 @@ import (
 var createWithAssociationsAllowed = map[string]int{
 	"internal/core/auth/repository/user_repository.go":               1, // C6 (users: no associations)
 	"internal/core/diet/repository/repository.go":                    23,
-	"internal/core/money/service/accounts.go":                        4,
-	"internal/core/money/service/contribution_types.go":              6,
-	"internal/core/tracking/grocery/service.go":                      3,
-	"internal/core/tracking/profile/service.go":                      2,
-	"internal/core/tracking/steps/service.go":                        2,
-	"internal/core/tracking/weight/import.go":                        1,
-	"internal/core/tracking/weight/service.go":                       2,
 	"internal/core/workout/repository/cardio_repository.go":          2,
 	"internal/core/workout/repository/exercise_repository.go":        1,
 	"internal/core/workout/repository/logged_exercise_repository.go": 3,

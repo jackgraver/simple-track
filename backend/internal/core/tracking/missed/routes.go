@@ -3,6 +3,8 @@ package missed
 import (
 	"net/http"
 
+	"be-simpletracker/internal/utils/apierr"
+
 	"github.com/gin-gonic/gin"
 )
 
@@ -10,7 +12,7 @@ func RegisterMissedRoutes(group *gin.RouterGroup) {
 	group.GET("/missed", func(c *gin.Context) {
 		date, missingWeight, missingSteps, err := GetMissedYesterday(c.Request.Context())
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			apierr.Internal(c, err)
 			return
 		}
 		c.JSON(http.StatusOK, gin.H{

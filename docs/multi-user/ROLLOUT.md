@@ -57,7 +57,7 @@ the compose file and `.env.vps` must be updated before the deploy, not after.
 7. (B3) Every owned-table migration backfills existing rows to the one admin and **fails** if
    there isn't exactly one live admin (0011 `drink_size_presets` first; C lanes copy it). After
    0009 that's the account from check 6, so nothing to do beyond it; the rehearsal proves it.
-8. (C5) Record the media counts, and look at what migration 0013 will change:
+8. (C5) Record the media counts, and look at what migration 0015 will change:
    ```sql
    SELECT count(*) AS media_items, count(*) FILTER (WHERE deleted_at IS NULL) AS live FROM media_items;
    -- live items sharing a (source, external_id): all but the oldest lose source/external_id
@@ -68,6 +68,11 @@ the compose file and `.env.vps` must be updated before the deploy, not after.
    SELECT id, title, cover_url FROM media_items WHERE deleted_at IS NULL AND cover_url <> ''
      AND cover_url !~ '^https://(image\.tmdb\.org|covers\.openlibrary\.org|[^/]*\.anilist\.co|[^/]*\.mzstatic\.com)/';
    ```
+
+9. (C1) `user_profiles` should hold at most one live row (the app only ever kept one):
+   `SELECT count(*) FROM user_profiles WHERE deleted_at IS NULL;` expect 0 or 1. With more, the
+   migration keeps the oldest live row and soft-deletes the rest (nothing is dropped), so note
+   which one you expect to survive.
 
 ## 2. Rehearsal (D1, locally, before touching the VPS)
 
@@ -175,7 +180,61 @@ Each lane adds what its changes need here (README: "Prod changes go in ROLLOUT.m
     before deploy day, not during it.
   - In 3.4, the water page's drink sizes are the owner's (0011 backfilled them).
 
-- **C5 (media)**: migration 0013 runs in pre_swap with the rest. `media_items` becomes the shared
+- **C1 (tracking)**: migration 0013 runs in pre_swap with the rest and makes `body_weight_logs`,
+  `step_logs`, `water_logs`, `grocery_items` and `user_profiles` owned (every row goes to the one
+  admin, RLS on, `water_logs.preset_id` becomes a composite FK to the owner's presets). Nothing to
+  configure; relies on pre-check 1.6. It **stops** if rows exist and there isn't exactly one live
+  admin. **Row counts for the D1 rehearsal**: run before and after `migrate up`, the numbers must
+  match, and after it `owned` must equal `total` for every table:
+  ```sql
+  -- psql_owner (bypasses RLS, so it counts soft-deleted rows too)
+  SELECT 'body_weight_logs' AS tbl, count(*) AS total FROM body_weight_logs
+  UNION ALL SELECT 'step_logs',     count(*) FROM step_logs
+  UNION ALL SELECT 'water_logs',    count(*) FROM water_logs
+  UNION ALL SELECT 'grocery_items', count(*) FROM grocery_items
+  UNION ALL SELECT 'user_profiles', count(*) FROM user_profiles;
+  -- after the migration, rows given to the admin (expect owned = total on every line):
+  SELECT 'body_weight_logs' AS tbl, count(*) AS owned FROM body_weight_logs WHERE user_id = (SELECT id FROM users WHERE is_admin AND deleted_at IS NULL)
+  UNION ALL SELECT 'step_logs',     count(*) FROM step_logs     WHERE user_id = (SELECT id FROM users WHERE is_admin AND deleted_at IS NULL)
+  UNION ALL SELECT 'water_logs',    count(*) FROM water_logs    WHERE user_id = (SELECT id FROM users WHERE is_admin AND deleted_at IS NULL)
+  UNION ALL SELECT 'grocery_items', count(*) FROM grocery_items WHERE user_id = (SELECT id FROM users WHERE is_admin AND deleted_at IS NULL)
+  UNION ALL SELECT 'user_profiles', count(*) FROM user_profiles WHERE user_id = (SELECT id FROM users WHERE is_admin AND deleted_at IS NULL);
+  ```
+  In 3.4: the weight, steps, water, grocery and profile pages show the owner's data as before
+  (a new account starts with an empty profile and no history). Error responses from these
+  endpoints are now fixed messages; database errors are only in the backend log.
+- **C4 (money)**: migration 0014 runs in pre_swap with the rest. It moves each account type's
+  start year and opening room to a new per-user table (`investment_contribution_room`, the
+  admin's row), drops those three columns from `investment_account_types`, and gives every
+  account, balance, deposit, type and limit row to the admin. Nothing to configure. **D1
+  rehearsal check** (run on the restored prod copy as `psql_owner`, before and after `migrate up`;
+  the numbers must match exactly):
+  ```sql
+  -- row counts (all five tables, deleted rows included)
+  SELECT 'accounts' t, count(*) FROM investment_accounts UNION ALL
+  SELECT 'balances', count(*) FROM account_balances UNION ALL
+  SELECT 'deposits', count(*) FROM investment_deposits UNION ALL
+  SELECT 'types', count(*) FROM investment_account_types UNION ALL
+  SELECT 'limits', count(*) FROM investment_contribution_rules;
+  -- net worth today: latest balance per live, unarchived account; liabilities subtract
+  SELECT round(sum(CASE WHEN a.kind IN ('credit_card','loan') THEN -b.balance ELSE b.balance END), 2) AS net_worth
+  FROM investment_accounts a
+  JOIN LATERAL (SELECT balance FROM account_balances
+                WHERE account_id = a.id AND deleted_at IS NULL ORDER BY date DESC LIMIT 1) b ON true
+  WHERE a.deleted_at IS NULL AND a.archived_at IS NULL;
+  ```
+  Before `migrate up` also note the room settings the types carry
+  (`SELECT name, contribution_start_year, opening_room_year, opening_room FROM investment_account_types ORDER BY id;`);
+  after it, the same rows must be in
+  `SELECT t.name, r.contribution_start_year, r.opening_room_year, r.opening_room FROM investment_contribution_room r JOIN investment_account_types t ON t.id = r.investment_account_type_id ORDER BY t.id;`
+  (types with all three NULL have no row, and `types` and `limits` counts are unchanged). Then in
+  the app as the owner: `/finances` net worth and `/finances/rules` room figures equal what they
+  were before the rehearsal. In 3.4, the same two pages are the check on prod. The migration
+  fails (changing nothing) unless there is exactly one live admin.
+  Effects to know: other family accounts see the owner's contribution types (TFSA, ...) and their
+  limits, but never the owner's accounts, balances or room figures. They can't edit the owner's
+  types; only the admin deletes types or limits.
+- **C5 (media)**: migration 0015 runs in pre_swap with the rest. `media_items` becomes the shared
   catalog and every existing row gets a `user_media` row for the admin (same id, so `/media/:id`
   links keep working); the personal columns leave `media_items`. Nothing to configure. Effects:
   - Items sharing a (source, external_id) lose that pair on all but the oldest (pre-check 1.8

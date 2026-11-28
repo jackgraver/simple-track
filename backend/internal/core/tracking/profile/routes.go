@@ -3,6 +3,9 @@ package profile
 import (
 	"net/http"
 
+	"be-simpletracker/internal/core/tracking/common"
+	"be-simpletracker/internal/utils/apierr"
+
 	"github.com/gin-gonic/gin"
 )
 
@@ -17,7 +20,7 @@ func RegisterProfileRoutes(group *gin.RouterGroup) {
 func (h *handler) getProfile(c *gin.Context) {
 	row, err := GetProfile(c.Request.Context())
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		apierr.Internal(c, err)
 		return
 	}
 	if row == nil {
@@ -37,12 +40,12 @@ type putProfileBody struct {
 func (h *handler) putProfile(c *gin.Context) {
 	var body putProfileBody
 	if err := c.ShouldBindJSON(&body); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		apierr.BadRequest(c, "invalid body")
 		return
 	}
 	row, err := UpsertProfile(c.Request.Context(), body.HeightIn, body.Age, body.Sex, body.ActivityLevel)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		common.Respond(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"profile": row})

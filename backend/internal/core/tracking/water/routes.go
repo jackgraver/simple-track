@@ -10,7 +10,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"gorm.io/gorm"
 )
 
 type handler struct{}
@@ -33,12 +32,12 @@ func (h *handler) getWater(c *gin.Context) {
 	dateStr := c.Query("date")
 	date, err := common.ParseDateString(dateStr)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid date"})
+		apierr.BadRequest(c, "invalid date")
 		return
 	}
 	rows, err := ListWaterLogsForDate(c.Request.Context(), date)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		apierr.Internal(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"logs": rows})
@@ -54,17 +53,17 @@ type postWaterBody struct {
 func (h *handler) postWater(c *gin.Context) {
 	var body postWaterBody
 	if err := c.ShouldBindJSON(&body); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		apierr.BadRequest(c, "invalid body")
 		return
 	}
 	date, err := common.ParseDateString(body.Date)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid date"})
+		apierr.BadRequest(c, "invalid date")
 		return
 	}
 	if body.ClientID != "" {
 		if _, err := uuid.Parse(body.ClientID); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid client_id"})
+			apierr.BadRequest(c, "invalid client_id")
 			return
 		}
 	}
@@ -91,15 +90,11 @@ func (h *handler) deleteWater(c *gin.Context) {
 	} else if u, uerr := uuid.Parse(raw); uerr == nil && u != uuid.Nil {
 		err = DeleteWaterLogByClientID(c.Request.Context(), u.String())
 	} else {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		apierr.BadRequest(c, "invalid id")
 		return
 	}
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
-			return
-		}
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		apierr.NotFoundOrInternal(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"ok": true})

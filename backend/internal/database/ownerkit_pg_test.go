@@ -32,9 +32,6 @@ var nullableOwnerColumn = map[string]bool{
 // its entries in the PR that adds the policies; D1 requires this to be empty. An entry whose
 // table already has RLS (or no longer exists) only logs a reminder, so lanes can merge in any order.
 var rlsPending = map[string]string{
-	"body_weight_logs": "C1", "step_logs": "C1", "water_logs": "C1", "grocery_items": "C1",
-	"user_profiles": "C1",
-
 	"foods": "C2", "composite_foods": "C2", "composite_food_items": "C2", "days": "C2",
 	"day_logs": "C2", "plans": "C2", "meals": "C2", "meal_items": "C2", "planned_meals": "C2",
 	"saved_meals": "C2", "saved_meal_items": "C2",
@@ -42,9 +39,6 @@ var rlsPending = map[string]string{
 	"exercises": "C3", "workout_programs": "C3", "workout_plans": "C3", "workout_plan_days": "C3",
 	"workout_plan_exercises": "C3", "workout_logs": "C3", "logged_exercises": "C3",
 	"logged_sets": "C3", "cardios": "C3",
-
-	"investment_account_types": "C4", "investment_contribution_rules": "C4",
-	"investment_accounts": "C4", "account_balances": "C4", "investment_deposits": "C4",
 }
 
 // Every table has row-level security with at least one policy, and every user_id / created_by

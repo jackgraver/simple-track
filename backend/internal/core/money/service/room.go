@@ -176,22 +176,29 @@ func CalculateRoom(rules RoomRules, flows map[int]YearFlow, currentYear int) Roo
 	return summary
 }
 
-// ResolveStartYear picks the first year room accrues for a contribution type.
-// The opening-room year wins when set; otherwise the latest of the explicit
-// start year and the year the user reaches the eligibility age; otherwise the
-// first limit year. Returns false when room cannot be calculated, including
-// when an eligibility age is set but the birth year is unknown.
-func ResolveStartYear(contributionType models.ContributionType, birthYear *int) (int, bool) {
-	if contributionType.OpeningRoomYear != nil && contributionType.OpeningRoom != nil {
-		return *contributionType.OpeningRoomYear, true
+// ResolveStartYear picks the first year room accrues for a contribution type
+// for one user. room is that user's own settings for the type (nil when they
+// have none). The opening-room year wins when set; otherwise the latest of the
+// explicit start year and the year the user reaches the eligibility age;
+// otherwise the first limit year. Returns false when room cannot be
+// calculated, including when an eligibility age is set but the birth year is
+// unknown.
+func ResolveStartYear(contributionType models.ContributionType, room *models.ContributionRoom, birthYear *int) (int, bool) {
+	var explicitStart, openingYear *int
+	var opening *float64
+	if room != nil {
+		explicitStart, openingYear, opening = room.StartYear, room.OpeningRoomYear, room.OpeningRoom
+	}
+	if openingYear != nil && opening != nil {
+		return *openingYear, true
 	}
 	// Guessing without the birth year could overstate room by years.
-	if contributionType.EligibilityAge != nil && birthYear == nil && contributionType.StartYear == nil {
+	if contributionType.EligibilityAge != nil && birthYear == nil && explicitStart == nil {
 		return 0, false
 	}
 	start, ok := 0, false
-	if contributionType.StartYear != nil {
-		start, ok = *contributionType.StartYear, true
+	if explicitStart != nil {
+		start, ok = *explicitStart, true
 	}
 	if contributionType.EligibilityAge != nil && birthYear != nil {
 		eligible := *birthYear + *contributionType.EligibilityAge

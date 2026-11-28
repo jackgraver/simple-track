@@ -96,7 +96,8 @@ func devOwner(db *gorm.DB) (uint, error) {
 func seed(tx *gorm.DB, owner uint) error {
 	tracking := func(tx *gorm.DB) error { return seedTracking(tx, owner) }
 	media := func(tx *gorm.DB) error { return seedMedia(tx, owner) }
-	for _, f := range []func(*gorm.DB) error{seedGym, seedDiet, tracking, media, seedMoney} {
+	money := func(tx *gorm.DB) error { return seedMoney(tx, owner) }
+	for _, f := range []func(*gorm.DB) error{seedGym, seedDiet, tracking, media, money} {
 		if err := f(tx); err != nil {
 			return err
 		}
@@ -311,10 +312,10 @@ func seedTracking(tx *gorm.DB, owner uint) error {
 	}
 	for i := 30; i >= 0; i-- {
 		d := today().AddDate(0, 0, -i)
-		if err := tx.Create(&weight.BodyWeightLog{Date: d, WeightLbs: 182 - float64(30-i)*0.1 + float64(i%3)*0.4}).Error; err != nil {
+		if err := tx.Create(&weight.BodyWeightLog{Owner: database.Owner{UserID: owner}, Date: d, WeightLbs: 182 - float64(30-i)*0.1 + float64(i%3)*0.4}).Error; err != nil {
 			return err
 		}
-		if err := tx.Create(&steps.StepLog{Date: d, Steps: 6000 + (i*937)%6000}).Error; err != nil {
+		if err := tx.Create(&steps.StepLog{Owner: database.Owner{UserID: owner}, Date: d, Steps: 6000 + (i*937)%6000}).Error; err != nil {
 			return err
 		}
 	}
@@ -350,22 +351,23 @@ func seedMedia(tx *gorm.DB, owner uint) error {
 	return nil
 }
 
-func seedMoney(tx *gorm.DB) error {
+func seedMoney(tx *gorm.DB, owner uint) error {
+	own := database.Owner{UserID: owner}
 	accts := []moneym.Account{
-		{Name: "Everyday Chequing", Kind: moneym.AccountKindChequing, Institution: "Sample Bank", CurrentBalance: 3200},
-		{Name: "Savings", Kind: moneym.AccountKindSavings, Institution: "Sample Bank", CurrentBalance: 12000},
-		{Name: "Brokerage", Kind: moneym.AccountKindInvestment, Institution: "Sample Brokerage", CurrentBalance: 18500},
+		{Owner: own, Name: "Everyday Chequing", Kind: moneym.AccountKindChequing, Institution: "Sample Bank", CurrentBalance: 3200},
+		{Owner: own, Name: "Savings", Kind: moneym.AccountKindSavings, Institution: "Sample Bank", CurrentBalance: 12000},
+		{Owner: own, Name: "Brokerage", Kind: moneym.AccountKindInvestment, Institution: "Sample Brokerage", CurrentBalance: 18500},
 	}
 	if err := tx.Create(&accts).Error; err != nil {
 		return err
 	}
 	for _, a := range accts {
 		for m := 5; m >= 0; m-- {
-			b := moneym.AccountBalance{AccountID: a.ID, Date: today().AddDate(0, -m, 0), Balance: a.CurrentBalance - float64(m)*250}
+			b := moneym.AccountBalance{Owner: own, AccountID: a.ID, Date: today().AddDate(0, -m, 0), Balance: a.CurrentBalance - float64(m)*250}
 			if err := tx.Create(&b).Error; err != nil {
 				return err
 			}
 		}
 	}
-	return tx.Create(&moneym.AccountTransaction{AccountID: accts[2].ID, Kind: moneym.TransactionDeposit, Amount: 500, Date: today().AddDate(0, -1, 0), Note: "Monthly contribution"}).Error
+	return tx.Create(&moneym.AccountTransaction{Owner: own, AccountID: accts[2].ID, Kind: moneym.TransactionDeposit, Amount: 500, Date: today().AddDate(0, -1, 0), Note: "Monthly contribution"}).Error
 }

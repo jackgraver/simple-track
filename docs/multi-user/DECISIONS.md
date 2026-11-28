@@ -629,10 +629,125 @@ not the caller) and `nullableOwnerColumn` for `auth_events.user_id` and
 `user_setup_tokens.created_by`. `accounts_pg_test.go` now uses `pgtest`, so CI fails instead of
 skipping it.
 
+## 2026-11-27: Tracking is per user (lane C1)
+
+Migration `0013_tracking_owned.sql`, one file for all five tables (they share one backfill and
+one admin lookup, and one file renumbers once when C2-C5 merge first). Same shape as B3's
+reference (`drink_size_presets`); tests in each package (`*_pg_test.go`) and
+`internal/database/tracking_migration_pg_test.go`.
+
+- **Owned, no catalogs**: `body_weight_logs`, `step_logs`, `water_logs`, `grocery_items`,
+  `user_profiles`. Each: `user_id` backfilled to the admin (soft-deleted rows too; stops unless
+  exactly one live admin, when there are rows to give away), NOT NULL, FK, `owner` RLS policy.
+  Models embed `database.Owner`; every read is `Scopes(database.Owned(ctx))`, including the
+  client_id lookups, the preset preload and the aggregates (`ParseTextList`, `ListSuggestions`,
+  `GetMissedYesterday`).
+- **Uniques**: `(user_id, date)` on weight and steps (replacing the global date index),
+  `(user_id, client_id) WHERE client_id IS NOT NULL` on water and grocery. The same client_id
+  from two users is two rows, and each user's replay stays idempotent. They are not partial on
+  `deleted_at`, like the indexes they replace (a deleted row still answers its client_id replay).
+- **`water_logs.preset_id`** is the composite FK `(preset_id, user_id) -> drink_size_presets
+  (id, user_id)` that 0011 prepared. With a NULL preset the FK isn't checked (MATCH SIMPLE), so
+  logs without a preset are unaffected. A test inserts a log for Bob with Alice's preset as the
+  schema owner and the FK refuses it.
+- **`user_profiles` is one live row per user**: unique `(user_id) WHERE deleted_at IS NULL`. The
+  row is created on the first `PUT /tracking/profile`; `GET` still answers `{"profile": null}`
+  until then, so a new account sees the onboarding state. The old table was meant to hold one
+  row (the app read and updated the oldest). If prod somehow has several live rows, the
+  migration soft-deletes all but the oldest rather than failing or dropping data (ROLLOUT 1.9
+  checks the count first). The first-save race (two requests for a user with no row) is
+  handled: the loser's insert fails in a savepoint and it updates the winner's row.
+- **Upserts** (weight, steps) do the same: find the user's row for the date, else create in a
+  savepoint, and on a lost race update the winner's row. They answered a raw unique-violation as
+  a 400 before.
+- **Renpho import** writes as the importing user: the create hook stamps each new row and the
+  existing-day lookup is `Owned`, so importing the same days as Alice leaves her rows alone. The
+  update path is `Select("*").Omit(clause.Associations, "user_id").Save(...)`: `Select("*")`
+  writes every column, and without the `Omit` it would write the model's zero `user_id` over
+  the row's. (Rewriting `UserID` by hand is what the rules test forbids, so `Omit` is the way.)
+- **`database.CreateInSavepoint` now omits associations** (it was the one create path the B3
+  rule couldn't see). `WaterLog.Preset` is the one nested struct it matters for.
+- **Errors (BACKLOG #6)**: every tracking handler is on `apierr`. Client mistakes are
+  `common.Invalid(msg)` (400 with our own message, answered by `common.Respond`), a missing or
+  someone else's row is the shared 404, anything else is a logged 500 with a fixed message. The
+  4xx paths that echoed database errors (water delete, grocery complete/delete, weight, steps and
+  profile upserts) now answer 500 for database failures. Bind errors answer `invalid body`
+  instead of the binder's text. Validation messages and the Renpho parser's row/column messages
+  are unchanged. The request bodies were already DTOs (`postWeightBody`, `postWaterBody`,
+  `itemBody`, `putProfileBody`, ...), none binds a model.
+- **Allowlists**: `rlsPending` has no C1 tables; the tracking files are gone from
+  `createWithAssociationsAllowed` and apierr's `rawInternalErrorAllowed` (all their creates and
+  saves now carry `Omit(clause.Associations)`).
+- **Seeds**: devseed's weight and step rows belong to the dev login (the `owner` it already
+  passes); the e2e `large` profile looks the `dev` user up (`devUser`) for its weight, step and
+  grocery rows. The base e2e seed has no tracking rows.
+- **Not done**: no advisory locks anywhere in tracking (upserts rely on the unique indexes, as
+  before), so nothing for B3's `XactLock`. `missed` has no table of its own (it counts weight and
+  step logs), so it only needed `Owned` and `apierr`.
+
+## 2026-11-27: C4 money (agent, lane C4; split approved by the owner)
+
+Migration `0014_money_owned.sql` (renumbered from 0013 when merged after C1).
+
+**What is shared and what is personal**
+- Catalog (`created_by`, catalog policies, `catalog_guard`): `investment_account_types` (name,
+  eligibility age, carry-forward cap, lifetime limit, withdrawals-restore) and
+  `investment_contribution_rules` (the per-year limits). Anyone signed in adds, the creator or the
+  admin edits (handler answers 403, not 404: the row is visible), only the admin deletes (403).
+- Per user, new table `investment_contribution_room` (`user_id`, type, `contribution_start_year`,
+  `opening_room_year`, `opening_room`; unique per user and type; plain FK to the catalog type).
+  **Start year moved here too**, not just opening room: it is "the first year *you* could
+  contribute" (e.g. when you opened an FHSA). The migration copies each type's three old
+  columns into an admin-owned row and drops them. Birth year still lives on `users` (C1 moves
+  it with the profile: update `currentUserBirthYear` in `money/controller/routes.go` then).
+- Owned: `investment_accounts`; children `account_balances` and `investment_deposits` with
+  composite FKs `(account_id, user_id)`. An account's type FK stays a plain FK to the catalog.
+  Net worth, room flows and every total only read the caller's rows (`Owned`).
+
+**API**
+- `PUT /money/contribution-types/:id` takes the shared rules only (creator or admin, else 403).
+  `PUT /money/contribution-types/:id/room` saves the caller's own figures (any signed-in user;
+  all null clears them) and returns the type. `POST /contribution-types` and the preset POST still
+  accept `start_year` / `opening_room*` and store them as the caller's room.
+- `GET` types merges the caller's room figures into each type under the same JSON names
+  (`start_year`, `opening_room_year`, `opening_room`) and adds `created_by` and `can_edit`.
+  The frontend dialog saves rules and room separately and hides the rules (and the limit form)
+  from users who can't edit; delete buttons show for the admin only.
+- **Preset reuse**: creating a preset whose name already exists (another user added their TFSA
+  first) reuses that type and only saves the caller's room, instead of a 400. A manual create
+  with a taken name is still a 400. Two users both have their own accounts called "TFSA"
+  (account names were never unique); both use the one shared TFSA type, each with their own room.
+- Deleting a type is admin-only and refused (400) while an account of the admin's uses it; if
+  another user's account uses it the FK stops it (also a 400, via 23503). Admin can't see other
+  users' accounts, so the FK is the only check there. Limits: delete is admin-only (hard delete
+  by policy); upsert is creator or admin.
+- Limit rows: `investment_contribution_rules.created_by` is the type's creator at migration time
+  and the caller afterwards. Their UPDATE policy also lets the **type's** creator edit, so a limit
+  the admin added to Bob's type stays editable by Bob (plain catalog policy would not).
+- `respondError` now uses `apierr`: 400 for validation, 403 for `ErrForbidden`, 404/500 via
+  `NotFoundOrInternal`. A 500 shows "Internal server error" instead of the raw error, so the e2e
+  atomic-deposit spec asserts that text (the raw error is in the backend log).
+
+**Not done / for later**: two users creating the same new preset at the same instant would hit
+the unique name index on the second (a 500, then retry works); not worth a lock. devseed and the
+e2e `large` profile give the seeded accounts to the dev login (`seedOwner`). The browser
+click-through was not possible in this session (the shared Playwright browser was busy); the
+e2e finances specs and a before/after API comparison across `migrate down 1` + `up` (net worth,
+accounts, types and room unchanged) stand in for it.
+
+**Review (/code-review high, scoped to this lane) and what was deferred**: nothing important. Fixed:
+a unique-index race on shared types or first room rows now answers 409, not 500. Deferred, for the
+owner: (1) the creator can add a limit but only the admin can remove one (a typo'd year stays
+until the admin removes it; deletes are low priority per the owner); (2) deleting a type cascades
+away other users' room rows (the admin can't count them through RLS); (3) the dialog saves rules
+then room as two requests, so a room validation error after rules saved shows "Failed to save"
+though the rules persisted; (4) `created_by` (a user ID) is visible on catalog types, as the kit
+specifies; (5) migration 0013's down is lossy with several users.
+
 ## 2026-11-27: C5 media (agent, lane C5)
 
 `media_items` is the shared catalog; `user_media` holds everything personal. Migration
-`0013_media_catalog.sql`, owner-approved column split ahead of the code.
+`0015_media_catalog.sql` (renumbered from 0013 when merged after C1 and C4), owner-approved column split ahead of the code.
 
 - **Catalog (`media_items`)**: `type`, `title`, `creator` (director/author/...), `release_year`,
   `genres`, `cover_url`, `synopsis`, `length` (total pages/episodes/hours: a fact about the item),

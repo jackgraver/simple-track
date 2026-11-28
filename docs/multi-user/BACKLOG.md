@@ -26,7 +26,7 @@ Nothing Critical was found. Prod today has one account, so most multi-user findi
 | 3 | Medium | Anyone can lock the owner out of login, from one IP, indefinitely | S1: **done**; C6: lockouts in `auth_events` (`login_rate_limited`) **done** |
 | 4 | Medium | IPv6 address rotation defeats per-IP limits and can fill the limiter (global lockout) | S1: **done** |
 | 5 | Medium | TMDB API key can leak to users in lookup error messages | S3: **done** |
-| 6 | Medium | Raw internal errors (SQL, constraint names) returned to clients at ~160 sites | C1–C5 (C5 **done**); B3 test **done** (`TestNoRawErrorsIn500s`) |
+| 6 | Medium | Raw internal errors (SQL, constraint names) returned to clients at ~160 sites | C1–C5 (C1, C4, C5 **done**); B3 test **done** (`TestNoRawErrorsIn500s`) |
 | 7 | Medium | No security headers (CSP, frame-ancestors, nosniff, Referrer-Policy); API has none at all | H1: **done** (Caddy; deploys at D1, ROLLOUT 3.5) |
 | 8 | Medium | No request body size limit outside `/auth` (imports, JSON) | H1: **done** (1 MiB default, 5 MiB + 10k rows on import; Caddy 6MB) |
 | 9 | Medium | Frontend local storage isn't scoped to the user; logout leaves drafts, timers, last route | S2: **done** |
@@ -176,8 +176,12 @@ Nothing Critical was found. Prod today has one account, so most multi-user findi
   B3 adds a grep test that fails on new `"error": err.Error()` in `StatusInternalServerError`
   responses.
 - **Lane**: C1 (tracking), C2 (diet), C3 (workout), C4 (money), C5 (media); B3 for the test.
+- **C4 (done)**: money handlers moved to `apierr` (`respondError`, the birth-year lookup); the
+  raw-error allowlist entry is gone.
 - **B3 (done)**: `internal/utils/apierr/rules_test.go` counts 500 responses with `.Error()` per
   file; lanes lower their entries. 4xx responses echoing database errors aren't caught by it.
+- **C1 (done)**: all tracking handlers (weight, steps, water, grocery, profile, missed) are on
+  `apierr` / `common.Respond`, including the 4xx paths that echoed database errors.
 
 ### 7. Medium: no security headers
 

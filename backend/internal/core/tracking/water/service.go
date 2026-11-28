@@ -17,6 +17,9 @@ var (
 
 // CreateWaterLog inserts a log. With a non-empty clientID it is idempotent: a replay returns the
 // existing row (even if it was deleted since) and creates nothing.
+//
+// Everything is the current user's: the client_id lookup (the same client_id from two users is two
+// rows), the preset (someone else's reads as missing), and the new row's owner.
 func CreateWaterLog(ctx context.Context, date time.Time, amountOz float64, presetID *uint, clientID string) (*WaterLog, error) {
 	db := database.From(ctx)
 	if clientID != "" {
@@ -54,7 +57,7 @@ func CreateWaterLog(ctx context.Context, date time.Time, amountOz float64, prese
 		}
 		return nil, err
 	}
-	if err := db.Preload("Preset", database.Owned(ctx)).First(&row, row.ID).Error; err != nil {
+	if err := db.Scopes(database.Owned(ctx)).Preload("Preset", database.Owned(ctx)).First(&row, row.ID).Error; err != nil {
 		return nil, err
 	}
 	return &row, nil
@@ -62,7 +65,7 @@ func CreateWaterLog(ctx context.Context, date time.Time, amountOz float64, prese
 
 func findByClientID(ctx context.Context, db *gorm.DB, clientID string) (*WaterLog, error) {
 	var row WaterLog
-	err := db.Unscoped().Preload("Preset", database.Owned(ctx)).Where("client_id = ?", clientID).First(&row).Error
+	err := db.Unscoped().Scopes(database.Owned(ctx)).Preload("Preset", database.Owned(ctx)).Where("client_id = ?", clientID).First(&row).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, nil
 	}
@@ -75,33 +78,20 @@ func findByClientID(ctx context.Context, db *gorm.DB, clientID string) (*WaterLo
 func ListWaterLogsForDate(ctx context.Context, date time.Time) ([]WaterLog, error) {
 	db := database.From(ctx)
 	var rows []WaterLog
-	err := db.Where("date = ?", date).Preload("Preset", database.Owned(ctx)).Order("created_at DESC").Find(&rows).Error
+	err := db.Scopes(database.Owned(ctx)).Where("date = ?", date).Preload("Preset", database.Owned(ctx)).Order("created_at DESC").Find(&rows).Error
 	return rows, err
 }
 
+// DeleteWaterLog deletes the current user's log (database.ErrNotFound if it is missing, already
+// deleted or someone else's).
 func DeleteWaterLog(ctx context.Context, id uint) error {
-	db := database.From(ctx)
-	res := db.Delete(&WaterLog{}, id)
-	if res.Error != nil {
-		return res.Error
-	}
-	if res.RowsAffected == 0 {
-		return gorm.ErrRecordNotFound
-	}
-	return nil
+	return database.Affected(database.From(ctx).Scopes(database.Owned(ctx)).Delete(&WaterLog{}, id))
 }
 
-// DeleteWaterLogByClientID deletes the entry created with clientID (gorm.ErrRecordNotFound if none).
+// DeleteWaterLogByClientID deletes the current user's entry created with clientID
+// (database.ErrNotFound if none).
 func DeleteWaterLogByClientID(ctx context.Context, clientID string) error {
-	db := database.From(ctx)
-	res := db.Where("client_id = ?", clientID).Delete(&WaterLog{})
-	if res.Error != nil {
-		return res.Error
-	}
-	if res.RowsAffected == 0 {
-		return gorm.ErrRecordNotFound
-	}
-	return nil
+	return database.Affected(database.From(ctx).Scopes(database.Owned(ctx)).Where("client_id = ?", clientID).Delete(&WaterLog{}))
 }
 
 // Errors from the preset functions that the client caused (400, message shown as is).

@@ -28,6 +28,16 @@ var Profiles = map[string]func(*gorm.DB) error{
 // LargeDays is how far back the large profile's history goes from EpochDay.
 const LargeDays = 730
 
+// devUser is the seeded login's ID. The seed runs on the owner role with no request identity, so
+// owned rows get their user_id from here (database.Owner's create hook accepts a preset owner then).
+func devUser(tx *gorm.DB) (database.Owner, error) {
+	var u authm.User
+	if err := tx.Where("username = ?", Username).First(&u).Error; err != nil {
+		return database.Owner{}, fmt.Errorf("seeded user %q: %w", Username, err)
+	}
+	return database.Owner{UserID: u.ID}, nil
+}
+
 // Large adds two years of history in every module, plus awkward values the UI must survive:
 // unicode and very long names, fractional weights, zero and very large numbers.
 // Deterministic: no randomness, everything derived from the day index.
@@ -158,13 +168,17 @@ func largeDiet(tx *gorm.DB) error {
 }
 
 func largeTracking(tx *gorm.DB) error {
+	owner, err := devUser(tx)
+	if err != nil {
+		return err
+	}
 	ws := make([]weight.BodyWeightLog, 0, LargeDays)
 	ss := make([]steps.StepLog, 0, LargeDays)
 	for back := LargeDays; back >= 0; back-- {
 		// A slow cut, a bulk, and day-to-day noise; deterministic.
 		w := 190 - 12*math.Sin(float64(back)/120) + float64(back%5)*0.3
 		if back%11 != 0 { // gaps: not every day is weighed
-			ws = append(ws, weight.BodyWeightLog{Date: day(back), WeightLbs: math.Round(w*10) / 10})
+			ws = append(ws, weight.BodyWeightLog{Owner: owner, Date: day(back), WeightLbs: math.Round(w*10) / 10})
 		}
 		n := 2000 + (back*7919)%14000
 		if back%97 == 0 {
@@ -173,7 +187,7 @@ func largeTracking(tx *gorm.DB) error {
 		if back%101 == 0 {
 			n = 48000
 		}
-		ss = append(ss, steps.StepLog{Date: day(back), Steps: n})
+		ss = append(ss, steps.StepLog{Owner: owner, Date: day(back), Steps: n})
 	}
 	if err := tx.CreateInBatches(&ws, batch).Error; err != nil {
 		return err
@@ -216,12 +230,26 @@ func largeMedia(tx *gorm.DB) error {
 	return tx.Omit(clause.Associations).CreateInBatches(&saves, batch).Error
 }
 
+// seedOwner is the seeded login's ID: the owner of every owned row the profiles add. The seed
+// runs on the owner role with no request identity, so rows carry their user_id by hand.
+func seedOwner(tx *gorm.DB) (database.Owner, error) {
+	var user authm.User
+	if err := tx.Select("id").Where("username = ?", Username).First(&user).Error; err != nil {
+		return database.Owner{}, fmt.Errorf("seed login %q: %w", Username, err)
+	}
+	return database.Owner{UserID: user.ID}, nil
+}
+
 func largeMoney(tx *gorm.DB) error {
+	own, err := seedOwner(tx)
+	if err != nil {
+		return err
+	}
 	accts := []moneym.Account{
-		{Name: "Everyday Chequing", Kind: moneym.AccountKindChequing, Institution: "Sample Bank", CurrentBalance: 3200},
-		{Name: "Savings", Kind: moneym.AccountKindSavings, Institution: "Sample Bank", CurrentBalance: 12000},
-		{Name: "Brokerage", Kind: moneym.AccountKindInvestment, Institution: "Sample Brokerage", CurrentBalance: 1_250_000.55},
-		{Name: "Overdrawn", Kind: moneym.AccountKindChequing, Institution: "Sample Bank", CurrentBalance: -420.10},
+		{Owner: own, Name: "Everyday Chequing", Kind: moneym.AccountKindChequing, Institution: "Sample Bank", CurrentBalance: 3200},
+		{Owner: own, Name: "Savings", Kind: moneym.AccountKindSavings, Institution: "Sample Bank", CurrentBalance: 12000},
+		{Owner: own, Name: "Brokerage", Kind: moneym.AccountKindInvestment, Institution: "Sample Brokerage", CurrentBalance: 1_250_000.55},
+		{Owner: own, Name: "Overdrawn", Kind: moneym.AccountKindChequing, Institution: "Sample Bank", CurrentBalance: -420.10},
 	}
 	if err := tx.Create(&accts).Error; err != nil {
 		return err
@@ -230,11 +258,11 @@ func largeMoney(tx *gorm.DB) error {
 	var txs []moneym.AccountTransaction
 	for _, a := range accts {
 		for m := 24; m >= 0; m-- {
-			bals = append(bals, moneym.AccountBalance{AccountID: a.ID, Date: EpochDay().AddDate(0, -m, 0), Balance: a.CurrentBalance - float64(m)*137.5})
+			bals = append(bals, moneym.AccountBalance{Owner: own, AccountID: a.ID, Date: EpochDay().AddDate(0, -m, 0), Balance: a.CurrentBalance - float64(m)*137.5})
 		}
 	}
 	for m := 24; m >= 1; m-- {
-		txs = append(txs, moneym.AccountTransaction{AccountID: accts[2].ID, Kind: moneym.TransactionDeposit, Amount: 500, Date: EpochDay().AddDate(0, -m, 0), Note: "Monthly contribution"})
+		txs = append(txs, moneym.AccountTransaction{Owner: own, AccountID: accts[2].ID, Kind: moneym.TransactionDeposit, Amount: 500, Date: EpochDay().AddDate(0, -m, 0), Note: "Monthly contribution"})
 	}
 	if err := tx.CreateInBatches(&bals, batch).Error; err != nil {
 		return err
@@ -243,9 +271,13 @@ func largeMoney(tx *gorm.DB) error {
 }
 
 func largeGrocery(tx *gorm.DB) error {
+	owner, err := devUser(tx)
+	if err != nil {
+		return err
+	}
 	items := make([]grocery.GroceryItem, 0, 150)
 	for i := 0; i < 150; i++ {
-		it := grocery.GroceryItem{Name: fmt.Sprintf("Item %03d", i)}
+		it := grocery.GroceryItem{Owner: owner, Name: fmt.Sprintf("Item %03d", i)}
 		if i%3 != 0 { // most are history (completed), which feeds suggestions
 			t := day(i % 60)
 			it.CompletedAt = &t
