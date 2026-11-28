@@ -185,19 +185,25 @@ docker compose -f docker-compose.vps.yml --env-file .env.vps config >/dev/null &
 
 `config` must succeed (it fails on a missing `APP_DB_PASSWORD`). Don't `up` anything by hand.
 
-D1 takes BACKLOG #16: `app-network` is pinned to 172.18.0.0/16 with gateway 172.18.0.1 (what
-`TRUSTED_PROXIES` already says). Before the deploy, check the live network matches:
+BACKLOG #16 (pin `app-network` to 172.18.0.0/16, gateway 172.18.0.1, what `TRUSTED_PROXIES`
+says) is **done on prod** (2026-11-28), but not as part of a deploy. Lesson: the deploy's
+`pre_swap` runs `docker compose run`, which on the VPS's compose version tries to recreate a
+network whose config changed while the live containers are still attached, and Docker refuses
+(`network has active endpoints`); the deploy fails safely and changes nothing. So a network
+config change must be applied by hand first, with the stack briefly down (about 2 minutes):
 
-```sh
-docker network inspect simple-track_app-network --format '{{range .IPAM.Config}}{{.Subnet}} {{.Gateway}}{{end}}'
-```
-
-Expect `172.18.0.0/16 172.18.0.1`. If it differs, fix `TRUSTED_PROXIES` in `.env.vps` to the pinned
-gateway (or change the pin to the live values) before deploying. Compose sees the new `ipam`
-config as a change and recreates the network, which needs its containers stopped: that happens
-inside the deploy window as the stack is recreated. After the deploy, re-run the command above and
-`docker inspect simple-track-backend-1 | grep TRUSTED`, then log in once and look at a
-`login_failed` / auth event to confirm client IPs aren't all the gateway's.
+1. Fresh dump to `~/backups`; note the running image digests
+   (`docker inspect simple-track-backend-1 --format '{{.Config.Image}}'`, same for frontend).
+2. Install the new `docker-compose.vps.yml`, then with `BACKEND_IMAGE` / `FRONTEND_IMAGE` exported
+   to those digests (the file's default is `:latest`): `docker compose -f docker-compose.vps.yml
+   --env-file .env.vps up -d`.
+3. Postgres is restarted onto the new network **without its `postgres` DNS alias**, so the backend
+   fails with `lookup postgres ... server misbehaving`. Fix: `up -d --force-recreate postgres`
+   (data is in the `simple-track_postgres_data` volume), then `up -d` again.
+4. Check the subnet (`docker network inspect simple-track_app-network --format
+   '{{range .IPAM.Config}}{{.Subnet}} {{.Gateway}}{{end}}'`), `docker inspect
+   simple-track-backend-1 | grep TRUSTED`, and that a login attempt's `auth_events.client_ip` is
+   your own address, not the gateway's.
 
 ### 3.3 Deploy
 
