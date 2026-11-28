@@ -134,7 +134,9 @@ func TestMoney_someoneElsesAccountIsNotFound(t *testing.T) {
 		}).Status(t, http.StatusBadRequest)
 	}
 	// (The message names the requested ID, so mask it before comparing.)
-	mask := func(r *twousers.Response, id uint) string { return strings.ReplaceAll(string(r.Body), fmt.Sprint(id), "N") }
+	mask := func(r *twousers.Response, id uint) string {
+		return strings.ReplaceAll(string(r.Body), fmt.Sprint(id), "N")
+	}
 	if a, m := mask(bulk(acct.ID), acct.ID), mask(bulk(missing), missing); a != m {
 		t.Fatalf("Alice's account answers %s, a missing one %s: must be the same", a, m)
 	}

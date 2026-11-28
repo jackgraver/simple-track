@@ -15,6 +15,7 @@ import (
 	"be-simpletracker/internal/utils/apierr"
 
 	"github.com/gin-gonic/gin"
+	"github.com/jackc/pgx/v5/pgconn"
 )
 
 type Handler struct{}
@@ -488,9 +489,17 @@ func respondError(c *gin.Context, err error) {
 		apierr.BadRequest(c, validation.Message)
 	case errors.Is(err, service.ErrForbidden):
 		apierr.Forbidden(c, "not allowed")
+	case isUniqueViolation(err):
+		// Two requests adding the same shared type (or first room row) at once: the loser retries.
+		apierr.Conflict(c, "already exists, reload and try again")
 	default:
 		apierr.NotFoundOrInternal(c, err)
 	}
+}
+
+func isUniqueViolation(err error) bool {
+	var pgErr *pgconn.PgError
+	return errors.As(err, &pgErr) && pgErr.Code == "23505"
 }
 
 func (h *Handler) currentUserBirthYear(c *gin.Context) (*int, bool) {

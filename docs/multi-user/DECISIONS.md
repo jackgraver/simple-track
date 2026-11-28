@@ -678,3 +678,12 @@ e2e `large` profile give the seeded accounts to the dev login (`seedOwner`). The
 click-through was not possible in this session (the shared Playwright browser was busy); the
 e2e finances specs and a before/after API comparison across `migrate down 1` + `up` (net worth,
 accounts, types and room unchanged) stand in for it.
+
+**Review (/code-review high, scoped to this lane) and what was deferred**: nothing important. Fixed:
+a unique-index race on shared types or first room rows now answers 409, not 500. Deferred, for the
+owner: (1) the creator can add a limit but only the admin can remove one (a typo'd year stays
+until the admin removes it; deletes are low priority per the owner); (2) deleting a type cascades
+away other users' room rows (the admin can't count them through RLS); (3) the dialog saves rules
+then room as two requests, so a room validation error after rules saved shows "Failed to save"
+though the rules persisted; (4) `created_by` (a user ID) is visible on catalog types, as the kit
+specifies; (5) migration 0013's down is lossy with several users.

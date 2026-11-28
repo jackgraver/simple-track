@@ -161,6 +161,8 @@ CREATE POLICY owner ON public.investment_deposits
   WITH CHECK (user_id = public.app_user_id());
 
 -- migrate:down
+-- Only lossless while the admin is the only user with room figures: with several users the
+-- lowest user ID's row per type wins and the rest are dropped (dev and the D1 rehearsal only).
 DROP POLICY owner ON public.investment_deposits;
 ALTER TABLE public.investment_deposits DISABLE ROW LEVEL SECURITY;
 DROP INDEX public.idx_investment_deposits_user_account;
