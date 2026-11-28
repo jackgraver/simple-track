@@ -21,9 +21,14 @@ import {
 // amounts, and the sessionStorage draft. Logging navigates back to /diet, so every write is verified
 // there after a reload. Amounts are in servings: 100 g of Chicken Breast is 1 serving (165 kcal).
 
-const DRAFT_KEY = 'simpletracker:diet:logmeal-draft:v2:log';
+// Per-user since S2: `st:u:<user id>:diet:logmeal-draft:v2:log` (frontend/src/utils/userStorage.ts).
+const DRAFT_KEY_SUFFIX = ':diet:logmeal-draft:v2:log';
 
-const draftInStorage = (page: Page) => page.evaluate((key) => sessionStorage.getItem(key), DRAFT_KEY);
+const draftInStorage = (page: Page) =>
+  page.evaluate((suffix) => {
+    const key = Object.keys(sessionStorage).find((k) => k.startsWith('st:u:') && k.endsWith(suffix));
+    return key ? sessionStorage.getItem(key) : null;
+  }, DRAFT_KEY_SUFFIX);
 
 test.describe('diet: log meal', { tag: ['@diet'] }, () => {
   test('log a catalogue meal: right kcal on /diet after a reload', async ({ page, api }) => {
