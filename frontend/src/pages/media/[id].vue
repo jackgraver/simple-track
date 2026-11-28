@@ -235,6 +235,7 @@ function toForm(item: MediaItem) {
         external_id: item.external_id,
     });
     coverOk.value = true;
+    catalogBaseline = JSON.stringify(catalogPayload());
 }
 
 function intOrNull(v: NumberField) {
@@ -255,6 +256,17 @@ function catalogPayload(): MediaCatalogInput {
         source: form.source,
         external_id: form.external_id,
     };
+}
+
+// What the catalog fields held when the form was filled from the server. Saving sends only the ones
+// that changed: a rating edit must never rewrite the shared entry (and a cover the API hid would
+// otherwise be blanked for everyone).
+let catalogBaseline = "{}";
+function changedCatalogFields(): MediaCatalogInput {
+    const before = JSON.parse(catalogBaseline) as Record<string, unknown>;
+    return Object.fromEntries(
+        Object.entries(catalogPayload()).filter(([key, value]) => before[key] !== value),
+    ) as MediaCatalogInput;
 }
 
 function personalPayload(): MediaPersonalInput {
@@ -299,8 +311,9 @@ async function save() {
             toForm(item);
         } else {
             const current = itemQuery.data.value;
-            if (canEditCatalog.value && current) {
-                await updateCatalogMut.mutateAsync({ id: current.media_item_id, payload: catalogPayload() });
+            const changed = changedCatalogFields();
+            if (canEditCatalog.value && current && Object.keys(changed).length) {
+                await updateCatalogMut.mutateAsync({ id: current.media_item_id, payload: changed });
             }
             await updateMut.mutateAsync({ id: itemId.value, payload: personalPayload() });
             toast.push("Saved", "success");

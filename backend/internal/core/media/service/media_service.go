@@ -249,7 +249,9 @@ func UpdateMedia(ctx context.Context, id uint, in PersonalInput, now time.Time) 
 	if err := applyPersonal(&save, item, in, now); err != nil {
 		return nil, err
 	}
-	if err := database.Affected(db.Scopes(database.Owned(ctx)).Omit(clause.Associations).Save(&save)); err != nil {
+	if err := database.Affected(db.Scopes(database.Owned(ctx)).Model(&models.UserMedia{}).Where("id = ?", save.ID).
+		Select("Status", "Rating", "Review", "Favorite", "Progress", "StartedAt", "FinishedAt", "TimesConsumed").
+		Updates(&save)); err != nil {
 		return nil, err
 	}
 	return GetMedia(ctx, id)
@@ -413,7 +415,9 @@ func UpdateCatalog(ctx context.Context, id uint, in CatalogInput) (*CatalogEntry
 			return nil, invalid("another catalog entry already has that source and external_id")
 		}
 	}
-	if err := database.Affected(db.Omit(clause.Associations).Save(item)); err != nil {
+	if err := database.Affected(db.Model(&models.MediaItem{}).Where("id = ?", item.ID).
+		Select("Type", "Title", "Author", "ReleaseYear", "Genres", "CoverURL", "Synopsis", "Length", "Source", "ExternalID").
+		Updates(item)); err != nil {
 		return nil, err
 	}
 	e := catalogEntry(ctx, *item)
@@ -450,7 +454,14 @@ func applyCatalog(item *models.MediaItem, in CatalogInput) error {
 	setString(&item.ExternalID, in.ExternalID)
 	setPtr(&item.ReleaseYear, in.ReleaseYear)
 	setPtr(&item.Length, in.Length)
-	return validateCatalog(item)
+	if err := validateCatalog(item); err != nil {
+		return err
+	}
+	// Only judged when the caller sets one of them, so a legacy row with half a pair stays editable.
+	if (in.Source.Set || in.ExternalID.Set) && (item.Source == "") != (item.ExternalID == "") {
+		return invalid("source and external_id go together")
+	}
+	return nil
 }
 
 func validateCatalog(item *models.MediaItem) error {
@@ -468,9 +479,6 @@ func validateCatalog(item *models.MediaItem) error {
 	}
 	if len(item.Source) > 32 || len(item.ExternalID) > 64 {
 		return invalid("source/external_id too long")
-	}
-	if (item.Source == "") != (item.ExternalID == "") {
-		return invalid("source and external_id go together")
 	}
 	return nil
 }

@@ -3,6 +3,7 @@ package controller
 import (
 	"be-simpletracker/internal/clock"
 	"errors"
+	"io"
 	"log"
 	"net/http"
 	"strconv"
@@ -176,7 +177,7 @@ func (h *MediaHandler) catalogSave(c *gin.Context) {
 	}
 	var body service.PersonalInput
 	if c.Request.ContentLength != 0 {
-		if err := c.ShouldBindJSON(&body); err != nil {
+		if err := c.ShouldBindJSON(&body); err != nil && !errors.Is(err, io.EOF) { // EOF: empty chunked body
 			apierr.BadRequest(c, "invalid request body")
 			return
 		}

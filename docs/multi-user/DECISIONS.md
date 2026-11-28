@@ -685,3 +685,16 @@ skipping it.
   the media files' allowlist entries are gone from the rules tests.
 - **Seeds**: devseed creates the catalog entries and the dev login's saves; the e2e `large` seed
   does the same for the `dev` user (the base e2e seed has no media).
+- **Known limits (from the C5 review)**:
+  - *First writer wins on an external ID.* A signed-in user can add a catalog row for a
+    `(source, external_id)` with wrong metadata; later people adding that title reuse it and only
+    its creator or an admin can fix it. Family-only accounts make this acceptable for now. If it
+    bites: fill the metadata server-side from `lookup.Details` when a source is given, and add an
+    admin UI for the catalog delete (API only today).
+  - *Legacy covers are hidden, not cleaned.* A stored cover outside the allowlist stays in the
+    database but is blanked in responses (ROLLOUT pre-check 1.8 lists them). The edit form only
+    sends catalog fields the user changed, so rating an item never wipes the hidden cover.
+  - Updates use explicit column lists (`Select(...).Updates` + `database.Affected`), not `Save`,
+    because gorm's `Save` falls back to an upsert when a concurrent soft delete leaves 0 rows.
+  - A legacy row with half a `(source, external_id)` pair stays editable; the "go together" rule
+    only applies when an edit sets one of them.

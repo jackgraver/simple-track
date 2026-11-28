@@ -283,3 +283,26 @@ func TestMedia_rlsBackstop(t *testing.T) {
 		t.Fatalf("app role without app.user_id sees %d saves (%v)", n, err)
 	}
 }
+
+// A row from before the catalog split can have half a (source, external_id) pair; editing it
+// must keep working, and an edit must bump updated_at and write NULLs (cleared rating).
+func TestMedia_legacyHalfPairStaysEditable(t *testing.T) {
+	h, api := mediaAPI(t)
+	a := save(t, api, h.Alice, map[string]any{"type": "movie", "title": "Old", "rating": 3}, http.StatusCreated)
+	if err := h.Owner.Exec("UPDATE media_items SET source = 'tmdb' WHERE id = ?", a.MediaItemID).Error; err != nil {
+		t.Fatal(err)
+	}
+	path := fmt.Sprintf("/media/catalog/%d", a.MediaItemID)
+	api.Do(h.Alice, http.MethodPatch, path, map[string]any{"title": "Older"}).Status(t, http.StatusOK)
+	api.Do(h.Alice, http.MethodPatch, path, map[string]any{"external_id": ""}).Status(t, http.StatusBadRequest)
+	api.Do(h.Alice, http.MethodPatch, fmt.Sprintf("/media/%d", a.ID), map[string]any{"rating": nil}).Status(t, http.StatusOK)
+	got := list(t, api, h.Alice)
+	if len(got) != 1 || got[0].Title != "Older" || got[0].Rating != nil {
+		t.Fatalf("after edits: %+v", got)
+	}
+	var bumped bool
+	h.Owner.Raw("SELECT updated_at > created_at FROM user_media WHERE id = ?", a.ID).Scan(&bumped)
+	if !bumped {
+		t.Fatal("updated_at not bumped by a personal edit")
+	}
+}
